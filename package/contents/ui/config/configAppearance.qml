@@ -1,0 +1,146 @@
+/*
+ *  SPDX-FileCopyrightText: 2022-2023 Yuri Saurov <dr@i-glu4it.ru>
+ *
+ *  SPDX-License-Identifier: LGPL-2.0-or-later
+ */
+
+import QtQuick
+import QtQuick.Controls as QQC2
+import QtQuick.Layouts
+import org.kde.plasma.core as PlasmaCore
+import org.kde.kirigami as Kirigami
+import org.kde.plasma.plasmoid
+import org.kde.kcmutils as KCM
+
+KCM.SimpleKCM {
+    id: root
+    property alias cfg_lastplay: middleLastPlay.checked
+    property alias cfg_speedfactor: slider.speedFactor
+    property alias cfg_defaultVolume: volumeSlider.value
+    property alias cfg_fadeEnabled: fadeCheck.checked
+    property alias cfg_fadeDuration: fadeDurationSpin.value
+    property alias cfg_albumArtEnabled: albumArtCheck.checked
+    property alias cfg_blurBackdrop: blurCheck.checked
+    property alias cfg_mprisEnabled: mprisCheck.checked
+
+    Kirigami.FormLayout {
+        Item {
+            Kirigami.FormData.label: i18n("Audio")
+            Kirigami.FormData.isSection: true
+        }
+
+        ColumnLayout {
+            Kirigami.FormData.label: i18n("Default volume:")
+            Kirigami.FormData.buddyFor: volumeSlider
+
+            QQC2.Slider {
+                id: volumeSlider
+                Layout.fillWidth: true
+                from: 0
+                to: 100
+                stepSize: 1
+                snapMode: QQC2.Slider.SnapAlways
+            }
+            QQC2.Label {
+                text: Math.round(volumeSlider.value) + "%"
+                opacity: 0.7
+            }
+        }
+
+        QQC2.CheckBox {
+            id: fadeCheck
+            Kirigami.FormData.label: i18n("Smooth fade:")
+            text: i18n("Fade volume when changing stations")
+        }
+
+        QQC2.SpinBox {
+            id: fadeDurationSpin
+            Kirigami.FormData.label: i18n("Fade duration (ms):")
+            from: 0
+            to: 2000
+            stepSize: 50
+            enabled: fadeCheck.checked
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+        }
+
+        Item {
+            Kirigami.FormData.label: i18n("Visuals")
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: albumArtCheck
+            Kirigami.FormData.label: i18n("Album art:")
+            text: i18n("Look up cover art via iTunes")
+        }
+
+        QQC2.CheckBox {
+            id: blurCheck
+            Kirigami.FormData.label: i18n("Backdrop:")
+            text: i18n("Blurred album art behind now playing")
+            enabled: albumArtCheck.checked
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+        }
+
+        Item {
+            Kirigami.FormData.label: i18n("Integration")
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: mprisCheck
+            Kirigami.FormData.label: i18n("System integration:")
+            text: i18n("Allow control via media keys (MPRIS)")
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+        }
+
+        Item {
+            Kirigami.FormData.label: i18n("Behavior")
+            Kirigami.FormData.isSection: true
+        }
+
+        ColumnLayout {
+            Kirigami.FormData.label: i18n("Marquee speed:")
+            Kirigami.FormData.buddyFor: slider
+
+            QQC2.Slider {
+                id: slider
+                property double speedFactor
+                Layout.fillWidth: true
+                from: -1.5
+                to: 1.5
+                stepSize: 0.25
+                snapMode: QQC2.Slider.SnapAlways
+                value: -(Math.log(speedFactor) / Math.log(2))
+                onMoved: {
+                    speedFactor = 1.0 / Math.pow(2, value)
+                }
+            }
+
+            RowLayout {
+                QQC2.Label { text: i18n("Slower") }
+                Item { Layout.fillWidth: true }
+                QQC2.Label { text: i18n("Faster") }
+            }
+        }
+
+        QQC2.CheckBox {
+            id: middleLastPlay
+            Kirigami.FormData.label: i18n("Panel click:")
+            text: i18n("Middle click to toggle last station")
+            enabled: plasmoid.formFactor !== PlasmaCore.Types.Planar
+
+            QQC2.ToolTip.visible: hovered
+            QQC2.ToolTip.text: i18n("Use middle click for play last playing station")
+        }
+    }
+}
