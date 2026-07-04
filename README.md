@@ -33,7 +33,7 @@ Optional (features degrade gracefully without them):
 
 ## Install
 
-**From KDE Store (recommended):** right-click your desktop or panel → *Add Widgets* → *Get New Widgets* → search **On Air**.
+**From KDE Store (recommended):** right-click your desktop or panel → *Add Widgets* → *Get New Widgets* → search **On Air**, or get it from the [KDE Store page](https://store.kde.org/p/2364623).
 
 **Manual:**
 ```bash
