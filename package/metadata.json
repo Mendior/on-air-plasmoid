@@ -1,0 +1,34 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "Egon.greenberg@gmail.com",
+                "Name": "Egon Greenberg (2026 edition: new UI, bug fixes, MPRIS/metadata engine, downloads)"
+            },
+            {
+                "Email": "dr@i-glu4it.ru",
+                "Name": "Yuri Saurov (original: Advanced Radio Player)"
+            }
+        ],
+        "BugReportUrl": "https://github.com/Mendior/on-air-plasmoid/issues",
+        "Category": "Multimedia",
+        "Description": "Beautiful internet radio for your panel — worldwide station search, one-click track downloads, offline library, MPRIS media keys, sleep timer and live track info.",
+        "EnabledByDefault": true,
+        "FormFactors": [
+            "tablet",
+            "handset",
+            "desktop"
+        ],
+        "Icon": "radio",
+        "Id": "io.github.mendior.onair",
+        "License": "LGPL-2.0+",
+        "Name": "On Air",
+        "Website": "https://github.com/Mendior/on-air-plasmoid",
+        "Version": "2026.1"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multimedia"
+    ]
+}
