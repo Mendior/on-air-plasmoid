@@ -1,5 +1,7 @@
 *.plasmoid
 __pycache__/
-# Kohalik agendi-seadistus (ei kuulu avalikku reposse)
+# Local agent/working notes — not part of the public repo
 CLAUDE.md
 .claude/
+STORE-TEKSTID.md
+FOORUMI-POSTITUS.md
