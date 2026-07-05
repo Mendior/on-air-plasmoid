@@ -13,6 +13,11 @@ The recording release — plus 24 bug fixes from a second deep audit.
 - Safety by design: one recording at a time, a hard duration cap (Settings → Recording, default 3 h) so a forgotten recording can never fill the disk, and orphan cleanup after a Plasma crash.
 - *Recordings are for personal use only — do not redistribute them.* The feature does not circumvent any copy protection (plain public HTTP/ICY streams).
 
+### Fixed — station logos now load reliably
+- Station logos are downloaded **once** into a persistent disk cache (`~/.cache/onair-favicons/`) and always shown from there — instant after every Plasma restart, offline included. Previously they lived only in process memory and re-downloaded (or silently failed) on every restart.
+- Downloads use a full browser User-Agent — some hosts rejected Qt's bare default UA with 403, so those logos never appeared at all.
+- Failed downloads are retried (once per day, and whenever the network comes back up — the post-login race was the main reason logos "sometimes" vanished); every cached file is validated as a real image, and a corrupted cache entry self-heals by falling back to the remote URL.
+
 ### Fixed — playback & engine
 - A delayed auto-bitrate lookup could hijack a just-started local file (or a removed station's neighbour) and restart the radio — all direct-start paths now invalidate in-flight lookups.
 - Stop is now truly final: a pending bitrate-fallback can no longer restart playback ~0.6 s after an explicit stop.

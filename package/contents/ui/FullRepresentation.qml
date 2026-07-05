@@ -36,7 +36,7 @@ PlasmaExtras.Representation {
     readonly property string _bestArtUrl: {
         if (root.albumArtUrl) return root.albumArtUrl
         if (root.imageurl) return root.imageurl
-        if (root.currentStationFavicon) return root.currentStationFavicon
+        if (root.currentStationFavicon) return root.faviconSrc(root.currentStationFavicon)
         return ""
     }
 
@@ -784,11 +784,19 @@ PlasmaExtras.Representation {
                             clip: true
                             Image {
                                 anchors.fill: parent
-                                source: root.currentStationFavicon || ""
+                                // Disk-cached copy when available
+                                source: root.faviconSrc(root.currentStationFavicon)
                                 fillMode: Image.PreserveAspectCrop
                                 asynchronous: true
                                 smooth: true
                                 visible: status === Image.Ready
+                                // Self-healing: corrupted cache → retry remote once
+                                onStatusChanged: {
+                                    if (status === Image.Error && root.currentStationFavicon
+                                        && source.toString().indexOf("file://") === 0) {
+                                        source = root.currentStationFavicon
+                                    }
+                                }
                                 layer.enabled: true
                                 layer.effect: MultiEffect {
                                     maskEnabled: true

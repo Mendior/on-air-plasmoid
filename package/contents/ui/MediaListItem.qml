@@ -117,11 +117,20 @@ PlasmaComponents3.ItemDelegate {
                     id: faviconImage
                     anchors.fill: parent
                     anchors.margins: 1
-                    source: model.favicon || ""
+                    // Disk-cached copy when available (instant, offline-proof)
+                    source: root.faviconSrc(model.favicon)
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     smooth: true
                     visible: status === Image.Ready && !listItem.hovered && !listItem.isCurrent
+                    // Self-healing: a corrupted cache file must not kill the
+                    // logo forever — fall back to the remote URL once.
+                    onStatusChanged: {
+                        if (status === Image.Error && model.favicon
+                            && source.toString().indexOf("file://") === 0) {
+                            source = model.favicon
+                        }
+                    }
                 }
 
                 PlasmaComponents3.Label {
