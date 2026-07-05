@@ -1,1 +1,5 @@
 *.plasmoid
+__pycache__/
+# Kohalik agendi-seadistus (ei kuulu avalikku reposse)
+CLAUDE.md
+.claude/

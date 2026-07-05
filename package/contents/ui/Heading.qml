@@ -1,5 +1,6 @@
 /*
  *  SPDX-FileCopyrightText: 2022-2023 Yuri Saurov <dr@i-glu4it.ru>
+ *  SPDX-FileCopyrightText: 2026 Egon Greenberg
  *
  *  SPDX-License-Identifier: LGPL-2.0-or-later
  */
@@ -47,6 +48,8 @@ RowLayout {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             text: headingRoot.primaryText
+            // Untrusted (station name / ICY title) — never interpret as HTML
+            textFormat: Text.PlainText
             font.weight: Font.Bold
             font.pointSize: Kirigami.Theme.defaultFont.pointSize + 4
             font.letterSpacing: 0.4
@@ -86,6 +89,8 @@ RowLayout {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             text: headingRoot.secondaryText
+            // Untrusted (ICY title) — never interpret as HTML
+            textFormat: Text.PlainText
             visible: text !== ""
             opacity: 0.85
             font.italic: true

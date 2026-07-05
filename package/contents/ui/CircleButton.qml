@@ -39,8 +39,13 @@ Item {
     Accessible.name: tooltipText
     Accessible.description: tooltipText
     Accessible.checkable: circleRoot.checkable
-    Accessible.checked: circleRoot.checked
+    // Only expose checked for real toggles — some momentary buttons reuse the
+    // checked *visual* (e.g. armed delete confirmation) without checkbox semantics.
+    Accessible.checked: circleRoot.checkable && circleRoot.checked
     Accessible.onPressAction: if (enabledState) { rippleAnim.restart(); circleRoot.clicked() }
+    // CheckBox role's default AT action is Toggle; without this handler Qt would
+    // flip the checked property directly (breaking the binding) instead of clicking.
+    Accessible.onToggleAction: if (enabledState) { rippleAnim.restart(); circleRoot.clicked() }
     activeFocusOnTab: enabledState
     Keys.onPressed: (event) => {
         if (!enabledState) return

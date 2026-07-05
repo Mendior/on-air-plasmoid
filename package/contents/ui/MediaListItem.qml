@@ -193,6 +193,8 @@ PlasmaComponents3.ItemDelegate {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
                     text: model.name
+                    // Untrusted (station name) — never interpret as HTML
+                    textFormat: Text.PlainText
                     font.weight: listItem.isCurrent && listItem.isBuffered ? Font.DemiBold : Font.Normal
                     color: listItem.isCurrent && listItem.isBuffered
                            ? root.accentBright
@@ -234,7 +236,8 @@ PlasmaComponents3.ItemDelegate {
             Layout.alignment: Qt.AlignVCenter
             iconName: "edit-delete"
             iconScale: 0.55
-            checkable: true
+            // Not checkable: two-step confirm button; armed is a visual state,
+            // not checkbox semantics.
             checked: armed
             checkedColor: "#E0463C"
             checkedIconColor: "#FFFFFF"
@@ -249,7 +252,7 @@ PlasmaComponents3.ItemDelegate {
                     disarmTimer.restart()
                 } else {
                     armed = false
-                    root.removeStation(model.hostname)
+                    root.removeStation(index, model.name, model.hostname)
                 }
             }
 

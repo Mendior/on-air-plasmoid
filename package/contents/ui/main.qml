@@ -72,6 +72,14 @@ PlasmoidItem {
     property string _dlCurrentQuery: ""
     readonly property string downloadDirPath: {
         var conf = (Plasmoid.configuration.downloadDir || "").trim();
+        // Expand a leading tilde (the settings placeholder itself suggests
+        // "~/Music/..."), otherwise downloads land in a literal "~" directory
+        // and the My Music page stays empty.
+        if (conf === "~" || conf.indexOf("~/") === 0) {
+            var h = Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation).toString();
+            var home = h.indexOf("file://") === 0 ? h.substring(7) : "";
+            conf = home + conf.substring(1);
+        }
         if (conf !== "") return conf;
         var loc = Labs.StandardPaths.writableLocation(Labs.StandardPaths.MusicLocation).toString();
         var base = loc.indexOf("file://") === 0 && loc.length > 7 ? loc.substring(7) : (_mprisRunDir + "/Music");
@@ -150,24 +158,47 @@ PlasmoidItem {
         Plasmoid.configuration.favorites = JSON.stringify(list);
     }
 
+    // hostname → name from the PREVIOUS load; lets a rename in settings migrate
+    // the favorite instead of the name-based prune silently dropping it.
+    property var _stationNameByHost: ({})
+
     function reloadStationsModel() {
         playMusic.stop();
         stationsModel.clear();
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             const allNames = [];
+            const nameByHost = {};
             for (const server of servers) {
                 allNames.push(server.name || "");
+                nameByHost[(server.hostname || "").toString()] = server.name || "";
                 if (server.active)
                     stationsModel.append(server);
             }
+            // Favorites are name-based (deliberate). If a favorite's name is
+            // gone but its previous hostname still exists under a new name,
+            // this was a rename — follow it instead of losing the favorite.
+            const oldHostByName = {};
+            for (const h in _stationNameByHost) oldHostByName[_stationNameByHost[h]] = h;
+            var favs = favoriteNames.slice();
+            var migrated = false;
+            for (var fi = 0; fi < favs.length; fi++) {
+                if (allNames.indexOf(favs[fi]) !== -1) continue;
+                const oldHost = oldHostByName[favs[fi]];
+                const newName = oldHost !== undefined ? nameByHost[oldHost] : undefined;
+                if (newName !== undefined && newName !== "" && favs.indexOf(newName) === -1) {
+                    favs[fi] = newName;
+                    migrated = true;
+                }
+            }
             // Prune dead favorites — the station has been truly deleted from the list
             // (an inactive station stays a favorite).
-            const pruned = favoriteNames.filter(n => allNames.indexOf(n) !== -1);
-            if (pruned.length !== favoriteNames.length) {
+            const pruned = favs.filter(n => allNames.indexOf(n) !== -1);
+            if (migrated || pruned.length !== favoriteNames.length) {
                 favoriteNames = pruned;
                 Plasmoid.configuration.favorites = JSON.stringify(pruned);
             }
+            _stationNameByHost = nameByHost;
         } catch (e) {
             console.log(e);
         }
@@ -302,7 +333,10 @@ PlasmoidItem {
         // Check for yt-dlp BEFORE running and emit a clear sentinel if it is
         // missing — otherwise the user would see a confusing "Unknown error" (the
         // exit-127 stderr does not contain the word "ERROR" that the filter below looks for).
-        executable.exec("if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
+        // ": DL_YTDLP;" is a no-op sentinel PREFIX for the onExited dispatcher —
+        // matching on a substring like "yt-dlp" would also match commands whose
+        // text embeds an untrusted ICY title (same pattern as ": AI_CLEAN;").
+        executable.exec(": DL_YTDLP; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
                         + "mkdir -p '" + safeDir + "' && yt-dlp --no-playlist " + fmtArgs
                         + " -o '" + safeDir + "/%(title)s.%(ext)s' 'ytsearch1:" + safeQuery + "'");
     }
@@ -355,6 +389,246 @@ PlasmoidItem {
 
     ListModel { id: historyModel }
 
+    // ── Recording (REC) — stream capture with ffmpeg ─────────────────────────
+    // A SECOND ffmpeg connection records the raw stream bit-exactly (-c copy,
+    // no re-encoding — same "best quality" principle as downloads). One
+    // recording at a time; personal use only (see README). Two kinds:
+    //   • instant: follows playback — switching station / stopping stops it;
+    //   • scheduled: independent of playback (records without playing).
+
+    property bool recording: false
+    // Whether the current recording was started by the scheduler
+    property bool _recScheduled: false
+    property string _recUrl: ""
+    property string _recStationName: ""
+    property string _recFilePath: ""
+    property string _recTracksPath: ""
+    property int recElapsedSec: 0
+    // Same stable-id pattern as the MPRIS files: two widget instances must
+    // never kill each other's recording via a shared pid file.
+    readonly property string _recPidFile: _mprisRunDir + "/arp-rec-" + _mprisId + ".pid"
+    property var recSchedules: []
+
+    function _pad2(n) { return ("0" + n).slice(-2); }
+
+    function recElapsedText() {
+        var h = Math.floor(recElapsedSec / 3600);
+        var m = Math.floor((recElapsedSec % 3600) / 60);
+        var s = recElapsedSec % 60;
+        return (h > 0 ? h + ":" + _pad2(m) : m) + ":" + _pad2(s);
+    }
+
+    // Station names come from an external catalogue — make them file-name safe
+    // (and quote-free, so they are also shell-safe after the dir escaping).
+    function _recSanitizeName(name) {
+        var s = (name || "").replace(/[\/\\:*?"<>|'\t\r\n]/g, "-").replace(/\s+/g, " ").trim();
+        if (s.length > 60) s = s.substring(0, 60).trim();
+        return s || "Radio";
+    }
+
+    // HLS/playlist wrappers don't survive a plain "-c copy"; local files and
+    // empty URLs can't be recorded at all.
+    function canRecordUrl(url) {
+        var s = (url || "").toString();
+        if (s === "" || s.indexOf("file://") === 0) return false;
+        var fmt = _streamFormat(s);
+        return fmt !== "hls" && fmt !== "playlist";
+    }
+
+    // REC button: record what is playing right now.
+    function recStartCurrent() {
+        if (recording || !isPlaying()) return;
+        var url = playMusic.source.toString();
+        if (!canRecordUrl(url)) return;
+        var maxMin = Math.max(1, Plasmoid.configuration.recordMaxMinutes || 180);
+        _recStart(root.currentStation, url, maxMin * 60, false);
+    }
+
+    function recStop() {
+        if (!recording) return;
+        var safePid = _recPidFile.replace(/'/g, "'\\''");
+        // SIGINT (not KILL) lets ffmpeg finish the container properly.
+        executable.exec(": REC_STOP; [ -f '" + safePid + "' ] && kill -INT $(cat '" + safePid + "') 2>/dev/null; true");
+    }
+
+    function _recStart(stationName, url, durationSec, scheduled) {
+        if (recording) return;
+        // Format choice. "original" (-c copy) is the professional default: the
+        // stream is already lossy-compressed, so a bit-exact copy is the best
+        // quality that exists. MP3 re-encodes for maximum device compatibility
+        // (high-quality VBR); WAV decodes to uncompressed PCM — huge files,
+        // NO quality gain over the stream, offered for editing workflows only.
+        var recFmt = (Plasmoid.configuration.recordFormat || "original").toLowerCase();
+        var codecArgs, ext;
+        if (recFmt === "mp3" && _streamFormat(url) !== "mp3") {
+            codecArgs = "-c:a libmp3lame -q:a 0";
+            ext = "mp3";
+        } else if (recFmt === "wav") {
+            codecArgs = "-c:a pcm_s16le";
+            ext = "wav";
+        } else {
+            // "original" — and also "mp3" when the stream already IS mp3
+            // (an mp3→mp3 re-encode would only lose quality).
+            codecArgs = "-c copy";
+            var extMap = { "mp3": "mp3", "aac": "aac", "ogg": "ogg", "opus": "opus", "flac": "flac" };
+            ext = extMap[_streamFormat(url)] || "mka";
+        }
+        var d = new Date();
+        var stamp = d.getFullYear() + "-" + _pad2(d.getMonth() + 1) + "-" + _pad2(d.getDate())
+                    + " " + _pad2(d.getHours()) + "." + _pad2(d.getMinutes()) + "." + _pad2(d.getSeconds());
+        var cleanName = _recSanitizeName(stationName);
+        var base = "REC " + cleanName + " " + stamp;
+        recording = true;
+        _recScheduled = scheduled;
+        recElapsedSec = 0;
+        _recUrl = url;
+        _recStationName = cleanName;
+        _recFilePath = downloadDirPath + "/" + base + "." + ext;
+        _recTracksPath = downloadDirPath + "/" + base + ".tracks.txt";
+        var safeDir = downloadDirPath.replace(/'/g, "'\\''");
+        var safeOut = _recFilePath.replace(/'/g, "'\\''");
+        var safeTracks = _recTracksPath.replace(/'/g, "'\\''");
+        var safeUrl = url.replace(/'/g, "'\\''");
+        var safePid = _recPidFile.replace(/'/g, "'\\''");
+        // ffmpeg runs as a CHILD (&, wait) — the pid file holds ffmpeg's own
+        // pid for SIGINT, the wrapper cleans up and reports via sentinels, and
+        // the attached process gives us a free completion event in onExited.
+        // "-t" is a hard duration cap: even an orphaned recording can never
+        // fill the disk. The VLC user agent matches reader.py (some stations
+        // block ffmpeg's default UA).
+        executable.exec(": REC_START; if ! command -v ffmpeg >/dev/null 2>&1; then echo __NO_FFMPEG__; exit 0; fi; "
+            + "mkdir -p '" + safeDir + "' || { echo __REC_EMPTY__; exit 0; }; "
+            + "ffmpeg -hide_banner -nostdin -loglevel error"
+            + " -user_agent 'VLC/3.0.20 LibVLC/3.0.20'"
+            + " -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10"
+            + " -i '" + safeUrl + "' " + codecArgs + " -t " + Math.max(60, Math.floor(durationSec))
+            + " -metadata title='" + base.replace(/'/g, "'\\''") + "'"
+            + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
+            + " -n '" + safeOut + "' & pid=$!; echo $pid > '" + safePid + "'; "
+            + "wait $pid; rm -f '" + safePid + "'; "
+            + "if [ -s '" + safeOut + "' ]; then echo __REC_OK__; else rm -f '" + safeOut + "' '" + safeTracks + "'; echo __REC_EMPTY__; fi");
+        if (scheduled) {
+            dlNotification.title = i18n("Scheduled recording started");
+            dlNotification.text = stationName;
+            dlNotification.iconName = "media-record";
+            dlNotification.sendEvent();
+        }
+    }
+
+    // ── Scheduled recordings ─────────────────────────────────────────────────
+    // Entries: { station, url, hh, mm, durationMin, repeat: "once"|"daily"|"weekly",
+    //            weekday: 0-6 (Sunday=0, used when weekly), nextRun: epoch ms }.
+    // Persisted in config; the 30 s tick starts a due entry even if the exact
+    // start moment was missed (machine asleep) — it records the REMAINDER.
+
+    function _loadRecSchedules() {
+        try {
+            var arr = JSON.parse(Plasmoid.configuration.recSchedules || "[]");
+            recSchedules = Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            recSchedules = [];
+        }
+    }
+
+    function _saveRecSchedules() {
+        Plasmoid.configuration.recSchedules = JSON.stringify(recSchedules);
+    }
+
+    // Next occurrence of hh:mm strictly after fromMs. Recomputed from the wall
+    // clock each time (not "+24h") so DST changes don't drift the start time.
+    function _nextOccurrence(hh, mm, repeat, weekday, fromMs) {
+        var d = new Date(fromMs);
+        d.setHours(hh, mm, 0, 0);
+        if (repeat === "weekly") {
+            var delta = (weekday - d.getDay() + 7) % 7;
+            d.setDate(d.getDate() + delta);
+            if (d.getTime() <= fromMs) d.setDate(d.getDate() + 7);
+        } else if (d.getTime() <= fromMs) {
+            d.setDate(d.getDate() + 1);
+        }
+        return d.getTime();
+    }
+
+    function addRecSchedule(stationName, url, hh, mm, durationMin, repeat, weekday) {
+        if (!url || !canRecordUrl(url)) return;
+        var list = recSchedules.slice();
+        list.push({
+            "station": stationName || url,
+            "url": url,
+            "hh": hh, "mm": mm,
+            "durationMin": Math.max(1, durationMin),
+            "repeat": repeat || "once",
+            "weekday": weekday === undefined ? new Date().getDay() : weekday,
+            "nextRun": _nextOccurrence(hh, mm, repeat || "once", weekday, Date.now())
+        });
+        recSchedules = list;
+        _saveRecSchedules();
+    }
+
+    function removeRecSchedule(index) {
+        if (index < 0 || index >= recSchedules.length) return;
+        var list = recSchedules.slice();
+        list.splice(index, 1);
+        recSchedules = list;
+        _saveRecSchedules();
+    }
+
+    function _recScheduleTick() {
+        if (recSchedules.length === 0) return;
+        var now = Date.now();
+        var list = recSchedules.slice();
+        var changed = false;
+        for (var i = list.length - 1; i >= 0; i--) {
+            var s = list[i];
+            if (now < s.nextRun) continue;
+            var endMs = s.nextRun + s.durationMin * 60000;
+            if (now < endMs) {
+                var remainSec = Math.round((endMs - now) / 1000);
+                if (!recording && remainSec >= 60) {
+                    _recStart(s.station, s.url, remainSec, true);
+                } else {
+                    dlNotification.title = i18n("Scheduled recording skipped");
+                    dlNotification.text = recording
+                        ? i18n("%1 — another recording is already running.", s.station)
+                        : s.station;
+                    dlNotification.iconName = "dialog-warning";
+                    dlNotification.sendEvent();
+                }
+            } else {
+                dlNotification.title = i18n("Scheduled recording missed");
+                dlNotification.text = s.station;
+                dlNotification.iconName = "dialog-warning";
+                dlNotification.sendEvent();
+            }
+            if (s.repeat === "once") {
+                list.splice(i, 1);
+            } else {
+                s.nextRun = _nextOccurrence(s.hh, s.mm, s.repeat, s.weekday, now);
+            }
+            changed = true;
+        }
+        if (changed) {
+            recSchedules = list;
+            _saveRecSchedules();
+        }
+    }
+
+    Timer {
+        id: recScheduleTimer
+        interval: 30000
+        repeat: true
+        running: root.recSchedules.length > 0
+        onTriggered: root._recScheduleTick()
+    }
+
+    Timer {
+        id: recElapsedTimer
+        interval: 1000
+        repeat: true
+        running: root.recording
+        onTriggered: root.recElapsedSec += 1
+    }
+
     // Play a downloaded file (My Music page)
     function playLocalFile(fileUrl, displayName) {
         if (!fileUrl) return;
@@ -366,28 +640,57 @@ PlasmoidItem {
         root._previewUrl = "";
         root.lastPlay = -1;
         root.currentStationFavicon = "";
+        // A local file is not a station: clear the station-tracking state so
+        // e.g. removeStation's "resume what was playing" can't restart a stale
+        // radio URL over the local track.
+        root._currentOrigUrl = "";
+        root._currentResolvedUrl = "";
+        // Invalidate in-flight auto-bitrate resolves — otherwise a delayed
+        // radio-browser callback would hijack the just-started local file
+        // (same rationale as stopWithFade).
+        _resolveCallSeq++;
         startWithFade({ "name": displayName || i18n("My Music"), "hostname": urlStr, "favicon": "", "active": true });
     }
 
     // Permanently remove a station from the list (the trash button on the row).
     // reloadStationsModel's prune cleans it out of favorites automatically.
     // If ANOTHER station was playing, it continues after the removal.
-    function removeStation(hostname) {
+    // Identified by popup index + name + hostname: with duplicate URLs a bare
+    // hostname match would delete the wrong (first) row.
+    function removeStation(popupIndex, name, hostname) {
         if (!hostname) return;
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
-            const out = [];
-            var removed = false;
+            // The popup list holds only ACTIVE stations — map the popup index to
+            // the config index by walking active entries, then verify identity.
+            var cfgIdx = -1, seen = -1;
             for (var i = 0; i < servers.length; i++) {
-                if (!removed && (servers[i].hostname || "") === hostname) {
-                    removed = true;
-                    continue;
-                }
-                out.push(servers[i]);
+                if (!servers[i].active) continue;
+                seen++;
+                if (seen === popupIndex) { cfgIdx = i; break; }
             }
-            if (!removed) return;
-            const wasPlayingUrl = isPlaying() && root._previewUrl === "" ? root._currentOrigUrl : "";
-            Plasmoid.configuration.servers = JSON.stringify(out); // → reload (stops playback)
+            if (cfgIdx < 0
+                || (servers[cfgIdx].hostname || "") !== hostname
+                || (servers[cfgIdx].name || "") !== name) {
+                // Model changed underneath — fall back to a UNIQUE name+URL match;
+                // refuse to guess between ambiguous duplicates.
+                cfgIdx = -1;
+                for (var j = 0; j < servers.length; j++) {
+                    if ((servers[j].hostname || "") === hostname && (servers[j].name || "") === name) {
+                        if (cfgIdx !== -1) return;
+                        cfgIdx = j;
+                    }
+                }
+                if (cfgIdx < 0) return;
+            }
+            servers.splice(cfgIdx, 1);
+            // Resume only if a station from the list is actually what is being
+            // played right now — a stale _currentOrigUrl (e.g. a local file is
+            // playing) must not restart an old radio stream.
+            const wasPlayingUrl = isPlaying() && root._previewUrl === ""
+                                  && playMusic.source.toString() === root._currentResolvedUrl
+                                  ? root._currentOrigUrl : "";
+            Plasmoid.configuration.servers = JSON.stringify(servers); // → reload (stops playback)
             Qt.callLater(function() {
                 if (wasPlayingUrl !== "" && wasPlayingUrl !== hostname) {
                     for (var k = 0; k < stationsModel.count; k++) {
@@ -498,7 +801,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.1");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.3");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -618,6 +921,13 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         root._previewUrl = "";
+        // An INSTANT recording follows playback — stopping playback stops it
+        // (a scheduled recording is independent and keeps running).
+        if (recording && !_recScheduled) recStop();
+        // "Stop must NEVER start playback": a pending bitrate fallback would
+        // otherwise restart the stream up to 600 ms after an explicit stop.
+        bitrateFallbackTimer.stop();
+        bitrateFallbackTimer.fallbackUrl = "";
         // Invalidate in-flight auto-bitrate resolves — otherwise the stop is
         // "forgotten" and a delayed callback restarts playback.
         _resolveCallSeq++;
@@ -644,6 +954,14 @@ PlasmoidItem {
 
     function startWithFade(station) {
         infoTimer.stop();
+        // Station switch ends the instant recording of the previous station.
+        if (recording && !_recScheduled) recStop();
+        // A pending bitrate fallback belongs to the PREVIOUS stream — it must
+        // not swap the source under the playback we are starting now.
+        // (_playStation clears it too, but direct callers like playLocalFile
+        // do not go through _playStation.)
+        bitrateFallbackTimer.stop();
+        bitrateFallbackTimer.fallbackUrl = "";
         // A fade-out may be in progress (the user switched station during the
         // fade) — stop it, otherwise its onFinished kills the just-started station.
         fadeOutAnimation.stop();
@@ -1050,6 +1368,15 @@ PlasmoidItem {
             if (playMusic.source.toString().indexOf("file://") !== 0) {
                 _pushHistory(parsed.artist, parsed.title, root.currentStation);
             }
+            // Track log sidecar for an INSTANT recording of this same stream —
+            // no per-track splitting, but the times + titles are all there.
+            if (root.recording && !root._recScheduled && root._recTracksPath !== ""
+                && playMusic.source.toString() === root._recUrl && parsed.title) {
+                var recLine = "[" + root.recElapsedText() + "] "
+                              + (parsed.artist ? parsed.artist + " - " : "") + parsed.title;
+                executable.exec(": REC_TRACK; printf '%s\\n' '" + recLine.replace(/'/g, "'\\''")
+                                + "' >> '" + root._recTracksPath.replace(/'/g, "'\\''") + "'");
+            }
             lookupAlbumArt(raw);
         } else {
             root.title = Plasmoid.title;
@@ -1069,11 +1396,20 @@ PlasmoidItem {
     Component.onCompleted: {
         reloadStationsModel();
         _loadHistory();
+        _loadRecSchedules();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
+        // A plasmashell crash can orphan a recording ffmpeg — the pid file
+        // survives, so stop the orphan on the next start. ("-t" already caps
+        // how long it could have kept running.)
+        var safePid = _recPidFile.replace(/'/g, "'\\''");
+        executable.exec(": REC_CLEAN; [ -f '" + safePid + "' ] && { kill -INT $(cat '" + safePid + "') 2>/dev/null; rm -f '" + safePid + "'; }; true");
+        // Catch a schedule that came due while the shell was down/starting.
+        Qt.callLater(_recScheduleTick);
     }
 
     Component.onDestruction: {
+        recStop();
         _mprisStop();
     }
 
@@ -1100,6 +1436,9 @@ PlasmoidItem {
         function onMprisEnabledChanged() {
             if (Plasmoid.configuration.mprisEnabled) _mprisStart();
             else _mprisStop();
+        }
+        function onRecSchedulesChanged() {
+            _loadRecSchedules();
         }
         target: Plasmoid.configuration
     }
@@ -1148,8 +1487,34 @@ PlasmoidItem {
                 _startDownload(cleaned);
                 return;
             }
-            // yt-dlp finished → notify
-            if (cmd.indexOf("yt-dlp --no-playlist") >= 0) {
+            // Recording finished (stopped, duration cap, stream died) → notify
+            if (cmd.indexOf(": REC_START;") === 0) {
+                var recFile = root._recFilePath;
+                var recDur = root.recElapsedText();
+                root.recording = false;
+                root._recScheduled = false;
+                root._recUrl = "";
+                root._recFilePath = "";
+                root._recTracksPath = "";
+                var recOut = stdout || "";
+                if (recOut.indexOf("__NO_FFMPEG__") !== -1) {
+                    dlNotification.title = i18n("ffmpeg is not installed");
+                    dlNotification.text = i18n("Install ffmpeg to record radio.");
+                    dlNotification.iconName = "dialog-warning";
+                } else if (recOut.indexOf("__REC_OK__") !== -1) {
+                    dlNotification.title = i18n("Recording saved ✓ (%1)", recDur);
+                    dlNotification.text = recFile.substring(recFile.lastIndexOf("/") + 1);
+                    dlNotification.iconName = "media-record";
+                } else {
+                    dlNotification.title = i18n("Recording failed");
+                    dlNotification.text = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
+                    dlNotification.iconName = "dialog-error";
+                }
+                dlNotification.sendEvent();
+                return;
+            }
+            // yt-dlp finished → notify (sentinel-prefix match, see _startDownload)
+            if (cmd.indexOf(": DL_YTDLP;") === 0) {
                 root.downloading = false;
                 root._dlCurrentQuery = "";
                 if ((stdout || "").indexOf("__NO_YTDLP__") !== -1) {
@@ -1172,12 +1537,17 @@ PlasmoidItem {
             // Which URL was this query for? A delayed result must not
             // be applied to a meanwhile-switched station, nor pin __NO_ICY__
             // to the wrong stream.
-            var m = cmd.match(/reader\.py' '([^']*)'/);
-            var queryUrl = m ? m[1] : root._icyQueryUrl;
+            // Capture the whole shell-quoted argument (including '\'' escapes)
+            // and decode it back — a bare [^']* would break on URLs containing
+            // an apostrophe and discard their metadata forever.
+            var m = cmd.match(/reader\.py' '((?:'\\''|[^'])*)'/);
+            var queryUrl = m ? m[1].replace(/'\\''/g, "'") : root._icyQueryUrl;
             if (queryUrl !== playMusic.source.toString()) {
                 return; // stale result — the station has been switched
             }
-            var formattedText = (stdout || "").trim();
+            // Strip only trailing newlines — .trim() would eat the protocol TAB
+            // when the StreamUrl part is empty ("Title\t\n") and break '::' titles.
+            var formattedText = (stdout || "").replace(/[\r\n]+$/, "");
             if (!isPlaying()) {
                 root.metadata = "";
                 root.title = Plasmoid.title;
@@ -1348,6 +1718,9 @@ PlasmoidItem {
         property string fallbackUrl: ""
         onTriggered: {
             if (!fallbackUrl) return;
+            // The instant recording was capturing the upgrade URL that just
+            // failed — stop it (its stream is dead); the fallback plays on.
+            if (recording && !_recScheduled) recStop();
             isError = false;
             errorTimer.stop();
             // A new stream = a clean slate for ICY metadata (the old pin was for
@@ -1456,6 +1829,12 @@ PlasmoidItem {
             if (!_mprisStarted) return;
             const safe = _mprisCmdFile.replace(/'/g, "'\\''");
             connectSource("inotifywait -qq -t 900 -e modify '" + safe + "' 2>/dev/null ; cat '" + safe + "' 2>/dev/null || true");
+            // Lost-wakeup guard: a write that lands between the previous cat and
+            // this watch re-arm would otherwise sit unnoticed until the 900 s
+            // timeout — and then fire unexpectedly (e.g. a very stale Next).
+            // One extra cat ~250 ms after each re-arm picks such writes up; the
+            // seq filter below dedupes anything read twice. Idle stays 0-fork.
+            mprisCmdSafetyCat.restart();
         }
 
         onNewData: function(sourceName, data) {
@@ -1485,6 +1864,15 @@ PlasmoidItem {
         // Fallback only when inotifywait is missing — hence the gentle interval
         interval: 1500
         repeat: true
+        running: false
+        onTriggered: mprisCmdReader.readNow()
+    }
+
+    Timer {
+        id: mprisCmdSafetyCat
+        // One-shot safety read after each inotify re-arm (see watchNow).
+        interval: 250
+        repeat: false
         running: false
         onTriggered: mprisCmdReader.readNow()
     }

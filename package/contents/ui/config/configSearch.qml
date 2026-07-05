@@ -129,25 +129,43 @@ KCM.ScrollViewKCM {
             if (_activeXhr === xhr)
                 _activeXhr = null
             if (xhr.status === 200) {
-                _retryCount = 0
-                currentUrl = url.split("?")[0]
-                var servers = JSON.parse(xhr.responseText)
-                searchModel.clear()
-                for (var i = 0; i < servers.length; i++) {
-                    searchModel.append(servers[i])
-                    searchModel.setProperty(i, "name",
-                                            servers[i].name.replace(
-                                                /\n/g, ' ').trim())
-                    searchModel.setProperty(i, "added", false)
+                // A 200 with a non-JSON body (captive portal, HTML error page)
+                // must fall into the retry chain — an unguarded JSON.parse throw
+                // would leave the page on "Please wait…" forever.
+                try {
+                    var servers = JSON.parse(xhr.responseText)
+                    // Reset the retry counter only AFTER a successful parse.
+                    _retryCount = 0
+                    currentUrl = url.split("?")[0]
+                    searchModel.clear()
+                    for (var i = 0; i < servers.length; i++) {
+                        searchModel.append(servers[i])
+                        searchModel.setProperty(i, "name",
+                                                servers[i].name.replace(
+                                                    /\n/g, ' ').trim())
+                        searchModel.setProperty(i, "added", false)
+                    }
+                    busy.running = false
+                    busy.visible = false
+                    gettext.visible = servers.length === 0
+                    gettext.text = servers.length === 0
+                        ? i18n("Nothing found\nTry changing your query")
+                        : i18n("Get list of stations\nPlease wait…")
+                    view.enabled = true
+                    stat = 1
+                } catch (e) {
+                    _retryCount++
+                    if (_retryCount < _maxRetries) {
+                        getServer()
+                        _doGetStations(by, val)
+                    } else {
+                        busy.running = false
+                        busy.visible = false
+                        gettext.visible = true
+                        gettext.text = i18n("Error: Could not connect to API servers")
+                        view.enabled = true
+                    }
                 }
-                busy.running = false
-                busy.visible = false
-                gettext.visible = servers.length === 0
-                gettext.text = servers.length === 0
-                    ? i18n("Nothing found\nTry changing your query")
-                    : i18n("Get list of stations\nPlease wait…")
-                view.enabled = true
-                stat = 1
             } else {
                 _retryCount++
                 if (_retryCount < _maxRetries) {
@@ -199,14 +217,20 @@ KCM.ScrollViewKCM {
             if (_activeLoadMoreXhr === xhr)
                 _activeLoadMoreXhr = null
             if (xhr.status === 200) {
-                currentUrl = url
-                const servers = JSON.parse(xhr.responseText)
-                if (servers.length > 0) {
-                    for (const srv of servers) {
-                        srv.name = srv.name.replace(/\n/g, ' ').trim()
-                        srv.added = false
-                        searchModel.append(srv)
+                try {
+                    const servers = JSON.parse(xhr.responseText)
+                    // Update currentUrl only after a successful parse.
+                    currentUrl = url
+                    if (servers.length > 0) {
+                        for (const srv of servers) {
+                            srv.name = srv.name.replace(/\n/g, ' ').trim()
+                            srv.added = false
+                            searchModel.append(srv)
+                        }
+                        stat = 1
                     }
+                } catch (e) {
+                    // Restore stat so the scroll trigger can try again.
                     stat = 1
                 }
             }
@@ -218,14 +242,52 @@ KCM.ScrollViewKCM {
         xhr.send()
     }
 
+    // Snapshot of the last state synced with plasmoid.configuration.servers —
+    // see configGeneral.qml for the rationale (⭐ from the popup while the
+    // settings window is open must not be lost on Apply).
+    property string _lastSynced: ""
+
     Component.onCompleted: {
         stationsModel.clear()
         const servers = JSON.parse(cfg_servers)
         for (const srv of servers) {
             stationsModel.append(srv)
         }
+        _lastSynced = cfg_servers
         stat = 0
         discoverServers()
+    }
+
+    Connections {
+        target: plasmoid.configuration
+        function onServersChanged() {
+            const external = plasmoid.configuration.servers
+            if (external === root.cfg_servers) {
+                root._lastSynced = external
+                return
+            }
+            if (root.cfg_servers === root._lastSynced) {
+                try {
+                    const servers = JSON.parse(external)
+                    stationsModel.clear()
+                    for (const srv of servers) stationsModel.append(srv)
+                    root.cfg_servers = external
+                    root._lastSynced = external
+                } catch (e) {}
+            } else {
+                try {
+                    const ext = JSON.parse(external)
+                    const have = {}
+                    for (var i = 0; i < stationsModel.count; i++)
+                        have[stationsModel.get(i).hostname] = true
+                    var added = false
+                    for (const srv of ext) {
+                        if (!have[srv.hostname]) { stationsModel.append(srv); added = true }
+                    }
+                    if (added) root.cfg_servers = JSON.stringify(getServersArray())
+                } catch (e) {}
+            }
+        }
     }
 
     Kirigami.Dialog {
@@ -560,9 +622,12 @@ KCM.ScrollViewKCM {
                 icon.name: "edit-clear-all"
                 enabled: search.text !== ""
                 onClicked: {
-                    searchModel.clear()
+                    // Reload the default list DIRECTLY — routing through
+                    // search.accepted() is a no-op when no search had been run
+                    // (isNoSearch still true) and left the page blank forever.
                     search.text = ""
-                    search.accepted()
+                    searchModel.clear()
+                    root.getStations()
                 }
             }
         }

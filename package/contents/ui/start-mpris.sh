@@ -30,9 +30,15 @@ sleep 0.3
 
 # Cleanup: remove orphaned file pairs whose daemon is gone
 # (plasmashell crash, etc.). Files of live instances are left untouched.
+# 30 s age grace: a SECOND instance starting right now may have written its
+# state file before its daemon becomes pgrep-visible — real orphans are
+# minutes/hours old, startup transients are not.
+now=$(date +%s)
 for f in "$RUN_DIR"/arp-mpris-state-*.json; do
     [[ -e "$f" ]] || continue
     [[ "$f" == "$STATE_FILE" ]] && continue
+    age=$(( now - $(stat -c %Y "$f" 2>/dev/null || echo "$now") ))
+    [[ $age -gt 30 ]] || continue
     if ! pgrep -f "mpris.py $f" >/dev/null 2>&1; then
         ts="${f##*arp-mpris-state-}"
         ts="${ts%.json}"
@@ -41,7 +47,11 @@ for f in "$RUN_DIR"/arp-mpris-state-*.json; do
 done
 
 # Cleanup the other way around: kill daemons whose state file has vanished.
+# Same 30 s grace: a freshly started neighbour daemon exists before the QML
+# side writes its state file (~300 ms debounce) — don't kill it.
 for pid in $(pgrep -f "mpris.py $RUN_DIR/arp-mpris-state-" 2>/dev/null); do
+    et=$(ps -o etimes= -p "$pid" 2>/dev/null || echo 0)
+    [[ ${et:-0} -gt 30 ]] || continue
     sf=$(tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null | grep 'arp-mpris-state' | head -1)
     if [[ -n "$sf" && ! -e "$sf" ]]; then
         kill "$pid" 2>/dev/null

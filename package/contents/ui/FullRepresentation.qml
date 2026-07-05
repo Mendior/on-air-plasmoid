@@ -26,7 +26,11 @@ PlasmaExtras.Representation {
     Layout.minimumHeight: Kirigami.Units.gridUnit * 20
     Layout.maximumWidth: Kirigami.Units.gridUnit * 32
     Layout.maximumHeight: Kirigami.Units.gridUnit * 36
-    Layout.preferredHeight: Layout.minimumHeight
+    Layout.preferredWidth: Kirigami.Units.gridUnit * 21
+    // The default popup must be tall enough for the FULL Now Playing page
+    // (art + title + controls + action row) — at the 20 gu minimum the button
+    // rows would be clipped on a fresh install until the user resizes.
+    Layout.preferredHeight: Kirigami.Units.gridUnit * 32
     collapseMarginsHint: true
 
     readonly property string _bestArtUrl: {
@@ -79,7 +83,8 @@ PlasmaExtras.Representation {
         q = (q || "").trim()
         webResultsModel.clear()
         const seq = ++fullRepresentation._webSearchSeq
-        if (q.length < 3) {
+        // Short queries are noise — EXCEPT exact country-map keys ("uk").
+        if (q.length < 3 && !(q.toLowerCase() in _countryMap)) {
             fullRepresentation.webSearching = false
             return
         }
@@ -104,7 +109,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.1")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.3")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -114,7 +119,6 @@ PlasmaExtras.Representation {
                 _webSearchAttempt(q, seq, serverIdx + 1)
                 return
             }
-            fullRepresentation.webSearching = false
             try {
                 const results = JSON.parse(xhr.responseText) || []
                 const existing = {}
@@ -137,6 +141,9 @@ PlasmaExtras.Representation {
                     })
                     if (webResultsModel.count >= 30) break
                 }
+                // Only now — a parse failure above keeps the "Searching…"
+                // indicator alive while the next mirror is tried.
+                fullRepresentation.webSearching = false
             } catch (e) {
                 console.log("[ARP] webSearch parse: " + e)
                 _webSearchAttempt(q, seq, serverIdx + 1)
@@ -293,13 +300,16 @@ PlasmaExtras.Representation {
                     autoAccept: true
                     onTextChanged: root.searchFilter = text
                     placeholderText: i18n("Search station or country… (e.g. Finland, jazz)")
-                    Keys.onDownPressed: stationView.forceActiveFocus()
-                    Keys.onReturnPressed: {
+                    // Both Return AND the numpad Enter (same pattern as CircleButton)
+                    function jumpToList() {
                         if (stationView.count > 0) {
                             stationView.currentIndex = 0
                             stationView.forceActiveFocus()
                         }
                     }
+                    Keys.onDownPressed: stationView.forceActiveFocus()
+                    Keys.onReturnPressed: jumpToList()
+                    Keys.onEnterPressed: jumpToList()
                 }
 
                 CircleButton {
@@ -343,7 +353,8 @@ PlasmaExtras.Representation {
                     highlightMoveDuration: 150
                     highlightMoveVelocity: -1
 
-                    Keys.onReturnPressed: {
+                    // Both Return AND the numpad Enter (same pattern as CircleButton)
+                    function activateCurrent() {
                         if (currentIndex >= 0 && currentItem) {
                             isError = false
                             errorTimer.stop()
@@ -351,6 +362,8 @@ PlasmaExtras.Representation {
                             refreshServer(currentItem.targetIndex)
                         }
                     }
+                    Keys.onReturnPressed: activateCurrent()
+                    Keys.onEnterPressed: activateCurrent()
                     Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Slash) {
                             filterField.forceActiveFocus()
@@ -398,7 +411,9 @@ PlasmaExtras.Representation {
 
                     // ── Global search results at the end of the list ─────────
                     footer: Column {
-                        width: stationView.width - stationView.leftMargin - stationView.rightMargin
+                        // Bind to the ScrollView, not the ListView: the footer's height feeds
+                        // contentHeight -> scrollbar -> ListView width, which would loop.
+                        width: scrollView.width - stationView.leftMargin - stationView.rightMargin
                         spacing: 2
                         visible: webResultsModel.count > 0 || fullRepresentation.webSearching
                         height: visible ? implicitHeight : 0
@@ -446,6 +461,21 @@ PlasmaExtras.Representation {
                                 width: parent.width
                                 height: Kirigami.Units.gridUnit * 3
 
+                                // Keyboard + screen-reader access — the row is otherwise
+                                // reachable only with a pointer (TapHandler).
+                                activeFocusOnTab: true
+                                Accessible.role: Accessible.Button
+                                Accessible.name: webItem.isPreviewing
+                                                 ? i18n("Stop preview: %1", model.name)
+                                                 : i18n("Preview: %1", model.name)
+                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon)
+                                Keys.onPressed: (event) => {
+                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon)
+                                        event.accepted = true
+                                    }
+                                }
+
                                 Rectangle {
                                     id: webBg
                                     anchors.fill: parent
@@ -454,10 +484,12 @@ PlasmaExtras.Representation {
                                     color: webHover.hovered
                                            ? Qt.alpha(root.accent, 0.09)
                                            : Qt.alpha(Kirigami.Theme.textColor, 0.03)
-                                    border.width: 1
-                                    border.color: webHover.hovered
-                                                  ? Qt.alpha(root.accent, 0.35)
-                                                  : Qt.alpha(Kirigami.Theme.textColor, 0.05)
+                                    border.width: webItem.activeFocus ? 2 : 1
+                                    border.color: webItem.activeFocus
+                                                  ? root.accent
+                                                  : (webHover.hovered
+                                                     ? Qt.alpha(root.accent, 0.35)
+                                                     : Qt.alpha(Kirigami.Theme.textColor, 0.05))
 
                                     Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
                                     Behavior on border.color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
@@ -505,6 +537,8 @@ PlasmaExtras.Representation {
                                             PlasmaComponents3.Label {
                                                 width: parent.width
                                                 text: webItem.model.name
+                                                // Untrusted catalogue data — never interpret as HTML
+                                                textFormat: Text.PlainText
                                                 elide: Text.ElideRight
                                                 maximumLineCount: 1
                                             }
@@ -517,6 +551,7 @@ PlasmaExtras.Representation {
                                                     if (webItem.model.codec) bits.push(webItem.model.codec)
                                                     return bits.join(" · ")
                                                 }
+                                                textFormat: Text.PlainText
                                                 visible: text !== ""
                                                 elide: Text.ElideRight
                                                 maximumLineCount: 1
@@ -879,6 +914,8 @@ PlasmaExtras.Representation {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     text: root.currentStation
+                    // Untrusted (station-controlled) — never interpret as HTML
+                    textFormat: Text.PlainText
                     visible: text !== ""
                     opacity: 0.6
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -897,6 +934,8 @@ PlasmaExtras.Representation {
                     elide: Text.ElideRight
                     maximumLineCount: 2
                     wrapMode: Text.Wrap
+                    // Untrusted (ICY title / station name) — never interpret as HTML
+                    textFormat: Text.PlainText
                     text: {
                         if (root.trackTitle) return root.trackTitle
                         if (root.currentStation) return root.currentStation
@@ -921,6 +960,8 @@ PlasmaExtras.Representation {
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     text: root.trackArtist
+                    // Untrusted (ICY title) — never interpret as HTML
+                    textFormat: Text.PlainText
                     visible: text !== ""
                     transform: Translate { id: artistShift; y: 0 }
                     onTextChanged: artistReveal.restart()
@@ -1049,7 +1090,8 @@ PlasmaExtras.Representation {
                     implicitHeight: implicitWidth
                     iconName: root.downloading ? "view-refresh" : "download"
                     iconScale: 0.55
-                    checkable: true
+                    // Not checkable: one-shot action button; checked only drives the
+                    // "downloading" visual, it is not a user-togglable state.
                     checked: root.downloading
                     glowPulse: root.downloading
                     enabledState: !root.downloading && (root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== ""))
@@ -1057,6 +1099,32 @@ PlasmaExtras.Representation {
                                  ? i18n("Downloading…")
                                  : i18n("Download this track (for offline listening)")
                     onClicked: root.downloadCurrentTrack()
+                }
+
+                // ● REC — capture the live stream to ~/Music/OnAir (bit-exact copy)
+                CircleButton {
+                    readonly property bool canRec: isPlaying() && root.canRecordUrl(playMusic.source.toString())
+                    Layout.alignment: Qt.AlignVCenter
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "media-record"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: root.recording
+                    checkedColor: "#E0463C"
+                    checkedIconColor: "#FFFFFF"
+                    glowPulse: root.recording
+                    enabledState: root.recording ? !root._recScheduled : canRec
+                    tooltipText: {
+                        if (root.recording && root._recScheduled)
+                            return i18n("A scheduled recording is running (%1)", root._recStationName)
+                        if (root.recording)
+                            return i18n("Recording %1 — click to stop", root.recElapsedText())
+                        if (!canRec && isPlaying())
+                            return i18n("This source cannot be recorded")
+                        return i18n("Record this station (personal use only)")
+                    }
+                    onClicked: root.recording ? root.recStop() : root.recStartCurrent()
                 }
             }
 
@@ -1066,12 +1134,16 @@ PlasmaExtras.Representation {
         // ── PAGE 3: My Music — downloaded tracks for offline use ────────
         ColumnLayout {
             id: libraryPage
+            // Scheduled-recordings panel visibility (toggled from the header row)
+            property bool showSchedules: false
             spacing: 0
 
             FolderListModel {
                 id: musicFolder
                 folder: "file://" + root.downloadDirPath
-                nameFilters: ["*.mp3", "*.opus", "*.m4a", "*.ogg", "*.flac", "*.mp4", "*.webm"]
+                // .aac/.mka are what stream recordings produce (-c copy keeps
+                // the original codec; unknown codecs land in a Matroska file)
+                nameFilters: ["*.mp3", "*.opus", "*.m4a", "*.ogg", "*.flac", "*.aac", "*.mka", "*.wav", "*.mp4", "*.webm"]
                 showDirs: false
                 sortField: FolderListModel.Time
                 sortReversed: true
@@ -1111,6 +1183,54 @@ PlasmaExtras.Representation {
                         maximumLineCount: 1
                         color: root.accent
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
+                }
+            }
+
+            // In-progress recording bar — same pattern as the download bar,
+            // in the signature REC red
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                visible: root.recording
+                implicitHeight: recRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+                radius: Kirigami.Units.smallSpacing * 1.5
+                color: Qt.alpha("#E0463C", 0.1)
+                border.width: 1
+                border.color: Qt.alpha("#E0463C", 0.45)
+
+                RowLayout {
+                    id: recRow
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.smallSpacing
+                    spacing: Kirigami.Units.smallSpacing
+
+                    EqBars {
+                        Layout.alignment: Qt.AlignVCenter
+                        visible: root.recording
+                        animating: visible && root.expanded
+                        bars: 3
+                        barWidth: 3
+                        minHeight: 4
+                        maxHeight: Kirigami.Units.gridUnit * 0.9
+                        barColor: "#E0463C"
+                    }
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        text: "● REC " + root.recElapsedText() + " · " + root._recStationName
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        color: "#E0463C"
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
+                    CircleButton {
+                        implicitWidth: Kirigami.Units.gridUnit * 1.7
+                        implicitHeight: implicitWidth
+                        iconName: "media-playback-stop"
+                        iconScale: 0.5
+                        tooltipText: i18n("Stop recording")
+                        onClicked: root.recStop()
                     }
                 }
             }
@@ -1193,6 +1313,8 @@ PlasmaExtras.Representation {
                                     PlasmaComponents3.Label {
                                         Layout.fillWidth: true
                                         text: (histItem.model.artist ? histItem.model.artist + " — " : "") + histItem.model.trackName
+                                        // Untrusted (ICY title) — never interpret as HTML
+                                        textFormat: Text.PlainText
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -1200,6 +1322,7 @@ PlasmaExtras.Representation {
                                     PlasmaComponents3.Label {
                                         Layout.fillWidth: true
                                         text: histItem.model.station
+                                        textFormat: Text.PlainText
                                         visible: text !== ""
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
@@ -1253,10 +1376,232 @@ PlasmaExtras.Representation {
                 CircleButton {
                     implicitWidth: Kirigami.Units.gridUnit * 2
                     implicitHeight: implicitWidth
+                    iconName: "chronometer"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: libraryPage.showSchedules
+                    tooltipText: i18n("Scheduled recordings")
+                    onClicked: libraryPage.showSchedules = !libraryPage.showSchedules
+
+                    // Badge with the number of scheduled recordings
+                    Rectangle {
+                        visible: root.recSchedules.length > 0
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.topMargin: -2
+                        anchors.rightMargin: -2
+                        width: Kirigami.Units.gridUnit * 0.85
+                        height: width
+                        radius: width / 2
+                        color: "#E0463C"
+                        PlasmaComponents3.Label {
+                            anchors.centerIn: parent
+                            text: root.recSchedules.length
+                            color: "#FFFFFF"
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 2
+                            font.weight: Font.Bold
+                        }
+                    }
+                }
+                CircleButton {
+                    implicitWidth: Kirigami.Units.gridUnit * 2
+                    implicitHeight: implicitWidth
                     iconName: "folder-open"
                     iconScale: 0.55
                     tooltipText: i18n("Open folder in file manager")
                     onClicked: executable.exec("xdg-open '" + root.downloadDirPath.replace(/'/g, "'\\''") + "'")
+                }
+            }
+
+            // ── Scheduled recordings panel ───────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                visible: libraryPage.showSchedules
+                implicitHeight: schedCol.implicitHeight + Kirigami.Units.smallSpacing * 3
+                radius: Kirigami.Units.smallSpacing * 1.5
+                color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
+                border.width: 1
+                border.color: Qt.alpha(root.accent, 0.25)
+
+                ColumnLayout {
+                    id: schedCol
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                    spacing: Kirigami.Units.smallSpacing
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        Kirigami.Icon {
+                            source: "media-record"
+                            width: Kirigami.Units.iconSizes.small
+                            height: width
+                            color: "#E0463C"
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Scheduled recordings")
+                            font.weight: Font.DemiBold
+                            color: root.accent
+                        }
+                    }
+
+                    // Existing schedules
+                    Repeater {
+                        model: root.recSchedules
+
+                        RowLayout {
+                            id: schedItem
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: {
+                                    var s = schedItem.modelData
+                                    var when = root._pad2(s.hh) + ":" + root._pad2(s.mm)
+                                    // Fixed English day names — the UI language is
+                                    // English by design, Qt.locale() would leak the
+                                    // system locale here.
+                                    var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                    var d = new Date(s.nextRun)
+                                    var rep = s.repeat === "daily" ? i18n("Daily")
+                                            : s.repeat === "weekly" ? i18n("Every %1", days[s.weekday])
+                                            : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
+                                    return "⏺ " + rep + " " + when + " · " + s.durationMin + " min · " + s.station
+                                }
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            }
+                            CircleButton {
+                                implicitWidth: Kirigami.Units.gridUnit * 1.6
+                                implicitHeight: implicitWidth
+                                iconName: "edit-delete"
+                                iconScale: 0.5
+                                opacity: 0.7
+                                tooltipText: i18n("Remove this schedule")
+                                onClicked: root.removeRecSchedule(schedItem.index)
+                            }
+                        }
+                    }
+
+                    PlasmaComponents3.Label {
+                        visible: root.recSchedules.length === 0
+                        text: i18n("No scheduled recordings yet — add one below.")
+                        opacity: 0.55
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
+
+                    Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
+
+                    // Add form: station · time · duration · repeat · [+]
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: Kirigami.Units.smallSpacing
+                        rowSpacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Station:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.ComboBox {
+                            id: schedStation
+                            Layout.fillWidth: true
+                            model: stationsModel
+                            textRole: "name"
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Start:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.SpinBox {
+                                id: schedHH
+                                from: 0; to: 23
+                                value: 20
+                                textFromValue: function(v) { return root._pad2(v) }
+                                wrap: true
+                            }
+                            PlasmaComponents3.Label { text: ":" }
+                            QQC2.SpinBox {
+                                id: schedMM
+                                from: 0; to: 59
+                                stepSize: 5
+                                value: 0
+                                textFromValue: function(v) { return root._pad2(v) }
+                                wrap: true
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Duration:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.SpinBox {
+                            id: schedDuration
+                            from: 5; to: 600
+                            stepSize: 5
+                            value: 60
+                            textFromValue: function(v) { return v + " min" }
+                            valueFromText: function(t) { return parseInt(t) || 60 }
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Repeat:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.ComboBox {
+                                id: schedRepeat
+                                model: [i18n("Once"), i18n("Daily"), i18n("Weekly")]
+                            }
+                            QQC2.ComboBox {
+                                id: schedWeekday
+                                visible: schedRepeat.currentIndex === 2
+                                // Fixed English day names (UI language is English by design)
+                                model: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                currentIndex: new Date().getDay()
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Recordings are for personal use only.")
+                            opacity: 0.5
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            font.italic: true
+                            elide: Text.ElideRight
+                        }
+                        QQC2.Button {
+                            icon.name: "list-add"
+                            text: i18n("Add")
+                            enabled: schedStation.currentIndex >= 0 && stationsModel.count > 0
+                            onClicked: {
+                                var st = stationsModel.get(schedStation.currentIndex)
+                                if (!st || !st.hostname) return
+                                var repeats = ["once", "daily", "weekly"]
+                                root.addRecSchedule(st.name, st.hostname,
+                                                    schedHH.value, schedMM.value,
+                                                    schedDuration.value,
+                                                    repeats[schedRepeat.currentIndex],
+                                                    schedWeekday.currentIndex)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1277,9 +1622,17 @@ PlasmaExtras.Representation {
                     delegate: Item {
                         id: fileItem
                         required property string fileName
-                        required property string fileBaseName
                         required property string filePath
-                        readonly property string localUrl: "file://" + filePath
+                        // FolderListModel's fileUrl is already percent-encoded — a raw
+                        // "file://" + filePath breaks on '#' or '?' in the file name.
+                        required property url fileUrl
+                        readonly property string localUrl: fileUrl.toString()
+                        // completeBaseName behaviour: strip only the LAST suffix —
+                        // fileBaseName would cut "Mr. Brightside.mp3" down to "Mr".
+                        readonly property string displayName: {
+                            const i = fileName.lastIndexOf(".")
+                            return i > 0 ? fileName.substring(0, i) : fileName
+                        }
                         readonly property bool isThisPlaying: isPlaying() && playMusic.source.toString() === localUrl
                         readonly property bool isVideo: fileName.endsWith(".mp4") || fileName.endsWith(".webm")
                         width: libraryView.width - libraryView.leftMargin - libraryView.rightMargin
@@ -1334,7 +1687,8 @@ PlasmaExtras.Representation {
 
                                 PlasmaComponents3.Label {
                                     Layout.fillWidth: true
-                                    text: fileItem.fileBaseName
+                                    text: fileItem.displayName
+                                    textFormat: Text.PlainText
                                     elide: Text.ElideRight
                                     maximumLineCount: 1
                                     color: fileItem.isThisPlaying ? root.accent : Kirigami.Theme.textColor
@@ -1348,7 +1702,8 @@ PlasmaExtras.Representation {
                                     Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
                                     iconName: "edit-delete"
                                     iconScale: 0.55
-                                    checkable: true
+                                    // Not checkable: two-step confirm button; armed is a
+                                    // visual state, not checkbox semantics.
                                     checked: armed
                                     checkedColor: "#E0463C"
                                     checkedIconColor: "#FFFFFF"
@@ -1378,7 +1733,7 @@ PlasmaExtras.Representation {
 
                         HoverHandler { id: fileHover }
                         TapHandler {
-                            onTapped: root.playLocalFile(fileItem.localUrl, fileItem.fileBaseName)
+                            onTapped: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
                         }
                     }
 
@@ -1462,7 +1817,9 @@ PlasmaExtras.Representation {
 
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
-            if (root.view === 1) {
+            // Esc on ANY non-list page (Now Playing, My Music) returns to the
+            // station list; only on the list itself it may close the popup.
+            if (root.view !== 0) {
                 root.view = 0
                 event.accepted = true
             } else if (filterField.text !== "") {
@@ -1582,6 +1939,8 @@ PlasmaExtras.Representation {
                 elide: Text.ElideRight
                 clip: true
                 color: {
+                    if (root.recording)
+                        return "#E0463C"
                     if (isError || !isConnected)
                         return Kirigami.Theme.negativeTextColor
                     else if (fullRepresentation._streamActive)
@@ -1592,6 +1951,10 @@ PlasmaExtras.Representation {
                         return Kirigami.Theme.textColor
                 }
                 text: {
+                    if (root.recording) {
+                        return "● REC " + root.recElapsedText()
+                               + (root._recScheduled ? " · " + root._recStationName : "")
+                    }
                     if (root.sleepRemainingSec > 0) {
                         return i18n("Sleeping in ") + sleepFormatted()
                     }
