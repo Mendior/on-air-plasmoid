@@ -13,7 +13,7 @@
         ],
         "BugReportUrl": "https://github.com/Mendior/on-air-plasmoid/issues",
         "Category": "Multimedia",
-        "Description": "Beautiful internet radio for your panel — worldwide station search, one-click track downloads, offline library, MPRIS media keys, sleep timer and live track info.",
+        "Description": "Internet radio for your panel — search, play and download stations from around the world.",
         "EnabledByDefault": true,
         "FormFactors": [
             "tablet",
