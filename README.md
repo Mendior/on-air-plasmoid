@@ -57,3 +57,5 @@ kpackagetool6 --type Plasma/Applet --install on-air-2026.1.plasmoid
 Based on [Advanced Radio Player](https://store.kde.org/p/1972502) by **Yuri Saurov**.
 
 Licensed under **LGPL-2.0-or-later**. See [LICENSE](LICENSE).
+
+*Note: the track download feature is a tool provided as-is; users are responsible for complying with local laws and the terms of the services they use.*
