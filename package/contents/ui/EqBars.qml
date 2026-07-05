@@ -3,8 +3,8 @@
  *
  *  SPDX-License-Identifier: LGPL-2.0-or-later
  *
- *  Taaskasutatav ekvalaiseri-animatsioon. Pulseerivad pulgad, mille faasid
- *  on nihutatud, et liikumine tunduks orgaaniline, mitte mehaaniline.
+ *  Reusable equalizer animation. Pulsing bars whose phases are
+ *  offset so the motion feels organic rather than mechanical.
  */
 
 import QtQuick

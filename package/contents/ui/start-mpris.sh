@@ -22,14 +22,14 @@ if [[ ! -f "$MPRIS_PY" ]]; then
     exit 1
 fi
 
-# Tapa AINULT sama state-faili vana daemon (restart-juht) — MITTE teiste
-# plasmoidi-instantside daemoneid. Bus-nimed on nüüd instantsi-põhised,
-# nii et nimekonflikti pole.
+# Kill ONLY the old daemon for this same state file (restart case) — NOT the
+# daemons of other plasmoid instances. Bus names are now instance-specific,
+# so there is no name conflict.
 pkill -f "mpris.py $STATE_FILE" 2>/dev/null || true
 sleep 0.3
 
-# Koristus: kustuta orvuks jäänud failipaarid, mille daemonit enam ei ole
-# (plasmashell'i crash vms). Elus instantside faile EI puututa.
+# Cleanup: remove orphaned file pairs whose daemon is gone
+# (plasmashell crash, etc.). Files of live instances are left untouched.
 for f in "$RUN_DIR"/arp-mpris-state-*.json; do
     [[ -e "$f" ]] || continue
     [[ "$f" == "$STATE_FILE" ]] && continue
@@ -40,7 +40,7 @@ for f in "$RUN_DIR"/arp-mpris-state-*.json; do
     fi
 done
 
-# Koristus teistpidi: tapa daemonid, mille state-fail on kadunud.
+# Cleanup the other way around: kill daemons whose state file has vanished.
 for pid in $(pgrep -f "mpris.py $RUN_DIR/arp-mpris-state-" 2>/dev/null); do
     sf=$(tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null | grep 'arp-mpris-state' | head -1)
     if [[ -n "$sf" && ! -e "$sf" ]]; then

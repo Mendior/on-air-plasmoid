@@ -22,6 +22,10 @@ KCM.SimpleKCM {
     property alias cfg_albumArtEnabled: albumArtCheck.checked
     property alias cfg_blurBackdrop: blurCheck.checked
     property alias cfg_mprisEnabled: mprisCheck.checked
+    property alias cfg_followSystemAccent: accentCheck.checked
+    property alias cfg_aiHelperEnabled: aiCheck.checked
+    property alias cfg_downloadDir: dirField.text
+    property string cfg_downloadFormat
 
     Kirigami.FormLayout {
         Item {
@@ -84,6 +88,12 @@ KCM.SimpleKCM {
             enabled: albumArtCheck.checked
         }
 
+        QQC2.CheckBox {
+            id: accentCheck
+            Kirigami.FormData.label: i18n("Accent color:")
+            text: i18n("Follow the system accent color instead of the built-in emerald")
+        }
+
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
         }
@@ -97,6 +107,43 @@ KCM.SimpleKCM {
             id: mprisCheck
             Kirigami.FormData.label: i18n("System integration:")
             text: i18n("Allow control via media keys (MPRIS)")
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+        }
+
+        Item {
+            Kirigami.FormData.label: i18n("Downloads")
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.ComboBox {
+            id: formatCombo
+            Kirigami.FormData.label: i18n("Format:")
+            model: [
+                { value: "best", text: i18n("Best quality (no re-encode)") },
+                { value: "mp3",  text: i18n("MP3") },
+                { value: "opus", text: i18n("Opus") },
+                { value: "mp4",  text: i18n("MP4 (video)") }
+            ]
+            textRole: "text"
+            valueRole: "value"
+            Component.onCompleted: currentIndex = Math.max(0, indexOfValue(root.cfg_downloadFormat))
+            onActivated: root.cfg_downloadFormat = currentValue
+        }
+
+        QQC2.TextField {
+            id: dirField
+            Kirigami.FormData.label: i18n("Save to folder:")
+            placeholderText: "~/Music/OnAir"
+            Layout.fillWidth: true
+        }
+
+        QQC2.CheckBox {
+            id: aiCheck
+            Kirigami.FormData.label: i18n("Title cleanup:")
+            text: i18n("Use Claude CLI to clean up messy titles before download (optional)")
         }
 
         Kirigami.Separator {

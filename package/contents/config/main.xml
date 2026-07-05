@@ -103,12 +103,16 @@
             <default>[]</default>
         </entry>
         <entry name="downloadDir" type="String">
-            <label>Allalaadimise kaust (tühi = ~/Muusika/Eeter)</label>
+            <label>Download directory (empty = ~/Music/OnAir)</label>
             <default></default>
         </entry>
         <entry name="aiHelperEnabled" type="bool">
-            <label>Puhasta loo pealkiri Claude CLI abil enne otsingut/allalaadimist</label>
+            <label>Clean up track title with Claude CLI before searching/downloading</label>
             <default>true</default>
+        </entry>
+        <entry name="followSystemAccent" type="bool">
+            <label>Use the system accent color instead of the built-in emerald theme</label>
+            <default>false</default>
         </entry>
     </group>
 </kcfg>

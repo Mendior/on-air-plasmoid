@@ -4,11 +4,11 @@
         "Authors": [
             {
                 "Email": "Egon.greenberg@gmail.com",
-                "Name": "Egon Greenberg (2026 edition: new UI, bug fixes, MPRIS/metadata engine, downloads)"
+                "Name": "Egon Greenberg"
             },
             {
                 "Email": "dr@i-glu4it.ru",
-                "Name": "Yuri Saurov (original: Advanced Radio Player)"
+                "Name": "Yuri Saurov"
             }
         ],
         "BugReportUrl": "https://github.com/Mendior/on-air-plasmoid/issues",
@@ -25,7 +25,7 @@
         "License": "LGPL-2.0+",
         "Name": "On Air",
         "Website": "https://github.com/Mendior/on-air-plasmoid",
-        "Version": "2026.1"
+        "Version": "2026.2"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
     "X-Plasma-Provides": [

@@ -57,7 +57,7 @@ RowLayout {
                    : Kirigami.Theme.textColor
         }
 
-        // 2026 signatuur: smaragd-gradiendi triip pealkirja all
+        // 2026 signature: emerald-gradient strip below the title
         Rectangle {
             id: accentUnderline
             Layout.alignment: Qt.AlignHCenter
@@ -72,7 +72,7 @@ RowLayout {
                 GradientStop { position: 1.0; color: Qt.alpha(root.accentTeal, 0.15) }
             }
 
-            // Triip "hingab" muusika mängides
+            // The strip "breathes" while music is playing
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
                 running: isPlaying() && root.expanded
@@ -98,7 +98,7 @@ RowLayout {
             transform: Translate { id: secondaryShift; y: 0 }
             onTextChanged: if (text !== "") secondaryReveal.restart()
 
-            // Loo vahetumisel libiseb uus pealkiri sujuvalt sisse
+            // On track change, the new title slides in smoothly
             ParallelAnimation {
                 id: secondaryReveal
                 NumberAnimation { target: secondaryLabel; property: "opacity"; from: 0; to: 0.85; duration: 380; easing.type: Easing.OutCubic }

@@ -46,9 +46,9 @@ PlasmaExtras.Representation {
         return br && br > 0 ? Math.round(br / 1000) : 0
     }
 
-    // ── Globaalne otsing: radio-browser.info kataloog (~50 000 jaama) ────
-    // Kirjuta riigi nimi ("Soome") → riigi populaarseimad jaamad;
-    // muu tekst → nimeotsing. Tulemused ilmuvad nimekirja lõppu.
+    // ── Global search: radio-browser.info catalog (~50,000 stations) ────
+    // Type a country name ("Finland") → the country's most popular stations;
+    // any other text → search by name. Results appear at the end of the list.
     property bool webSearching: false
     property int _webSearchSeq: 0
     readonly property var _countryMap: ({
@@ -87,8 +87,8 @@ PlasmaExtras.Representation {
         _webSearchAttempt(q, seq, 0)
     }
 
-    // Proovi API-peegleid JÄRJEST — osa peegleid on ajuti maas ja üks
-    // juhuslik valik tegi otsingu ebausaldusväärseks ("vahel töötab").
+    // Try the API mirrors IN SEQUENCE — some mirrors are occasionally down, and
+    // a single random pick made the search unreliable ("works sometimes").
     function _webSearchAttempt(q, seq, serverIdx) {
         const apiServers = ["de1", "nl1", "de2", "at1", "fi1"]
         if (serverIdx >= apiServers.length) {
@@ -108,9 +108,9 @@ PlasmaExtras.Representation {
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
-            if (seq !== fullRepresentation._webSearchSeq) return // vananenud päring
+            if (seq !== fullRepresentation._webSearchSeq) return // stale request
             if (xhr.status !== 200) {
-                // See peegel on maas → proovi kohe järgmist
+                // This mirror is down → try the next one right away
                 _webSearchAttempt(q, seq, serverIdx + 1)
                 return
             }
@@ -157,9 +157,9 @@ PlasmaExtras.Representation {
         id: webResultsModel
     }
 
-    // ── 2026 aurora-taust: kaks aeglaselt triivivat valguslaiku ──────────
-    // NB: kõik animatsioonid on pausil, kui popup on suletud (root.expanded) —
-    // muidu põletaks plasmashell CPU-d 24/7 (KDE ülevaatajate standardnõue).
+    // ── 2026 aurora background: two slowly drifting light blobs ──────────
+    // NB: all animations are paused when the popup is closed (root.expanded) —
+    // otherwise plasmashell would burn CPU 24/7 (a standard KDE reviewer requirement).
     Item {
         id: aurora
         anchors.fill: parent
@@ -262,8 +262,8 @@ PlasmaExtras.Representation {
         anchors.fill: parent
         clip: true
 
-        // Kahepoolne sünk root.view'ga — deklaratiivne binding katkeks jäädavalt
-        // esimese kasutaja-svaibi peale (imperatiivne currentIndex-kirjutus).
+        // Two-way sync with root.view — a declarative binding would break permanently
+        // on the first user swipe (imperative currentIndex write).
         Component.onCompleted: currentIndex = root.view
         onCurrentIndexChanged: {
             if (root.view !== currentIndex) root.view = currentIndex
@@ -275,7 +275,7 @@ PlasmaExtras.Representation {
             }
         }
 
-        // ── LEHT 1: jaamade nimekiri ─────────────────────────────────────
+        // ── PAGE 1: station list ─────────────────────────────────────────
         ColumnLayout {
             id: listPage
             spacing: 0
@@ -357,7 +357,7 @@ PlasmaExtras.Representation {
                         }
                     }
 
-                    // 2026: kaskaadis sisenevad read
+                    // 2026: rows entering in a cascade
                     populate: Transition {
                         id: popTrans
                         SequentialAnimation {
@@ -395,7 +395,7 @@ PlasmaExtras.Representation {
                     delegate: MediaListItem {
                     }
 
-                    // ── Globaalse otsingu tulemused nimekirja lõpus ──────────
+                    // ── Global search results at the end of the list ─────────
                     footer: Column {
                         width: stationView.width - stationView.leftMargin - stationView.rightMargin
                         spacing: 2
@@ -547,7 +547,7 @@ PlasmaExtras.Representation {
                                     }
                                 }
 
-                                // ⭐ = lisa PÜSIVALT oma jaamade hulka + lemmikutesse
+                                // ⭐ = add PERMANENTLY to my stations + favorites
                                 CircleButton {
                                     anchors.right: parent.right
                                     anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5
@@ -620,7 +620,7 @@ PlasmaExtras.Representation {
             }
         }
 
-        // ── LEHT 2: praegu mängib ────────────────────────────────────────
+        // ── PAGE 2: now playing ──────────────────────────────────────────
         ColumnLayout {
             id: nowPlayingPage
             spacing: Kirigami.Units.smallSpacing
@@ -630,12 +630,12 @@ PlasmaExtras.Representation {
             Item {
                 id: artContainer
                 Layout.alignment: Qt.AlignHCenter
-                // Veidi väiksem kui varem, et lemmiku-nupp ei jääks popup'i
-                // fikseeritud kõrgusega (popupHeight) alt ära lõigatuks.
+                // Slightly smaller than before, so the favorite button doesn't get
+                // clipped off the bottom by the popup's fixed height (popupHeight).
                 Layout.preferredWidth: Math.min(fullRepresentation.width - Kirigami.Units.largeSpacing * 4, Kirigami.Units.gridUnit * 10.5)
                 Layout.preferredHeight: Layout.preferredWidth
 
-                // Pehme smaragd-kuma kaanepildi taga
+                // Soft emerald glow behind the cover art
                 Rectangle {
                     id: artGlowSrc
                     anchors.fill: parent
@@ -662,7 +662,7 @@ PlasmaExtras.Representation {
                     border.width: 1
                     border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
                     clip: true
-                    // Hingamine mängimise ajal (ainult avatud popup'iga)
+                    // Breathing effect while playing (only with the popup open)
                     SequentialAnimation on scale {
                         loops: Animation.Infinite
                         running: fullRepresentation._streamActive && root.view === 1 && root.expanded
@@ -683,7 +683,7 @@ PlasmaExtras.Representation {
                         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
                     }
 
-                    // 2026: pöörlev vinüül, kui kaanepilti pole
+                    // 2026: spinning vinyl when there's no cover art
                     Item {
                         id: vinyl
                         anchors.centerIn: parent
@@ -705,12 +705,12 @@ PlasmaExtras.Representation {
                                 var ctx = getContext("2d")
                                 ctx.reset()
                                 var c = width / 2
-                                // Plaat
+                                // Record
                                 ctx.beginPath()
                                 ctx.arc(c, c, c - 1, 0, Math.PI * 2)
                                 ctx.fillStyle = "#151515"
                                 ctx.fill()
-                                // Sooned
+                                // Grooves
                                 ctx.strokeStyle = "rgba(255,255,255,0.07)"
                                 ctx.lineWidth = 1
                                 for (var r = c * 0.45; r < c * 0.94; r += c * 0.055) {
@@ -718,7 +718,7 @@ PlasmaExtras.Representation {
                                     ctx.arc(c, c, r, 0, Math.PI * 2)
                                     ctx.stroke()
                                 }
-                                // Valgusesähvatus
+                                // Light glint
                                 var g = ctx.createLinearGradient(0, 0, width, height)
                                 g.addColorStop(0, "rgba(111,207,151,0.14)")
                                 g.addColorStop(0.5, "rgba(111,207,151,0)")
@@ -727,7 +727,7 @@ PlasmaExtras.Representation {
                                 ctx.arc(c, c, c - 1, 0, Math.PI * 2)
                                 ctx.fillStyle = g
                                 ctx.fill()
-                                // Keskring
+                                // Center hole
                                 ctx.beginPath()
                                 ctx.arc(c, c, c * 0.3, 0, Math.PI * 2)
                                 ctx.fillStyle = "#1f1f1f"
@@ -803,7 +803,7 @@ PlasmaExtras.Representation {
                 }
             }
 
-            // LIVE + bitrate pillid
+            // LIVE + bitrate pills
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: Kirigami.Units.smallSpacing
@@ -974,8 +974,8 @@ PlasmaExtras.Representation {
                     enabledState: stationsModel.count > 0 || isPlaying()
                     tooltipText: isPlaying() ? i18n("Stop") : i18n("Play")
                     onClicked: {
-                        // Mängimise ajal = ALATI stopp (ka proovikuulamine);
-                        // muidu mängi viimast / esimest jaama.
+                        // While playing = ALWAYS stop (including preview);
+                        // otherwise play the last / first station.
                         if (isPlaying()) {
                             stopWithFade()
                         } else {
@@ -1007,7 +1007,7 @@ PlasmaExtras.Representation {
                 visible: root.currentStation !== ""
                 spacing: Kirigami.Units.largeSpacing
 
-                // Otsi mängivat lugu YouTube'ist
+                // Search the currently playing track on YouTube
                 CircleButton {
                     Layout.alignment: Qt.AlignVCenter
                     implicitWidth: Kirigami.Units.gridUnit * 2.4
@@ -1040,7 +1040,7 @@ PlasmaExtras.Representation {
                     }
                 }
 
-                // Laadi mängiv lugu alla (yt-dlp, formaat seadetest)
+                // Download the currently playing track (yt-dlp, format from settings)
                 CircleButton {
                     Layout.alignment: Qt.AlignVCenter
                     implicitWidth: Kirigami.Units.gridUnit * 2.4
@@ -1060,7 +1060,7 @@ PlasmaExtras.Representation {
             Item { Layout.fillHeight: true }
         }
 
-        // ── LEHT 3: Minu muusika — allalaaditud lood offline'iks ────────
+        // ── PAGE 3: My Music — downloaded tracks for offline use ────────
         ColumnLayout {
             id: libraryPage
             spacing: 0
@@ -1074,7 +1074,7 @@ PlasmaExtras.Representation {
                 sortReversed: true
             }
 
-            // Käimasoleva allalaadimise riba
+            // In-progress download bar
             Rectangle {
                 Layout.fillWidth: true
                 Layout.margins: Kirigami.Units.smallSpacing
@@ -1112,7 +1112,7 @@ PlasmaExtras.Representation {
                 }
             }
 
-            // Hiljuti mänginud lood — saab TAGANTJÄRELE alla laadida
+            // Recently played tracks — can be downloaded AFTER THE FACT
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
@@ -1523,7 +1523,7 @@ PlasmaExtras.Representation {
                              : i18n("Sleep timer")
                 onClicked: sleepMenu.open()
 
-                // Une-taimeri edenemise rõngas
+                // Sleep timer progress ring
                 Canvas {
                     id: sleepRing
                     anchors.fill: parent
@@ -1624,7 +1624,7 @@ PlasmaExtras.Representation {
                 tooltipText: i18n("Volume: ") + Math.round(playMusicOutput.volume * 100) + "% " + i18n("(scroll to adjust)")
                 onClicked: volumePopup.open()
 
-                // Rullik nupu peal = helitugevus
+                // Scroll wheel over the button = volume
                 WheelHandler {
                     onWheel: (event) => {
                         const step = event.angleDelta.y > 0 ? 0.05 : -0.05
