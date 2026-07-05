@@ -234,6 +234,7 @@ PlasmaComponents3.ItemDelegate {
             Layout.alignment: Qt.AlignVCenter
             iconName: "edit-delete"
             iconScale: 0.55
+            checkable: true
             checked: armed
             checkedColor: "#E0463C"
             checkedIconColor: "#FFFFFF"
@@ -271,6 +272,7 @@ PlasmaComponents3.ItemDelegate {
             Layout.alignment: Qt.AlignVCenter
             iconName: listItem.isFav ? "favorite" : "non-starred-symbolic"
             iconScale: 0.55
+            checkable: true
             checked: listItem.isFav
             opacity: listItem.isFav ? 1.0 : (listItem.hovered ? 0.85 : 0.0)
             visible: opacity > 0.0

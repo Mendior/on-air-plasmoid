@@ -308,6 +308,7 @@ PlasmaExtras.Representation {
                     implicitHeight: implicitWidth
                     iconName: root.favoritesOnly ? "favorite" : "non-starred-symbolic"
                     iconScale: 0.55
+                    checkable: true
                     checked: root.favoritesOnly
                     tooltipText: root.favoritesOnly ? i18n("Show all stations") : i18n("Show only favorites")
                     onClicked: root.favoritesOnly = !root.favoritesOnly
@@ -1026,6 +1027,7 @@ PlasmaExtras.Representation {
                     implicitHeight: implicitWidth
                     iconName: !previewing && root.isFavorite(root.currentStation) ? "favorite" : "non-starred-symbolic"
                     iconScale: 0.55
+                    checkable: true
                     checked: !previewing && root.isFavorite(root.currentStation)
                     tooltipText: {
                         if (previewing) return i18n("Add to my stations + favorites")
@@ -1047,6 +1049,7 @@ PlasmaExtras.Representation {
                     implicitHeight: implicitWidth
                     iconName: root.downloading ? "view-refresh" : "download"
                     iconScale: 0.55
+                    checkable: true
                     checked: root.downloading
                     glowPulse: root.downloading
                     enabledState: !root.downloading && (root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== ""))
@@ -1345,6 +1348,7 @@ PlasmaExtras.Representation {
                                     Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
                                     iconName: "edit-delete"
                                     iconScale: 0.55
+                                    checkable: true
                                     checked: armed
                                     checkedColor: "#E0463C"
                                     checkedIconColor: "#FFFFFF"
@@ -1505,6 +1509,7 @@ PlasmaExtras.Representation {
                 implicitHeight: implicitWidth
                 iconName: "folder-music"
                 iconScale: 0.55
+                checkable: true
                 checked: root.view === 2
                 tooltipText: i18n("My Music (downloaded tracks)")
                 onClicked: root.view = root.view === 2 ? 0 : 2
@@ -1517,6 +1522,7 @@ PlasmaExtras.Representation {
                 implicitHeight: implicitWidth
                 iconName: root.sleepRemainingSec > 0 ? "chronometer" : "clock"
                 iconScale: 0.55
+                checkable: true
                 checked: root.sleepRemainingSec > 0
                 tooltipText: root.sleepRemainingSec > 0
                              ? i18n("Sleep timer: ") + sleepFormatted()
