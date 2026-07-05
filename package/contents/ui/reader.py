@@ -59,14 +59,18 @@ def main():
 
         if response.status_code != 200:
             print(f"reader.py: HTTP {response.status_code} for {url}", file=sys.stderr)
-            # Sentinel on the error path too — otherwise the plasmoid respawns us every 2 s forever.
-            print("__NO_ICY__")
+            # Sentinel only on DEFINITIVE failures (4xx: UA filter, 404...) —
+            # a transient server error (5xx) must not pin __NO_ICY__ for the
+            # whole listening session; exiting silently lets the poll retry.
+            if 400 <= response.status_code < 500:
+                print("__NO_ICY__")
             return
 
         icy_metaint = int(response.headers.get('icy-metaint', 0))
-        if icy_metaint == 0:
-            # Sentinel: tells the plasmoid to stop polling this stream for
-            # metadata — it does not expose ICY.
+        if not (0 < icy_metaint <= 1_000_000):
+            # Sentinel: no ICY (0/absent), or a nonsensical metaint — negative
+            # would index the buffer from the end and parse audio bytes as
+            # metadata; a huge one would buffer the stream into RAM.
             print("__NO_ICY__")
             return
 
@@ -126,10 +130,15 @@ def main():
 
         except KeyboardInterrupt:
             pass
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+        # TRANSIENT network failure — exit silently (no sentinel) so the
+        # plasmoid's poll can retry once the network/server recovers. The
+        # 6-empty-results counter on the QML side still bounds endless polling.
+        print(f"reader.py: transient {type(exc).__name__}: {exc}", file=sys.stderr)
     except requests.exceptions.RequestException as exc:
         print(f"reader.py: {type(exc).__name__}: {exc}", file=sys.stderr)
-        # The connection failed (UA filter, TLS error, timeout) — don't let
-        # the plasmoid retry forever.
+        # A DEFINITIVE failure (invalid URL, TLS error, redirect loop) — don't
+        # let the plasmoid retry forever.
         print("__NO_ICY__")
     except Exception as exc:
         print(f"reader.py: unexpected {type(exc).__name__}: {exc}", file=sys.stderr)

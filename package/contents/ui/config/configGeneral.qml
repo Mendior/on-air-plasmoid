@@ -520,11 +520,54 @@ KCM.ScrollViewKCM {
         _fetchNextLogo();
     }
 
+    // Snapshot of the last state synced with plasmoid.configuration.servers —
+    // used to detect whether this page has unsaved local edits.
+    property string _lastSynced: ""
+
     Component.onCompleted: {
         stationsModel.clear();
         var servers = JSON.parse(cfg_servers);
         for (const server of servers) {
             stationsModel.append(server);
+        }
+        _lastSynced = cfg_servers;
+    }
+
+    // The dialog's cfg_servers is a SNAPSHOT: without this, adding a station
+    // from the popup (⭐) while the settings window is open would be silently
+    // overwritten by the next Apply.
+    Connections {
+        target: plasmoid.configuration
+        function onServersChanged() {
+            const external = plasmoid.configuration.servers;
+            if (external === root.cfg_servers) {
+                root._lastSynced = external;
+                return;
+            }
+            if (root.cfg_servers === root._lastSynced) {
+                // No unsaved edits on this page — take the external state over.
+                try {
+                    const servers = JSON.parse(external);
+                    stationsModel.clear();
+                    for (const server of servers) stationsModel.append(server);
+                    root.cfg_servers = external;
+                    root._lastSynced = external;
+                } catch (e) {}
+            } else {
+                // Unsaved local edits — merge in externally added stations by
+                // hostname so Apply loses neither side.
+                try {
+                    const ext = JSON.parse(external);
+                    const have = {};
+                    for (var i = 0; i < stationsModel.count; i++)
+                        have[stationsModel.get(i).hostname] = true;
+                    var added = false;
+                    for (const srv of ext) {
+                        if (!have[srv.hostname]) { stationsModel.append(srv); added = true; }
+                    }
+                    if (added) root.cfg_servers = JSON.stringify(getServersArray());
+                } catch (e) {}
+            }
         }
     }
 
@@ -694,14 +737,26 @@ KCM.ScrollViewKCM {
         title: dialogMode === -1 ? i18n("Add Station") : i18n("Edit station")
         padding: Kirigami.Units.largeSpacing
         standardButtons: QQC2.Dialog.Ok | QQC2.Dialog.Cancel
-        onOpened: serverName.forceActiveFocus(Qt.MouseFocusReason)
+        // An entry without a URL is unplayable and confuses removal — keep OK
+        // disabled until a non-empty URL is entered.
+        function updateOkEnabled() {
+            const ok = standardButton(QQC2.Dialog.Ok);
+            if (ok) ok.enabled = serverHostname.text.trim().length > 0;
+        }
+        onOpened: {
+            updateOkEnabled();
+            serverName.forceActiveFocus(Qt.MouseFocusReason);
+        }
         onAccepted: {
+            const nameClean = serverName.text.trim();
+            const hostClean = serverHostname.text.trim();
             const faviconClean = serverFavicon.text.trim();
+            if (hostClean === "") return;
             let itemObject;
             if (dialogMode === -1) {
                 itemObject = {
-                    "name": serverName.text,
-                    "hostname": serverHostname.text,
+                    "name": nameClean !== "" ? nameClean : hostClean,
+                    "hostname": hostClean,
                     "favicon": faviconClean,
                     "active": serverActive.checked
                 };
@@ -712,8 +767,8 @@ KCM.ScrollViewKCM {
                 for (const key in existing) {
                     itemObject[key] = existing[key];
                 }
-                itemObject.name = serverName.text;
-                itemObject.hostname = serverHostname.text;
+                itemObject.name = nameClean !== "" ? nameClean : hostClean;
+                itemObject.hostname = hostClean;
                 itemObject.favicon = faviconClean;
                 itemObject.active = serverActive.checked;
                 stationsModel.set(dialogMode, itemObject);
@@ -733,6 +788,7 @@ KCM.ScrollViewKCM {
                     id: serverHostname
 
                     Kirigami.FormData.label: i18n("URL:")
+                    onTextChanged: serverDialog.updateOkEnabled()
                 }
 
                 QQC2.TextField {

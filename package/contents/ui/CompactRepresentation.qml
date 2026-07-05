@@ -95,6 +95,27 @@ MouseArea {
         barColor: root.accentBright
     }
 
+    // Pulsing red dot while a recording is running — visible even when the
+    // popup is closed, so a recording is never forgotten.
+    Rectangle {
+        id: recDot
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 1
+        width: Math.max(4, Math.round(parent.width * 0.22))
+        height: width
+        radius: width / 2
+        color: "#E0463C"
+        visible: root.recording
+
+        SequentialAnimation on opacity {
+            loops: Animation.Infinite
+            running: recDot.visible
+            NumberAnimation { from: 1.0; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 0.35; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+        }
+    }
+
     PlasmaCore.ToolTipArea {
         id: tooltip
 

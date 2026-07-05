@@ -13,7 +13,7 @@
         ],
         "BugReportUrl": "https://github.com/Mendior/on-air-plasmoid/issues",
         "Category": "Multimedia",
-        "Description": "Internet radio for your panel — search, play and download stations from around the world.",
+        "Description": "Internet radio for your panel — search, play, record and download stations from around the world.",
         "EnabledByDefault": true,
         "FormFactors": [
             "tablet",
@@ -25,7 +25,7 @@
         "License": "LGPL-2.0+",
         "Name": "On Air",
         "Website": "https://github.com/Mendior/on-air-plasmoid",
-        "Version": "2026.2"
+        "Version": "2026.3"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
     "X-Plasma-Provides": [

@@ -114,5 +114,17 @@
             <label>Use the system accent color instead of the built-in emerald theme</label>
             <default>false</default>
         </entry>
+        <entry name="recordMaxMinutes" type="Int">
+            <label>Hard cap for a single recording, in minutes (disk-fill protection)</label>
+            <default>180</default>
+        </entry>
+        <entry name="recordFormat" type="String">
+            <label>Recording format: original (bit-exact copy, recommended), mp3 (re-encode), wav (uncompressed)</label>
+            <default>original</default>
+        </entry>
+        <entry name="recSchedules" type="String">
+            <label>Scheduled recordings (JSON array)</label>
+            <default>[]</default>
+        </entry>
     </group>
 </kcfg>
