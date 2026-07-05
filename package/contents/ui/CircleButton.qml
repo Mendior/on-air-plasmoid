@@ -23,10 +23,28 @@ Item {
     property color checkedColor: root.accent
     property color checkedIconColor: root.accentTextOn
     property string tooltipText: ""
-    // 2026: pehme pulseeriv rõngas (nt play-nupp mängimise ajal)
+    // 2026: soft pulsing ring (e.g. the play button while playback is active)
     property bool glowPulse: false
 
     signal clicked()
+
+    // Accessibility: expose this custom control to screen readers (Orca) and
+    // make it keyboard-reachable/activatable — it is not a native Button.
+    Accessible.role: circleRoot.checked ? Accessible.CheckBox : Accessible.Button
+    Accessible.name: tooltipText
+    Accessible.description: tooltipText
+    Accessible.checkable: circleRoot.checked
+    Accessible.checked: circleRoot.checked
+    Accessible.onPressAction: if (enabledState) circleRoot.clicked()
+    activeFocusOnTab: enabledState
+    Keys.onPressed: (event) => {
+        if (!enabledState) return
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            rippleAnim.restart()
+            circleRoot.clicked()
+            event.accepted = true
+        }
+    }
 
     opacity: enabledState ? 1.0 : 0.4
     scale: pressArea.pressed && enabledState ? 0.92 : (pressArea.containsMouse && enabledState ? 1.04 : 1.0)
@@ -37,7 +55,18 @@ Item {
     implicitWidth: Kirigami.Units.gridUnit * 2.2
     implicitHeight: implicitWidth
 
-    // Pulseeriv "hingamise" rõngas — käivitub glowPulse'iga
+    // Visible keyboard-focus ring (accent), so Tab navigation is discoverable.
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: -2
+        radius: width / 2
+        color: "transparent"
+        border.width: 2
+        border.color: root.accent
+        visible: circleRoot.activeFocus
+    }
+
+    // Pulsing "breathing" ring — driven by glowPulse
     Rectangle {
         id: pulseRing
         anchors.centerIn: parent
@@ -83,7 +112,7 @@ Item {
         Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
     }
 
-    // Ripple-efekt klikil
+    // Ripple effect on click
     Rectangle {
         id: ripple
         anchors.centerIn: parent

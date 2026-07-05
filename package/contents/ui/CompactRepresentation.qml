@@ -81,7 +81,7 @@ MouseArea {
         Behavior on color { ColorAnimation { duration: 400 } }
     }
 
-    // 2026: mini-ekvalaiser paneeli-ikooni nurgas, kui muusika mängib
+    // 2026: mini-equalizer in the corner of the panel icon while music is playing
     EqBars {
         anchors.right: parent.right
         anchors.bottom: parent.bottom

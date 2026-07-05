@@ -27,7 +27,7 @@ import dbus.mainloop.glib
 from gi.repository import GLib
 
 BUS_NAME = "org.mpris.MediaPlayer2.advancedradio"
-# Cmd-fail ei tohi piiramatult kasvada — QML loeb kogu faili igal sündmusel.
+# The command file must not grow unbounded — QML reads the whole file on every event.
 CMD_FILE_MAX_BYTES = 8192
 OBJ_PATH = "/org/mpris/MediaPlayer2"
 ROOT_IF = "org.mpris.MediaPlayer2"
@@ -111,8 +111,8 @@ class MPRISBridge(dbus.service.Object):
             line = f"{self.cmd_seq}\t{cmd}\n"
         print(f"[mpris] cmd #{self.cmd_seq}: {cmd}", flush=True)
         try:
-            # Rotatsioon: kui fail on kasvanud üle piiri, alusta puhtalt —
-            # seq-numbrid aina kasvavad, nii et QML-i filter ei korda vanu käske.
+            # Rotation: if the file has grown past the limit, start fresh —
+            # seq numbers keep increasing, so the QML filter won't replay old commands.
             mode = "a"
             try:
                 if self.cmd_file.stat().st_size > CMD_FILE_MAX_BYTES:
@@ -255,8 +255,8 @@ def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     print("[mpris] got session bus", flush=True)
-    # Unikaalne bus-nimi instantsi kohta (MPRIS lubab .instanceN sufiksit) —
-    # kaks plasmoidi-eksemplari ei võitle enam sama nime pärast.
+    # Unique bus name per instance (MPRIS allows the .instanceN suffix) —
+    # two plasmoid instances no longer fight over the same name.
     instance_id = re.sub(r"\D", "", state_path.stem) or str(os.getpid())
     bus_name_str = f"{BUS_NAME}.instance{instance_id}"
     try:

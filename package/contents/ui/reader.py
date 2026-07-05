@@ -18,15 +18,15 @@ if len(sys.argv) < 3:
 
 script, url, meta = sys.argv[0], sys.argv[1], sys.argv[2]
 
-# Kõva kogukestuse piir — requests'i timeout katab ainult connect'i ja
-# chunk'ide-vahelise pausi, mitte kogu allalaadimist. Ilma selleta võib
-# protsess rippuda ja striimi igavesti alla laadida.
+# Hard total-duration cap — the requests timeout only covers the connect and
+# the pause between chunks, not the whole download. Without this the process
+# could hang and keep downloading the stream forever.
 MAX_SECONDS = 20
 MAX_META_BLOCKS = 10
 
 
 def decode_meta(raw: bytes) -> str:
-    """UTF-8 esimesena, Latin-1 varuvariandina (Latin-1 ei saa ebaõnnestuda)."""
+    """UTF-8 first, Latin-1 as a fallback (Latin-1 can never fail)."""
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
@@ -34,8 +34,8 @@ def decode_meta(raw: bytes) -> str:
 
 
 def extract_field(raw_meta: bytes, key: bytes) -> str:
-    """Loe ICY väli kujul key='value'; — otsi lõppu "';" järgi, et semikoolon
-    VÄÄRTUSE SEES (nt "AC/DC; Live") pealkirja ei kärbiks."""
+    """Read an ICY field of the form key='value'; — find the end via "';" so that
+    a semicolon INSIDE THE VALUE (e.g. "AC/DC; Live") does not truncate the title."""
     if key not in raw_meta:
         return ""
     start = raw_meta.index(key) + len(key)
@@ -59,7 +59,7 @@ def main():
 
         if response.status_code != 200:
             print(f"reader.py: HTTP {response.status_code} for {url}", file=sys.stderr)
-            # Sentinel ka veateel — muidu respawnib plasmoid meid iga 2 s igavesti.
+            # Sentinel on the error path too — otherwise the plasmoid respawns us every 2 s forever.
             print("__NO_ICY__")
             return
 
@@ -109,9 +109,9 @@ def main():
                     if cleaned_title.lower() in placeholders:
                         return
 
-                    # TAB-separaator: '::' esines päris-pealkirjades ja lõhkus
-                    # QML-i splitti. TAB-i striimi tiitlis esineda ei saa
-                    # (asendame igaks juhuks tühikuga).
+                    # TAB separator: '::' appeared in real titles and broke the
+                    # QML split. A TAB cannot occur in a stream title
+                    # (we replace it with a space just in case).
                     safe_title = cleaned_title.replace("\t", " ")
                     safe_url = stream_url.replace("\t", " ")
                     stream_metadata = safe_title + "\t" + safe_url
@@ -128,8 +128,8 @@ def main():
             pass
     except requests.exceptions.RequestException as exc:
         print(f"reader.py: {type(exc).__name__}: {exc}", file=sys.stderr)
-        # Ühendus ebaõnnestus (UA-filter, TLS-viga, timeout) — ära lase
-        # plasmoidil igavesti uuesti proovida.
+        # The connection failed (UA filter, TLS error, timeout) — don't let
+        # the plasmoid retry forever.
         print("__NO_ICY__")
     except Exception as exc:
         print(f"reader.py: unexpected {type(exc).__name__}: {exc}", file=sys.stderr)

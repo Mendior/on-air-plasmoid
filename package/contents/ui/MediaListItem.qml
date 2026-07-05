@@ -64,7 +64,7 @@ PlasmaComponents3.ItemDelegate {
             Behavior on border.color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
             Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
 
-            // Mängiva jaama gradiendi-triip vasakul
+            // Gradient accent strip on the left for the playing station
             Rectangle {
                 anchors.left: parent.left
                 anchors.top: parent.top
@@ -98,7 +98,7 @@ PlasmaComponents3.ItemDelegate {
             Rectangle {
                 id: avatar
                 anchors.fill: parent
-                // 2026: squircle ring — mitte täisring
+                // 2026: squircle ring — not a full circle
                 radius: width * 0.32
                 color: listItem.isCurrent
                        ? root.accent
@@ -225,7 +225,7 @@ PlasmaComponents3.ItemDelegate {
             }
         }
 
-        // Prügikast: eemalda jaam — kaheastmeline kinnitus (punane = "kindel?")
+        // Trash button: remove station — two-step confirmation (red = "are you sure?")
         CircleButton {
             id: removeButton
             property bool armed: false
