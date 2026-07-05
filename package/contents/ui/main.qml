@@ -389,6 +389,82 @@ PlasmoidItem {
 
     ListModel { id: historyModel }
 
+    // ── Station logo (favicon) disk cache ────────────────────────────────────
+    // QML Image caches only in process memory and Qt sends a bare "Mozilla/5.0"
+    // User-Agent that some hosts (WAF/Cloudflare) reject — so logos vanished on
+    // every plasmashell restart and a failed load never retried. Fix, following
+    // KDE's own KIO favicon pattern: download each logo ONCE with a full
+    // browser UA into ${XDG_CACHE_HOME:-~/.cache}/onair-favicons/<md5(url)>
+    // and always prefer the local file (instant, offline-proof, restart-proof).
+    // Failures leave a ".fail" marker retried after 24 h; if curl or file(1)
+    // are missing, everything gracefully stays remote-only as before.
+
+    // remote favicon URL → local file:// URL. Always REPLACED as a whole
+    // object (bindings re-evaluate) but built as a MERGE — a stale batch
+    // finishing late must not clobber entries added by a newer one.
+    property var _favMap: ({})
+    property var _favHashToUrl: ({})
+
+    function faviconSrc(url) {
+        var u = (url || "").toString();
+        if (u === "") return "";
+        return _favMap[u] || u;
+    }
+
+    function _favUrls() {
+        const seen = {};
+        const urls = [];
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            for (const s of servers) {
+                const f = (s.favicon || "").toString().trim();
+                // http(s) only — anything else must never reach the shell
+                if (!/^https?:\/\//i.test(f) || seen[f]) continue;
+                seen[f] = true;
+                urls.push(f);
+            }
+        } catch (e) {}
+        return urls;
+    }
+
+    function syncFavicons() {
+        const urls = _favUrls();
+        if (urls.length === 0) return;
+        const hashToUrl = {};
+        for (const u of urls) hashToUrl[Qt.md5(u)] = u;
+        _favHashToUrl = hashToUrl;
+        // Phase 1 — instant: map whatever is already on disk (milliseconds),
+        // so a restart shows cached logos immediately, offline included.
+        executable.exec(': FAV_LIST; d="${XDG_CACHE_HOME:-$HOME/.cache}/onair-favicons"; echo "DIR $d"; '
+                        + 'for h in ' + Object.keys(hashToUrl).join(" ") + '; do [ -s "$d/$h" ] && echo "OK $h"; done; true');
+        // Phase 2 — background: download the missing ones sequentially with an
+        // atomic tmp+mv write (safe against two widget instances) and a
+        // file(1) mime check (an HTML error page must never be cached).
+        const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+        var cmd = ': FAV_SYNC; command -v curl >/dev/null 2>&1 || { echo __NO_CURL__; exit 0; }; '
+                + 'command -v file >/dev/null 2>&1 || { echo __NO_FILE__; exit 0; }; '
+                + 'd="${XDG_CACHE_HOME:-$HOME/.cache}/onair-favicons"; mkdir -p "$d" || exit 0; echo "DIR $d"; '
+                + 'find "$d" -type f -mtime +180 -delete 2>/dev/null; ';
+        for (const u of urls) {
+            const h = Qt.md5(u);
+            const safeU = u.replace(/'/g, "'\\''");
+            cmd += 'f="$d/' + h + '"; if [ -s "$f" ]; then echo "OK ' + h + '"; else '
+                 + 'if [ -z "$(find "$f.fail" -mmin -1440 2>/dev/null)" ]; then '
+                 + 'curl -sS --fail --proto \'=http,https\' -L --max-redirs 5 --connect-timeout 3 -m 10 --max-filesize 2097152 '
+                 + '-A \'' + UA + '\' -o "$f.tmp.$$" --url \'' + safeU + '\' '
+                 + '&& [ "$(file -b --mime-type "$f.tmp.$$" | cut -d/ -f1)" = image ] '
+                 + '&& mv -f "$f.tmp.$$" "$f" && rm -f "$f.fail" '
+                 + '|| { rm -f "$f.tmp.$$"; touch "$f.fail"; }; fi; '
+                 + '[ -s "$f" ] && echo "OK ' + h + '"; fi; ';
+        }
+        executable.exec(cmd + 'true');
+    }
+
+    // The cold-boot race is the root cause of "logos gone after login": the
+    // first sync may run before the network is up. Re-sync when it comes up —
+    // cheap, because everything already cached is skipped.
+    onIsConnectedChanged: if (isConnected) syncFavicons()
+
     // ── Recording (REC) — stream capture with ffmpeg ─────────────────────────
     // A SECOND ffmpeg connection records the raw stream bit-exactly (-c copy,
     // no re-encoding — same "best quality" principle as downloads). One
@@ -1397,6 +1473,7 @@ PlasmoidItem {
         reloadStationsModel();
         _loadHistory();
         _loadRecSchedules();
+        syncFavicons();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
@@ -1421,6 +1498,7 @@ PlasmoidItem {
         function onServersChanged() {
             playMusic.stop();
             reloadStationsModel();
+            syncFavicons();
         }
         function onPanelChanged() {
             playMusic.stop();
@@ -1485,6 +1563,31 @@ PlasmoidItem {
                 }
                 root._dlPendingRaw = "";
                 _startDownload(cleaned);
+                return;
+            }
+            // Favicon disk-cache results (instant list + background sync)
+            if (cmd.indexOf(": FAV_LIST;") === 0 || cmd.indexOf(": FAV_SYNC;") === 0) {
+                var favOut = stdout || "";
+                if (favOut.indexOf("__NO_CURL__") !== -1 || favOut.indexOf("__NO_FILE__") !== -1) return;
+                var favLines = favOut.split("\n");
+                var favDir = "";
+                var favUpdated = null;
+                for (var fi = 0; fi < favLines.length; fi++) {
+                    var fl = favLines[fi];
+                    if (fl.indexOf("DIR ") === 0) { favDir = fl.substring(4).trim(); continue; }
+                    if (fl.indexOf("OK ") === 0 && favDir !== "") {
+                        var fh = fl.substring(3).trim();
+                        var fu = _favHashToUrl[fh];
+                        if (fu !== undefined && _favMap[fu] === undefined) {
+                            if (favUpdated === null) {
+                                favUpdated = {};
+                                for (var fk in _favMap) favUpdated[fk] = _favMap[fk];
+                            }
+                            favUpdated[fu] = "file://" + favDir + "/" + fh;
+                        }
+                    }
+                }
+                if (favUpdated !== null) _favMap = favUpdated;
                 return;
             }
             // Recording finished (stopped, duration cap, stream died) → notify
