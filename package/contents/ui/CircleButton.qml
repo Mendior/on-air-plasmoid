@@ -20,6 +20,10 @@ Item {
     property bool primary: false
     property bool enabledState: true
     property bool checked: false
+    // Whether this button is a toggle (checkbox) rather than a momentary button.
+    // This is a *capability*, set by the caller — it must not change with state,
+    // otherwise a screen reader would hear the role flip between Button/CheckBox.
+    property bool checkable: false
     property color checkedColor: root.accent
     property color checkedIconColor: root.accentTextOn
     property string tooltipText: ""
@@ -30,12 +34,13 @@ Item {
 
     // Accessibility: expose this custom control to screen readers (Orca) and
     // make it keyboard-reachable/activatable — it is not a native Button.
-    Accessible.role: circleRoot.checked ? Accessible.CheckBox : Accessible.Button
+    // Role/checkable reflect the fixed capability; only checked reflects state.
+    Accessible.role: circleRoot.checkable ? Accessible.CheckBox : Accessible.Button
     Accessible.name: tooltipText
     Accessible.description: tooltipText
-    Accessible.checkable: circleRoot.checked
+    Accessible.checkable: circleRoot.checkable
     Accessible.checked: circleRoot.checked
-    Accessible.onPressAction: if (enabledState) circleRoot.clicked()
+    Accessible.onPressAction: if (enabledState) { rippleAnim.restart(); circleRoot.clicked() }
     activeFocusOnTab: enabledState
     Keys.onPressed: (event) => {
         if (!enabledState) return
