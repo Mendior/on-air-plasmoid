@@ -19,6 +19,11 @@ ConfigModel {
         source: "config/configAppearance.qml"
     }
     ConfigCategory {
+        name: i18n("Recording")
+        icon: "media-record"
+        source: "config/configRecording.qml"
+    }
+    ConfigCategory {
         name: i18n("Search")
         icon: "search"
         source: "config/configSearch.qml"
