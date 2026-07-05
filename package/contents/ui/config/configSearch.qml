@@ -417,7 +417,6 @@ KCM.ScrollViewKCM {
                     }
 
                     Kirigami.Chip {
-                        Layout.rightMargin: bitrate.visible ? 0 : Kirigami.Units.largeSpacing
                         text: listItem.model.codec ? listItem.model.codec : ""
                         closable: false
                         enabled: false
@@ -428,8 +427,6 @@ KCM.ScrollViewKCM {
                     Kirigami.Chip {
                         id: bitrate
 
-                        Layout.rightMargin: Kirigami.Units.largeSpacing
-
                         text: listItem.model.bitrate ? listItem.model.bitrate + i18n(
                                                            "kBit/s") : ""
                         closable: false
@@ -437,41 +434,41 @@ KCM.ScrollViewKCM {
                         visible: listItem.model.bitrate !== 0
                         implicitWidth: implicitContentWidth
                     }
-                }
-                actions: [
-                    Kirigami.Action {
-                        id: info
 
+                    // Inline buttons instead of SwipeListItem "actions": the
+                    // actions overlay is painted ON TOP of the row's right edge
+                    // and collided with the codec/bitrate chips.
+                    QQC2.ToolButton {
+                        display: QQC2.AbstractButton.IconOnly
                         icon.name: "documentinfo"
-                        text: i18n("Info")
-
-                        onTriggered: {
+                        QQC2.ToolTip.text: i18n("Info")
+                        QQC2.ToolTip.visible: hovered
+                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                        onClicked: {
                             listItem.ListView.view.currentIndex = listItem.index
-                            if (testPlay.source != searchModel.get(
-                                    listItem.ListView.view.currentIndex).url_resolved) {
+                            if (testPlay.source != listItem.model.url_resolved) {
                                 testPlay.stop()
                             }
                             message.visible = false
                             infoSheet.open()
                         }
-                    },
-                    Kirigami.Action {
-                        id: addButton
+                    }
 
-                        text: i18n("Add Station")
+                    QQC2.ToolButton {
+                        display: QQC2.AbstractButton.IconOnly
                         icon.name: listItem.model.added ? "checkbox" : "list-add"
                         enabled: !listItem.model.added
-
-                        onTriggered: {
+                        QQC2.ToolTip.text: i18n("Add Station")
+                        QQC2.ToolTip.visible: hovered
+                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                        onClicked: {
                             listItem.ListView.view.currentIndex = listItem.index
-                            if (testPlay.source != searchModel.get(
-                                    listItem.ListView.view.currentIndex).url_resolved) {
+                            if (testPlay.source != listItem.model.url_resolved) {
                                 testPlay.stop()
                             }
                             searchModel.setProperty(listItem.index,
                                                     "added", true)
-                            const src = searchModel.get(
-                                            listItem.ListView.view.currentIndex)
+                            const src = searchModel.get(listItem.index)
                             const favicon = src.favicon && src.favicon !== "null"
                                             ? src.favicon : ""
                             const itemObject = {
@@ -491,26 +488,23 @@ KCM.ScrollViewKCM {
                                 closetimer.restart()
                             }
                         }
-                    },
-                    Kirigami.Action {
-                        id: playButton
+                    }
 
-                        text: (root.isPlaying()
-                               && listItem.ListView.view.currentIndex
-                               === listItem.index) ? i18n("Stop") : i18n("Play")
-                        icon.name: (root.isPlaying()
-                                    && listItem.ListView.view.currentIndex
-                                    === listItem.index) ? "media-playback-stop" : "media-playback-start"
-
-                        enabled: listItem.ListView.view.currentIndex !== -1
-                                 && searchModel.get(
-                                     listItem.ListView.view.currentIndex).lastcheckok == 1
-
-                        onTriggered: {
+                    QQC2.ToolButton {
+                        readonly property bool playingThis: root.isPlaying()
+                                                            && testPlay.source == listItem.model.url_resolved
+                        display: QQC2.AbstractButton.IconOnly
+                        icon.name: playingThis ? "media-playback-stop" : "media-playback-start"
+                        // Per-ROW check — the old binding looked at the SELECTED
+                        // row's lastcheckok, so buttons enabled/disabled wrongly.
+                        enabled: listItem.model.lastcheckok == 1
+                        QQC2.ToolTip.text: playingThis ? i18n("Stop") : i18n("Play")
+                        QQC2.ToolTip.visible: hovered
+                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                        onClicked: {
                             listItem.ListView.view.currentIndex = listItem.index
                             message.visible = false
-                            const currentUrl = searchModel.get(
-                                listItem.ListView.view.currentIndex).url_resolved
+                            const currentUrl = listItem.model.url_resolved
                             if (root.isPlaying()
                                 && testPlay.source == currentUrl) {
                                 testPlay.stop()
@@ -522,7 +516,7 @@ KCM.ScrollViewKCM {
                             }
                         }
                     }
-                ]
+                }
             }
         }
     }
