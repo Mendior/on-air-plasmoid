@@ -32,6 +32,9 @@ PlasmaComponents3.ItemDelegate {
     padding: 0
     clip: false
     hoverEnabled: true
+    // NOT text: — AbstractButton would parse '&' in station names ("R&B FM")
+    // into stray Alt-mnemonic shortcuts; Accessible.name has no side effects.
+    Accessible.name: model.name
 
     background: Item {
         anchors.fill: parent
@@ -250,7 +253,9 @@ PlasmaComponents3.ItemDelegate {
             checked: armed
             checkedColor: "#E0463C"
             checkedIconColor: "#FFFFFF"
-            opacity: armed ? 1.0 : (listItem.hovered ? 0.6 : 0.0)
+            // Keyboard-current row (or own focus) reveals the button too —
+            // visible:false items are skipped by Tab and screen readers
+            opacity: armed ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0)
             visible: opacity > 0.0
             tooltipText: armed
                          ? i18n("Click again to confirm removal")
@@ -261,7 +266,9 @@ PlasmaComponents3.ItemDelegate {
                     disarmTimer.restart()
                 } else {
                     armed = false
-                    root.removeStation(index, model.name, model.hostname)
+                    // targetIndex (= originalIndex), NOT the delegate's filtered-list
+                    // index — with a search filter active they point at different rows
+                    root.removeStation(listItem.targetIndex, model.name, model.hostname)
                 }
             }
 
@@ -286,7 +293,7 @@ PlasmaComponents3.ItemDelegate {
             iconScale: 0.55
             checkable: true
             checked: listItem.isFav
-            opacity: listItem.isFav ? 1.0 : (listItem.hovered ? 0.85 : 0.0)
+            opacity: listItem.isFav ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.85 : 0.0)
             visible: opacity > 0.0
             tooltipText: listItem.isFav ? i18n("Remove from favorites") : i18n("Add to favorites")
             onClicked: root.toggleFavorite(model.name)

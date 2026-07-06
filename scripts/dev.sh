@@ -63,6 +63,8 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     out="$REPO_DIR/on-air-$ver.plasmoid"
     rm -f "$out"
     (cd "$PKG" && 7z a -tzip "$out" contents metadata.json -xr'!__pycache__' >/dev/null)
+    # LGPL requires the license text to accompany every distributed copy.
+    (cd "$REPO_DIR" && 7z a -tzip "$out" LICENSE >/dev/null)
     echo "OK: $out"
     ;;
   view)

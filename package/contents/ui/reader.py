@@ -7,10 +7,19 @@ Prints "<title>\t<stream_url>" when the stream's ICY title differs from the
 previous metadata (argv[2]). Prints "__NO_ICY__" when the stream can't or
 won't deliver usable metadata, so the plasmoid stops respawning us.
 """
+import signal
 import sys
 import time
 
-import requests
+try:
+    import requests
+except ImportError:
+    # python-requests is a third-party package a Store plasmoid can't declare.
+    # The sentinel pins this source after ONE spawn instead of six crashing
+    # respawns per playback start.
+    print("reader.py: python-requests not installed — track titles disabled", file=sys.stderr)
+    print("__NO_ICY__")
+    sys.exit(0)
 
 if len(sys.argv) < 3:
     print("reader.py: usage: reader.py <stream_url> <previous_metadata>", file=sys.stderr)
@@ -44,7 +53,16 @@ def extract_field(raw_meta: bytes, key: bytes) -> str:
         end = raw_meta.find(b";", start)
     if end == -1:
         end = len(raw_meta)
-    return decode_meta(raw_meta[start:end]).strip("'").strip()
+    val = decode_meta(raw_meta[start:end])
+    # Remove exactly ONE delimiter quote per side — a greedy .strip("'")
+    # destroys apostrophes that belong to the title ("'39", "Rockin'").
+    if val.startswith("'"):
+        val = val[1:]
+        # The "';" terminator already excludes the closing quote from the
+        # slice; only the end-of-buffer fallback can still contain it.
+        if end == len(raw_meta) and val.endswith("'"):
+            val = val[:-1]
+    return val.strip()
 
 
 def main():
@@ -53,6 +71,13 @@ def main():
         'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
     }
     started = time.monotonic()
+
+    # True OS-level cap: the soft MAX_SECONDS check below only runs between
+    # iter_content chunks, and a slow-drip stream (each recv gap < the 10 s
+    # socket timeout, rate far below the 4096 B chunk) never yields a chunk —
+    # SIGALRM's default action kills the process regardless. No output means
+    # an empty result to the plasmoid, which is the correct outcome here.
+    signal.alarm(MAX_SECONDS + 10)
 
     try:
         response = requests.get(url, headers=headers, stream=True, timeout=10)

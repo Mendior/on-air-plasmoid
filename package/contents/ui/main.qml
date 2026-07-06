@@ -227,6 +227,10 @@ PlasmoidItem {
         if (stopping) {
             stopWithFade();
         } else {
+            // Keep lastPlay in sync for every caller — the popup play button and
+            // the Space shortcut pass a fallback index after a preview/local file
+            // (lastPlay === -1) and the toggle-stop check above needs the match.
+            lastPlay = index;
             root._previewUrl = "";
             root.currentStationFavicon = station.favicon || "";
             _playStation(station);
@@ -513,7 +517,9 @@ PlasmoidItem {
 
     // REC button: record what is playing right now.
     function recStartCurrent() {
-        if (recording || !isPlaying()) return;
+        // fadeOutAnimation.running = a stop is in progress; playbackState is
+        // still Playing then, and a recording started now would survive the stop.
+        if (recording || !isPlaying() || fadeOutAnimation.running) return;
         var url = playMusic.source.toString();
         if (!canRecordUrl(url)) return;
         var maxMin = Math.max(1, Plasmoid.configuration.recordMaxMinutes || 180);
@@ -790,6 +796,13 @@ PlasmoidItem {
     function addStationToList(name, url, favicon, makeFavorite) {
         if (!url) return;
         const keepPlaying = isPlaying() && root._previewUrl === url;
+        // The config write below stops playback (onServersChanged). If a regular
+        // list station was playing, remember it so it can resume afterwards —
+        // same guard as removeStation: only a real list-station stream, never a
+        // stale _currentOrigUrl (e.g. while a local file is playing).
+        const wasPlayingUrl = isPlaying() && root._previewUrl === ""
+                              && playMusic.source.toString() === root._currentResolvedUrl
+                              ? root._currentOrigUrl : "";
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             for (var i = 0; i < servers.length; i++) {
@@ -806,12 +819,16 @@ PlasmoidItem {
             if (makeFavorite) toggleFavorite(stName);
             Qt.callLater(function() {
                 for (var k = 0; k < stationsModel.count; k++) {
-                    if (stationsModel.get(k).hostname === url) {
-                        if (keepPlaying) {
-                            root._previewUrl = "";
-                            lastPlay = k;
-                            refreshServer(k);
-                        }
+                    const h = stationsModel.get(k).hostname;
+                    if (keepPlaying && h === url) {
+                        root._previewUrl = "";
+                        lastPlay = k;
+                        refreshServer(k);
+                        return;
+                    }
+                    if (!keepPlaying && wasPlayingUrl !== "" && h === wasPlayingUrl) {
+                        lastPlay = k;
+                        refreshServer(k);
                         return;
                     }
                 }
@@ -877,7 +894,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.3");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.4");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1344,6 +1361,9 @@ PlasmoidItem {
         var safeLauncher = launcher.replace(/'/g, "'\\''");
         var safeState = _mprisStateFile.replace(/'/g, "'\\''");
         var safeCmd = _mprisCmdFile.replace(/'/g, "'\\''");
+        // Create the cmd file BEFORE the inotify probe can arm the watcher —
+        // watching a missing file makes inotifywait exit instantly (spawn churn).
+        executable.exec("touch '" + safeCmd + "'");
         executable.exec("bash '" + safeLauncher + "' '" + safeState + "' '" + safeCmd + "'");
         _mprisStarted = true;
         // Prefer inotify-based waiting (0 spawns while idle); the probe response
@@ -1356,9 +1376,22 @@ PlasmoidItem {
         if (!_mprisStarted) return;
         mprisCmdPoll.stop();
         mprisStateDebounce.stop();
+        mprisWatchRearm.stop();
         var safeState = _mprisStateFile.replace(/'/g, "'\\''");
         var safeCmd = _mprisCmdFile.replace(/'/g, "'\\''");
-        executable.exec("pkill -f 'mpris.py " + safeState + "' ; pkill -f 'inotifywait.*" + safeCmd + "' 2>/dev/null ; rm -f '" + safeState + "' '" + safeCmd + "'");
+        // Three SEPARATE execs, each a single metacharacter-free command: a ';'
+        // chain runs via sh -c whose own cmdline contains "mpris.py <state>" —
+        // the first pkill then kills the wrapper and the rest never executes
+        // (pkill never signals itself, so single commands are safe).
+        var safeLog = _mprisStateFile.replace("arp-mpris-state-", "arp-mpris-")
+                                     .replace(/\.json$/, ".log").replace(/'/g, "'\\''");
+        executable.exec("pkill -f 'mpris.py " + safeState + "'");
+        executable.exec("pkill -f 'inotifywait.*" + safeCmd + "'");
+        executable.exec("rm -f '" + safeState + "' '" + safeCmd + "' '" + safeLog + "'");
+        // Second pass for a daemon that slipped through the launcher's startup
+        // debounce window and recreated its files after the sweep above.
+        // ^python3 anchor: must never match this wrapper's own sh cmdline.
+        executable.exec("setsid sh -c 'sleep 2; pkill -f \"^python3 .*mpris.py " + safeState + "\"; rm -f \"" + safeState + "\" \"" + safeCmd + "\"' >/dev/null 2>&1 &");
         _mprisStarted = false;
     }
 
@@ -1500,9 +1533,6 @@ PlasmoidItem {
             reloadStationsModel();
             syncFavicons();
         }
-        function onPanelChanged() {
-            playMusic.stop();
-        }
         function onFavoritesChanged() {
             favoriteNames = parseFavorites(Plasmoid.configuration.favorites);
         }
@@ -1545,6 +1575,17 @@ PlasmoidItem {
 
     Connections {
         function onExited(cmd, exitCode, exitStatus, stdout, stderr) {
+            // MPRIS launcher failed (missing python-dbus/PyGObject, dead bus…):
+            // surface it and stop churning writes/polls against a dead daemon.
+            if (cmd.indexOf("start-mpris.sh") !== -1) {
+                if (exitCode !== 0) {
+                    console.warn("[ARP] MPRIS daemon failed to start (exit " + exitCode + "): " + (stderr || "").trim());
+                    mprisCmdPoll.stop();
+                    mprisStateDebounce.stop();
+                    _mprisStarted = false;
+                }
+                return;
+            }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {
                 root._hasInotify = (stdout || "").indexOf("INOTIFY_YES") !== -1;
@@ -1751,6 +1792,16 @@ PlasmoidItem {
                 || playMusic.mediaStatus === MediaPlayer.NoMedia) {
                 infoTimer.stop();
             }
+            // EndOfMedia ONLY (NoMedia fires on every source="" during station
+            // starts, InvalidMedia is part of the auto-bitrate error retry):
+            // a local track that finished by itself must not keep its name in
+            // the header as a stale "now playing".
+            if (playMusic.mediaStatus === MediaPlayer.EndOfMedia) {
+                playMusic.source = "";
+                root.title = Plasmoid.title;
+                root.currentStation = "";
+                root.currentStationFavicon = "";
+            }
         }
 
         audioOutput: AudioOutput {
@@ -1827,9 +1878,13 @@ PlasmoidItem {
             isError = false;
             errorTimer.stop();
             // A new stream = a clean slate for ICY metadata (the old pin was for
-            // the failed upgrade URL, not the original).
+            // the failed upgrade URL, not the original). _qtMetaWorks too — it
+            // was learned from the failed stream and would otherwise block every
+            // reader.py recovery path for the fallback stream.
             root._noIcySource = "";
             root._icyEmptyCount = 0;
+            root._qtMetaWorks = false;
+            root._stallAttempts = 0;
             playMusic.stop();
             playMusic.source = "";
             playMusic.source = fallbackUrl;
@@ -1928,8 +1983,10 @@ PlasmoidItem {
         // inotify mode: blocking wait for a file change — 0 process spawns while
         // idle (the old 250 ms 'cat' poll did ~345,000 forks per day).
         // The 900 s timeout is a safety net against lost events.
+        property double watchArmedAt: 0
         function watchNow() {
             if (!_mprisStarted) return;
+            watchArmedAt = Date.now();
             const safe = _mprisCmdFile.replace(/'/g, "'\\''");
             connectSource("inotifywait -qq -t 900 -e modify '" + safe + "' 2>/dev/null ; cat '" + safe + "' 2>/dev/null || true");
             // Lost-wakeup guard: a write that lands between the previous cat and
@@ -1955,9 +2012,13 @@ PlasmoidItem {
                 const cmd = line.substring(tabIdx + 1);
                 _handleMprisCommand(cmd);
             }
-            // inotify loop: resume waiting only after processing
+            // inotify loop: resume waiting only after processing. If the watch
+            // came back almost instantly (missing/deleted cmd file, inotify
+            // instance exhaustion), back off instead of fork-spinning; a real
+            // event or the 900 s timeout re-arms immediately as before.
             if (root._hasInotify && _mprisStarted && sourceName.indexOf("inotifywait") === 0) {
-                Qt.callLater(watchNow);
+                if (Date.now() - watchArmedAt < 1000) mprisWatchRearm.restart();
+                else Qt.callLater(watchNow);
             }
         }
     }
@@ -1978,6 +2039,16 @@ PlasmoidItem {
         repeat: false
         running: false
         onTriggered: mprisCmdReader.readNow()
+    }
+
+    Timer {
+        id: mprisWatchRearm
+        // Backoff re-arm when inotifywait exits instantly (see onNewData) —
+        // bounds the worst case to ~1 spawn/s instead of hundreds per second.
+        interval: 1000
+        repeat: false
+        running: false
+        onTriggered: mprisCmdReader.watchNow()
     }
 
     compactRepresentation: CompactRepresentation {

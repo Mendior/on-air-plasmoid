@@ -8,33 +8,27 @@
       {"active":true,"hostname":"https://mangoradio.stream.laut.fm/mangoradio?t302=2022-12-13_14-45-27&amp;uuid=b8559986-54ba-4368-9ac0-f2f4745d4b78","name":"MANGORADIO"},
       {"active":true,"hostname":"https://reyfm-stream16.radiohost.de/reyfm-original_mp3-192","name":"REYFM - #original"},
       {"active":true,"hostname":"http://stream.dancewave.online:8080/dance.mp3","name":"Dance Wave!"},
-      {"active":true,"hostname":"http://peridot.streamguys.com:7150/Mirchi","name":"Radio Mirchi"},
+      {"active":true,"hostname":"https://drive.uber.radio/uber/bollywoodnow/icecast.audio","name":"Mirchi Top 20"},
       {"active":true,"hostname":"http://stream-uk1.radioparadise.com/aac-320","name":"Radio Paradise (320k)"},
       {"active":true,"hostname":"https://icecast.walmradio.com:8443/classic","name":"Classic Vinyl HD"},
       {"active":true,"hostname":"https://icecast.walmradio.com:8443/jazz","name":"Adroit Jazz Underground"},
       {"active":true,"hostname":"https://icecast.walmradio.com:8443/christmas","name":"Christmas Vinyl HD"},
       {"active":true,"hostname":"https://icecast.walmradio.com:8443/walm","name":"WALM HD"},
       {"active":true,"hostname":"http://198.15.94.34:8006/stream","name":"Deep House Lounge"},
-      {"active":true,"hostname":"http://26453.live.streamtheworld.com/SAM03AAC226_SC","name":"#1980s Zoom"},
+      {"active":true,"hostname":"https://playerservices.streamtheworld.com/api/livestream-redirect/SAM03AAC226_SC","name":"#1980s Zoom"},
       {"active":true,"hostname":"http://ice3.somafm.com/groovesalad-128-mp3","name":"SomaFM Groove Salad"},
       {"active":true,"hostname":"http://jking.cdnstream1.com/b22139_128mp3","name":"101 SMOOTH JAZZ"},
       {"active":true,"hostname":"http://jazzblues.ice.infomaniak.ch/jazzblues-high.mp3","name":"Jazz Radio Blues"},
       {"active":true,"hostname":"http://ep256.hostingradio.ru:8052/europaplus256.mp3","name":"Europa Plus"},
       {"active":true,"hostname":"http://lin3.ash.fast-serv.com:6026/stream_96","name":"Rockabilly-radio.net"},
-      {"active":true,"hostname":"http://185.52.127.168/fr/30001/mp3_128.mp3?origine=fluxradios?1535727639539.mp3&amp;access_token=bccc39f27055469799ec9f2f48d34f12","name":"NRJ"},
+      {"active":true,"hostname":"https://streaming.nrjaudio.fm/ou7xugf3s5gi?origine=playernrj","name":"NRJ Hits"},
       {"active":true,"hostname":"http://retroserver.streamr.ru:8043/retro256.mp3","name":"Ретро FM"},
       {"active":true,"hostname":"https://dfm-disc90.hostingradio.ru/disc9096.aacp","name":"DFM Дискач 90-х"},
-      {"active":true,"hostname":"http://18103.live.streamtheworld.com:3690/977_COUNTRY_SC","name":".977 Country"}
+      {"active":true,"hostname":"https://playerservices.streamtheworld.com/api/livestream-redirect/977_COUNTRY_SC","name":".977 Country"}
       ]</default>
         </entry>
     </group>
     <group name="Appearance">
-        <entry name="notification" type="bool">
-            <default>true</default>
-        </entry>
-        <entry name="getinfo" type="bool">
-            <default>true</default>
-        </entry>
         <entry name="speedfactor" type="Double">
             <default>1.0</default>
         </entry>
@@ -48,19 +42,6 @@
         <entry name="iconFallback" type="String">
             <label>Main Icon</label>
             <default>radio-symbolic</default>
-        </entry>
-        <entry name="indicator" type="String">
-            <label>Indicator Icon</label>
-            <default>media-default-track</default>
-        </entry>
-        <entry name="indicatorIndex" type="Int">
-            <default>0</default>
-        </entry>
-        <entry name="panel" type="bool">
-            <default>false</default>
-        </entry>
-        <entry name="border" type="bool">
-            <default>true</default>
         </entry>
         <entry name="defaultVolume" type="Int">
             <label>Default volume (0-100)</label>

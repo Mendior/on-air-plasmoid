@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026.4
+
+Widget resizing fixed (#1), four dead default stations replaced, and a stability/accessibility round across the whole codebase.
+
+### Fixed — widget resizing (issue #1)
+- **The widget can now actually be resized — and it stays resized.** A hardcoded maximum size (~576×648 px) silently clamped every enlarge attempt back, which looked exactly like "it always returns to its original size". Thanks to @Driglu4it for the report. The only limit now is your screen.
+- Bonus: extra height you drag out goes into the cover art on Now Playing.
+- Shrinking the popup below the natural height of the Now Playing page now scrolls the page instead of clipping the playback buttons out of reach.
+
+### Fixed — default stations
+- Four of the twenty bundled stations had quietly died over the years: *Radio Mirchi* (404), *#1980s Zoom* (403), *.977 Country* (403) and *NRJ* (a hanging connection that never errored out). All four now point to live, stable streams — the streamtheworld ones via the permanent redirector instead of a hardcoded edge node that expires. Every bundled station was probe-tested. (Only fresh installs are affected; your own station list is never touched.)
+
+### Fixed — playback & MPRIS
+- Removing the widget (or toggling MPRIS off) could leave its state/command files and helper processes behind: the cleanup command killed its own shell mid-chain. Teardown is now split into independent commands, with a delayed second sweep for restart races.
+- A missing command file no longer sends the media-keys watcher into a tight process-respawn loop (the file is created up front, and instant failures back off to one retry per second).
+- With two widget instances, a startup cleanup sweep could kill the healthy neighbour's daemon after a rare file race; it now requires the instance's whole file pair to be gone.
+- If the MPRIS daemon can't start at all (python-dbus or PyGObject missing), the launcher now reports it — previously the daemon just died into /dev/null and media keys were silently dead. Daemon output goes to a small per-instance log now.
+- A local track that plays to its end no longer stays in the header as a stale "now playing".
+- Play (button or Space) after previewing a search result or playing a local file works as a proper toggle again, and the station list highlights the right row. Middle-click "play last station" on the panel icon recovers from the same situation.
+- Starring a web search result while the radio is playing no longer silently stops the music — playback resumes once the list is updated.
+- REC can no longer be started during the ~0.4 s stop fade (such a recording used to survive the stop and run until its duration cap). Track titles also recover properly after an automatic bitrate fallback.
+
+### Fixed — security & data safety
+- The "Downloading:" label was the one remaining place that rendered a stream-controlled string as rich text — a malicious station could inject HTML there. Plain text now, like everywhere else.
+- Web search results are only accepted with http(s) URLs — defence in depth for everything a stream URL later touches (player, saved config, ffmpeg).
+- "Re-fetch all" station logos no longer wipes a hand-entered logo URL when the lookup finds nothing better.
+- The stations backup export no longer goes through `echo`, which corrupts backslash escapes on some shells.
+- Track titles that genuinely start or end with an apostrophe (*'39*, *Rockin'*) are no longer mangled by the ICY parser.
+- The metadata reader now has a real OS-level runtime cap — a slow-drip stream could previously keep it downloading for hours past its supposed 20-second limit. And if python-requests isn't installed, it says so once instead of crash-respawning six times per station start.
+
+### Accessibility
+- Station rows, My Music files, history entries and the panel icon now announce themselves to screen readers; the per-row delete and favorite buttons are keyboard-reachable (they used to exist only on mouse hover).
+- The volume popup is fully keyboard-operable (arrow keys adjust in 5% steps, Esc closes and returns focus); the scheduler form fields have accessible labels.
+- The global Space/M shortcuts stay quiet while a text field or spinner has focus.
+
+### Settings, UI & packaging
+- The automatic highest-bitrate switch is now a visible setting (Settings → Appearance) instead of a hidden config key.
+- The recording scheduler's Add button now explains when a source can't be recorded (HLS/playlists) instead of doing nothing.
+- The REC and download pulse animations no longer burn CPU while the popup is closed.
+- Six dead config keys inherited from the original applet were removed, and the `.plasmoid` package now ships the LGPL license text it always should have.
+
 ## 2026.3
 
 The recording release — plus 24 bug fixes from a second deep audit.

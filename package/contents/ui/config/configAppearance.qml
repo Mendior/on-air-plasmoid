@@ -23,6 +23,7 @@ KCM.SimpleKCM {
     property alias cfg_albumArtEnabled: albumArtCheck.checked
     property alias cfg_blurBackdrop: blurCheck.checked
     property alias cfg_mprisEnabled: mprisCheck.checked
+    property alias cfg_autoBitrate: autoBitrateCheck.checked
     property alias cfg_followSystemAccent: accentCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
@@ -65,6 +66,15 @@ KCM.SimpleKCM {
             to: 2000
             stepSize: 50
             enabled: fadeCheck.checked
+        }
+
+        QQC2.CheckBox {
+            id: autoBitrateCheck
+            Kirigami.FormData.label: i18n("Stream quality:")
+            text: i18n("Automatically switch to the highest-bitrate variant of a station")
+
+            QQC2.ToolTip.visible: hovered
+            QQC2.ToolTip.text: i18n("Looks the station up on radio-browser.info and picks the best-quality stream URL")
         }
 
         Kirigami.Separator {

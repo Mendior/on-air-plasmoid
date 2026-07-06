@@ -24,8 +24,8 @@ PlasmaExtras.Representation {
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 16
     Layout.minimumHeight: Kirigami.Units.gridUnit * 20
-    Layout.maximumWidth: Kirigami.Units.gridUnit * 32
-    Layout.maximumHeight: Kirigami.Units.gridUnit * 36
+    // No Layout.maximum*: a hard cap makes user resizing snap back (issue #1) —
+    // AppletPopup already clamps popups to 95% of the screen on its own.
     Layout.preferredWidth: Kirigami.Units.gridUnit * 21
     // The default popup must be tall enough for the FULL Now Playing page
     // (art + title + controls + action row) — at the 20 gu minimum the button
@@ -109,7 +109,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.3")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.4")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -127,7 +127,10 @@ PlasmaExtras.Representation {
                 const seen = {}
                 for (const r of results) {
                     const u = (r.url_resolved || r.url || "").toString()
-                    if (!u || existing[u] || seen[u]) continue
+                    // http(s) only — catalogue data is untrusted and these URLs
+                    // reach playMusic.source, the config and ffmpeg (same rule
+                    // as _favUrls in main.qml).
+                    if (!u || !/^https?:\/\//i.test(u) || existing[u] || seen[u]) continue
                     seen[u] = true
                     var br = parseInt(r.bitrate) || 0
                     if (br > 1000) br = Math.round(br / 1000)
@@ -657,486 +660,517 @@ PlasmaExtras.Representation {
         }
 
         // ── PAGE 2: now playing ──────────────────────────────────────────
-        ColumnLayout {
-            id: nowPlayingPage
-            spacing: Kirigami.Units.smallSpacing
+        // Wrapped in a Flickable so the controls stay reachable when the
+        // popup is resized below the page's natural height (min is 20 gu).
+        Flickable {
+            id: nowPlayingFlick
+            clip: true
+            contentWidth: width
+            contentHeight: nowPlayingPage.implicitHeight
+            interactive: contentHeight > height
+            flickableDirection: Flickable.VerticalFlick
+            boundsBehavior: Flickable.StopAtBounds
 
-            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing; Layout.fillWidth: true }
+            ColumnLayout {
+                id: nowPlayingPage
+                width: nowPlayingFlick.width
+                height: Math.max(implicitHeight, nowPlayingFlick.height)
+                spacing: Kirigami.Units.smallSpacing
 
-            Item {
-                id: artContainer
-                Layout.alignment: Qt.AlignHCenter
-                // Slightly smaller than before, so the favorite button doesn't get
-                // clipped off the bottom by the popup's fixed height (popupHeight).
-                Layout.preferredWidth: Math.min(fullRepresentation.width - Kirigami.Units.largeSpacing * 4, Kirigami.Units.gridUnit * 10.5)
-                Layout.preferredHeight: Layout.preferredWidth
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing; Layout.fillWidth: true }
 
-                // Soft emerald glow behind the cover art
-                Rectangle {
-                    id: artGlowSrc
-                    anchors.fill: parent
-                    anchors.margins: -Kirigami.Units.smallSpacing
-                    radius: Kirigami.Units.smallSpacing * 3
-                    color: Qt.alpha(root.accent, 0.45)
-                    visible: false
-                }
-                MultiEffect {
-                    anchors.fill: artGlowSrc
-                    source: artGlowSrc
-                    blurEnabled: true
-                    blur: 1.0
-                    blurMax: 48
-                    opacity: fullRepresentation._streamActive ? 0.6 : 0.0
-                    Behavior on opacity { NumberAnimation { duration: 900; easing.type: Easing.InOutQuad } }
-                }
+                Item {
+                    id: artContainer
+                    Layout.alignment: Qt.AlignHCenter
+                    // 10.5 gu at the default popup height (32 gu); extra height the
+                    // user drags out goes into the art — it never shrinks below that,
+                    // so the button rows can't get clipped at the default size.
+                    Layout.preferredWidth: Math.min(fullRepresentation.width - Kirigami.Units.largeSpacing * 4,
+                                                    Kirigami.Units.gridUnit * 10.5
+                                                    + Math.max(0, fullRepresentation.height - Kirigami.Units.gridUnit * 32))
+                    Layout.preferredHeight: Layout.preferredWidth
 
-                Rectangle {
-                    id: artFrame
-                    anchors.fill: parent
-                    radius: Kirigami.Units.smallSpacing * 2
-                    color: Qt.alpha(Kirigami.Theme.textColor, 0.06)
-                    border.width: 1
-                    border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
-                    clip: true
-                    // Breathing effect while playing (only with the popup open)
-                    SequentialAnimation on scale {
-                        loops: Animation.Infinite
-                        running: fullRepresentation._streamActive && root.view === 1 && root.expanded
-                        NumberAnimation { from: 1.0; to: 1.011; duration: 2600; easing.type: Easing.InOutSine }
-                        NumberAnimation { from: 1.011; to: 1.0; duration: 2600; easing.type: Easing.InOutSine }
-                    }
-
-                    Image {
-                        id: artImage
+                    // Soft emerald glow behind the cover art
+                    Rectangle {
+                        id: artGlowSrc
                         anchors.fill: parent
-                        anchors.margins: 1
-                        source: fullRepresentation._bestArtUrl
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        visible: status === Image.Ready
-                        smooth: true
-
-                        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
+                        anchors.margins: -Kirigami.Units.smallSpacing
+                        radius: Kirigami.Units.smallSpacing * 3
+                        color: Qt.alpha(root.accent, 0.45)
+                        visible: false
+                    }
+                    MultiEffect {
+                        anchors.fill: artGlowSrc
+                        source: artGlowSrc
+                        blurEnabled: true
+                        blur: 1.0
+                        blurMax: 48
+                        opacity: fullRepresentation._streamActive ? 0.6 : 0.0
+                        Behavior on opacity { NumberAnimation { duration: 900; easing.type: Easing.InOutQuad } }
                     }
 
-                    // 2026: spinning vinyl when there's no cover art
-                    Item {
-                        id: vinyl
-                        anchors.centerIn: parent
-                        width: parent.width * 0.78
-                        height: width
-                        visible: artImage.status !== Image.Ready && root.currentStation !== ""
-
-                        RotationAnimator on rotation {
-                            from: 0
-                            to: 360
-                            duration: 9000
+                    Rectangle {
+                        id: artFrame
+                        anchors.fill: parent
+                        radius: Kirigami.Units.smallSpacing * 2
+                        color: Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                        border.width: 1
+                        border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
+                        clip: true
+                        // Breathing effect while playing (only with the popup open)
+                        SequentialAnimation on scale {
                             loops: Animation.Infinite
-                            running: vinyl.visible && fullRepresentation._streamActive && root.view === 1 && root.expanded
+                            running: fullRepresentation._streamActive && root.view === 1 && root.expanded
+                            NumberAnimation { from: 1.0; to: 1.011; duration: 2600; easing.type: Easing.InOutSine }
+                            NumberAnimation { from: 1.011; to: 1.0; duration: 2600; easing.type: Easing.InOutSine }
                         }
 
-                        Canvas {
+                        Image {
+                            id: artImage
                             anchors.fill: parent
-                            onPaint: {
-                                var ctx = getContext("2d")
-                                ctx.reset()
-                                var c = width / 2
-                                // Record
-                                ctx.beginPath()
-                                ctx.arc(c, c, c - 1, 0, Math.PI * 2)
-                                ctx.fillStyle = "#151515"
-                                ctx.fill()
-                                // Grooves
-                                ctx.strokeStyle = "rgba(255,255,255,0.07)"
-                                ctx.lineWidth = 1
-                                for (var r = c * 0.45; r < c * 0.94; r += c * 0.055) {
-                                    ctx.beginPath()
-                                    ctx.arc(c, c, r, 0, Math.PI * 2)
-                                    ctx.stroke()
-                                }
-                                // Light glint
-                                var g = ctx.createLinearGradient(0, 0, width, height)
-                                g.addColorStop(0, "rgba(111,207,151,0.14)")
-                                g.addColorStop(0.5, "rgba(111,207,151,0)")
-                                g.addColorStop(1, "rgba(43,179,163,0.10)")
-                                ctx.beginPath()
-                                ctx.arc(c, c, c - 1, 0, Math.PI * 2)
-                                ctx.fillStyle = g
-                                ctx.fill()
-                                // Center hole
-                                ctx.beginPath()
-                                ctx.arc(c, c, c * 0.3, 0, Math.PI * 2)
-                                ctx.fillStyle = "#1f1f1f"
-                                ctx.fill()
-                                ctx.beginPath()
-                                ctx.arc(c, c, c * 0.045, 0, Math.PI * 2)
-                                ctx.fillStyle = "#0a0a0a"
-                                ctx.fill()
-                            }
+                            anchors.margins: 1
+                            source: fullRepresentation._bestArtUrl
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            visible: status === Image.Ready
+                            smooth: true
+
+                            Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
                         }
 
-                        Rectangle {
+                        // 2026: spinning vinyl when there's no cover art
+                        Item {
+                            id: vinyl
                             anchors.centerIn: parent
-                            width: parent.width * 0.56
+                            width: parent.width * 0.78
                             height: width
-                            radius: width / 2
-                            color: "transparent"
-                            clip: true
-                            Image {
+                            visible: artImage.status !== Image.Ready && root.currentStation !== ""
+
+                            RotationAnimator on rotation {
+                                from: 0
+                                to: 360
+                                duration: 9000
+                                loops: Animation.Infinite
+                                running: vinyl.visible && fullRepresentation._streamActive && root.view === 1 && root.expanded
+                            }
+
+                            Canvas {
                                 anchors.fill: parent
-                                // Disk-cached copy when available
-                                source: root.faviconSrc(root.currentStationFavicon)
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                                smooth: true
-                                visible: status === Image.Ready
-                                // Self-healing: corrupted cache → retry remote once
-                                onStatusChanged: {
-                                    if (status === Image.Error && root.currentStationFavicon
-                                        && source.toString().indexOf("file://") === 0) {
-                                        source = root.currentStationFavicon
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.reset()
+                                    var c = width / 2
+                                    // Record
+                                    ctx.beginPath()
+                                    ctx.arc(c, c, c - 1, 0, Math.PI * 2)
+                                    ctx.fillStyle = "#151515"
+                                    ctx.fill()
+                                    // Grooves
+                                    ctx.strokeStyle = "rgba(255,255,255,0.07)"
+                                    ctx.lineWidth = 1
+                                    for (var r = c * 0.45; r < c * 0.94; r += c * 0.055) {
+                                        ctx.beginPath()
+                                        ctx.arc(c, c, r, 0, Math.PI * 2)
+                                        ctx.stroke()
                                     }
+                                    // Light glint
+                                    var g = ctx.createLinearGradient(0, 0, width, height)
+                                    g.addColorStop(0, "rgba(111,207,151,0.14)")
+                                    g.addColorStop(0.5, "rgba(111,207,151,0)")
+                                    g.addColorStop(1, "rgba(43,179,163,0.10)")
+                                    ctx.beginPath()
+                                    ctx.arc(c, c, c - 1, 0, Math.PI * 2)
+                                    ctx.fillStyle = g
+                                    ctx.fill()
+                                    // Center hole
+                                    ctx.beginPath()
+                                    ctx.arc(c, c, c * 0.3, 0, Math.PI * 2)
+                                    ctx.fillStyle = "#1f1f1f"
+                                    ctx.fill()
+                                    ctx.beginPath()
+                                    ctx.arc(c, c, c * 0.045, 0, Math.PI * 2)
+                                    ctx.fillStyle = "#0a0a0a"
+                                    ctx.fill()
                                 }
-                                layer.enabled: true
-                                layer.effect: MultiEffect {
-                                    maskEnabled: true
-                                    maskSource: ShaderEffectSource {
-                                        sourceItem: Rectangle {
-                                            width: 64; height: 64; radius: 32; color: "white"
+                            }
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width * 0.56
+                                height: width
+                                radius: width / 2
+                                color: "transparent"
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    // Disk-cached copy when available. The self-heal must not
+                                    // assign source imperatively — that destroys the binding
+                                    // and pins this logo until the popup is rebuilt.
+                                    property string brokenCacheFor: ""
+                                    source: {
+                                        var fav = root.currentStationFavicon
+                                        return (fav && fav === brokenCacheFor) ? fav : root.faviconSrc(fav)
+                                    }
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                    smooth: true
+                                    visible: status === Image.Ready
+                                    // Self-healing: corrupted cache → retry remote once
+                                    // (flag flips the binding to the remote URL, so it
+                                    // stays declarative and station changes keep working)
+                                    onStatusChanged: {
+                                        if (status === Image.Error && root.currentStationFavicon
+                                            && source.toString().indexOf("file://") === 0) {
+                                            brokenCacheFor = root.currentStationFavicon
+                                        }
+                                    }
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled: true
+                                        maskSource: ShaderEffectSource {
+                                            sourceItem: Rectangle {
+                                                width: 64; height: 64; radius: 32; color: "white"
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        width: parent.width * 0.4
-                        height: parent.height * 0.4
-                        source: "radio"
-                        opacity: 0.45
-                        visible: artImage.status !== Image.Ready && !vinyl.visible
+                        Kirigami.Icon {
+                            anchors.centerIn: parent
+                            width: parent.width * 0.4
+                            height: parent.height * 0.4
+                            source: "radio"
+                            opacity: 0.45
+                            visible: artImage.status !== Image.Ready && !vinyl.visible
+                        }
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: Kirigami.Units.gridUnit * 3.5
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: "transparent" }
+                                GradientStop { position: 1.0; color: Qt.alpha("black", 0.7) }
+                            }
+                            visible: artImage.status === Image.Ready && playingEq.visible
+                        }
+
+                        EqBars {
+                            id: playingEq
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                            visible: fullRepresentation._streamActive
+                            animating: visible && root.expanded
+                            bars: 4
+                            barWidth: 4
+                            minHeight: 6
+                            maxHeight: Kirigami.Units.gridUnit
+                            barColor: artImage.status === Image.Ready ? "white" : root.accentBright
+                        }
+                    }
+                }
+
+                // LIVE + bitrate pills
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: Kirigami.Units.smallSpacing
+                    spacing: Kirigami.Units.smallSpacing
+                    visible: fullRepresentation._streamActive
+
+                    Rectangle {
+                        implicitHeight: liveRow.implicitHeight + Kirigami.Units.smallSpacing
+                        implicitWidth: liveRow.implicitWidth + Kirigami.Units.largeSpacing
+                        radius: height / 2
+                        color: Qt.alpha("#e0463c", 0.16)
+                        border.width: 1
+                        border.color: Qt.alpha("#e0463c", 0.4)
+
+                        RowLayout {
+                            id: liveRow
+                            anchors.centerIn: parent
+                            spacing: Kirigami.Units.smallSpacing / 1.5
+
+                            Rectangle {
+                                id: liveDot
+                                width: 7
+                                height: 7
+                                radius: 3.5
+                                color: "#ff5c52"
+                                SequentialAnimation on opacity {
+                                    loops: Animation.Infinite
+                                    running: fullRepresentation._streamActive && root.view === 1 && root.expanded
+                                    NumberAnimation { from: 1.0; to: 0.25; duration: 800; easing.type: Easing.InOutSine }
+                                    NumberAnimation { from: 0.25; to: 1.0; duration: 800; easing.type: Easing.InOutSine }
+                                }
+                            }
+                            PlasmaComponents3.Label {
+                                text: i18n("LIVE")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                font.weight: Font.Bold
+                                font.letterSpacing: 1.2
+                                color: "#ff8a80"
+                            }
+                        }
                     }
 
                     Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: Kirigami.Units.gridUnit * 3.5
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 1.0; color: Qt.alpha("black", 0.7) }
-                        }
-                        visible: artImage.status === Image.Ready && playingEq.visible
-                    }
+                        visible: fullRepresentation._nowBitrate > 0
+                        implicitHeight: brLabel.implicitHeight + Kirigami.Units.smallSpacing
+                        implicitWidth: brLabel.implicitWidth + Kirigami.Units.largeSpacing
+                        radius: height / 2
+                        color: Qt.alpha(root.accent, 0.12)
+                        border.width: 1
+                        border.color: Qt.alpha(root.accent, 0.4)
 
-                    EqBars {
-                        id: playingEq
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.margins: Kirigami.Units.smallSpacing * 1.5
-                        visible: fullRepresentation._streamActive
-                        animating: visible && root.expanded
-                        bars: 4
-                        barWidth: 4
-                        minHeight: 6
-                        maxHeight: Kirigami.Units.gridUnit
-                        barColor: artImage.status === Image.Ready ? "white" : root.accentBright
-                    }
-                }
-            }
-
-            // LIVE + bitrate pills
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.smallSpacing
-                visible: fullRepresentation._streamActive
-
-                Rectangle {
-                    implicitHeight: liveRow.implicitHeight + Kirigami.Units.smallSpacing
-                    implicitWidth: liveRow.implicitWidth + Kirigami.Units.largeSpacing
-                    radius: height / 2
-                    color: Qt.alpha("#e0463c", 0.16)
-                    border.width: 1
-                    border.color: Qt.alpha("#e0463c", 0.4)
-
-                    RowLayout {
-                        id: liveRow
-                        anchors.centerIn: parent
-                        spacing: Kirigami.Units.smallSpacing / 1.5
-
-                        Rectangle {
-                            id: liveDot
-                            width: 7
-                            height: 7
-                            radius: 3.5
-                            color: "#ff5c52"
-                            SequentialAnimation on opacity {
-                                loops: Animation.Infinite
-                                running: fullRepresentation._streamActive && root.view === 1 && root.expanded
-                                NumberAnimation { from: 1.0; to: 0.25; duration: 800; easing.type: Easing.InOutSine }
-                                NumberAnimation { from: 0.25; to: 1.0; duration: 800; easing.type: Easing.InOutSine }
-                            }
-                        }
                         PlasmaComponents3.Label {
-                            text: i18n("LIVE")
+                            id: brLabel
+                            anchors.centerIn: parent
+                            text: fullRepresentation._nowBitrate + " kb/s"
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            font.weight: Font.Bold
-                            font.letterSpacing: 1.2
-                            color: "#ff8a80"
+                            color: root.accentBright
                         }
                     }
                 }
 
-                Rectangle {
-                    visible: fullRepresentation._nowBitrate > 0
-                    implicitHeight: brLabel.implicitHeight + Kirigami.Units.smallSpacing
-                    implicitWidth: brLabel.implicitWidth + Kirigami.Units.largeSpacing
-                    radius: height / 2
-                    color: Qt.alpha(root.accent, 0.12)
-                    border.width: 1
-                    border.color: Qt.alpha(root.accent, 0.4)
+                ColumnLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Kirigami.Units.largeSpacing
+                    Layout.rightMargin: Kirigami.Units.largeSpacing
+                    Layout.topMargin: Kirigami.Units.smallSpacing / 2
+                    spacing: Kirigami.Units.smallSpacing / 2
 
                     PlasmaComponents3.Label {
-                        id: brLabel
-                        anchors.centerIn: parent
-                        text: fullRepresentation._nowBitrate + " kb/s"
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: root.currentStation
+                        // Untrusted (station-controlled) — never interpret as HTML
+                        textFormat: Text.PlainText
+                        visible: text !== ""
+                        opacity: 0.6
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        color: root.accentBright
+                        font.capitalization: Font.AllUppercase
+                        font.letterSpacing: 1.1
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    Kirigami.Heading {
+                        id: titleHeading
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        level: 2
+                        elide: Text.ElideRight
+                        maximumLineCount: 2
+                        wrapMode: Text.Wrap
+                        // Untrusted (ICY title / station name) — never interpret as HTML
+                        textFormat: Text.PlainText
+                        text: {
+                            if (root.trackTitle) return root.trackTitle
+                            if (root.currentStation) return root.currentStation
+                            return ""
+                        }
+                        transform: Translate { id: titleShift; y: 0 }
+                        onTextChanged: titleReveal.restart()
+
+                        ParallelAnimation {
+                            id: titleReveal
+                            NumberAnimation { target: titleHeading; property: "opacity"; from: 0; to: 1; duration: 380; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: titleShift; property: "y"; from: Kirigami.Units.smallSpacing * 1.5; to: 0; duration: 380; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    PlasmaComponents3.Label {
+                        id: artistLabel
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        opacity: 0.8
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: root.trackArtist
+                        // Untrusted (ICY title) — never interpret as HTML
+                        textFormat: Text.PlainText
+                        visible: text !== ""
+                        transform: Translate { id: artistShift; y: 0 }
+                        onTextChanged: artistReveal.restart()
+
+                        ParallelAnimation {
+                            id: artistReveal
+                            NumberAnimation { target: artistLabel; property: "opacity"; from: 0; to: 0.8; duration: 420; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: artistShift; property: "y"; from: Kirigami.Units.smallSpacing; to: 0; duration: 420; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    PlasmaComponents3.Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        opacity: 0.55
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        font.italic: true
+                        text: i18n("Nothing playing")
+                        visible: !isPlaying() && root.currentStation === ""
                     }
                 }
-            }
 
-            ColumnLayout {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
-                Layout.topMargin: Kirigami.Units.smallSpacing / 2
-                spacing: Kirigami.Units.smallSpacing / 2
-
-                PlasmaComponents3.Label {
+                RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    text: root.currentStation
-                    // Untrusted (station-controlled) — never interpret as HTML
-                    textFormat: Text.PlainText
-                    visible: text !== ""
-                    opacity: 0.6
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    font.capitalization: Font.AllUppercase
-                    font.letterSpacing: 1.1
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
+                    Layout.topMargin: Kirigami.Units.smallSpacing
+                    spacing: Kirigami.Units.largeSpacing * 1.5
 
-                Kirigami.Heading {
-                    id: titleHeading
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    level: 2
-                    elide: Text.ElideRight
-                    maximumLineCount: 2
-                    wrapMode: Text.Wrap
-                    // Untrusted (ICY title / station name) — never interpret as HTML
-                    textFormat: Text.PlainText
-                    text: {
-                        if (root.trackTitle) return root.trackTitle
-                        if (root.currentStation) return root.currentStation
-                        return ""
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 3
+                        implicitHeight: implicitWidth
+                        iconName: "media-skip-backward"
+                        iconScale: 0.5
+                        enabledState: stationsModel.count > 1
+                        tooltipText: i18n("Previous station")
+                        onClicked: {
+                            let idx = lastPlay - 1
+                            if (idx < 0) idx = stationsModel.count - 1
+                            lastPlay = idx
+                            refreshServer(idx)
+                        }
                     }
-                    transform: Translate { id: titleShift; y: 0 }
-                    onTextChanged: titleReveal.restart()
 
-                    ParallelAnimation {
-                        id: titleReveal
-                        NumberAnimation { target: titleHeading; property: "opacity"; from: 0; to: 1; duration: 380; easing.type: Easing.OutCubic }
-                        NumberAnimation { target: titleShift; property: "y"; from: Kirigami.Units.smallSpacing * 1.5; to: 0; duration: 380; easing.type: Easing.OutCubic }
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 4.5
+                        implicitHeight: implicitWidth
+                        iconName: isPlaying() ? "media-playback-stop" : "media-playback-start"
+                        iconScale: 0.45
+                        primary: true
+                        glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded
+                        enabledState: stationsModel.count > 0 || isPlaying()
+                        tooltipText: isPlaying() ? i18n("Stop") : i18n("Play")
+                        onClicked: {
+                            // While playing = ALWAYS stop (including preview);
+                            // otherwise play the last / first station.
+                            if (isPlaying()) {
+                                stopWithFade()
+                            } else {
+                                const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
+                                refreshServer(idx)
+                            }
+                        }
                     }
-                }
 
-                PlasmaComponents3.Label {
-                    id: artistLabel
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    opacity: 0.8
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                    text: root.trackArtist
-                    // Untrusted (ICY title) — never interpret as HTML
-                    textFormat: Text.PlainText
-                    visible: text !== ""
-                    transform: Translate { id: artistShift; y: 0 }
-                    onTextChanged: artistReveal.restart()
-
-                    ParallelAnimation {
-                        id: artistReveal
-                        NumberAnimation { target: artistLabel; property: "opacity"; from: 0; to: 0.8; duration: 420; easing.type: Easing.OutCubic }
-                        NumberAnimation { target: artistShift; property: "y"; from: Kirigami.Units.smallSpacing; to: 0; duration: 420; easing.type: Easing.OutCubic }
-                    }
-                }
-
-                PlasmaComponents3.Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    opacity: 0.55
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    font.italic: true
-                    text: i18n("Nothing playing")
-                    visible: !isPlaying() && root.currentStation === ""
-                }
-            }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.largeSpacing * 1.5
-
-                CircleButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 3
-                    implicitHeight: implicitWidth
-                    iconName: "media-skip-backward"
-                    iconScale: 0.5
-                    enabledState: stationsModel.count > 1
-                    tooltipText: i18n("Previous station")
-                    onClicked: {
-                        let idx = lastPlay - 1
-                        if (idx < 0) idx = stationsModel.count - 1
-                        lastPlay = idx
-                        refreshServer(idx)
-                    }
-                }
-
-                CircleButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 4.5
-                    implicitHeight: implicitWidth
-                    iconName: isPlaying() ? "media-playback-stop" : "media-playback-start"
-                    iconScale: 0.45
-                    primary: true
-                    glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded
-                    enabledState: stationsModel.count > 0 || isPlaying()
-                    tooltipText: isPlaying() ? i18n("Stop") : i18n("Play")
-                    onClicked: {
-                        // While playing = ALWAYS stop (including preview);
-                        // otherwise play the last / first station.
-                        if (isPlaying()) {
-                            stopWithFade()
-                        } else {
-                            const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 3
+                        implicitHeight: implicitWidth
+                        iconName: "media-skip-forward"
+                        iconScale: 0.5
+                        enabledState: stationsModel.count > 1
+                        tooltipText: i18n("Next station")
+                        onClicked: {
+                            let idx = lastPlay + 1
+                            if (idx >= stationsModel.count) idx = 0
+                            lastPlay = idx
                             refreshServer(idx)
                         }
                     }
                 }
 
-                CircleButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 3
-                    implicitHeight: implicitWidth
-                    iconName: "media-skip-forward"
-                    iconScale: 0.5
-                    enabledState: stationsModel.count > 1
-                    tooltipText: i18n("Next station")
-                    onClicked: {
-                        let idx = lastPlay + 1
-                        if (idx >= stationsModel.count) idx = 0
-                        lastPlay = idx
-                        refreshServer(idx)
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: root.currentStation !== ""
+                    spacing: Kirigami.Units.largeSpacing
+
+                    // Search the currently playing track on YouTube
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: "globe"
+                        iconScale: 0.55
+                        enabledState: root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== "")
+                        tooltipText: i18n("Search this track on YouTube")
+                        onClicked: root.youtubeOpenSearch()
                     }
-                }
-            }
 
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                visible: root.currentStation !== ""
-                spacing: Kirigami.Units.largeSpacing
-
-                // Search the currently playing track on YouTube
-                CircleButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 2.4
-                    implicitHeight: implicitWidth
-                    iconName: "globe"
-                    iconScale: 0.55
-                    enabledState: root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== "")
-                    tooltipText: i18n("Search this track on YouTube")
-                    onClicked: root.youtubeOpenSearch()
-                }
-
-                CircleButton {
-                    readonly property bool previewing: root._previewUrl !== ""
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 2.4
-                    implicitHeight: implicitWidth
-                    iconName: !previewing && root.isFavorite(root.currentStation) ? "favorite" : "non-starred-symbolic"
-                    iconScale: 0.55
-                    checkable: true
-                    checked: !previewing && root.isFavorite(root.currentStation)
-                    tooltipText: {
-                        if (previewing) return i18n("Add to my stations + favorites")
-                        return root.isFavorite(root.currentStation) ? i18n("Remove from favorites") : i18n("Add to favorites")
-                    }
-                    onClicked: {
-                        if (previewing) {
-                            root.addStationToList(root.currentStation, root._previewUrl, root.currentStationFavicon, true)
-                        } else {
-                            root.toggleFavorite(root.currentStation)
+                    CircleButton {
+                        readonly property bool previewing: root._previewUrl !== ""
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: !previewing && root.isFavorite(root.currentStation) ? "favorite" : "non-starred-symbolic"
+                        iconScale: 0.55
+                        checkable: true
+                        checked: !previewing && root.isFavorite(root.currentStation)
+                        tooltipText: {
+                            if (previewing) return i18n("Add to my stations + favorites")
+                            return root.isFavorite(root.currentStation) ? i18n("Remove from favorites") : i18n("Add to favorites")
+                        }
+                        onClicked: {
+                            if (previewing) {
+                                root.addStationToList(root.currentStation, root._previewUrl, root.currentStationFavicon, true)
+                            } else {
+                                root.toggleFavorite(root.currentStation)
+                            }
                         }
                     }
-                }
 
-                // Download the currently playing track (yt-dlp, format from settings)
-                CircleButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 2.4
-                    implicitHeight: implicitWidth
-                    iconName: root.downloading ? "view-refresh" : "download"
-                    iconScale: 0.55
-                    // Not checkable: one-shot action button; checked only drives the
-                    // "downloading" visual, it is not a user-togglable state.
-                    checked: root.downloading
-                    glowPulse: root.downloading
-                    enabledState: !root.downloading && (root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== ""))
-                    tooltipText: root.downloading
-                                 ? i18n("Downloading…")
-                                 : i18n("Download this track (for offline listening)")
-                    onClicked: root.downloadCurrentTrack()
-                }
-
-                // ● REC — capture the live stream to ~/Music/OnAir (bit-exact copy)
-                CircleButton {
-                    readonly property bool canRec: isPlaying() && root.canRecordUrl(playMusic.source.toString())
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: Kirigami.Units.gridUnit * 2.4
-                    implicitHeight: implicitWidth
-                    iconName: "media-record"
-                    iconScale: 0.55
-                    checkable: true
-                    checked: root.recording
-                    checkedColor: "#E0463C"
-                    checkedIconColor: "#FFFFFF"
-                    glowPulse: root.recording
-                    enabledState: root.recording ? !root._recScheduled : canRec
-                    tooltipText: {
-                        if (root.recording && root._recScheduled)
-                            return i18n("A scheduled recording is running (%1)", root._recStationName)
-                        if (root.recording)
-                            return i18n("Recording %1 — click to stop", root.recElapsedText())
-                        if (!canRec && isPlaying())
-                            return i18n("This source cannot be recorded")
-                        return i18n("Record this station (personal use only)")
+                    // Download the currently playing track (yt-dlp, format from settings)
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: root.downloading ? "view-refresh" : "download"
+                        iconScale: 0.55
+                        // Not checkable: one-shot action button; checked only drives the
+                        // "downloading" visual, it is not a user-togglable state.
+                        checked: root.downloading
+                        // && expanded: the infinite pulse ring must not tick in a hidden popup
+                        glowPulse: root.downloading && root.expanded
+                        enabledState: !root.downloading && (root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== ""))
+                        tooltipText: root.downloading
+                                     ? i18n("Downloading…")
+                                     : i18n("Download this track (for offline listening)")
+                        onClicked: root.downloadCurrentTrack()
                     }
-                    onClicked: root.recording ? root.recStop() : root.recStartCurrent()
-                }
-            }
 
-            Item { Layout.fillHeight: true }
+                    // ● REC — capture the live stream to ~/Music/OnAir (bit-exact copy)
+                    CircleButton {
+                        // !fadeOutAnimation.running: during a stop fade the stream is
+                        // still "playing" — starting a REC there would outlive the stop
+                        readonly property bool canRec: isPlaying() && !fadeOutAnimation.running
+                                                       && root.canRecordUrl(playMusic.source.toString())
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: "media-record"
+                        iconScale: 0.55
+                        checkable: true
+                        checked: root.recording
+                        checkedColor: "#E0463C"
+                        checkedIconColor: "#FFFFFF"
+                        // && expanded: recordings run for hours — the pulse ring must
+                        // not keep plasmashell's animation timer alive popup-closed
+                        glowPulse: root.recording && root.expanded
+                        enabledState: root.recording ? !root._recScheduled : canRec
+                        tooltipText: {
+                            if (root.recording && root._recScheduled)
+                                return i18n("A scheduled recording is running (%1)", root._recStationName)
+                            if (root.recording)
+                                return i18n("Recording %1 — click to stop", root.recElapsedText())
+                            if (!canRec && isPlaying())
+                                return i18n("This source cannot be recorded")
+                            return i18n("Record this station (personal use only)")
+                        }
+                        onClicked: root.recording ? root.recStop() : root.recStartCurrent()
+                    }
+                }
+
+                Item { Layout.fillHeight: true }
+            }
         }
 
         // ── PAGE 3: My Music — downloaded tracks for offline use ────────
@@ -1187,6 +1221,8 @@ PlasmaExtras.Representation {
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
                         text: i18n("Downloading: ") + (root._dlCurrentQuery || "…")
+                        // Untrusted (derived from the ICY title) — never interpret as HTML
+                        textFormat: Text.PlainText
                         elide: Text.ElideRight
                         maximumLineCount: 1
                         color: root.accent
@@ -1297,11 +1333,26 @@ PlasmaExtras.Representation {
                         width: historyView.width - historyView.leftMargin - historyView.rightMargin
                         height: Kirigami.Units.gridUnit * 2.2
 
+                        // Keyboard + screen-reader access — the row is otherwise
+                        // reachable only with a pointer (same pattern as web rows)
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: i18n("Search YouTube for %1", (histItem.model.artist ? histItem.model.artist + " " : "") + histItem.model.trackName)
+                        Accessible.onPressAction: root.youtubeSearchFor((histItem.model.artist ? histItem.model.artist + " " : "") + histItem.model.trackName)
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                                root.youtubeSearchFor((histItem.model.artist ? histItem.model.artist + " " : "") + histItem.model.trackName)
+                                event.accepted = true
+                            }
+                        }
+
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: 1
                             radius: Kirigami.Units.smallSpacing
                             color: histHover.hovered ? Qt.alpha(root.accent, 0.07) : Qt.alpha(Kirigami.Theme.textColor, 0.03)
+                            border.width: histItem.activeFocus ? 2 : 0
+                            border.color: histItem.activeFocus ? root.accent : "transparent"
                             Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
 
                             RowLayout {
@@ -1523,6 +1574,7 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             model: stationsModel
                             textRole: "name"
+                            Accessible.name: i18n("Station")
                         }
 
                         PlasmaComponents3.Label {
@@ -1537,6 +1589,7 @@ PlasmaExtras.Representation {
                                 value: 20
                                 textFromValue: function(v) { return root._pad2(v) }
                                 wrap: true
+                                Accessible.name: i18n("Start hour")
                             }
                             PlasmaComponents3.Label { text: ":" }
                             QQC2.SpinBox {
@@ -1546,6 +1599,7 @@ PlasmaExtras.Representation {
                                 value: 0
                                 textFromValue: function(v) { return root._pad2(v) }
                                 wrap: true
+                                Accessible.name: i18n("Start minute")
                             }
                         }
 
@@ -1560,6 +1614,7 @@ PlasmaExtras.Representation {
                             value: 60
                             textFromValue: function(v) { return v + " min" }
                             valueFromText: function(t) { return parseInt(t) || 60 }
+                            Accessible.name: i18n("Duration in minutes")
                         }
 
                         PlasmaComponents3.Label {
@@ -1571,6 +1626,7 @@ PlasmaExtras.Representation {
                             QQC2.ComboBox {
                                 id: schedRepeat
                                 model: [i18n("Once"), i18n("Daily"), i18n("Weekly")]
+                                Accessible.name: i18n("Repeat")
                             }
                             QQC2.ComboBox {
                                 id: schedWeekday
@@ -1578,6 +1634,7 @@ PlasmaExtras.Representation {
                                 // Fixed English day names (UI language is English by design)
                                 model: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
                                 currentIndex: new Date().getDay()
+                                Accessible.name: i18n("Weekday")
                             }
                         }
                     }
@@ -1589,15 +1646,32 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.Label {
                             Layout.fillWidth: true
                             text: i18n("Recordings are for personal use only.")
+                            visible: addSchedButton.selRecordable || schedStation.currentIndex < 0
                             opacity: 0.5
                             font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
                             font.italic: true
                             elide: Text.ElideRight
                         }
+                        // Shown instead of the hint when the selected station's
+                        // stream type can't be captured (HLS/playlist/local) —
+                        // a disabled button alone would be a silent no-op.
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            visible: !addSchedButton.selRecordable && schedStation.currentIndex >= 0 && stationsModel.count > 0
+                            text: i18n("This source cannot be recorded")
+                            opacity: 0.7
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            elide: Text.ElideRight
+                        }
                         QQC2.Button {
+                            id: addSchedButton
+                            readonly property bool selRecordable:
+                                schedStation.currentIndex >= 0
+                                && schedStation.currentIndex < stationsModel.count
+                                && root.canRecordUrl(stationsModel.get(schedStation.currentIndex).hostname || "")
                             icon.name: "list-add"
                             text: i18n("Add")
-                            enabled: schedStation.currentIndex >= 0 && stationsModel.count > 0
+                            enabled: selRecordable
                             onClicked: {
                                 var st = stationsModel.get(schedStation.currentIndex)
                                 if (!st || !st.hostname) return
@@ -1646,6 +1720,19 @@ PlasmaExtras.Representation {
                         width: libraryView.width - libraryView.leftMargin - libraryView.rightMargin
                         height: Kirigami.Units.gridUnit * 3
 
+                        // Keyboard + screen-reader access — the row is otherwise
+                        // reachable only with a pointer (same pattern as web rows)
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: fileItem.isThisPlaying ? i18n("Stop: %1", displayName) : i18n("Play: %1", displayName)
+                        Accessible.onPressAction: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                                root.playLocalFile(fileItem.localUrl, fileItem.displayName)
+                                event.accepted = true
+                            }
+                        }
+
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: Kirigami.Units.smallSpacing / 2
@@ -1655,10 +1742,12 @@ PlasmaExtras.Representation {
                                 if (fileHover.hovered) return Qt.alpha(root.accent, 0.07)
                                 return Qt.alpha(Kirigami.Theme.textColor, 0.045)
                             }
-                            border.width: 1
-                            border.color: fileItem.isThisPlaying
-                                          ? Qt.alpha(root.accent, 0.55)
-                                          : (fileHover.hovered ? Qt.alpha(root.accent, 0.25) : Qt.alpha(Kirigami.Theme.textColor, 0.06))
+                            border.width: fileItem.activeFocus ? 2 : 1
+                            border.color: {
+                                if (fileItem.activeFocus) return root.accent
+                                if (fileItem.isThisPlaying) return Qt.alpha(root.accent, 0.55)
+                                return fileHover.hovered ? Qt.alpha(root.accent, 0.25) : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                            }
 
                             Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
 
@@ -1715,7 +1804,10 @@ PlasmaExtras.Representation {
                                     checked: armed
                                     checkedColor: "#E0463C"
                                     checkedIconColor: "#FFFFFF"
-                                    opacity: armed ? 1.0 : (fileHover.hovered ? 0.6 : 0.0)
+                                    // Row focus reveals the button so Tab can reach it;
+                                    // its own focus keeps it revealed once tabbed into
+                                    // (fileItem is no FocusScope — both terms needed).
+                                    opacity: armed ? 1.0 : ((fileHover.hovered || fileItem.activeFocus || fileRemoveBtn.activeFocus) ? 0.6 : 0.0)
                                     visible: opacity > 0.0
                                     tooltipText: armed ? i18n("Click again to confirm delete") : i18n("Delete file")
                                     onClicked: {
@@ -1823,6 +1915,22 @@ PlasmaExtras.Representation {
 
     Component.onCompleted: rebuildFilteredModel()
 
+    // True when any text/form input (search field, scheduler SpinBoxes /
+    // ComboBoxes, volume slider) owns keyboard focus — the global Space/M
+    // shortcuts must stay inert then. Walks up from the focus item so a
+    // control's internal TextInput contentItem is caught too.
+    function _inputFocused() {
+        var it = fullRepresentation.Window.activeFocusItem
+        while (it && it !== fullRepresentation) {
+            if (it.hasOwnProperty("stepSize")      // SpinBox / Slider
+                || it.hasOwnProperty("editText")   // ComboBox
+                || it.hasOwnProperty("echoMode"))  // TextInput / TextField
+                return true
+            it = it.parent
+        }
+        return false
+    }
+
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
             // Esc on ANY non-list page (Now Playing, My Music) returns to the
@@ -1834,11 +1942,13 @@ PlasmaExtras.Representation {
                 filterField.text = ""
                 event.accepted = true
             }
-        } else if (event.key === Qt.Key_Space && !filterField.activeFocus) {
-            const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
-            if (stationsModel.count > 0) refreshServer(idx)
+        } else if (event.key === Qt.Key_Space && !_inputFocused()) {
+            if (stationsModel.count > 0) {
+                const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
+                refreshServer(idx)
+            }
             event.accepted = true
-        } else if (event.key === Qt.Key_M && !filterField.activeFocus) {
+        } else if (event.key === Qt.Key_M && !_inputFocused()) {
             playMusicOutput.volume = playMusicOutput.volume > 0 ? 0 : root.targetVolume()
             event.accepted = true
         }
@@ -2015,6 +2125,11 @@ PlasmaExtras.Representation {
                     x: -width + parent.width
                     padding: Kirigami.Units.smallSpacing * 1.5
                     modal: false
+                    // Keyboard path: opening moves focus onto the slider (arrow
+                    // keys adjust, Esc closes), closing hands it back to the button
+                    focus: true
+                    onOpened: volumeSlider.forceActiveFocus()
+                    onClosed: volumeBtn.forceActiveFocus()
 
                     contentItem: RowLayout {
                         spacing: Kirigami.Units.smallSpacing
@@ -2028,8 +2143,11 @@ PlasmaExtras.Representation {
                             implicitWidth: Kirigami.Units.gridUnit * 8
                             from: 0
                             to: 1
+                            // Same step as the wheel (arrow keys would jump 10% otherwise)
+                            stepSize: 0.05
                             value: playMusicOutput.volume
                             onMoved: playMusicOutput.volume = value
+                            Accessible.name: i18n("Volume")
                         }
                         PlasmaComponents3.Label {
                             text: Math.round(playMusicOutput.volume * 100) + "%"
