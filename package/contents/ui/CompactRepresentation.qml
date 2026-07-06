@@ -42,11 +42,31 @@ MouseArea {
 
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton
     hoverEnabled: true
+
+    // Screen-reader identity — a bare MouseArea otherwise exposes nothing
+    // (the default compact representation this file replaces would have)
+    Accessible.role: Accessible.Button
+    Accessible.name: root.recording
+        ? i18n("%1 — recording", Plasmoid.title)
+        : (isPlaying() && root.title !== Plasmoid.title
+            ? i18n("%1 — playing %2", Plasmoid.title, root.title)
+            : Plasmoid.title)
+    Accessible.description: Plasmoid.metaData.description
+    Accessible.onPressAction: root.expanded = !root.expanded
+
     onClicked: (mouse) => {
         if (mouse.button === Qt.MiddleButton) {
-            if (Plasmoid.configuration.lastplay)
-                refreshServer(lastPlay);
-
+            if (Plasmoid.configuration.lastplay) {
+                if (isPlaying()) {
+                    // Toggle semantics also while a preview/local file plays
+                    // (lastPlay is -1 then and refreshServer would no-op)
+                    stopWithFade();
+                } else if (stationsModel.count > 0) {
+                    const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0;
+                    lastPlay = idx;
+                    refreshServer(idx);
+                }
+            }
         } else {
             root.expanded = !root.expanded;
         }

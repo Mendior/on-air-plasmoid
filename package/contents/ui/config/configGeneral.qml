@@ -34,7 +34,10 @@ KCM.ScrollViewKCM {
         var file = fileUrl.toString().replace("file:///", "/").replace(/'/g, "'\\''");
         if (mode === 1) {
             var escapedText = text.replace(/'/g, "'\\''");
-            executable.exec("echo '" + escapedText + "' > '" + file + "' && cat '" + file + "'");
+            // printf %s, NOT echo: a dash/busybox /bin/sh echo interprets the
+            // backslash escapes JSON.stringify emits (\\, \n, \t) and corrupts
+            // the exported file (same pattern as _mprisWriteState in main.qml).
+            executable.exec("sh -c 'printf %s \"$1\" > \"$2\" && cat \"$2\"' _ '" + escapedText + "' '" + file + "'");
         } else {
             executable.exec("cat '" + file + "'");
         }
@@ -505,7 +508,9 @@ KCM.ScrollViewKCM {
         _logoQueue = [];
         for (var i = 0; i < stationsModel.count; i++) {
             const it = stationsModel.get(i);
-            stationsModel.setProperty(i, "favicon", "");
+            // Do NOT clear the current favicon up front: _saveLogo only writes
+            // on a validated success, so a failed lookup keeps the previous
+            // (possibly hand-entered) URL instead of wiping it from the config.
             _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname });
         }
         _logoTotal = _logoQueue.length;
@@ -967,7 +972,7 @@ KCM.ScrollViewKCM {
                 enabled: !root._logoFetching
                 onClicked: root.refetchAllLogos()
                 QQC2.ToolTip.visible: hovered
-                QQC2.ToolTip.text: i18n("Clear all logos and fetch them again from scratch (use if some logos are broken)")
+                QQC2.ToolTip.text: i18n("Fetch fresh logos for all stations; existing logos are kept if nothing better is found")
             }
 
             QQC2.BusyIndicator {
