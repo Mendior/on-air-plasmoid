@@ -77,7 +77,21 @@ done
 # Truncate the command file before starting so old commands aren't replayed.
 : > "$CMD_FILE"
 
+# Find the hosting process (plasmashell / plasmoidviewer) by walking up past
+# the transient sh/bash wrappers the QML executable engine runs us through.
+# The daemon watches that pid and exits cleanly when it dies — a shell crash
+# no longer leaves an orphan daemon polling until the next login.
+HOST_PID=$PPID
+for _ in 1 2 3 4 5; do
+    comm="$(ps -o comm= -p "$HOST_PID" 2>/dev/null | tr -d ' ')"
+    case "$comm" in
+        sh|bash|dash|zsh) HOST_PID="$(ps -o ppid= -p "$HOST_PID" 2>/dev/null | tr -cd '0-9')" ;;
+        *) break ;;
+    esac
+    [[ -n "$HOST_PID" && "$HOST_PID" != 0 && "$HOST_PID" != 1 ]] || { HOST_PID=0; break; }
+done
+
 # Detach with setsid + redirections so the parent shell returns immediately.
 # Daemon output goes to the per-instance log so a crash leaves a diagnosable
 # trace instead of vanishing into /dev/null.
-setsid -f python3 "$MPRIS_PY" "$STATE_FILE" "$CMD_FILE" >"$LOG_FILE" 2>&1 < /dev/null
+setsid -f python3 "$MPRIS_PY" "$STATE_FILE" "$CMD_FILE" "${HOST_PID:-0}" >"$LOG_FILE" 2>&1 < /dev/null

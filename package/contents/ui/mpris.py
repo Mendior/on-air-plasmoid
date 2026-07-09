@@ -41,6 +41,7 @@ class MPRISBridge(dbus.service.Object):
         self.state_file = state_file
         self.cmd_file = cmd_file
         self.cmd_seq = 0
+        self._last_mtime_ns = -1
         self._lock = threading.Lock()
         self._state = {
             "status": "Stopped",
@@ -57,9 +58,16 @@ class MPRISBridge(dbus.service.Object):
         self._tracker_path = "/org/mpris/MediaPlayer2/Track/0"
 
     def update_from_state_file(self):
+        # mtime gate: this runs every 300 ms for the whole session — reading
+        # and JSON-parsing an unchanged file that often is pointless work.
         try:
-            if not self.state_file.exists():
-                return
+            mtime_ns = self.state_file.stat().st_mtime_ns
+        except OSError:
+            return
+        if mtime_ns == self._last_mtime_ns:
+            return
+        self._last_mtime_ns = mtime_ns
+        try:
             new_state = json.loads(self.state_file.read_text())
         except (OSError, ValueError):
             return
@@ -244,9 +252,13 @@ class MPRISBridge(dbus.service.Object):
 
 def main():
     if len(sys.argv) < 3:
-        sys.exit("Usage: mpris.py <state_file> <cmd_file>")
+        sys.exit("Usage: mpris.py <state_file> <cmd_file> [host_pid]")
     state_path = Path(sys.argv[1])
     cmd_path = Path(sys.argv[2])
+    try:
+        host_pid = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+    except ValueError:
+        host_pid = 0
 
     cmd_path.parent.mkdir(parents=True, exist_ok=True)
     cmd_path.write_text("")
@@ -282,6 +294,31 @@ def main():
         return True
 
     GLib.timeout_add(300, poll_state)
+
+    # Self-termination watchdog: if the hosting process (plasmashell /
+    # plasmoidviewer) is gone, there is nobody left to serve — exit cleanly
+    # and remove our files instead of polling as an orphan until next login.
+    # (A normal restart replaces us via the launcher anyway; this covers the
+    # crash path, where no teardown ever runs.)
+    if host_pid > 1:
+        def watch_host():
+            try:
+                os.kill(host_pid, 0)
+            except ProcessLookupError:
+                print(f"[mpris] host pid {host_pid} is gone — exiting", flush=True)
+                for p in (state_path, cmd_path):
+                    try:
+                        p.unlink()
+                    except OSError:
+                        pass
+                loop.quit()
+                return False
+            except PermissionError:
+                pass  # exists but owned elsewhere (pid reuse) — treat as alive
+            return True
+
+        GLib.timeout_add_seconds(5, watch_host)
+
     print("[mpris] entering main loop", flush=True)
 
     def handle_signal(signum, frame):
