@@ -208,6 +208,33 @@ PlasmoidItem {
         return Math.max(0, Math.min(1, Plasmoid.configuration.defaultVolume / 100));
     }
 
+    // Volume set deliberately by the user (wheel, slider, MPRIS) is persisted
+    // into the config — debounced, because the wheel fires in rapid bursts.
+    // targetVolume() then returns what the user last chose, so stopping (which
+    // resets to targetVolume) and restarts no longer snap back to a stale
+    // default. Fades never come through here — they must not be persisted.
+    property int _pendingUserVolumePct: -1
+
+    function setUserVolume(v) {
+        var vol = Math.max(0, Math.min(1, v));
+        playMusicOutput.volume = vol;
+        _pendingUserVolumePct = Math.round(vol * 100);
+        volumePersistTimer.restart();
+    }
+
+    Timer {
+        id: volumePersistTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            // 0 (mute) is never persisted: unmute and the next playback start
+            // restore the last audible level instead of starting silent.
+            if (root._pendingUserVolumePct > 0)
+                Plasmoid.configuration.defaultVolume = root._pendingUserVolumePct;
+            root._pendingUserVolumePct = -1;
+        }
+    }
+
     function refreshServer(index) {
         if (index < 0 || index >= stationsModel.count) {
             return;
@@ -373,6 +400,27 @@ PlasmoidItem {
         Plasmoid.configuration.history = JSON.stringify(arr);
     }
 
+    // Throttled persistence: every track change used to rewrite the appletsrc
+    // file immediately — with radio playing all day that's hundreds of disk
+    // writes for a nice-to-have list. Batched to one write per 30 s (throttle,
+    // not debounce — steady track changes must not postpone it forever) and
+    // flushed when the popup closes or the widget goes away.
+    Timer {
+        id: historyPersistTimer
+        interval: 30000
+        repeat: false
+        onTriggered: _saveHistory()
+    }
+
+    function _flushHistory() {
+        if (historyPersistTimer.running) {
+            historyPersistTimer.stop();
+            _saveHistory();
+        }
+    }
+
+    onExpandedChanged: if (!root.expanded) _flushHistory()
+
     function _pushHistory(artist, trackName, station) {
         if (!trackName) return;
         if (historyModel.count > 0) {
@@ -383,10 +431,11 @@ PlasmoidItem {
         const when = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
         historyModel.insert(0, { "artist": artist || "", "trackName": trackName, "station": station || "", "when": when });
         while (historyModel.count > 30) historyModel.remove(historyModel.count - 1);
-        _saveHistory();
+        if (!historyPersistTimer.running) historyPersistTimer.start();
     }
 
     function clearHistory() {
+        historyPersistTimer.stop();
         historyModel.clear();
         Plasmoid.configuration.history = "[]";
     }
@@ -484,6 +533,14 @@ PlasmoidItem {
     property string _recFilePath: ""
     property string _recTracksPath: ""
     property int recElapsedSec: 0
+    // Requested length of the current recording — the completion handler
+    // compares the actual elapsed time against it to tell "ran to the end"
+    // from "the stream died halfway through".
+    property int _recDurationSec: 0
+    // Identifies the schedule entry being recorded (url + nextRun), so the
+    // completion handler can advance exactly that entry — and only after the
+    // recording actually finished, not when it started.
+    property string _recActiveSchedKey: ""
     // Same stable-id pattern as the MPRIS files: two widget instances must
     // never kill each other's recording via a shared pid file.
     readonly property string _recPidFile: _mprisRunDir + "/arp-rec-" + _mprisId + ".pid"
@@ -526,8 +583,15 @@ PlasmoidItem {
         _recStart(root.currentStation, url, maxMin * 60, false);
     }
 
+    // Set when the user (or a station switch) asked the recording to stop —
+    // ffmpeg then exits via SIGINT with a nonzero code that is NOT an error.
+    // Without this flag the completion handler can't tell a requested stop
+    // from a stream that died on its own.
+    property bool _recStopRequested: false
+
     function recStop() {
         if (!recording) return;
+        _recStopRequested = true;
         var safePid = _recPidFile.replace(/'/g, "'\\''");
         // SIGINT (not KILL) lets ffmpeg finish the container properly.
         executable.exec(": REC_STOP; [ -f '" + safePid + "' ] && kill -INT $(cat '" + safePid + "') 2>/dev/null; true");
@@ -562,7 +626,10 @@ PlasmoidItem {
         var base = "REC " + cleanName + " " + stamp;
         recording = true;
         _recScheduled = scheduled;
+        if (!scheduled) _recActiveSchedKey = "";
+        _recStopRequested = false;
         recElapsedSec = 0;
+        _recDurationSec = Math.max(60, Math.floor(durationSec));
         _recUrl = url;
         _recStationName = cleanName;
         _recFilePath = downloadDirPath + "/" + base + "." + ext;
@@ -587,8 +654,14 @@ PlasmoidItem {
             + " -metadata title='" + base.replace(/'/g, "'\\''") + "'"
             + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
             + " -n '" + safeOut + "' & pid=$!; echo $pid > '" + safePid + "'; "
-            + "wait $pid; rm -f '" + safePid + "'; "
-            + "if [ -s '" + safeOut + "' ]; then echo __REC_OK__; else rm -f '" + safeOut + "' '" + safeTracks + "'; echo __REC_EMPTY__; fi");
+            + "wait $pid; rc=$?; rm -f '" + safePid + "'; "
+            // Report ffmpeg's exit code AND the file size — "file is not empty"
+            // alone reported half-dead recordings (disk full, stream died) as
+            // successes. The QML side combines rc with the elapsed time to tell
+            // a requested stop / duration cap from a mid-recording failure.
+            + "bytes=$(stat -c %s '" + safeOut + "' 2>/dev/null || echo 0); "
+            + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then echo \"__REC_DONE__ rc=$rc bytes=$bytes\"; "
+            + "else rm -f '" + safeOut + "' '" + safeTracks + "'; echo \"__REC_EMPTY__ rc=$rc\"; fi");
         if (scheduled) {
             dlNotification.title = i18n("Scheduled recording started");
             dlNotification.text = stationName;
@@ -655,43 +728,83 @@ PlasmoidItem {
         _saveRecSchedules();
     }
 
-    function _recScheduleTick() {
-        if (recSchedules.length === 0) return;
-        var now = Date.now();
+    // One-shot notification guard per schedule occurrence — a due entry stays
+    // in the list for its whole window now (see below), so without this the
+    // 30 s tick would repeat "skipped"/"failed" notifications until it closes.
+    property var _recSchedNotified: ({})
+
+    function _recSchedKey(s) {
+        return s.url + "@" + s.nextRun;
+    }
+
+    function _recSchedNotifyOnce(key, title, text, icon) {
+        if (_recSchedNotified[key]) return;
+        if (Object.keys(_recSchedNotified).length > 50) _recSchedNotified = {};
+        _recSchedNotified[key] = true;
+        dlNotification.title = title;
+        dlNotification.text = text;
+        dlNotification.iconName = icon;
+        dlNotification.sendEvent();
+    }
+
+    // Advance (or remove, for "once") the schedule entry that just produced a
+    // FINISHED recording. Called from the completion handler and from the
+    // tick's missed-window path — advancing at start (the old behaviour) threw
+    // the rest of the window away whenever a recording died halfway: the entry
+    // had already moved to tomorrow, so nothing ever resumed.
+    function _recSchedAdvance(key) {
+        if (!key) return;
         var list = recSchedules.slice();
-        var changed = false;
-        for (var i = list.length - 1; i >= 0; i--) {
+        for (var i = 0; i < list.length; i++) {
             var s = list[i];
-            if (now < s.nextRun) continue;
-            var endMs = s.nextRun + s.durationMin * 60000;
-            if (now < endMs) {
-                var remainSec = Math.round((endMs - now) / 1000);
-                if (!recording && remainSec >= 60) {
-                    _recStart(s.station, s.url, remainSec, true);
-                } else {
-                    dlNotification.title = i18n("Scheduled recording skipped");
-                    dlNotification.text = recording
-                        ? i18n("%1 — another recording is already running.", s.station)
-                        : s.station;
-                    dlNotification.iconName = "dialog-warning";
-                    dlNotification.sendEvent();
-                }
-            } else {
-                dlNotification.title = i18n("Scheduled recording missed");
-                dlNotification.text = s.station;
-                dlNotification.iconName = "dialog-warning";
-                dlNotification.sendEvent();
-            }
+            if (_recSchedKey(s) !== key) continue;
             if (s.repeat === "once") {
                 list.splice(i, 1);
             } else {
-                s.nextRun = _nextOccurrence(s.hh, s.mm, s.repeat, s.weekday, now);
+                s.nextRun = _nextOccurrence(s.hh, s.mm, s.repeat, s.weekday, Date.now());
             }
-            changed = true;
-        }
-        if (changed) {
             recSchedules = list;
             _saveRecSchedules();
+            return;
+        }
+    }
+
+    function _recScheduleTick() {
+        if (recSchedules.length === 0) return;
+        var now = Date.now();
+        // Snapshot: _recSchedAdvance below replaces recSchedules itself.
+        var due = recSchedules.slice();
+        for (var i = 0; i < due.length; i++) {
+            var s = due[i];
+            if (now < s.nextRun) continue;
+            var key = _recSchedKey(s);
+            var endMs = s.nextRun + s.durationMin * 60000;
+            if (now >= endMs) {
+                // The window closed without a completed recording (the machine
+                // was off, or every attempt failed) — only now is it missed.
+                _recSchedNotifyOnce(key, i18n("Scheduled recording missed"),
+                                    s.station, "dialog-warning");
+                _recSchedAdvance(key);
+                continue;
+            }
+            if (recording) {
+                // Our own entry currently being recorded — all good.
+                if (root._recActiveSchedKey === key) continue;
+                _recSchedNotifyOnce(key, i18n("Scheduled recording skipped"),
+                                    i18n("%1 — another recording is already running.", s.station),
+                                    "dialog-warning");
+                continue; // the entry stays — it can still start if REC ends in time
+            }
+            var remainSec = Math.round((endMs - now) / 1000);
+            if (remainSec >= 60) {
+                // Record the remainder of the window. The entry is advanced
+                // when the recording FINISHES — if the stream dies mid-way,
+                // the next tick lands back here and resumes with what's left.
+                root._recActiveSchedKey = key;
+                _recStart(s.station, s.url, remainSec, true);
+            }
+            // < 60 s left: not worth an ffmpeg spawn; the entry ages into the
+            // missed branch above unless a recording already completed.
         }
     }
 
@@ -894,7 +1007,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.4");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.5");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1336,6 +1449,10 @@ PlasmoidItem {
     function startSleepTimer(seconds) {
         sleepRemainingSec = Math.max(0, Math.floor(seconds));
         sleepTotalSec = sleepRemainingSec;
+        // Wall-clock deadline, not a tick count: QML timers don't run during
+        // suspend, so "sleep in 30 min" used to stretch by however long the
+        // machine slept. The 1 s tick now just recomputes remaining time.
+        _sleepDeadlineMs = Date.now() + sleepRemainingSec * 1000;
         _abortSleepFade();
         if (sleepRemainingSec === 0) {
             sleepTimer.stop();
@@ -1344,9 +1461,12 @@ PlasmoidItem {
         }
     }
 
+    property double _sleepDeadlineMs: 0
+
     function cancelSleepTimer() {
         sleepRemainingSec = 0;
         sleepTotalSec = 0;
+        _sleepDeadlineMs = 0;
         sleepTimer.stop();
         _abortSleepFade();
     }
@@ -1457,7 +1577,7 @@ PlasmoidItem {
         } else if (cmd.indexOf("Volume ") === 0) {
             var v = parseFloat(cmd.substring(7));
             if (!isNaN(v)) {
-                playMusicOutput.volume = Math.max(0, Math.min(1, v));
+                setUserVolume(v);
             }
         }
     }
@@ -1519,6 +1639,7 @@ PlasmoidItem {
     }
 
     Component.onDestruction: {
+        _flushHistory();
         recStop();
         _mprisStop();
     }
@@ -1635,26 +1756,65 @@ PlasmoidItem {
             if (cmd.indexOf(": REC_START;") === 0) {
                 var recFile = root._recFilePath;
                 var recDur = root.recElapsedText();
+                var recElapsed = root.recElapsedSec;
+                var recWanted = root._recDurationSec;
+                var recWasScheduled = root._recScheduled;
+                var recSchedKey = root._recActiveSchedKey;
+                var recWasStopRequested = root._recStopRequested;
                 root.recording = false;
                 root._recScheduled = false;
+                root._recStopRequested = false;
+                root._recActiveSchedKey = "";
                 root._recUrl = "";
                 root._recFilePath = "";
                 root._recTracksPath = "";
                 var recOut = stdout || "";
+                var recName = recFile.substring(recFile.lastIndexOf("/") + 1);
+                // Success is judged on evidence, not on "the file is not empty":
+                //   • a user stop / the duration cap ending the recording is fine;
+                //   • anything that ends the recording early on its own (stream
+                //     died, disk full) is an interruption, whatever ffmpeg's rc;
+                //   • a file far too small for its duration (< ~10 KB/min — real
+                //     audio is at least 60 KB/min) is a broken capture.
+                var recDone = recOut.indexOf("__REC_DONE__") !== -1;
+                var recBytesM = recOut.match(/__REC_DONE__ rc=(-?\d+) bytes=(\d+)/);
+                var recRc = recBytesM ? parseInt(recBytesM[1], 10) : -1;
+                var recBytes = recBytesM ? parseInt(recBytesM[2], 10) : 0;
+                var recRanFull = recElapsed >= recWanted - 5;
+                var recTooSmall = recBytes < Math.max(1, recElapsed / 60) * 10240;
+                var recOk = recDone && (recWasStopRequested || (recRanFull && recRc === 0)) && !recTooSmall;
+                var recInterrupted = recDone && !recOk;
                 if (recOut.indexOf("__NO_FFMPEG__") !== -1) {
                     dlNotification.title = i18n("ffmpeg is not installed");
                     dlNotification.text = i18n("Install ffmpeg to record radio.");
                     dlNotification.iconName = "dialog-warning";
-                } else if (recOut.indexOf("__REC_OK__") !== -1) {
+                } else if (recOk) {
                     dlNotification.title = i18n("Recording saved ✓ (%1)", recDur);
-                    dlNotification.text = recFile.substring(recFile.lastIndexOf("/") + 1);
+                    dlNotification.text = recName;
                     dlNotification.iconName = "media-record";
+                } else if (recInterrupted) {
+                    dlNotification.title = i18n("Recording interrupted (%1 captured)", recDur);
+                    dlNotification.text = recTooSmall
+                        ? i18n("%1 — the file is much smaller than expected.", recName)
+                        : recName;
+                    dlNotification.iconName = "dialog-warning";
                 } else {
                     dlNotification.title = i18n("Recording failed");
                     dlNotification.text = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
                     dlNotification.iconName = "dialog-error";
                 }
                 dlNotification.sendEvent();
+                if (recWasScheduled && recSchedKey) {
+                    if (recOk || recWasStopRequested) {
+                        // The occurrence is done — move the entry forward (or
+                        // drop a "once") only NOW, after the actual outcome.
+                        _recSchedAdvance(recSchedKey);
+                    } else {
+                        // Interrupted mid-window: leave the entry as it is —
+                        // the next 30 s tick resumes with the remaining time.
+                        Qt.callLater(_recScheduleTick);
+                    }
+                }
                 return;
             }
             // yt-dlp finished → notify (sentinel-prefix match, see _startDownload)
@@ -1931,20 +2091,24 @@ PlasmoidItem {
         repeat: true
         running: false
         onTriggered: {
-            if (sleepRemainingSec <= 1) {
+            var remaining = Math.round((root._sleepDeadlineMs - Date.now()) / 1000);
+            if (remaining <= 0) {
                 sleepRemainingSec = 0;
                 sleepTotalSec = 0;
+                root._sleepDeadlineMs = 0;
                 sleepTimer.stop();
                 if (sleepFadeAnimation.running) sleepFadeAnimation.stop();
                 root._volumeBeforeSleepFade = -1;
                 if (isPlaying()) stopWithFade();
             } else {
-                sleepRemainingSec -= 1;
+                sleepRemainingSec = remaining;
                 // Begin a 30-second linear fade so audio tapers off naturally
                 // instead of cutting abruptly when the timer hits zero.
-                if (sleepRemainingSec === 30 && isPlaying() && !sleepFadeAnimation.running) {
+                if (remaining <= 30 && isPlaying() && !sleepFadeAnimation.running
+                    && root._volumeBeforeSleepFade < 0) {
                     root._volumeBeforeSleepFade = playMusicOutput.volume;
                     sleepFadeAnimation.from = playMusicOutput.volume;
+                    sleepFadeAnimation.duration = remaining * 1000;
                     sleepFadeAnimation.restart();
                 }
             }

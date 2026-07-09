@@ -109,7 +109,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.4")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.5")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -1949,7 +1949,7 @@ PlasmaExtras.Representation {
             }
             event.accepted = true
         } else if (event.key === Qt.Key_M && !_inputFocused()) {
-            playMusicOutput.volume = playMusicOutput.volume > 0 ? 0 : root.targetVolume()
+            root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
             event.accepted = true
         }
     }
@@ -2115,7 +2115,7 @@ PlasmaExtras.Representation {
                 WheelHandler {
                     onWheel: (event) => {
                         const step = event.angleDelta.y > 0 ? 0.05 : -0.05
-                        playMusicOutput.volume = Math.max(0, Math.min(1, playMusicOutput.volume + step))
+                        root.setUserVolume(playMusicOutput.volume + step)
                     }
                 }
 
@@ -2146,7 +2146,7 @@ PlasmaExtras.Representation {
                             // Same step as the wheel (arrow keys would jump 10% otherwise)
                             stepSize: 0.05
                             value: playMusicOutput.volume
-                            onMoved: playMusicOutput.volume = value
+                            onMoved: root.setUserVolume(value)
                             Accessible.name: i18n("Volume")
                         }
                         PlasmaComponents3.Label {

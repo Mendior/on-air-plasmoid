@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026.5
+
+Reliability release: recordings now tell the truth, scheduled recordings survive interruptions, and a handful of long-standing everyday annoyances are gone.
+
+### Fixed — recording honesty
+- **"Recording saved ✓" no longer lies.** Previously the only check was "the file is not empty" — a recording cut short by a dying stream or a full disk was still reported as a success. The widget now looks at ffmpeg's actual exit code, whether the recording ran its full length, and whether the file size is plausible for its duration. A capture that ended early is reported as **"Recording interrupted (12:34 captured)"** — you keep the partial file, but you know it's partial.
+- **Interrupted scheduled recordings resume.** A schedule entry used to be moved to its next occurrence the moment recording *started* — so if the stream died five minutes into a two-hour show, that was it: the rest of the window was silently thrown away. The entry now advances only after the recording actually finishes; if it's interrupted mid-window, the widget picks it back up within 30 seconds and records the remainder. "Missed" is only reported when the whole window has truly closed, and repeat notifications for the same occurrence are deduplicated.
+
+### Fixed — everyday annoyances
+- **The sleep timer now keeps wall-clock time.** It used to count timer ticks, which simply pause while the machine is suspended — "sleep in 30 minutes", a 20-minute suspend, and the radio played 20 minutes longer than asked. The timer now targets a fixed deadline, so it fires when it should even across suspend/resume (and if the deadline passed during sleep, it stops immediately on wake, with the fade shortened to whatever time is left).
+- **Your volume finally sticks.** Adjusting the volume (wheel, slider, media controls, mute toggle) only lasted until the next stop — then it snapped back to the setting from the config dialog. The level you set is now remembered and used everywhere the volume gets reset. Mute is deliberately not remembered: unmuting brings back the last audible level instead of starting silent.
+
+### Fixed — fewer writes, fewer leftovers
+- **Track history no longer rewrites your config file on every song.** With the radio on all day, that was hundreds of small disk writes for a nice-to-have list. History is now saved at most once every 30 seconds, and always flushed when the popup closes or the widget goes away.
+- **The MPRIS helper cleans up after a Plasma crash.** If plasmashell died, its media-keys daemon kept polling as an orphan until the next login. The daemon now watches its hosting process and exits cleanly (removing its runtime files) when that process is gone. It also stopped re-reading its state file 3× per second when nothing changed — a small but permanent background saving.
+
 ## 2026.4
 
 Widget resizing fixed (#1), four dead default stations replaced, and a stability/accessibility round across the whole codebase.
