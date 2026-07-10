@@ -107,6 +107,9 @@ MouseArea {
         anchors.bottom: parent.bottom
         anchors.margins: 1
         visible: isPlaying()
+        // Don't tick while the panel window isn't on screen at all
+        // (auto-hidden panel, screen off) — nobody is watching.
+        animating: visible && panelIconWidget.Window.visibility !== Window.Hidden
         bars: 3
         barWidth: Math.max(2, Math.round(parent.width * 0.07))
         minHeight: Math.max(2, parent.height * 0.1)
