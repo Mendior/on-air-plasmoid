@@ -19,8 +19,9 @@ Usage: scripts/dev.sh <command>
 
   install   sync repo package/contents/ -> local install (metadata.json and locale untouched)
   pull      sync local install -> repo package/contents/ (metadata.json and locale untouched)
-  lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json validation
-  build     build on-air-<Version>.plasmoid into the repo root (7z)
+  lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json + po validation
+  i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
+  build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
   view      plasmoidviewer on package/ (quick preview without restarting plasmashell)
   restart   systemctl --user restart plasma-plasmashell (reloads the QML)
 EOF
@@ -55,6 +56,12 @@ case "${1:-}" in
 for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/reader.py" "$PKG/contents/ui/mpris.py"
     python3 -c "import json; json.load(open('$PKG/metadata.json'))"
     bash -n "$PKG/contents/ui/start-mpris.sh"
+    # Translations: every .po must compile cleanly (a bad one would silently
+    # ship a broken catalog).
+    for po in "$REPO_DIR"/po/*.po; do
+      [ -e "$po" ] || continue
+      msgfmt --check -o /dev/null "$po" || { echo "lint FAILED: $po"; exit 1; }
+    done
     if [ "$fail" -eq 0 ]; then echo "lint OK"; else echo "lint FAILED"; fi
     exit "$fail"
     ;;
@@ -62,10 +69,36 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     ver="$(python3 -c "import json; print(json.load(open('$PKG/metadata.json'))['KPlugin']['Version'])")"
     out="$REPO_DIR/on-air-$ver.plasmoid"
     rm -f "$out"
+    # Compile translations into the package. The catalog domain must match
+    # the PUBLISHED plugin id (the local install has a different id and keeps
+    # its own catalogs — locale/ is excluded from install/pull syncs).
+    domain="plasma_applet_$(python3 -c "import json; print(json.load(open('$PKG/metadata.json'))['KPlugin']['Id'])")"
+    rm -rf "$PKG/contents/locale"
+    for po in "$REPO_DIR"/po/*.po; do
+      [ -e "$po" ] || continue
+      lang="$(basename "$po" .po)"
+      dir="$PKG/contents/locale/$lang/LC_MESSAGES"
+      mkdir -p "$dir"
+      msgfmt --check -o "$dir/$domain.mo" "$po"
+      echo "  locale: $lang"
+    done
     (cd "$PKG" && 7z a -tzip "$out" contents metadata.json -xr'!__pycache__' >/dev/null)
     # LGPL requires the license text to accompany every distributed copy.
     (cd "$REPO_DIR" && 7z a -tzip "$out" LICENSE >/dev/null)
     echo "OK: $out"
+    ;;
+  i18n)
+    find "$PKG/contents/ui" -name '*.qml' | sort > /tmp/onair-qml-files.txt
+    xgettext --from-code=UTF-8 -C -kde -ci18n -ki18n:1 -ki18nc:1c,2 -ki18np:1,2 -ki18ncp:1c,2,3 \
+      --package-name='plasma_applet_io.github.mendior.onair' \
+      --msgid-bugs-address='https://github.com/Mendior/on-air-plasmoid/issues' \
+      -o "$REPO_DIR/po/template.pot" --files-from=/tmp/onair-qml-files.txt 2>/dev/null
+    for po in "$REPO_DIR"/po/*.po; do
+      [ -e "$po" ] || continue
+      msgmerge --no-wrap -q --update --backup=off "$po" "$REPO_DIR/po/template.pot"
+      printf '%s: ' "$(basename "$po")"
+      msgfmt --statistics -o /dev/null "$po" 2>&1
+    done
     ;;
   view)
     exec plasmoidviewer -a "$PKG"
