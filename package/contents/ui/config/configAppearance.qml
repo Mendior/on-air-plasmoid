@@ -198,7 +198,7 @@ KCM.SimpleKCM {
             enabled: plasmoid.formFactor !== PlasmaCore.Types.Planar
 
             QQC2.ToolTip.visible: hovered
-            QQC2.ToolTip.text: i18n("Use middle click for play last playing station")
+            QQC2.ToolTip.text: i18n("Middle-click the panel icon to play or stop the last station")
         }
     }
 }

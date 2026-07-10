@@ -45,14 +45,36 @@ KCM.ScrollViewKCM {
         server = items[Math.floor(Math.random() * items.length)]
     }
 
+    // QML XHR's xhr.timeout/ontimeout are silently ignored by Qt — every
+    // "timeout" on this page was dead code and a hung connection meant
+    // "Please wait…" forever. A Timer that calls abort() is the real thing:
+    // abort drives readyState to DONE with status 0, which lands in the same
+    // error/retry paths a failed request takes.
+    function _armXhrTimeout(xhr, ms) {
+        const t = Qt.createQmlObject("import QtQuick; Timer { repeat: false }", root, "xhrTimeoutGuard")
+        t.interval = ms
+        t.triggered.connect(() => {
+            try { xhr.abort() } catch(e) {}
+            try { t.destroy() } catch(e) {}
+        })
+        t.start()
+        return t
+    }
+
+    function _clearXhrTimeout(t) {
+        if (!t) return
+        try { t.stop(); t.destroy() } catch(e) {}
+    }
+
     function discoverServers() {
         const xhr = new XMLHttpRequest
-        xhr.timeout = 5000
+        var guard = null
         xhr.open("GET", "https://all.api.radio-browser.info/json/servers")
         setHeaders(xhr)
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
                 return
+            _clearXhrTimeout(guard)
             const finish = () => {
                 if (items.length === 0)
                     items = ["de1"]
@@ -77,10 +99,7 @@ KCM.ScrollViewKCM {
             }
             finish()
         }
-        xhr.ontimeout = () => {
-            getServer()
-            getStations()
-        }
+        guard = _armXhrTimeout(xhr, 5000)
         xhr.send()
     }
 
@@ -105,13 +124,18 @@ KCM.ScrollViewKCM {
         if (!server || server === "")
             server = "de1"
 
+        // Clear the "active" slot BEFORE aborting: abort() dispatches the old
+        // request's readystatechange synchronously, and without this order a
+        // superseded request would enter the retry chain and double-query.
         if (_activeXhr) {
-            try { _activeXhr.abort() } catch(e) {}
+            const old = _activeXhr
             _activeXhr = null
+            try { old.abort() } catch(e) {}
         }
         if (_activeLoadMoreXhr) {
-            try { _activeLoadMoreXhr.abort() } catch(e) {}
+            const oldLm = _activeLoadMoreXhr
             _activeLoadMoreXhr = null
+            try { oldLm.abort() } catch(e) {}
         }
 
         const cleanVal = (val || "").toString().trim()
@@ -119,15 +143,17 @@ KCM.ScrollViewKCM {
         const url = `https://${server}.api.radio-browser.info/json/stations${byVal}?hidebroken=true&limit=${limit}&offset=${offset}`
 
         const xhr = new XMLHttpRequest
-        xhr.timeout = _httpTimeout
+        var guard = null
         xhr.open("GET", url)
         setHeaders(xhr)
         _activeXhr = xhr
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
                 return
-            if (_activeXhr === xhr)
-                _activeXhr = null
+            _clearXhrTimeout(guard)
+            if (_activeXhr !== xhr)
+                return // superseded by a newer search
+            _activeXhr = null
             if (xhr.status === 200) {
                 // A 200 with a non-JSON body (captive portal, HTML error page)
                 // must fall into the retry chain — an unguarded JSON.parse throw
@@ -180,19 +206,7 @@ KCM.ScrollViewKCM {
                 }
             }
         }
-        xhr.ontimeout = () => {
-            _retryCount++
-            if (_retryCount < _maxRetries) {
-                getServer()
-                _doGetStations(by, val)
-            } else {
-                busy.running = false
-                busy.visible = false
-                gettext.visible = true
-                gettext.text = i18n("Error: Connection timed out")
-                view.enabled = true
-            }
-        }
+        guard = _armXhrTimeout(xhr, _httpTimeout)
         xhr.send()
     }
 
@@ -201,11 +215,12 @@ KCM.ScrollViewKCM {
             return
         stat = 0
         if (_activeLoadMoreXhr) {
-            try { _activeLoadMoreXhr.abort() } catch(e) {}
+            const oldLm = _activeLoadMoreXhr
             _activeLoadMoreXhr = null
+            try { oldLm.abort() } catch(e) {}
         }
         const xhr = new XMLHttpRequest
-        xhr.timeout = _httpTimeout
+        var guard = null
         const baseUrl = currentUrl.split("?")[0]
         const url = `${baseUrl}?hidebroken=true&limit=${limit}&offset=${offset}`
         xhr.open("GET", url)
@@ -214,8 +229,10 @@ KCM.ScrollViewKCM {
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
                 return
-            if (_activeLoadMoreXhr === xhr)
-                _activeLoadMoreXhr = null
+            _clearXhrTimeout(guard)
+            if (_activeLoadMoreXhr !== xhr)
+                return // superseded
+            _activeLoadMoreXhr = null
             if (xhr.status === 200) {
                 try {
                     const servers = JSON.parse(xhr.responseText)
@@ -233,12 +250,12 @@ KCM.ScrollViewKCM {
                     // Restore stat so the scroll trigger can try again.
                     stat = 1
                 }
+            } else {
+                // Failed/timed-out page load — let scrolling retry it.
+                stat = 1
             }
         }
-        xhr.ontimeout = () => {
-            if (_activeLoadMoreXhr === xhr)
-                _activeLoadMoreXhr = null
-        }
+        guard = _armXhrTimeout(xhr, _httpTimeout)
         xhr.send()
     }
 
