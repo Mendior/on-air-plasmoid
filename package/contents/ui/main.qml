@@ -162,8 +162,8 @@ PlasmoidItem {
     // the favorite instead of the name-based prune silently dropping it.
     property var _stationNameByHost: ({})
 
-    function reloadStationsModel() {
-        playMusic.stop();
+    function reloadStationsModel(keepPlaying) {
+        if (!keepPlaying) playMusic.stop();
         stationsModel.clear();
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
@@ -903,6 +903,84 @@ PlasmoidItem {
         }
     }
 
+    // ── Reordering (the popup's move arrows) ─────────────────────────────────
+    // Set for the duration of one servers-write so onServersChanged knows this
+    // is a pure reorder and must not stop playback (see the Connections below).
+    property bool _reorderKeepPlaying: false
+
+    // Move a station one step up/down in the main list. popupIndex indexes the
+    // ACTIVE-stations list (what the popup shows); the swap partner is the
+    // neighbouring active entry, so hidden inactive entries keep their places.
+    function moveStation(popupIndex, name, hostname, delta) {
+        if (!hostname || (delta !== 1 && delta !== -1)) return;
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            // Map the popup index to the config index — same walk and identity
+            // check as removeStation (duplicate URLs make bare matching unsafe).
+            var cfgIdx = -1, seen = -1;
+            for (var i = 0; i < servers.length; i++) {
+                if (!servers[i].active) continue;
+                seen++;
+                if (seen === popupIndex) { cfgIdx = i; break; }
+            }
+            if (cfgIdx < 0
+                || (servers[cfgIdx].hostname || "") !== hostname
+                || (servers[cfgIdx].name || "") !== name) return;
+            var swapIdx = -1;
+            for (var j = cfgIdx + delta; j >= 0 && j < servers.length; j += delta) {
+                if (servers[j].active) { swapIdx = j; break; }
+            }
+            if (swapIdx < 0) return;
+            const tmp = servers[cfgIdx];
+            servers[cfgIdx] = servers[swapIdx];
+            servers[swapIdx] = tmp;
+            // Keep lastPlay following the same station across the reload, so
+            // the playing row stays highlighted and toggle-stop keeps working.
+            const followUrl = (lastPlay >= 0 && lastPlay < stationsModel.count)
+                              ? stationsModel.get(lastPlay).hostname : "";
+            const followName = (lastPlay >= 0 && lastPlay < stationsModel.count)
+                               ? stationsModel.get(lastPlay).name : "";
+            _reorderKeepPlaying = true;
+            Plasmoid.configuration.servers = JSON.stringify(servers);
+            Qt.callLater(function() {
+                if (followUrl === "") return;
+                for (var k = 0; k < stationsModel.count; k++) {
+                    const s = stationsModel.get(k);
+                    if (s.hostname === followUrl && s.name === followName) {
+                        lastPlay = k;
+                        return;
+                    }
+                }
+            });
+        } catch (e) {
+            console.log("[ARP] moveStation: " + e);
+        }
+    }
+
+    // Move a favorite one step up/down in the favorites view. The swap partner
+    // is the nearest favorite that is actually visible — a stale entry (its
+    // station was deactivated but not deleted) would make the swap look like
+    // a silent no-op.
+    function moveFavorite(name, delta) {
+        if (!name || (delta !== 1 && delta !== -1)) return;
+        const list = favoriteNames.slice();
+        const idx = list.indexOf(name);
+        if (idx === -1) return;
+        const visible = {};
+        for (var i = 0; i < stationsModel.count; i++)
+            visible[stationsModel.get(i).name] = true;
+        var swapIdx = -1;
+        for (var j = idx + delta; j >= 0 && j < list.length; j += delta) {
+            if (visible[list[j]]) { swapIdx = j; break; }
+        }
+        if (swapIdx < 0) return;
+        const tmp = list[idx];
+        list[idx] = list[swapIdx];
+        list[swapIdx] = tmp;
+        favoriteNames = list;
+        Plasmoid.configuration.favorites = JSON.stringify(list);
+    }
+
     // ⭐ on an internet result: add the station PERMANENTLY to the list + favorites.
     // Playback is NOT started; if the same station is already previewing, it
     // continues uninterrupted (now as an "own" station).
@@ -1007,7 +1085,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.5.1");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.6");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1650,8 +1728,16 @@ PlasmoidItem {
 
     Connections {
         function onServersChanged() {
-            playMusic.stop();
-            reloadStationsModel();
+            // A reorder only changes positions, never the set of stations —
+            // stopping playback for it would punish the user for tidying
+            // their list. Everything else (add/remove/edit) reloads as before.
+            if (root._reorderKeepPlaying) {
+                root._reorderKeepPlaying = false;
+                reloadStationsModel(true);
+            } else {
+                playMusic.stop();
+                reloadStationsModel();
+            }
             syncFavicons();
         }
         function onFavoritesChanged() {

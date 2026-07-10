@@ -109,7 +109,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.5.1")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.6")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -371,6 +371,25 @@ PlasmaExtras.Representation {
                         if (event.key === Qt.Key_Slash) {
                             filterField.forceActiveFocus()
                             event.accepted = true
+                            return
+                        }
+                        // Ctrl+Up/Down = move the current row (same as the
+                        // hover arrows, reachable without a mouse)
+                        if (event.modifiers & Qt.ControlModifier
+                            && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)
+                            && currentIndex >= 0 && currentItem
+                            && root.searchFilter === "") {
+                            const delta = event.key === Qt.Key_Up ? -1 : 1
+                            const next = currentIndex + delta
+                            if (next >= 0 && next < count) {
+                                const it = filteredStationsModel.get(currentIndex)
+                                if (root.favoritesOnly)
+                                    root.moveFavorite(it.name, delta)
+                                else
+                                    root.moveStation(currentItem.targetIndex, it.name, it.hostname, delta)
+                                currentIndex = next
+                            }
+                            event.accepted = true
                         }
                     }
 
@@ -402,12 +421,10 @@ PlasmaExtras.Representation {
                         NumberAnimation { properties: "opacity"; to: 1; duration: Kirigami.Units.shortDuration }
                     }
 
-                    Connections {
-                        function onErrorOccurred() {
-                            stationView.currentIndex = -1
-                        }
-                        target: playMusic
-                    }
+                    // (A stream error used to reset currentIndex to -1 here,
+                    // throwing away the keyboard position — the playing-row
+                    // highlight is driven by lastPlay, not currentIndex, so
+                    // there is nothing to clear.)
 
                     delegate: MediaListItem {
                     }
@@ -1882,9 +1899,32 @@ PlasmaExtras.Representation {
         const filter = (root.searchFilter || "").toLowerCase().trim()
         const favOnly = root.favoritesOnly
         filteredStationsModel.clear()
+        if (favOnly) {
+            // The favorites view follows the favorites list's own order (not
+            // the main list's), so the reorder arrows work on exactly the
+            // order the user is looking at.
+            const idxByName = {}
+            for (var m = 0; m < stationsModel.count; m++) {
+                const st = stationsModel.get(m)
+                if (idxByName[st.name] === undefined) idxByName[st.name] = m
+            }
+            for (var f = 0; f < root.favoriteNames.length; f++) {
+                const fi = idxByName[root.favoriteNames[f]]
+                if (fi === undefined) continue
+                const fs = stationsModel.get(fi)
+                if (filter !== "" && fs.name.toLowerCase().indexOf(filter) === -1) continue
+                filteredStationsModel.append({
+                    "name": fs.name || "",
+                    "hostname": fs.hostname || "",
+                    "favicon": fs.favicon || "",
+                    "active": fs.active !== false,
+                    "originalIndex": fi
+                })
+            }
+            return
+        }
         for (var i = 0; i < stationsModel.count; i++) {
             const s = stationsModel.get(i)
-            if (favOnly && !root.isFavorite(s.name)) continue
             if (filter !== "" && s.name.toLowerCase().indexOf(filter) === -1) continue
             const item = {
                 "name": s.name || "",
