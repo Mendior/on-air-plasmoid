@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026.6
+
+Reordering and translations — the two most-wished-for conveniences.
+
+### New — reorder your stations right in the popup
+- **Stations can finally be reordered without opening the settings.** Hover (or keyboard-focus) a row and use the new up/down arrows — or press **Ctrl+Up / Ctrl+Down**. Works in the main list and in the favorites view.
+- **Favorites keep their own order.** The favorites view now follows the order of your favorites list itself, not the main list's — move your morning station to the top and it stays there. (Your existing favorites keep the order they were added in until you move something.)
+- Reordering never interrupts playback, and the arrows hide while a search filter is active — moving rows in a filtered list would reorder things you can't see.
+
+### New — translations
+- On Air now speaks **Estonian, German, Polish, Ukrainian, Spanish, Brazilian Portuguese and Swedish** (English remains the source language). All 205 strings, no partial catalogs.
+- Groundwork included: string extraction is scripted, so future releases can keep the catalogs complete.
+
+### Fixed
+- **The station search in settings can no longer hang on "Please wait…" forever.** QML silently ignores the XMLHttpRequest timeout everyone assumed was working — every network timeout in the settings pages was dead code. They now use a real watchdog that aborts the request, so a dead mirror rotates to the next one instead of hanging the page. Same fix for the logo fetcher.
+- A superseded station search no longer keeps retrying in the background alongside the new one (a subtle double-query bug in the same code path).
+- A stream error no longer throws away your keyboard position in the station list.
+- Two settings messages inherited from the original applet had typos (one even contained a Cyrillic letter С that looked like a Latin C) — cleaned up.
+
 ## 2026.5.1
 
 - **Much lower CPU while playing (issue #2).** The mini equalizer on the panel icon ran continuous animations for the whole playback session, keeping the window repainting at the full display refresh rate — the main reason plasmashell could sit at ~10% CPU while the radio played. The bars are now driven by ~8 discrete updates per second (they read like a real spectrum meter), and they stop ticking entirely while the panel is hidden. All equalizer instances (panel icon, station list, Now Playing) share the saving.
