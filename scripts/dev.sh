@@ -21,6 +21,7 @@ Usage: scripts/dev.sh <command>
   pull      sync local install -> repo package/contents/ (metadata.json and locale untouched)
   lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json + po validation
   i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
+  locale-install  compile po/ catalogs into the LOCAL install (old plugin id domain)
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
   view      plasmoidviewer on package/ (quick preview without restarting plasmashell)
   restart   systemctl --user restart plasma-plasmashell (reloads the QML)
@@ -86,6 +87,22 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # LGPL requires the license text to accompany every distributed copy.
     (cd "$REPO_DIR" && 7z a -tzip "$out" LICENSE >/dev/null)
     echo "OK: $out"
+    ;;
+  locale-install)
+    # Compile the po catalogs into the LOCAL install under its OLD plugin id
+    # (org.kde.plasma.advancedradio) so the panel widget is translated too.
+    # The published package gets its own catalogs at build time; the regular
+    # install/pull sync deliberately never touches locale/.
+    domain="plasma_applet_org.kde.plasma.advancedradio"
+    for po in "$REPO_DIR"/po/*.po; do
+      [ -e "$po" ] || continue
+      lang="$(basename "$po" .po)"
+      dir="$INSTALL_DIR/contents/locale/$lang/LC_MESSAGES"
+      mkdir -p "$dir"
+      msgfmt --check -o "$dir/$domain.mo" "$po"
+      echo "  install locale: $lang"
+    done
+    echo "OK: reload with scripts/dev.sh restart (full effect after re-login)"
     ;;
   i18n)
     find "$PKG/contents/ui" -name '*.qml' | sort > /tmp/onair-qml-files.txt
