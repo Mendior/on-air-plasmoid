@@ -81,6 +81,26 @@ KCM.ScrollViewKCM {
         _apiServer = _apiServers[Math.floor(Math.random() * _apiServers.length)];
     }
 
+    // QML XHR ignores xhr.timeout/ontimeout entirely (Qt quirk) — the logo
+    // fetcher could hang forever on one dead server. A Timer calling abort()
+    // is the working replacement: abort lands in onreadystatechange with
+    // status 0, i.e. the same path as any failed request.
+    function _armXhrTimeout(xhr, ms) {
+        const t = Qt.createQmlObject("import QtQuick; Timer { repeat: false }", root, "xhrTimeoutGuard");
+        t.interval = ms;
+        t.triggered.connect(() => {
+            try { xhr.abort() } catch(e) {}
+            try { t.destroy() } catch(e) {}
+        });
+        t.start();
+        return t;
+    }
+
+    function _clearXhrTimeout(t) {
+        if (!t) return;
+        try { t.stop(); t.destroy() } catch(e) {}
+    }
+
     function fetchMissingLogos() {
         if (_logoFetching)
             return;
@@ -133,13 +153,14 @@ KCM.ScrollViewKCM {
                   + "?name=" + encodeURIComponent(cleanName)
                   + "&limit=20&hidebroken=true&order=votes&reverse=true";
         const xhr = new XMLHttpRequest();
-        xhr.timeout = 8000;
+        var guard = null;
         xhr.open("GET", url);
         xhr.setRequestHeader("User-Agent", "AdvancedRadio/2.0");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
                 return;
+            _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
             let parseOk = false;
@@ -208,17 +229,7 @@ KCM.ScrollViewKCM {
                 _probeNextCandidate(job, candidates, 0);
             }
         };
-        xhr.ontimeout = () => {
-            if (_activeLogoXhr === xhr)
-                _activeLogoXhr = null;
-            if (retryCount < _apiServers.length - 1) {
-                _pickApiServer();
-                _queryRadioBrowser(job, cleanName, retryCount + 1);
-            } else {
-                _logoDone++;
-                _fetchNextLogo();
-            }
-        };
+        guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
 
@@ -302,7 +313,7 @@ KCM.ScrollViewKCM {
 
     function _scrapeHomepageAndProbe(job, apiFavicon, homepage) {
         const xhr = new XMLHttpRequest();
-        xhr.timeout = 12000;
+        var guard = null;
         xhr.open("GET", homepage);
         xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; AdvancedRadio/2.0)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
@@ -336,6 +347,7 @@ KCM.ScrollViewKCM {
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
                 return;
+            _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
             const candidates = [];
@@ -368,11 +380,7 @@ KCM.ScrollViewKCM {
                     candidates.push(u);
             _probeNextCandidate(job, candidates, 0);
         };
-        xhr.ontimeout = () => {
-            if (_activeLogoXhr === xhr)
-                _activeLogoXhr = null;
-            fallback();
-        };
+        guard = _armXhrTimeout(xhr, 12000);
         xhr.send();
     }
 
@@ -467,7 +475,7 @@ KCM.ScrollViewKCM {
         }
         const url = candidates[idx];
         const xhr = new XMLHttpRequest();
-        xhr.timeout = 6000;
+        var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
         xhr.setRequestHeader("User-Agent", "AdvancedRadio/2.0");
@@ -475,6 +483,7 @@ KCM.ScrollViewKCM {
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
                 return;
+            _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
             let ok = false;
@@ -494,11 +503,7 @@ KCM.ScrollViewKCM {
                 _probeNextCandidate(job, candidates, idx + 1);
             }
         };
-        xhr.ontimeout = () => {
-            if (_activeLogoXhr === xhr)
-                _activeLogoXhr = null;
-            _probeNextCandidate(job, candidates, idx + 1);
-        };
+        guard = _armXhrTimeout(xhr, 6000);
         xhr.send();
     }
 
@@ -880,13 +885,13 @@ KCM.ScrollViewKCM {
                         stationsModel.append(srv);
                     }
                     cfg_servers = JSON.stringify(getServersArray());
-                    showMessage(true, i18n("Сonfiguration has been loaded. Click 'Apply' to save changes."));
+                    showMessage(true, i18n("Configuration has been loaded. Click 'Apply' to save changes."));
                 } catch (e) {
                     showMessage(false, i18n("Error loading configuration. Try choosing a different file."));
                 }
             } else {
                 if (formattedText === cfg_servers)
-                    showMessage(true, i18n("You сonfiguration saved successfully."));
+                    showMessage(true, i18n("Your configuration was saved successfully."));
                 else
                     showMessage(false, i18n("Error, make sure the selected directory is writable!"));
             }
