@@ -18,6 +18,10 @@ PlasmaComponents3.ItemDelegate {
     id: listItem
 
     readonly property int targetIndex: typeof model.originalIndex !== "undefined" ? model.originalIndex : model.index
+    // Reordering works on the list the user actually sees — with a search
+    // filter active the visible neighbours aren't the real neighbours, so the
+    // arrows hide themselves instead of doing something surprising.
+    readonly property bool reorderable: root.searchFilter === ""
     readonly property bool isCurrent: lastPlay === listItem.targetIndex && isPlaying()
     readonly property bool isBuffered: playMusic.mediaStatus === MediaPlayer.BufferedMedia
                                        || playMusic.mediaStatus === MediaPlayer.BufferingMedia
@@ -236,6 +240,54 @@ PlasmaComponents3.ItemDelegate {
                         }
                     }
                 }
+            }
+        }
+
+        // Reorder arrows: move the station (or, in the favorites view, the
+        // favorite) one step up/down. Ctrl+Up/Down does the same via keyboard.
+        CircleButton {
+            id: moveUpButton
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.6
+            Layout.alignment: Qt.AlignVCenter
+            iconName: "go-up"
+            iconScale: 0.55
+            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0
+            visible: opacity > 0.0 && listItem.reorderable && model.index > 0
+            tooltipText: i18n("Move up")
+            onClicked: {
+                if (root.favoritesOnly)
+                    root.moveFavorite(model.name, -1)
+                else
+                    root.moveStation(listItem.targetIndex, model.name, model.hostname, -1)
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: Kirigami.Units.shortDuration }
+            }
+        }
+
+        CircleButton {
+            id: moveDownButton
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.6
+            Layout.alignment: Qt.AlignVCenter
+            iconName: "go-down"
+            iconScale: 0.55
+            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0
+            visible: opacity > 0.0 && listItem.reorderable
+                     && listItem.ListView.view
+                     && model.index < listItem.ListView.view.count - 1
+            tooltipText: i18n("Move down")
+            onClicked: {
+                if (root.favoritesOnly)
+                    root.moveFavorite(model.name, 1)
+                else
+                    root.moveStation(listItem.targetIndex, model.name, model.hostname, 1)
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: Kirigami.Units.shortDuration }
             }
         }
 
