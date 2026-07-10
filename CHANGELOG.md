@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.5.1
+
+- **Much lower CPU while playing (issue #2).** The mini equalizer on the panel icon ran continuous animations for the whole playback session, keeping the window repainting at the full display refresh rate — the main reason plasmashell could sit at ~10% CPU while the radio played. The bars are now driven by ~8 discrete updates per second (they read like a real spectrum meter), and they stop ticking entirely while the panel is hidden. All equalizer instances (panel icon, station list, Now Playing) share the saving.
+
 ## 2026.5
 
 Reliability release: recordings now tell the truth, scheduled recordings survive interruptions, and a handful of long-standing everyday annoyances are gone.
