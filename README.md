@@ -15,6 +15,8 @@
 - 🕐 **Recently played history** — the last 30 tracks with timestamps; download a song you missed half an hour ago
 - ⏰ **Sleep timer** with progress ring and gentle 30-second fade-out
 - 🎹 **MPRIS integration** — media keys and the Plasma media controls just work
+- ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
+- 🌐 **8 languages** — English, Estonian, German, Polish, Ukrainian, Spanish, Brazilian Portuguese, Swedish
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
 ## Requirements
@@ -47,7 +49,8 @@ kpackagetool6 --type Plasma/Applet --install on-air-2026.6.plasmoid
 ## Usage tips
 
 - **Click** a search result to preview it — **⭐** adds it to your stations & favorites
-- **Hover** a station row for the ⭐ and 🗑 buttons (removal asks twice — no accidents)
+- **Hover** a station row for the ⭐, 🗑 and ↑/↓ reorder buttons (removal asks twice — no accidents); Ctrl+Up/Down moves the focused row
+- In the **favorites view** the arrows reorder your favorites list itself — your order, not the main list's
 - **Scroll** on the volume button or the panel icon to change volume
 - The **⬇ button** on the now-playing page downloads the current track to `~/Music/OnAir`
 - The **folder button** in the footer opens **My Music** — your offline library and play history
