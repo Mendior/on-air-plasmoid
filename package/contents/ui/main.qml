@@ -1092,7 +1092,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.7");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.1");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1263,7 +1263,7 @@ PlasmoidItem {
     function _castPlay(url, name, art) {
         if (_castUuid === "" || !url || url.indexOf("file://") === 0) return;
         _casting = true;
-        _castExec("CAST_PLAY", [_castHost, _castPort, _castUuid, _castModel,
+        _castExec("CAST_PLAY", ["play", _castHost, _castPort, _castUuid, _castModel,
                                 url, _castContentType(url), name || "", art || ""]);
     }
 
@@ -1271,7 +1271,7 @@ PlasmoidItem {
     // station on this computer if one was loaded.
     function castDisconnect() {
         if (_castUuid === "") return;
-        _castExec("CAST_STOP", [_castHost, _castPort, _castUuid, _castModel]);
+        _castExec("CAST_STOP", ["stop", _castHost, _castPort, _castUuid, _castModel]);
         var resume = _casting ? _currentOrigUrl : "";
         var resumeName = root.currentStation;
         _casting = false;
@@ -1303,7 +1303,7 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (root._pendingCastVolumePct < 0 || root._castUuid === "") return;
-            _castExec("CAST_VOL", [root._castHost, root._castPort, root._castUuid,
+            _castExec("CAST_VOL", ["volume", root._castHost, root._castPort, root._castUuid,
                                    root._castModel, (root._pendingCastVolumePct / 100).toFixed(3)]);
             root._pendingCastVolumePct = -1;
         }
@@ -1335,7 +1335,7 @@ PlasmoidItem {
         // Casting: stop the device but keep it selected, so the next play
         // resumes on the same device rather than silently falling back local.
         if (_casting) {
-            _castExec("CAST_STOP", [_castHost, _castPort, _castUuid, _castModel]);
+            _castExec("CAST_STOP", ["stop", _castHost, _castPort, _castUuid, _castModel]);
             _casting = false;
             root.title = Plasmoid.title;
             root.currentStation = "";
