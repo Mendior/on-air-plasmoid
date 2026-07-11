@@ -110,7 +110,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.1")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.2")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -1200,13 +1200,34 @@ PlasmaExtras.Representation {
 
             FolderListModel {
                 id: musicFolder
-                folder: "file://" + root.downloadDirPath
+                // NOT bound to downloadDirPath directly: FolderListModel
+                // silently falls back to the working directory (the user's
+                // HOME under plasmashell) when its folder doesn't exist — or
+                // isn't set — so on a fresh install My Music listed the whole
+                // home directory (issue #3). The folder is applied only after
+                // main.qml's mkdir -p confirms it exists; until then the
+                // match-nothing filter keeps the model empty.
                 // .aac/.mka are what stream recordings produce (-c copy keeps
                 // the original codec; unknown codecs land in a Matroska file)
-                nameFilters: ["*.mp3", "*.opus", "*.m4a", "*.ogg", "*.flac", "*.aac", "*.mka", "*.wav", "*.mp4", "*.webm"]
+                readonly property var libraryFilters: ["*.mp3", "*.opus", "*.m4a", "*.ogg", "*.flac", "*.aac", "*.mka", "*.wav", "*.mp4", "*.webm"]
+                nameFilters: ["#pending#"]
                 showDirs: false
                 sortField: FolderListModel.Time
                 sortReversed: true
+
+                function pointAtLibrary() {
+                    nameFilters = libraryFilters;
+                    folder = "file://" + root.downloadDirPath;
+                }
+
+                // The popup (and this model) is created lazily on first open —
+                // the ready signal may have fired long before, hence the latch.
+                Component.onCompleted: if (root._musicDirEnsured) pointAtLibrary()
+
+                Connections {
+                    target: root
+                    function onMusicDirReady() { musicFolder.pointAtLibrary() }
+                }
             }
 
             // In-progress download bar

@@ -93,6 +93,24 @@ PlasmoidItem {
         autoDelete: true
     }
 
+    // Fired once the music-library folder is guaranteed to exist — the My
+    // Music page points its FolderListModel at it only then. Pointing
+    // FolderListModel at a missing (or no) folder makes it silently fall back
+    // to the process working directory — plasmashell's HOME — so a fresh
+    // install used to list the user's home directory on the My Music page
+    // until the first download created the real folder (issue #3).
+    signal musicDirReady()
+    // Latched so a lazily-created FullRepresentation (first popup open) can
+    // catch up if the signal fired before it existed.
+    property bool _musicDirEnsured: false
+
+    function _ensureMusicDir() {
+        _musicDirEnsured = false;
+        executable.exec(": MUSICDIR; mkdir -p '" + downloadDirPath.replace(/'/g, "'\\''") + "'; true");
+    }
+
+    onDownloadDirPathChanged: _ensureMusicDir()
+
     // Source URL that has confirmed it does NOT expose ICY metadata. While set,
     // we suppress reader.py polling for that source to avoid spawning python
     // every 2 seconds forever. Cleared each time playback begins.
@@ -1092,7 +1110,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.1");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.2");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1861,6 +1879,7 @@ PlasmoidItem {
         playMusicOutput.volume = targetVolume();
         _mprisStart();
         castProbe();
+        _ensureMusicDir();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
         // survives, so stop the orphan on the next start. ("-t" already caps
         // how long it could have kept running.)
@@ -1945,6 +1964,12 @@ PlasmoidItem {
                     mprisStateDebounce.stop();
                     _mprisStarted = false;
                 }
+                return;
+            }
+            // Music-library folder created (or already existed) → safe to load
+            if (cmd.indexOf(": MUSICDIR;") === 0) {
+                root._musicDirEnsured = true;
+                root.musicDirReady();
                 return;
             }
             // Google Cast: availability probe
