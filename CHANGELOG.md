@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.7.3
+
+- Emergency fix: 2026.7.2 failed to load at all ("Type FullRepresentation unavailable"). The My Music fix in that release nested a `Connections` element inside `FolderListModel`, which has no default property, so the whole popup failed to parse. If you installed 2026.7.2, update immediately — nothing else changed in this release.
+
 ## 2026.7.2
 
 - **My Music no longer lists your home directory on a fresh install** (issue #3, thanks @ChimanaTech). Until the first download created `~/Music/OnAir`, the folder didn't exist — and Qt's folder model silently falls back to the process working directory when that happens, which under plasmashell is your home. So the page showed whatever audio files were lying around in `$HOME`, and freshly downloaded tracks (saved to the real folder) never appeared there. The library folder is now created up front and the page only ever reads from it.
