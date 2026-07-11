@@ -15,6 +15,7 @@
 - 🕐 **Recently played history** — the last 30 tracks with timestamps; download a song you missed half an hour ago
 - ⏰ **Sleep timer** with progress ring and gentle 30-second fade-out
 - 🎹 **MPRIS integration** — media keys and the Plasma media controls just work
+- 📺 **Cast to Chromecast, Nest & Cast-enabled TVs** — send the stream straight to the device, which does the decoding, so your PC stays quiet and cool (a real help on older machines). Volume and station switching stay in the widget
 - ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🌐 **8 languages** — English, Estonian, German, Polish, Ukrainian, Spanish, Brazilian Portuguese, Swedish
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
@@ -33,6 +34,7 @@ Optional (features degrade gracefully without them):
 | `ffmpeg` | Stream recording (instant + scheduled) |
 | `yt-dlp` + `ffmpeg` | Track downloads |
 | `inotify-tools` | Zero-polling MPRIS command channel |
+| `python-chromecast` (pychromecast) | Cast to Chromecast / Nest / Cast-enabled TVs |
 | `claude` (Claude Code CLI) | Optional AI cleanup of messy radio titles |
 
 ## Install
@@ -43,7 +45,7 @@ Optional (features degrade gracefully without them):
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.6.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.7.plasmoid
 ```
 
 ## Usage tips

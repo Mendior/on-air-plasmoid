@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026.7
+
+The casting release.
+
+### New — cast to Chromecast, Nest and Cast-enabled TVs
+- **Send the radio to a Cast device.** A new cast button on the Now Playing page lists the Chromecasts, Nest speakers and Cast-enabled TVs on your network; pick one and the station plays there. Pick *This computer* to bring it back.
+- **It's genuinely light on your PC.** The stream URL is handed to the device, which does all the decoding and buffering itself — your computer stops decoding audio entirely while casting. On an older or low-powered machine that's a real, measurable drop in CPU and memory use, not just a convenience.
+- Volume and station switching stay in the widget and drive the device; stopping playback frees the device for other apps.
+- Needs the `python-chromecast` package. Without it the cast button simply doesn't appear — nothing else changes. No Cast device is ever contacted unless you open the cast menu yourself.
+
+### Fixed
+- The station-name marquee in the settings list now repeats on hover as intended.
+- The "Server status" line in the settings search info dialog no longer fails to render the last-checked time (a stray undefined reference).
+
 ## 2026.6
 
 Reordering and translations — the two most-wished-for conveniences.

@@ -709,7 +709,7 @@ KCM.ScrollViewKCM {
                                 loops: 1
                                 onFinished: {
                                     from = trackRect.width;
-                                    if (listItem.containsMouse)
+                                    if (swipeListItem.containsMouse)
                                         start();
 
                                 }
