@@ -110,7 +110,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.2")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.3")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -1223,11 +1223,13 @@ PlasmaExtras.Representation {
                 // The popup (and this model) is created lazily on first open —
                 // the ready signal may have fired long before, hence the latch.
                 Component.onCompleted: if (root._musicDirEnsured) pointAtLibrary()
+            }
 
-                Connections {
-                    target: root
-                    function onMusicDirReady() { musicFolder.pointAtLibrary() }
-                }
+            // Sibling, not a child: FolderListModel has no default property,
+            // so nesting anything inside it fails to load at parse time.
+            Connections {
+                target: root
+                function onMusicDirReady() { musicFolder.pointAtLibrary() }
             }
 
             // In-progress download bar
