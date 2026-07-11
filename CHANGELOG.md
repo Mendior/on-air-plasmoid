@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.7.2
+
+- **My Music no longer lists your home directory on a fresh install** (issue #3, thanks @ChimanaTech). Until the first download created `~/Music/OnAir`, the folder didn't exist — and Qt's folder model silently falls back to the process working directory when that happens, which under plasmashell is your home. So the page showed whatever audio files were lying around in `$HOME`, and freshly downloaded tracks (saved to the real folder) never appeared there. The library folder is now created up front and the page only ever reads from it.
+
 ## 2026.7.1
 
 - Casting actually casts now. The widget was invoking its cast helper without the command word, so playing to a device (and the device volume/stop calls) failed with "bad arguments" while discovery worked — which made it look tantalizingly close. Caught within hours of the release; the whole chain has now been verified end to end against a real device on the local network.
