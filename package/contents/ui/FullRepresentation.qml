@@ -40,9 +40,10 @@ PlasmaExtras.Representation {
         return ""
     }
 
-    readonly property bool _streamActive: isPlaying()
-                                          && (playMusic.mediaStatus === MediaPlayer.BufferedMedia
-                                              || playMusic.mediaStatus === MediaPlayer.BufferingMedia)
+    readonly property bool _streamActive: root._casting
+                                          || (isPlaying()
+                                              && (playMusic.mediaStatus === MediaPlayer.BufferedMedia
+                                                  || playMusic.mediaStatus === MediaPlayer.BufferingMedia))
 
     readonly property int _nowBitrate: {
         if (!_streamActive) return 0
@@ -109,7 +110,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.6")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.7")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -2119,6 +2120,9 @@ PlasmaExtras.Representation {
                     if (root.downloading) {
                         return "⬇ " + i18n("Downloading…")
                     }
+                    if (root._casting) {
+                        return i18n("Casting to %1", root._castName)
+                    }
                     if (!isConnected)
                         return i18n("Check internet connection…")
                     else if (root.isError)
@@ -2133,6 +2137,104 @@ PlasmaExtras.Representation {
                         return i18n("Connecting…")
                     else
                         return i18n("Choose station and enjoy…")
+                }
+            }
+
+            // Cast button — hidden entirely when python-chromecast is absent,
+            // so users without it never see a dead control.
+            CircleButton {
+                id: castBtn
+                Layout.alignment: Qt.AlignVCenter
+                implicitWidth: Kirigami.Units.gridUnit * 2.2
+                implicitHeight: implicitWidth
+                visible: root._castAvailable
+                iconName: root._casting ? "media-playback-cast" : "video-display"
+                iconScale: 0.55
+                checkable: true
+                checked: root._casting
+                tooltipText: root._casting
+                             ? i18n("Casting to %1 — click to choose or stop", root._castName)
+                             : i18n("Play on a Cast device (Chromecast, Nest, TV)")
+                onClicked: {
+                    if (!castMenu.opened) {
+                        root.castDiscover()
+                        castMenu.open()
+                    } else {
+                        castMenu.close()
+                    }
+                }
+
+                QQC2.Popup {
+                    id: castMenu
+                    y: -height - Kirigami.Units.smallSpacing
+                    x: -width + parent.width
+                    padding: Kirigami.Units.smallSpacing
+                    modal: false
+                    implicitWidth: Kirigami.Units.gridUnit * 14
+
+                    contentItem: ColumnLayout {
+                        spacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            text: i18n("Cast to")
+                            font.weight: Font.DemiBold
+                            opacity: 0.7
+                        }
+
+                        // "This computer" — return playback to the local output
+                        PlasmaComponents3.ItemDelegate {
+                            Layout.fillWidth: true
+                            text: i18n("This computer")
+                            icon.name: "computer"
+                            highlighted: !root._casting
+                            onClicked: {
+                                root.castDisconnect()
+                                castMenu.close()
+                            }
+                        }
+
+                        Repeater {
+                            model: castDevicesModel
+                            delegate: PlasmaComponents3.ItemDelegate {
+                                required property var model
+                                Layout.fillWidth: true
+                                text: model.name
+                                icon.name: "video-television"
+                                highlighted: root._casting && root._castUuid === model.uuid
+                                onClicked: {
+                                    root.castTo(model.uuid, model.name, model.host, model.port, model.model)
+                                    castMenu.close()
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            visible: root._castDiscovering
+                            PlasmaComponents3.BusyIndicator {
+                                implicitWidth: Kirigami.Units.iconSizes.small
+                                implicitHeight: Kirigami.Units.iconSizes.small
+                                running: parent.visible
+                            }
+                            PlasmaComponents3.Label {
+                                text: i18n("Searching for devices…")
+                                opacity: 0.7
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            visible: !root._castDiscovering && castDevicesModel.count === 0
+                            text: i18n("No Cast devices found on your network")
+                            wrapMode: Text.Wrap
+                            opacity: 0.6
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                    }
                 }
             }
 

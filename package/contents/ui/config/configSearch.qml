@@ -717,7 +717,7 @@ KCM.ScrollViewKCM {
                         const timeModel = searchModel.get(
                                             mainList.currentIndex).lastchecktime
                         const timeString = Date.fromLocaleString(
-                                             locale, timeModel,
+                                             Qt.locale(), timeModel,
                                              "yyyy-MM-dd hh:mm:ss").toLocaleString(
                                              Qt.locale(), Locale.ShortFormat)
                         const label = i18n("last check: ")

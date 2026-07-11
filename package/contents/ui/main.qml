@@ -220,6 +220,9 @@ PlasmoidItem {
         playMusicOutput.volume = vol;
         _pendingUserVolumePct = Math.round(vol * 100);
         volumePersistTimer.restart();
+        // While casting, the slider drives the DEVICE volume (debounced) — the
+        // local output is muted anyway, so this is the level the user hears.
+        if (_castUuid !== "") _castSetVolume(vol);
     }
 
     Timer {
@@ -248,9 +251,13 @@ PlasmoidItem {
         // playMusic.source actually holds during playback).
         const origHost = (station.hostname || "").toString();
         const resolved = _bitrateCache[origHost] !== undefined ? _bitrateCache[origHost] : origHost;
-        const stopping = isPlaying()
-                         && (playMusic.source == origHost || playMusic.source == resolved)
-                         && lastPlay === index;
+        // While casting, playMusic is idle — compare against the origin URL of
+        // what's on the device so a second click on the casting row stops it.
+        const stopping = _casting
+                         ? (lastPlay === index && _currentOrigUrl === origHost)
+                         : (isPlaying()
+                            && (playMusic.source == origHost || playMusic.source == resolved)
+                            && lastPlay === index);
         if (stopping) {
             stopWithFade();
         } else {
@@ -1085,7 +1092,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.6");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.7");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1182,6 +1189,126 @@ PlasmoidItem {
         try { timer.stop(); timer.destroy(); } catch (e) {}
     }
 
+    // ── Google Cast (Chromecast / Nest / Cast-enabled TVs) ───────────────────
+    // Casting hands the STREAM URL to the device, which then pulls the audio
+    // itself — so local decoding stops entirely (a real CPU win on weak
+    // machines) and there is no long-running helper. All work is done by
+    // short-lived cast.py calls; see that file for the rationale.
+    property bool _castAvailable: false      // pychromecast importable?
+    property bool _castDiscovering: false
+    property bool _casting: false            // a stream is on the device now
+    property string _castUuid: ""            // active target ("" = play locally)
+    property string _castName: ""
+    property string _castHost: ""
+    property int _castPort: 8009
+    property string _castModel: ""
+    property int _pendingCastVolumePct: -1
+
+    ListModel { id: castDevicesModel }
+
+    function _castScript() {
+        return Qt.resolvedUrl("cast.py").toString().substring(7);
+    }
+
+    function _castContentType(url) {
+        switch (_streamFormat(url)) {
+        case "aac":  return "audio/aac";
+        case "ogg":  return "application/ogg";
+        case "opus": return "application/ogg";
+        case "flac": return "audio/flac";
+        case "hls":  return "application/vnd.apple.mpegurl";
+        default:     return "audio/mpeg"; // mp3 and unknown — the safe default
+        }
+    }
+
+    // Shell-quote each argument and run cast.py with a sentinel prefix that the
+    // onExited dispatcher matches on. Untrusted values (station name, URL) only
+    // ever arrive as separate quoted argv entries, never as shell text.
+    function _castExec(sentinel, argv) {
+        var cmd = ": " + sentinel + "; python3 '" + _castScript().replace(/'/g, "'\\''") + "'";
+        for (var i = 0; i < argv.length; i++) {
+            cmd += " '" + String(argv[i]).replace(/'/g, "'\\''") + "'";
+        }
+        executable.exec(cmd);
+    }
+
+    function castProbe() {
+        _castExec("CAST_PROBE", ["probe"]);
+    }
+
+    function castDiscover() {
+        if (!_castAvailable || _castDiscovering) return;
+        _castDiscovering = true;
+        castDevicesModel.clear();
+        _castExec("CAST_DISCOVER", ["discover", "6"]);
+    }
+
+    // Route playback to a device. If a station is loaded it starts casting at
+    // once; otherwise the target is remembered and the next play casts.
+    function castTo(uuid, name, host, port, model) {
+        _castUuid = uuid;
+        _castName = name;
+        _castHost = host;
+        _castPort = port;
+        _castModel = model;
+        var url = _currentResolvedUrl || (playMusic.source ? playMusic.source.toString() : "");
+        if (url === "" || url.indexOf("file://") === 0) return;
+        // Silence local playback — the device takes over.
+        playMusic.stop();
+        playMusic.source = "";
+        infoTimer.stop();
+        _castPlay(url, root.currentStation, root.currentStationFavicon);
+    }
+
+    function _castPlay(url, name, art) {
+        if (_castUuid === "" || !url || url.indexOf("file://") === 0) return;
+        _casting = true;
+        _castExec("CAST_PLAY", [_castHost, _castPort, _castUuid, _castModel,
+                                url, _castContentType(url), name || "", art || ""]);
+    }
+
+    // Return to local playback. Stops the device and resumes the current
+    // station on this computer if one was loaded.
+    function castDisconnect() {
+        if (_castUuid === "") return;
+        _castExec("CAST_STOP", [_castHost, _castPort, _castUuid, _castModel]);
+        var resume = _casting ? _currentOrigUrl : "";
+        var resumeName = root.currentStation;
+        _casting = false;
+        _castUuid = "";
+        _castName = "";
+        _castHost = "";
+        _castModel = "";
+        if (resume !== "" && resume.indexOf("file://") !== 0) {
+            for (var i = 0; i < stationsModel.count; i++) {
+                if (stationsModel.get(i).hostname === resume) {
+                    lastPlay = i;
+                    refreshServer(i);
+                    return;
+                }
+            }
+            _playStation({ "name": resumeName, "hostname": resume, "favicon": root.currentStationFavicon, "active": true });
+        }
+    }
+
+    function _castSetVolume(v) {
+        if (_castUuid === "") return;
+        _pendingCastVolumePct = Math.round(Math.max(0, Math.min(1, v)) * 100);
+        castVolumeTimer.restart();
+    }
+
+    Timer {
+        id: castVolumeTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            if (root._pendingCastVolumePct < 0 || root._castUuid === "") return;
+            _castExec("CAST_VOL", [root._castHost, root._castPort, root._castUuid,
+                                   root._castModel, (root._pendingCastVolumePct / 100).toFixed(3)]);
+            root._pendingCastVolumePct = -1;
+        }
+    }
+
     function _playStation(station) {
         bitrateFallbackTimer.stop();
         bitrateFallbackTimer.fallbackUrl = "";
@@ -1205,6 +1332,17 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         root._previewUrl = "";
+        // Casting: stop the device but keep it selected, so the next play
+        // resumes on the same device rather than silently falling back local.
+        if (_casting) {
+            _castExec("CAST_STOP", [_castHost, _castPort, _castUuid, _castModel]);
+            _casting = false;
+            root.title = Plasmoid.title;
+            root.currentStation = "";
+            root.currentStationFavicon = "";
+            _resolveCallSeq++;
+            return;
+        }
         // An INSTANT recording follows playback — stopping playback stops it
         // (a scheduled recording is independent and keeps running).
         if (recording && !_recScheduled) recStop();
@@ -1240,6 +1378,21 @@ PlasmoidItem {
         infoTimer.stop();
         // Station switch ends the instant recording of the previous station.
         if (recording && !_recScheduled) recStop();
+        // A Cast device is the current output — send the stream there instead
+        // of decoding it locally. Local files can't be cast (the device can't
+        // reach file://), so those still play on this computer.
+        if (_castUuid !== "" && station.hostname
+            && station.hostname.toString().indexOf("file://") !== 0) {
+            fadeOutAnimation.stop();
+            _abortSleepFade();
+            playMusic.stop();
+            playMusic.source = "";
+            root.title = Plasmoid.title;
+            root.currentStation = station.name || "";
+            root.currentStationFavicon = station.favicon || "";
+            _castPlay(station.hostname, station.name || "", station.favicon || "");
+            return;
+        }
         // A pending bitrate fallback belongs to the PREVIOUS stream — it must
         // not swap the source under the playback we are starting now.
         // (_playStation clears it too, but direct callers like playLocalFile
@@ -1707,6 +1860,7 @@ PlasmoidItem {
         syncFavicons();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
+        castProbe();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
         // survives, so stop the orphan on the next start. ("-t" already caps
         // how long it could have kept running.)
@@ -1792,6 +1946,48 @@ PlasmoidItem {
                     _mprisStarted = false;
                 }
                 return;
+            }
+            // Google Cast: availability probe
+            if (cmd.indexOf(": CAST_PROBE;") === 0) {
+                root._castAvailable = (stdout || "").indexOf("__CAST_OK__") !== -1;
+                return;
+            }
+            // Google Cast: device discovery results
+            if (cmd.indexOf(": CAST_DISCOVER;") === 0) {
+                root._castDiscovering = false;
+                var lines = (stdout || "").split("\n");
+                for (var ci = 0; ci < lines.length; ci++) {
+                    if (lines[ci].indexOf("DEV\t") !== 0) continue;
+                    var p = lines[ci].split("\t");
+                    if (p.length < 6) continue;
+                    castDevicesModel.append({
+                        "uuid": p[1], "name": p[2], "host": p[3],
+                        "port": parseInt(p[4]) || 8009, "model": p[5]
+                    });
+                }
+                return;
+            }
+            // Google Cast: play/stop/volume result
+            if (cmd.indexOf(": CAST_PLAY;") === 0) {
+                var castOut = stdout || "";
+                if (castOut.indexOf("__NO_PYCHROMECAST__") !== -1) {
+                    root._castAvailable = false;
+                    root._casting = false;
+                    dlNotification.title = i18n("Casting needs python-chromecast");
+                    dlNotification.text = i18n("Install the python-chromecast package to cast to your devices.");
+                    dlNotification.iconName = "dialog-warning";
+                    dlNotification.sendEvent();
+                } else if (castOut.indexOf("__CAST_OK__") === -1) {
+                    root._casting = false;
+                    dlNotification.title = i18n("Could not cast to %1", root._castName || i18n("the device"));
+                    dlNotification.text = i18n("The device could not play this station.");
+                    dlNotification.iconName = "dialog-error";
+                    dlNotification.sendEvent();
+                }
+                return;
+            }
+            if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0) {
+                return; // fire-and-forget
             }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {

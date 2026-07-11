@@ -22,7 +22,7 @@ PlasmaComponents3.ItemDelegate {
     // filter active the visible neighbours aren't the real neighbours, so the
     // arrows hide themselves instead of doing something surprising.
     readonly property bool reorderable: root.searchFilter === ""
-    readonly property bool isCurrent: lastPlay === listItem.targetIndex && isPlaying()
+    readonly property bool isCurrent: lastPlay === listItem.targetIndex && (isPlaying() || root._casting)
     readonly property bool isBuffered: playMusic.mediaStatus === MediaPlayer.BufferedMedia
                                        || playMusic.mediaStatus === MediaPlayer.BufferingMedia
     readonly property bool isLoading: listItem.isCurrent && !listItem.isBuffered
