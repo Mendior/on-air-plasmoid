@@ -421,7 +421,7 @@ _DLNA_PN = {
 
 
 def _didl_metadata(title, ctype, url):
-    """DIDL-Lite for one radio stream.
+    """Raw (unescaped) DIDL-Lite for one radio stream.
 
     Both tested renderer families require the stream URL REPEATED inside
     <res> (SetAVTransportURI with metadata whose res is empty fails with
@@ -429,7 +429,7 @@ def _didl_metadata(title, ctype, url):
     """
     proto = "http-get:*:%s:%s" % (ctype or "audio/mpeg",
                                   _DLNA_PN.get(ctype or "audio/mpeg", "*"))
-    didl = (
+    return (
         '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" '
         'xmlns:dc="http://purl.org/dc/elements/1.1/" '
         'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
@@ -439,7 +439,16 @@ def _didl_metadata(title, ctype, url):
         '<res protocolInfo="%s">%s</res>'
         "</item></DIDL-Lite>"
     ) % (escape(title or "On Air"), escape(proto), escape(url or ""))
-    return escape(didl)
+
+
+def _dlna_set_uri_and_play(avt, url, didl, cdata):
+    """One SetAVTransportURI+Play round with the metadata packed either as
+    CDATA or XML-escaped."""
+    meta = "<![CDATA[%s]]>" % didl if cdata else escape(didl)
+    _soap(avt, AVT_SERVICE, "SetAVTransportURI",
+          "<InstanceID>0</InstanceID><CurrentURI>%s</CurrentURI>"
+          "<CurrentURIMetaData>%s</CurrentURIMetaData>" % (escape(url), meta))
+    _soap(avt, AVT_SERVICE, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
 
 
 def cmd_dlna_play(location, url, ctype, title):
@@ -455,13 +464,26 @@ def cmd_dlna_play(location, url, ctype, title):
             _soap(avt, AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>", timeout=3.0)
         except Exception:
             pass
-        _soap(avt, AVT_SERVICE, "SetAVTransportURI",
-              "<InstanceID>0</InstanceID><CurrentURI>%s</CurrentURI>"
-              "<CurrentURIMetaData>%s</CurrentURIMetaData>"
-              % (escape(url), _didl_metadata(title, ctype, url)))
-        _soap(avt, AVT_SERVICE, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
+        didl = _didl_metadata(title, ctype, url)
+        # CDATA first: Frontier Silicon renderers (Ruark, Roberts…) silently
+        # DISCARD an escaped-metadata URI and then fail Play with 705
+        # "Transport is locked" — CDATA is the only packing they play from.
+        # Renderers that dislike CDATA get the spec-compliant escaped form
+        # on the retry.
+        try:
+            _dlna_set_uri_and_play(avt, url, didl, cdata=True)
+        except Exception:
+            _dlna_set_uri_and_play(avt, url, didl, cdata=False)
         _out(OK)
     except Exception as exc:
+        # Leave the renderer idle rather than stuck in a half-open session
+        # (Frontier Silicon radios switch source on the incoming URI and
+        # would otherwise sit in an empty "Music player" screen).
+        try:
+            _soap(dev["avtransport"], AVT_SERVICE, "Stop",
+                  "<InstanceID>0</InstanceID>", timeout=3.0)
+        except Exception:
+            pass
         _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
 
 

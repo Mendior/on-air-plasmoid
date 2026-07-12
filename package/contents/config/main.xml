@@ -107,5 +107,9 @@
             <label>Scheduled recordings (JSON array)</label>
             <default>[]</default>
         </entry>
+        <entry name="audioOutputDevice" type="String">
+            <label>Audio output device id for local playback (empty = system default)</label>
+            <default></default>
+        </entry>
     </group>
 </kcfg>

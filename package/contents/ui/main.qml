@@ -240,7 +240,7 @@ PlasmoidItem {
         volumePersistTimer.restart();
         // While casting, the slider drives the DEVICE volume (debounced) — the
         // local output is muted anyway, so this is the level the user hears.
-        if (_castUuid !== "") _castSetVolume(vol);
+        if (_castTargets.length > 0) _castSetVolume(vol);
     }
 
     Timer {
@@ -1110,7 +1110,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.8.1");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.9");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1216,14 +1216,21 @@ PlasmoidItem {
     // Google Cast devices additionally need the optional pychromecast.
     property bool _castAvailable: false      // cast.py bridge usable (python3)?
     property bool _castDiscovering: false
-    property bool _casting: false            // a stream is on the device now
-    property string _castKind: ""            // "cast" | "dlna"
-    property string _castUuid: ""            // active target ("" = play locally)
-    property string _castName: ""
-    property string _castHost: ""
-    property int _castPort: 8009
-    property string _castModel: ""
-    property string _castLocation: ""        // DLNA device description URL
+    property bool _casting: false            // a stream is on ≥1 device now
+    // Selected devices; the array is always REASSIGNED (never mutated in
+    // place) so every binding on it re-evaluates. Entry: {kind, uuid, name,
+    // host, port, deviceModel, location}.
+    property var _castTargets: []
+    // Whether this computer also plays while casting (multi-room). Off by
+    // default when the first device is picked — "send it to the TV" should
+    // not keep the PC talking over it.
+    property bool _castLocalPlay: false
+    // URL last pushed to the devices — station switches push again, but a
+    // local resume with the same stream must not restart the devices.
+    property string _castCurrentUrl: ""
+    readonly property string _castName: _castTargets.length === 1
+                                        ? _castTargets[0].name
+                                        : (_castTargets.length > 1 ? i18n("%1 devices", _castTargets.length) : "")
     property int _pendingCastVolumePct: -1
 
     ListModel { id: castDevicesModel }
@@ -1265,73 +1272,128 @@ PlasmoidItem {
         _castExec("CAST_DISCOVER", ["discover", "6"]);
     }
 
-    // Route playback to a device. If a station is loaded it starts casting at
-    // once; otherwise the target is remembered and the next play casts.
-    function castTo(kind, uuid, name, host, port, model, location) {
-        _castKind = kind;
-        _castUuid = uuid;
-        _castName = name;
-        _castHost = host;
-        _castPort = port;
-        _castModel = model;
-        _castLocation = location || "";
-        var url = _currentResolvedUrl || (playMusic.source ? playMusic.source.toString() : "");
-        if (url === "" || url.indexOf("file://") === 0) return;
-        // Silence local playback — the device takes over.
-        playMusic.stop();
-        playMusic.source = "";
-        infoTimer.stop();
-        _castPlay(url, root.currentStation, root.currentStationFavicon);
+    function castTargetIndex(uuid) {
+        for (var i = 0; i < _castTargets.length; i++)
+            if (_castTargets[i].uuid === uuid) return i;
+        return -1;
     }
 
-    function _castPlay(url, name, art) {
-        if (_castUuid === "" || !url || url.indexOf("file://") === 0) return;
-        _casting = true;
-        if (_castKind === "dlna") {
-            _castExec("CAST_PLAY", ["dlna-play", _castLocation, url,
+    function _castStreamUrl() {
+        var url = _currentResolvedUrl || (playMusic.source ? playMusic.source.toString() : "");
+        return (url === "" || url.indexOf("file://") === 0) ? "" : url;
+    }
+
+    // Toggle one device in the target set. Checking starts the current
+    // stream on it; unchecking stops THAT device (others keep playing).
+    function castToggleDevice(dev) {
+        var idx = castTargetIndex(dev.uuid);
+        var targets = _castTargets.slice();
+        if (idx >= 0) {
+            _castStopDevice(targets[idx]);
+            targets.splice(idx, 1);
+            _castTargets = targets;
+            if (targets.length === 0) {
+                var resume = _casting && !_castLocalPlay;
+                _casting = false;
+                _castCurrentUrl = "";
+                if (resume) _castResumeLocally();
+            }
+            return;
+        }
+        // First device picked: silence local playback unless the user has
+        // explicitly kept "This computer" checked (multi-room).
+        if (targets.length === 0 && !_castLocalPlay && isPlaying()) {
+            playMusic.stop();
+            playMusic.source = "";
+            infoTimer.stop();
+        }
+        targets.push(dev);
+        _castTargets = targets;
+        var url = _castStreamUrl();
+        if (url !== "") {
+            _casting = true;
+            _castCurrentUrl = url;
+            _castPlayOn(dev, url, root.currentStation, root.currentStationFavicon);
+        }
+    }
+
+    // Toggle "also play on this computer" while casting.
+    function castToggleLocal() {
+        if (_castTargets.length === 0) return;
+        if (_castLocalPlay) {
+            _castLocalPlay = false;
+            if (isPlaying()) {
+                playMusic.stop();
+                playMusic.source = "";
+                infoTimer.stop();
+            }
+        } else {
+            _castLocalPlay = true;
+            _castResumeLocally();
+        }
+    }
+
+    // Restart the current station through the normal local pipeline.
+    function _castResumeLocally() {
+        var resume = _currentOrigUrl;
+        if (resume === "" || resume.indexOf("file://") === 0) return;
+        for (var i = 0; i < stationsModel.count; i++) {
+            if (stationsModel.get(i).hostname === resume) {
+                lastPlay = i;
+                _playStation(stationsModel.get(i));
+                return;
+            }
+        }
+        _playStation({ "name": root.currentStation, "hostname": resume,
+                       "favicon": root.currentStationFavicon, "active": true });
+    }
+
+    function _castPlayOn(dev, url, name, art) {
+        if (dev.kind === "dlna") {
+            _castExec("CAST_PLAY", ["dlna-play", dev.location, url,
                                     _castContentType(url), name || ""]);
         } else {
-            _castExec("CAST_PLAY", ["play", _castHost, _castPort, _castUuid, _castModel,
+            _castExec("CAST_PLAY", ["play", dev.host, dev.port, dev.uuid, dev.deviceModel,
                                     url, _castContentType(url), name || "", art || ""]);
         }
     }
 
-    function _castStopDevice() {
-        if (_castKind === "dlna") {
-            _castExec("CAST_STOP", ["dlna-stop", _castLocation]);
+    // Push a (new) stream to every selected device.
+    function _castPlay(url, name, art) {
+        if (_castTargets.length === 0 || !url || url.indexOf("file://") === 0) return;
+        _casting = true;
+        _castCurrentUrl = url;
+        for (var i = 0; i < _castTargets.length; i++)
+            _castPlayOn(_castTargets[i], url, name, art);
+    }
+
+    function _castStopDevice(dev) {
+        if (dev.kind === "dlna") {
+            _castExec("CAST_STOP", ["dlna-stop", dev.location]);
         } else {
-            _castExec("CAST_STOP", ["stop", _castHost, _castPort, _castUuid, _castModel]);
+            _castExec("CAST_STOP", ["stop", dev.host, dev.port, dev.uuid, dev.deviceModel]);
         }
     }
 
-    // Return to local playback. Stops the device and resumes the current
-    // station on this computer if one was loaded.
+    function _castStopAll() {
+        for (var i = 0; i < _castTargets.length; i++)
+            _castStopDevice(_castTargets[i]);
+    }
+
+    // "This computer" only: stop all devices, resume the station locally.
     function castDisconnect() {
-        if (_castUuid === "") return;
-        _castStopDevice();
-        var resume = _casting ? _currentOrigUrl : "";
-        var resumeName = root.currentStation;
+        if (_castTargets.length === 0) return;
+        _castStopAll();
+        var resume = _casting;
+        _castTargets = [];
+        _castLocalPlay = false;
         _casting = false;
-        _castKind = "";
-        _castUuid = "";
-        _castName = "";
-        _castHost = "";
-        _castModel = "";
-        _castLocation = "";
-        if (resume !== "" && resume.indexOf("file://") !== 0) {
-            for (var i = 0; i < stationsModel.count; i++) {
-                if (stationsModel.get(i).hostname === resume) {
-                    lastPlay = i;
-                    refreshServer(i);
-                    return;
-                }
-            }
-            _playStation({ "name": resumeName, "hostname": resume, "favicon": root.currentStationFavicon, "active": true });
-        }
+        _castCurrentUrl = "";
+        if (resume && !isPlaying()) _castResumeLocally();
     }
 
     function _castSetVolume(v) {
-        if (_castUuid === "") return;
+        if (_castTargets.length === 0) return;
         _pendingCastVolumePct = Math.round(Math.max(0, Math.min(1, v)) * 100);
         castVolumeTimer.restart();
     }
@@ -1341,13 +1403,16 @@ PlasmoidItem {
         interval: 400
         repeat: false
         onTriggered: {
-            if (root._pendingCastVolumePct < 0 || root._castUuid === "") return;
+            if (root._pendingCastVolumePct < 0 || root._castTargets.length === 0) return;
             var level = (root._pendingCastVolumePct / 100).toFixed(3);
-            if (root._castKind === "dlna") {
-                _castExec("CAST_VOL", ["dlna-volume", root._castLocation, level]);
-            } else {
-                _castExec("CAST_VOL", ["volume", root._castHost, root._castPort, root._castUuid,
-                                       root._castModel, level]);
+            for (var i = 0; i < root._castTargets.length; i++) {
+                var dev = root._castTargets[i];
+                if (dev.kind === "dlna") {
+                    _castExec("CAST_VOL", ["dlna-volume", dev.location, level]);
+                } else {
+                    _castExec("CAST_VOL", ["volume", dev.host, dev.port, dev.uuid,
+                                           dev.deviceModel, level]);
+                }
             }
             root._pendingCastVolumePct = -1;
         }
@@ -1376,16 +1441,21 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         root._previewUrl = "";
-        // Casting: stop the device but keep it selected, so the next play
-        // resumes on the same device rather than silently falling back local.
+        // Casting: stop every device but keep them selected, so the next play
+        // resumes on the same devices rather than silently falling back local.
         if (_casting) {
-            _castStopDevice();
+            _castStopAll();
             _casting = false;
-            root.title = Plasmoid.title;
-            root.currentStation = "";
-            root.currentStationFavicon = "";
-            _resolveCallSeq++;
-            return;
+            _castCurrentUrl = "";
+            // Multi-room: local playback is also running — fall through to
+            // the normal local stop below.
+            if (!(_castLocalPlay && isPlaying())) {
+                root.title = Plasmoid.title;
+                root.currentStation = "";
+                root.currentStationFavicon = "";
+                _resolveCallSeq++;
+                return;
+            }
         }
         // An INSTANT recording follows playback — stopping playback stops it
         // (a scheduled recording is independent and keeps running).
@@ -1422,20 +1492,27 @@ PlasmoidItem {
         infoTimer.stop();
         // Station switch ends the instant recording of the previous station.
         if (recording && !_recScheduled) recStop();
-        // A Cast device is the current output — send the stream there instead
-        // of decoding it locally. Local files can't be cast (the device can't
-        // reach file://), so those still play on this computer.
-        if (_castUuid !== "" && station.hostname
+        // Devices are selected — send the stream to them instead of (or in
+        // multi-room mode, in addition to) decoding it locally. Local files
+        // can't be cast (the devices can't reach file://), so those still
+        // play only on this computer.
+        if (_castTargets.length > 0 && station.hostname
             && station.hostname.toString().indexOf("file://") !== 0) {
-            fadeOutAnimation.stop();
-            _abortSleepFade();
-            playMusic.stop();
-            playMusic.source = "";
-            root.title = Plasmoid.title;
-            root.currentStation = station.name || "";
-            root.currentStationFavicon = station.favicon || "";
-            _castPlay(station.hostname, station.name || "", station.favicon || "");
-            return;
+            var castUrl = station.hostname.toString();
+            // A local resume of the stream already on the devices (multi-room
+            // toggle) must not restart them mid-song.
+            if (castUrl !== _castCurrentUrl)
+                _castPlay(castUrl, station.name || "", station.favicon || "");
+            if (!_castLocalPlay) {
+                fadeOutAnimation.stop();
+                _abortSleepFade();
+                playMusic.stop();
+                playMusic.source = "";
+                root.title = Plasmoid.title;
+                root.currentStation = station.name || "";
+                root.currentStationFavicon = station.favicon || "";
+                return;
+            }
         }
         // A pending bitrate fallback belongs to the PREVIOUS stream — it must
         // not swap the source under the playback we are starting now.
@@ -1906,6 +1983,7 @@ PlasmoidItem {
         _mprisStart();
         castProbe();
         _ensureMusicDir();
+        _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
         // survives, so stop the orphan on the next start. ("-t" already caps
         // how long it could have kept running.)
@@ -2024,17 +2102,17 @@ PlasmoidItem {
                 }
                 return;
             }
-            // Casting: play/stop/volume result
+            // Casting: play/stop/volume result. One failing device must not
+            // tear down the whole casting state — the other targets (or the
+            // local multi-room playback) may be fine, so only notify.
             if (cmd.indexOf(": CAST_PLAY;") === 0) {
                 var castOut = stdout || "";
                 if (castOut.indexOf("__NO_PYCHROMECAST__") !== -1) {
-                    root._casting = false;
                     dlNotification.title = i18n("Casting needs python-chromecast");
                     dlNotification.text = i18n("Install the python-chromecast package to cast to your devices.");
                     dlNotification.iconName = "dialog-warning";
                     dlNotification.sendEvent();
                 } else if (castOut.indexOf("__CAST_OK__") === -1) {
-                    root._casting = false;
                     dlNotification.title = i18n("Could not cast to %1", root._castName || i18n("the device"));
                     dlNotification.text = i18n("The device could not play this station.");
                     dlNotification.iconName = "dialog-error";
@@ -2309,6 +2387,40 @@ PlasmoidItem {
 
             onVolumeChanged: _mprisQueueWrite()
         }
+    }
+
+    // System audio outputs (speakers, headphones, Bluetooth speakers, HDMI).
+    // The cast menu lets the user route local playback to any of them; a
+    // Bluetooth speaker paired in system settings shows up here by itself.
+    MediaDevices { id: mediaDevices }
+
+    // Route local playback to a specific output. An empty id follows the
+    // system default. The choice is persisted and re-applied on restart as
+    // long as the device is still present (a switched-off Bluetooth speaker
+    // falls back to the default output instead of playing into the void).
+    function setAudioOutputDevice(devId) {
+        Plasmoid.configuration.audioOutputDevice = devId || "";
+        _applyAudioOutputDevice();
+    }
+
+    function _applyAudioOutputDevice() {
+        var wanted = Plasmoid.configuration.audioOutputDevice || "";
+        var outs = mediaDevices.audioOutputs;
+        if (wanted !== "") {
+            for (var i = 0; i < outs.length; i++) {
+                if (String(outs[i].id) === wanted) {
+                    playMusicOutput.device = outs[i];
+                    return;
+                }
+            }
+        }
+        playMusicOutput.device = mediaDevices.defaultAudioOutput;
+    }
+
+    Connections {
+        target: mediaDevices
+        // Keeps the routing correct when a Bluetooth speaker (dis)connects.
+        function onAudioOutputsChanged() { root._applyAudioOutputDevice() }
     }
 
     NumberAnimation {

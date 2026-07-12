@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-12 09:51+0300\n"
+"POT-Creation-Date: 2026-07-12 10:50+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Polish\n"
@@ -29,7 +29,7 @@ msgid "Audio"
 msgstr "Dźwięk"
 
 #: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:86
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2318
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2369
 msgid "Volume"
 msgstr "Głośność"
 
@@ -779,26 +779,34 @@ msgid "Play on a device (Chromecast, TV, speaker)"
 msgstr "Odtwarzaj na urządzeniu (Chromecast, telewizor, głośnik)"
 
 #: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2206
-msgid "Cast to"
-msgstr "Prześlij do"
+msgid "Play on"
+msgstr "Odtwarzaj na"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2214
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2217
 msgid "This computer"
 msgstr "Ten komputer"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2249
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2233
+msgid "System default output"
+msgstr "Domyślne wyjście systemowe"
+
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2282
+msgid "Stop casting everywhere"
+msgstr "Zatrzymaj odtwarzanie na wszystkich urządzeniach"
+
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2300
 msgid "Searching for devices…"
 msgstr "Wyszukiwanie urządzeń…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2258
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2309
 msgid "No devices found on your network"
 msgstr "Nie znaleziono urządzeń w Twojej sieci"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2279
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2330
 msgid "Volume: "
 msgstr "Głośność: "
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2279
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2330
 msgid "(scroll to adjust)"
 msgstr "(przewiń, aby zmienić)"
 
@@ -826,75 +834,79 @@ msgstr "Zaplanowane nagranie pominięto"
 msgid "%1 — another recording is already running."
 msgstr "%1 — inne nagranie już trwa."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2029
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1233
+msgid "%1 devices"
+msgstr "%1 urządzenia(-eń)"
+
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2111
 msgid "Casting needs python-chromecast"
 msgstr "Przesyłanie wymaga python-chromecast"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2030
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2112
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Zainstaluj pakiet python-chromecast, aby przesyłać do swoich urządzeń."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2035
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2116
 msgid "the device"
 msgstr "urządzenie"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2035
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2116
 msgid "Could not cast to %1"
 msgstr "Nie można przesłać do %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2036
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2117
 msgid "The device could not play this station."
 msgstr "Urządzenie nie mogło odtworzyć tej stacji."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2123
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2204
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg nie jest zainstalowany"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2124
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2205
 msgid "Install ffmpeg to record radio."
 msgstr "Zainstaluj ffmpeg, aby nagrywać radio."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2127
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2208
 msgid "Recording saved ✓ (%1)"
 msgstr "Nagranie zapisane ✓ (%1)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2131
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2212
 msgid "Recording interrupted (%1 captured)"
 msgstr "Nagranie przerwane (nagrano %1)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2133
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2214
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — plik jest znacznie mniejszy niż oczekiwano."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2137
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2218
 msgid "Recording failed"
 msgstr "Nagrywanie nie powiodło się"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2138
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2219
 msgid "The stream could not be captured."
 msgstr "Nie udało się przechwycić strumienia."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2160
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2241
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp nie jest zainstalowany"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2161
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2242
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Zainstaluj yt-dlp (i ffmpeg), aby pobierać utwory."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2164
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2245
 msgid "Track downloaded ✓"
 msgstr "Utwór pobrany ✓"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2165
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2246
 msgid "Saved to: "
 msgstr "Zapisano w: "
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2168
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2249
 msgid "Download failed"
 msgstr "Pobieranie nie powiodło się"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2169
+#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2250
 msgid "Unknown error"
 msgstr "Nieznany błąd"
 
@@ -913,3 +925,6 @@ msgstr "Kliknij ponownie, aby potwierdzić usunięcie"
 #: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:314
 msgid "Remove station from list"
 msgstr "Usuń stację z listy"
+
+#~ msgid "Cast to"
+#~ msgstr "Prześlij do"
