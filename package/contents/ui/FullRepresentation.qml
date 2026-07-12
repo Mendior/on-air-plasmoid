@@ -33,11 +33,27 @@ PlasmaExtras.Representation {
     Layout.preferredHeight: Kirigami.Units.gridUnit * 32
     collapseMarginsHint: true
 
+    // Urls whose image failed to LOAD (404, broken file) — _bestArtUrl skips
+    // them so the chain falls through to the next candidate instead of
+    // showing the placeholder forever. Keyed by exact url, so a new track's
+    // fresh albumArtUrl self-heals; reset on station change. Always replaced
+    // as a whole object — QML var bindings don't see in-place mutation.
+    property var _brokenArtUrls: ({})
+
     readonly property string _bestArtUrl: {
-        if (root.albumArtUrl) return root.albumArtUrl
-        if (root.imageurl) return root.imageurl
-        if (root.currentStationFavicon) return root.faviconSrc(root.currentStationFavicon)
+        var broken = _brokenArtUrls
+        if (root.albumArtUrl && !broken[root.albumArtUrl]) return root.albumArtUrl
+        if (root.imageurl && !broken[root.imageurl]) return root.imageurl
+        if (root.currentStationFavicon) {
+            var fav = root.faviconSrc(root.currentStationFavicon)
+            if (!broken[fav]) return fav
+        }
         return ""
+    }
+
+    Connections {
+        target: root
+        function onCurrentStationChanged() { fullRepresentation._brokenArtUrls = {} }
     }
 
     readonly property bool _streamActive: root._casting
@@ -752,6 +768,19 @@ PlasmaExtras.Representation {
                             asynchronous: true
                             visible: status === Image.Ready
                             smooth: true
+
+                            // A url that 404s would otherwise pin the vinyl
+                            // placeholder even when the next chain link
+                            // (station image, favicon) would have loaded fine.
+                            onStatusChanged: {
+                                if (status === Image.Error && source.toString() !== "") {
+                                    var m = {}
+                                    for (var k in fullRepresentation._brokenArtUrls)
+                                        m[k] = true
+                                    m[source.toString()] = true
+                                    fullRepresentation._brokenArtUrls = m
+                                }
+                            }
 
                             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
                         }
