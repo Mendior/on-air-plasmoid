@@ -110,7 +110,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.8")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.8.1")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -2222,15 +2222,24 @@ PlasmaExtras.Representation {
 
                         Repeater {
                             model: castDevicesModel
+                            // Per-role required properties, NOT `required
+                            // property var model`: the rows carried a role
+                            // whose value shadowed the model object and
+                            // left every row blank.
                             delegate: PlasmaComponents3.ItemDelegate {
-                                required property var model
+                                required property string kind
+                                required property string uuid
+                                required property string name
+                                required property string host
+                                required property int port
+                                required property string deviceModel
+                                required property string location
                                 Layout.fillWidth: true
-                                text: model.name
-                                icon.name: model.kind === "dlna" ? "speaker" : "video-television"
-                                highlighted: root._casting && root._castUuid === model.uuid
+                                text: name
+                                icon.name: kind === "dlna" ? "speaker" : "video-television"
+                                highlighted: root._casting && root._castUuid === uuid
                                 onClicked: {
-                                    root.castTo(model.kind, model.uuid, model.name, model.host,
-                                                model.port, model.model, model.location)
+                                    root.castTo(kind, uuid, name, host, port, deviceModel, location)
                                     castMenu.close()
                                 }
                             }
