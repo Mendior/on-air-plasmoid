@@ -1110,7 +1110,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.3");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.8");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1207,19 +1207,23 @@ PlasmoidItem {
         try { timer.stop(); timer.destroy(); } catch (e) {}
     }
 
-    // ── Google Cast (Chromecast / Nest / Cast-enabled TVs) ───────────────────
+    // ── Casting (Google Cast + DLNA/UPnP renderers) ──────────────────────────
     // Casting hands the STREAM URL to the device, which then pulls the audio
     // itself — so local decoding stops entirely (a real CPU win on weak
     // machines) and there is no long-running helper. All work is done by
     // short-lived cast.py calls; see that file for the rationale.
-    property bool _castAvailable: false      // pychromecast importable?
+    // DLNA (smart TVs, soundbars, network speakers) needs no dependencies;
+    // Google Cast devices additionally need the optional pychromecast.
+    property bool _castAvailable: false      // cast.py bridge usable (python3)?
     property bool _castDiscovering: false
     property bool _casting: false            // a stream is on the device now
+    property string _castKind: ""            // "cast" | "dlna"
     property string _castUuid: ""            // active target ("" = play locally)
     property string _castName: ""
     property string _castHost: ""
     property int _castPort: 8009
     property string _castModel: ""
+    property string _castLocation: ""        // DLNA device description URL
     property int _pendingCastVolumePct: -1
 
     ListModel { id: castDevicesModel }
@@ -1263,12 +1267,14 @@ PlasmoidItem {
 
     // Route playback to a device. If a station is loaded it starts casting at
     // once; otherwise the target is remembered and the next play casts.
-    function castTo(uuid, name, host, port, model) {
+    function castTo(kind, uuid, name, host, port, model, location) {
+        _castKind = kind;
         _castUuid = uuid;
         _castName = name;
         _castHost = host;
         _castPort = port;
         _castModel = model;
+        _castLocation = location || "";
         var url = _currentResolvedUrl || (playMusic.source ? playMusic.source.toString() : "");
         if (url === "" || url.indexOf("file://") === 0) return;
         // Silence local playback — the device takes over.
@@ -1281,22 +1287,37 @@ PlasmoidItem {
     function _castPlay(url, name, art) {
         if (_castUuid === "" || !url || url.indexOf("file://") === 0) return;
         _casting = true;
-        _castExec("CAST_PLAY", ["play", _castHost, _castPort, _castUuid, _castModel,
-                                url, _castContentType(url), name || "", art || ""]);
+        if (_castKind === "dlna") {
+            _castExec("CAST_PLAY", ["dlna-play", _castLocation, url,
+                                    _castContentType(url), name || ""]);
+        } else {
+            _castExec("CAST_PLAY", ["play", _castHost, _castPort, _castUuid, _castModel,
+                                    url, _castContentType(url), name || "", art || ""]);
+        }
+    }
+
+    function _castStopDevice() {
+        if (_castKind === "dlna") {
+            _castExec("CAST_STOP", ["dlna-stop", _castLocation]);
+        } else {
+            _castExec("CAST_STOP", ["stop", _castHost, _castPort, _castUuid, _castModel]);
+        }
     }
 
     // Return to local playback. Stops the device and resumes the current
     // station on this computer if one was loaded.
     function castDisconnect() {
         if (_castUuid === "") return;
-        _castExec("CAST_STOP", ["stop", _castHost, _castPort, _castUuid, _castModel]);
+        _castStopDevice();
         var resume = _casting ? _currentOrigUrl : "";
         var resumeName = root.currentStation;
         _casting = false;
+        _castKind = "";
         _castUuid = "";
         _castName = "";
         _castHost = "";
         _castModel = "";
+        _castLocation = "";
         if (resume !== "" && resume.indexOf("file://") !== 0) {
             for (var i = 0; i < stationsModel.count; i++) {
                 if (stationsModel.get(i).hostname === resume) {
@@ -1321,8 +1342,13 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (root._pendingCastVolumePct < 0 || root._castUuid === "") return;
-            _castExec("CAST_VOL", ["volume", root._castHost, root._castPort, root._castUuid,
-                                   root._castModel, (root._pendingCastVolumePct / 100).toFixed(3)]);
+            var level = (root._pendingCastVolumePct / 100).toFixed(3);
+            if (root._castKind === "dlna") {
+                _castExec("CAST_VOL", ["dlna-volume", root._castLocation, level]);
+            } else {
+                _castExec("CAST_VOL", ["volume", root._castHost, root._castPort, root._castUuid,
+                                       root._castModel, level]);
+            }
             root._pendingCastVolumePct = -1;
         }
     }
@@ -1353,7 +1379,7 @@ PlasmoidItem {
         // Casting: stop the device but keep it selected, so the next play
         // resumes on the same device rather than silently falling back local.
         if (_casting) {
-            _castExec("CAST_STOP", ["stop", _castHost, _castPort, _castUuid, _castModel]);
+            _castStopDevice();
             _casting = false;
             root.title = Plasmoid.title;
             root.currentStation = "";
@@ -1972,31 +1998,33 @@ PlasmoidItem {
                 root.musicDirReady();
                 return;
             }
-            // Google Cast: availability probe
+            // Casting: bridge availability probe (python3 present = usable;
+            // the cast=0|1 flag only tells whether Cast devices can appear,
+            // DLNA renderers need nothing beyond the standard library)
             if (cmd.indexOf(": CAST_PROBE;") === 0) {
                 root._castAvailable = (stdout || "").indexOf("__CAST_OK__") !== -1;
                 return;
             }
-            // Google Cast: device discovery results
+            // Casting: device discovery results (Cast + DLNA)
             if (cmd.indexOf(": CAST_DISCOVER;") === 0) {
                 root._castDiscovering = false;
                 var lines = (stdout || "").split("\n");
                 for (var ci = 0; ci < lines.length; ci++) {
                     if (lines[ci].indexOf("DEV\t") !== 0) continue;
                     var p = lines[ci].split("\t");
-                    if (p.length < 6) continue;
+                    if (p.length < 7) continue;
                     castDevicesModel.append({
-                        "uuid": p[1], "name": p[2], "host": p[3],
-                        "port": parseInt(p[4]) || 8009, "model": p[5]
+                        "kind": p[1], "uuid": p[2], "name": p[3], "host": p[4],
+                        "port": parseInt(p[5]) || 8009, "model": p[6],
+                        "location": p.length > 7 ? p[7] : ""
                     });
                 }
                 return;
             }
-            // Google Cast: play/stop/volume result
+            // Casting: play/stop/volume result
             if (cmd.indexOf(": CAST_PLAY;") === 0) {
                 var castOut = stdout || "";
                 if (castOut.indexOf("__NO_PYCHROMECAST__") !== -1) {
-                    root._castAvailable = false;
                     root._casting = false;
                     dlNotification.title = i18n("Casting needs python-chromecast");
                     dlNotification.text = i18n("Install the python-chromecast package to cast to your devices.");

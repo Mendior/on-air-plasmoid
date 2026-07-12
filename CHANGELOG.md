@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026.8
+
+Casting now covers far more than Chromecast.
+
+- **Cast to any DLNA/UPnP device** — smart TVs (Samsung, LG, Sony…), soundbars (Bose, Sonos…), AV receivers and WiFi speakers now show up in the cast menu next to Cast devices. Same model as before: the stream URL is handed to the device, which decodes and buffers it itself, so your computer does no audio work while casting.
+- DLNA casting is built entirely on the Python standard library — **no new dependencies**. The cast button now appears even without `python-chromecast`; that package is only needed for Chromecast/Nest devices to show up.
+- Discovery got more robust along the way: renderers that sleep through the first multicast query (some soundbars do) are found via a retried direct query, and setups where a local firewall eats SSDP replies fall back to probing mDNS-visible devices directly. Verified against a Bose Smart Soundbar 900, a Samsung Q-series TV and a Chromecast-based TV on a real network.
+- Known limit, honestly stated: some Frontier Silicon based radios (Ruark, Roberts…) advertise DLNA but refuse pushed streams while idle; the widget reports "could not cast" instead of failing silently. AirPlay-only devices (Apple TV, HomePod) are not supported — Linux has no lightweight way to stream to them without pairing and a persistent transcoding process, which would defeat the low-CPU design.
+
 ## 2026.7.3
 
 - Emergency fix: 2026.7.2 failed to load at all ("Type FullRepresentation unavailable"). The My Music fix in that release nested a `Connections` element inside `FolderListModel`, which has no default property, so the whole popup failed to parse. If you installed 2026.7.2, update immediately — nothing else changed in this release.

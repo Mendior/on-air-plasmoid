@@ -110,7 +110,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.7.3")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.8")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -2163,8 +2163,10 @@ PlasmaExtras.Representation {
                 }
             }
 
-            // Cast button — hidden entirely when python-chromecast is absent,
-            // so users without it never see a dead control.
+            // Cast button — DLNA renderers (TVs, soundbars, network speakers)
+            // work with no extra packages; Google Cast devices additionally
+            // appear when python-chromecast is installed. Hidden only when
+            // the bridge itself is unusable (no python3).
             CircleButton {
                 id: castBtn
                 Layout.alignment: Qt.AlignVCenter
@@ -2177,7 +2179,7 @@ PlasmaExtras.Representation {
                 checked: root._casting
                 tooltipText: root._casting
                              ? i18n("Casting to %1 — click to choose or stop", root._castName)
-                             : i18n("Play on a Cast device (Chromecast, Nest, TV)")
+                             : i18n("Play on a device (Chromecast, TV, speaker)")
                 onClicked: {
                     if (!castMenu.opened) {
                         root.castDiscover()
@@ -2224,10 +2226,11 @@ PlasmaExtras.Representation {
                                 required property var model
                                 Layout.fillWidth: true
                                 text: model.name
-                                icon.name: "video-television"
+                                icon.name: model.kind === "dlna" ? "speaker" : "video-television"
                                 highlighted: root._casting && root._castUuid === model.uuid
                                 onClicked: {
-                                    root.castTo(model.uuid, model.name, model.host, model.port, model.model)
+                                    root.castTo(model.kind, model.uuid, model.name, model.host,
+                                                model.port, model.model, model.location)
                                     castMenu.close()
                                 }
                             }
@@ -2252,7 +2255,7 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             Layout.margins: Kirigami.Units.smallSpacing
                             visible: !root._castDiscovering && castDevicesModel.count === 0
-                            text: i18n("No Cast devices found on your network")
+                            text: i18n("No devices found on your network")
                             wrapMode: Text.Wrap
                             opacity: 0.6
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
