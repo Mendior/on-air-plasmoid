@@ -45,6 +45,24 @@ PlasmoidItem {
     readonly property color accentTeal: _followAccent ? Kirigami.Theme.highlightColor : "#2BB3A3"
     readonly property color accentTextOn: _followAccent ? Kirigami.Theme.highlightedTextColor : "#04140B"
 
+    // Panel-icon tooltip: while something plays, show the track and station
+    // instead of the stock widget name + description (issue #4). References
+    // playbackState directly (not isPlaying()) so the binding re-evaluates.
+    readonly property bool _tooltipActive: playMusic.playbackState === MediaPlayer.PlayingState || _casting
+    toolTipMainText: {
+        if (!_tooltipActive) return Plasmoid.title;
+        if (trackTitle !== "") return (trackArtist !== "" ? trackArtist + " – " : "") + trackTitle;
+        if (title !== Plasmoid.title && title !== "") return title;
+        return currentStation !== "" ? currentStation : Plasmoid.title;
+    }
+    toolTipSubText: {
+        if (!_tooltipActive) return Plasmoid.metaData.description;
+        var line = currentStation;
+        if (_casting && _castName !== "")
+            line += (line !== "" ? " · " : "") + i18n("Casting to %1", _castName);
+        return line;
+    }
+
     property string searchFilter: ""
     property bool favoritesOnly: false
     property var favoriteNames: parseFavorites(Plasmoid.configuration.favorites)
@@ -1119,7 +1137,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.10");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.10.1");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
