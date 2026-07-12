@@ -1595,9 +1595,13 @@ PlasmoidItem {
     // unbounded cache would be a slow memory leak.
     property var _artCacheKeys: []
 
+    // Also used for the art-cache key: trackArtistTitleKey() and the lookup
+    // query MUST normalize identically, or fetched art is silently never
+    // shown (the stale-result guard in _artFinish compares the two).
     function _normalizeQuery(s) {
         return (s || "").replace(/\s*\([^)]*\)\s*/g, " ")
                         .replace(/\s*\[[^\]]*\]\s*/g, " ")
+                        .replace(/\b\d{2,3}\s?kbps\b/gi, " ")
                         .replace(/\s+/g, " ").trim();
     }
 
@@ -1798,9 +1802,15 @@ PlasmoidItem {
 
     function parseTrackString(s) {
         if (!s) return { artist: "", title: "" };
-        var parts = s.split(" - ");
-        if (parts.length >= 2) {
-            return { artist: parts[0].trim(), title: parts.slice(1).join(" - ").trim() };
+        // Stations separate artist and title with more than the ASCII " - ":
+        // en-dash, em-dash and slash (all space-padded) are just as common.
+        // Only the FIRST separator splits — the rest belongs to the title.
+        // The surrounding spaces are required: a bare "-" would break
+        // hyphenated names like "Jay-Z".
+        var m = s.match(/\s+[-–—\/]\s+/);
+        if (m) {
+            return { artist: s.substring(0, m.index).trim(),
+                     title: s.substring(m.index + m[0].length).trim() };
         }
         return { artist: "", title: s.trim() };
     }
