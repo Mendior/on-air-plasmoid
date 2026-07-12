@@ -57,6 +57,16 @@ kpackagetool6 --type Plasma/Applet --install on-air-2026.9.1.plasmoid
 - The **⬇ button** on the now-playing page downloads the current track to `~/Music/OnAir`
 - The **folder button** in the footer opens **My Music** — your offline library and play history
 
+## Multi-room playback and sync
+
+Ticking several devices in the cast menu plays the same station everywhere, but each device pulls and buffers the stream on its own — so separately-picked rooms typically sit a few seconds apart. That offset is inherent to how Cast and DLNA handle live radio (neither protocol exposes latency control for live streams), so no player can line them up perfectly.
+
+**For perfectly synced speakers**, create a speaker group in the **Google Home app** from your Cast-capable devices. Google keeps group members clock-synced to the sample, and the group shows up in the cast menu as a single device — pick it and every speaker in it plays as one.
+
+A Bluetooth speaker adds its own 100–300 ms of codec latency on top, so it can never be in exact sync with network devices either.
+
+*Roadmap:* true whole-home sync across mixed devices (DLNA + Bluetooth + local) would need a [Snapcast](https://github.com/badaix/snapcast)-style timestamped-audio server — a separate project, noted here so it isn't forgotten.
+
 ## Recording
 
 - Press the **⏺ REC button** on the now-playing page to record the station you're listening to. Press again to stop. The recording is a bit-exact stream copy (original quality) saved to `~/Music/OnAir`, with a `.tracks.txt` file listing the songs and their timestamps.

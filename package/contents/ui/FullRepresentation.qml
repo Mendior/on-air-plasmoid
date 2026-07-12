@@ -2293,15 +2293,37 @@ PlasmaExtras.Representation {
                                 required property int port
                                 required property string deviceModel
                                 required property string location
+                                // Speaker groups made in the Google Home app
+                                // are one mDNS entry with this model name.
+                                // Google keeps the members sample-synced —
+                                // the only true whole-home sync we can offer.
+                                readonly property bool isGroup: deviceModel === "Google Cast Group"
                                 Layout.fillWidth: true
-                                text: name
-                                icon.name: kind === "dlna" ? "speaker" : "video-television"
+                                text: isGroup ? i18n("%1 (speaker group)", name) : name
+                                icon.name: isGroup ? "audio-speakers-symbolic"
+                                          : kind === "dlna" ? "speaker" : "video-television"
                                 checked: root.castTargetIndex(uuid) >= 0
                                 onToggled: root.castToggleDevice({
                                     "kind": kind, "uuid": uuid, "name": name, "host": host,
                                     "port": port, "deviceModel": deviceModel, "location": location
                                 })
                             }
+                        }
+
+                        // Honesty about multi-room: every target buffers the
+                        // stream on its own, so separately-picked devices sit
+                        // seconds apart and there is no protocol-level way to
+                        // line them up. Only a Cast speaker group (made in
+                        // Google Home, clock-synced by Google, one entry
+                        // here) plays in true sync — point the user there.
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            visible: root._castTargets.length > 1
+                            text: i18n("Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device.")
+                            wrapMode: Text.Wrap
+                            opacity: 0.6
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
                         }
 
                         // One-click way out: stop every device, back to local.
