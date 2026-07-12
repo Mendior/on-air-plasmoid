@@ -1,43 +1,64 @@
 # -*- coding: UTF-8 -*-
 # SPDX-FileCopyrightText: 2026 Egon Greenberg
 # SPDX-License-Identifier: LGPL-2.0-or-later
-"""Google Cast bridge for On Air.
+"""Cast bridge for On Air: Google Cast + DLNA/UPnP renderers.
 
 Casting a radio stream is handled by SHORT-LIVED commands, not a long-running
-daemon: once the stream URL is handed to the Cast device it pulls the audio
-itself, so the device keeps playing after this process exits. No orphaned
-background process, no local audio decoding while casting, and near-zero host
-CPU — which matters most on the low-powered machines this feature targets.
+daemon: once the stream URL is handed to the device it pulls the audio itself,
+so the device keeps playing after this process exits. No orphaned background
+process, no local audio decoding while casting, and near-zero host CPU — which
+matters most on the low-powered machines this feature targets.
 
-Discovery (mDNS) is slow (~5 s), so it is done ONCE up front; the returned
-host+port let every later play/stop/volume command connect directly in ~0.1 s,
-which keeps volume changes and playback responsive.
+Two device families are supported:
+
+* Google Cast (Chromecast, Nest, Android TVs) — needs the optional
+  pychromecast package; its absence only hides Cast devices.
+* DLNA/UPnP MediaRenderers (smart TVs, soundbars, AV receivers, network
+  speakers, Sonos) — pure standard library (SSDP + SOAP), always available.
+
+Discovery is slow (seconds), so it is done ONCE up front; the returned
+address lets every later play/stop/volume command connect directly in
+~0.1 s, which keeps volume changes and playback responsive.
 
 Commands (argv[1]):
-  probe                                   -> "__CAST_OK__" if pychromecast imports
-  discover [seconds]                      -> "DEV\\t<uuid>\\t<name>\\t<host>\\t<port>\\t<model>" per device
+  probe                       -> "__CAST_OK__ cast=0|1" (dlna is always on)
+  discover [seconds]          -> "DEV\\t<kind>\\t<id>\\t<name>\\t<host>\\t<port>\\t<model>\\t<location>"
   play   <host> <port> <uuid> <model> <url> <ctype> <title> <art>
   stop   <host> <port> <uuid> <model>
   volume <host> <port> <uuid> <model> <0.0..1.0>
+  dlna-play   <location> <url> <ctype> <title>
+  dlna-stop   <location>
+  dlna-volume <location> <0.0..1.0>
 
 Every command prints a sentinel the QML side matches on and always exits 0, so
 a missing optional dependency is a clean "feature unavailable", never a crash.
 """
+import socket
+import subprocess
 import sys
+import threading
+import time
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
 
 NO_LIB = "__NO_PYCHROMECAST__"
 OK = "__CAST_OK__"
 FAIL = "__CAST_FAIL__"
 DONE = "__CAST_DONE__"
 
-# mDNS discovery is bounded so the picker never spins forever on a network
-# with no devices; direct connections use a shorter socket timeout.
+# mDNS/SSDP discovery is bounded so the picker never spins forever on a
+# network with no devices; direct connections use a shorter socket timeout.
 DEFAULT_DISCOVERY_SECONDS = 6.0
 CONNECT_TIMEOUT = 6.0
 
+_out_lock = threading.Lock()
+
 
 def _out(line):
-    print(line, flush=True)
+    with _out_lock:
+        print(line, flush=True)
 
 
 def _import():
@@ -49,6 +70,8 @@ def _import():
 def _clean(text):
     return (text or "").replace("\t", " ").replace("\n", " ")
 
+
+# ── Google Cast ──────────────────────────────────────────────────────────────
 
 def _stop_browser(browser):
     if browser is None:
@@ -79,27 +102,17 @@ def _disconnect(cast):
         pass
 
 
-def cmd_probe():
-    try:
-        _import()
-    except Exception:
-        _out(NO_LIB)
-        return
-    _out(OK)
-
-
-def cmd_discover(seconds):
+def _discover_cast(seconds):
     try:
         pychromecast = _import()
     except Exception:
-        _out(NO_LIB)
         return
     browser = None
     try:
         casts, browser = pychromecast.get_chromecasts(timeout=seconds)
         for cast in casts:
             info = cast.cast_info
-            _out("DEV\t%s\t%s\t%s\t%s\t%s" % (
+            _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
                 info.uuid,
                 _clean(info.friendly_name) or "Cast device",
                 info.host or "",
@@ -108,10 +121,9 @@ def cmd_discover(seconds):
             ))
             _disconnect(cast)
     except Exception as exc:
-        print("cast.py discover: %r" % (exc,), file=sys.stderr)
+        print("cast.py discover(cast): %r" % (exc,), file=sys.stderr)
     finally:
         _stop_browser(browser)
-        _out(DONE)
 
 
 def cmd_play(host, port, uuid, model, url, ctype, title, art):
@@ -180,6 +192,330 @@ def cmd_volume(host, port, uuid, model, level):
         _disconnect(cast)
 
 
+# ── DLNA / UPnP MediaRenderer ────────────────────────────────────────────────
+# Pure standard library. A renderer is driven with two SOAP services from its
+# device description XML: AVTransport (SetAVTransportURI/Play/Stop) and
+# RenderingControl (SetVolume). Like Cast, the renderer pulls the stream URL
+# itself, so nothing keeps running on this machine.
+
+SSDP_ADDR = ("239.255.255.250", 1900)
+ST_RENDERER = "urn:schemas-upnp-org:device:MediaRenderer:1"
+_DEVNS = "{urn:schemas-upnp-org:device-1-0}"
+AVT_SERVICE = "urn:schemas-upnp-org:service:AVTransport:1"
+RC_SERVICE = "urn:schemas-upnp-org:service:RenderingControl:1"
+
+# Well-known descriptor locations, probed directly as a fallback for setups
+# where a local firewall drops SSDP replies (multicast responses create no
+# conntrack entry, so default-deny firewalls eat them). Ports/paths cover the
+# common stacks: Frontier Silicon radios (8080), Samsung TVs (9197), Sonos
+# (1400), LG (1441..) and the generic UPnP default (49152).
+KNOWN_DESCRIPTOR_PATHS = (
+    ":8080/dd.xml",
+    ":9197/dmr",
+    ":1400/xml/device_description.xml",
+    ":49152/description.xml",
+    ":1441/",
+)
+
+
+def _msearch(st, wait, target=None):
+    """One M-SEARCH round; returns a set of LOCATION URLs.
+
+    target=None sends to the multicast group; otherwise unicast to one host
+    (unicast replies pass stateful firewalls because the request created a
+    conntrack entry).
+    """
+    locations = set()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        s.settimeout(wait)
+        msg = "\r\n".join([
+            "M-SEARCH * HTTP/1.1",
+            "HOST: 239.255.255.250:1900",
+            'MAN: "ssdp:discover"',
+            "MX: %d" % max(1, int(wait)),
+            "ST: " + st,
+            "", "",
+        ]).encode()
+        dest = (target, 1900) if target else SSDP_ADDR
+        if not target:
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        # Some renderers (Bose, notably) miss the first datagram after idling;
+        # a third send costs nothing and makes single-round discovery reliable.
+        for _ in range(3):
+            s.sendto(msg, dest)
+            time.sleep(0.15)
+        end = time.time() + wait
+        while time.time() < end:
+            try:
+                data, _addr = s.recvfrom(65507)
+            except socket.timeout:
+                break
+            for line in data.decode("utf-8", "replace").split("\r\n"):
+                if line.lower().startswith("location:"):
+                    locations.add(line.split(":", 1)[1].strip())
+        s.close()
+    except OSError:
+        pass
+    return locations
+
+
+def _http_get(url, timeout=3.0):
+    req = urllib.request.Request(url, headers={"User-Agent": "OnAir"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def _describe_renderer(location):
+    """Fetch+parse a device description; None unless it is a MediaRenderer."""
+    try:
+        root = ET.fromstring(_http_get(location))
+    except Exception:
+        return None
+    # URLBase is deprecated but still used by older stacks (e.g. Frontier
+    # Silicon); without it relative control URLs resolve against the location.
+    base = (root.findtext(_DEVNS + "URLBase") or "").strip() or location
+    for dev in root.iter(_DEVNS + "device"):
+        if (dev.findtext(_DEVNS + "deviceType") or "").startswith(
+                "urn:schemas-upnp-org:device:MediaRenderer:"):
+            services = {}
+            for svc in dev.iter(_DEVNS + "service"):
+                stype = (svc.findtext(_DEVNS + "serviceType") or "").strip()
+                curl = (svc.findtext(_DEVNS + "controlURL") or "").strip()
+                if stype and curl:
+                    services[stype] = urllib.parse.urljoin(base, curl)
+            avt = next((u for t, u in services.items()
+                        if t.startswith("urn:schemas-upnp-org:service:AVTransport:")), None)
+            if not avt:
+                return None
+            rc = next((u for t, u in services.items()
+                       if t.startswith("urn:schemas-upnp-org:service:RenderingControl:")), None)
+            return {
+                "name": _clean(dev.findtext(_DEVNS + "friendlyName")) or "DLNA device",
+                "model": _clean(dev.findtext(_DEVNS + "modelName")),
+                "udn": _clean(dev.findtext(_DEVNS + "UDN")),
+                "avtransport": avt,
+                "rendering": rc,
+            }
+    return None
+
+
+def _mdns_candidates():
+    """Map of IPv4 -> extra descriptor paths for mDNS-visible devices.
+
+    Renderers whose SSDP replies a firewall drops (or which sleep through
+    M-SEARCH datagrams, like Bose soundbars) almost always advertise some
+    service over mDNS, so their IPs make good direct-probe candidates.
+    Bose additionally publishes its device GUID in the TXT record, and its
+    descriptor lives at :8091/<GUID>.xml — probing that is deterministic
+    where its UDP replies are not. avahi-browse is optional; without it
+    this fallback just yields nothing.
+    """
+    candidates = {}
+    try:
+        out = subprocess.run(
+            ["avahi-browse", "-atrp"],
+            capture_output=True, text=True, timeout=3.5,
+        ).stdout
+        for line in out.split("\n"):
+            parts = line.split(";")
+            if len(parts) > 9 and parts[0] == "=" and parts[2] == "IPv4":
+                ip = parts[7]
+                if ip.count(".") != 3 or ip.startswith("127."):
+                    continue
+                extra = candidates.setdefault(ip, set())
+                for token in parts[9].split('" "'):
+                    token = token.strip('"')
+                    if token.startswith("GUID="):
+                        extra.add(":8091/%s.xml" % token[5:])
+    except Exception:
+        pass
+    return candidates
+
+
+def _discover_dlna(seconds):
+    deadline = time.time() + seconds
+    locations = set()
+    lock = threading.Lock()
+
+    def collect(st, wait, target=None):
+        found = _msearch(st, wait, target)
+        if not found and target and time.time() + wait < deadline:
+            # Idle renderers (Bose soundbars, notably) regularly sleep through
+            # a whole M-SEARCH round; one retry makes discovery dependable.
+            found = _msearch(st, wait, target)
+        with lock:
+            locations.update(found)
+
+    threads = [
+        threading.Thread(target=collect, args=(ST_RENDERER, min(3.0, seconds))),
+        threading.Thread(target=collect, args=("ssdp:all", min(3.0, seconds))),
+    ]
+    # Firewall fallback: unicast M-SEARCH + well-known descriptor probes
+    # against every mDNS-visible device.
+    candidates = _mdns_candidates()
+    for ip in candidates:
+        threads.append(threading.Thread(
+            target=collect, args=(ST_RENDERER, min(2.5, seconds), ip)))
+
+    def probe_known(ip, extra_paths):
+        for suffix in list(extra_paths) + list(KNOWN_DESCRIPTOR_PATHS):
+            url = "http://" + ip + suffix
+            try:
+                if _describe_renderer(url):
+                    with lock:
+                        locations.add(url)
+                    return
+            except Exception:
+                pass
+
+    for ip, extra_paths in candidates.items():
+        threads.append(threading.Thread(target=probe_known, args=(ip, extra_paths)))
+
+    for t in threads:
+        t.daemon = True
+        t.start()
+    for t in threads:
+        t.join(max(0.1, deadline - time.time()))
+
+    seen_udns = set()
+    for loc in sorted(locations):
+        dev = _describe_renderer(loc)
+        if not dev or dev["udn"] in seen_udns:
+            continue
+        seen_udns.add(dev["udn"])
+        host = urllib.parse.urlsplit(loc).hostname or ""
+        _out("DEV\tdlna\t%s\t%s\t%s\t%s\t%s\t%s" % (
+            dev["udn"], dev["name"], host, 0, dev["model"], loc))
+
+
+def _soap(control_url, service_type, action, args_xml, timeout=5.0):
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+        's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
+        "<s:Body><u:%s xmlns:u=\"%s\">%s</u:%s></s:Body></s:Envelope>"
+    ) % (action, service_type, args_xml, action)
+    req = urllib.request.Request(
+        control_url,
+        data=body.encode("utf-8"),
+        headers={
+            "Content-Type": 'text/xml; charset="utf-8"',
+            "SOAPACTION": '"%s#%s"' % (service_type, action),
+            "User-Agent": "OnAir",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", "replace")
+
+
+# DLNA.ORG_PN profile tokens. Several renderers (Frontier Silicon based
+# radios like Ruark/Roberts, notably) reject a bare "http-get:*:type:*"
+# protocolInfo with UPnP error 716 but accept the same stream with the
+# profile named; others ignore the token. Types without a universal profile
+# fall back to the wildcard fourth field.
+_DLNA_PN = {
+    "audio/mpeg": "DLNA.ORG_PN=MP3",
+    "audio/aac": "DLNA.ORG_PN=AAC_ADTS",
+}
+
+
+def _didl_metadata(title, ctype, url):
+    """DIDL-Lite for one radio stream.
+
+    Both tested renderer families require the stream URL REPEATED inside
+    <res> (SetAVTransportURI with metadata whose res is empty fails with
+    error 716 "Resource not found") — CurrentURI alone is not enough.
+    """
+    proto = "http-get:*:%s:%s" % (ctype or "audio/mpeg",
+                                  _DLNA_PN.get(ctype or "audio/mpeg", "*"))
+    didl = (
+        '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/" '
+        'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
+        '<item id="onair-radio" parentID="-1" restricted="1">'
+        "<dc:title>%s</dc:title>"
+        "<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>"
+        '<res protocolInfo="%s">%s</res>'
+        "</item></DIDL-Lite>"
+    ) % (escape(title or "On Air"), escape(proto), escape(url or ""))
+    return escape(didl)
+
+
+def cmd_dlna_play(location, url, ctype, title):
+    try:
+        dev = _describe_renderer(location)
+        if not dev:
+            _out("%s renderer description unavailable" % FAIL)
+            return
+        avt = dev["avtransport"]
+        # A renderer that is already playing something may reject a new URI;
+        # Stop first and ignore the result (stopped/idle devices error here).
+        try:
+            _soap(avt, AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>", timeout=3.0)
+        except Exception:
+            pass
+        _soap(avt, AVT_SERVICE, "SetAVTransportURI",
+              "<InstanceID>0</InstanceID><CurrentURI>%s</CurrentURI>"
+              "<CurrentURIMetaData>%s</CurrentURIMetaData>"
+              % (escape(url), _didl_metadata(title, ctype, url)))
+        _soap(avt, AVT_SERVICE, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
+        _out(OK)
+    except Exception as exc:
+        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+
+
+def cmd_dlna_stop(location):
+    try:
+        dev = _describe_renderer(location)
+        if dev:
+            _soap(dev["avtransport"], AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>")
+    except Exception as exc:
+        print("cast.py dlna-stop: %r" % (exc,), file=sys.stderr)
+    _out(DONE)
+
+
+def cmd_dlna_volume(location, level):
+    try:
+        vol = int(round(max(0.0, min(1.0, float(level))) * 100))
+        dev = _describe_renderer(location)
+        if not dev or not dev["rendering"]:
+            _out("%s no RenderingControl" % FAIL)
+            return
+        _soap(dev["rendering"], RC_SERVICE, "SetVolume",
+              "<InstanceID>0</InstanceID><Channel>Master</Channel>"
+              "<DesiredVolume>%d</DesiredVolume>" % vol)
+        _out(OK)
+    except Exception as exc:
+        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+
+
+# ── entry points ─────────────────────────────────────────────────────────────
+
+def cmd_probe():
+    try:
+        _import()
+        has_cast = 1
+    except Exception:
+        has_cast = 0
+    # DLNA needs nothing beyond the standard library, so the bridge is always
+    # usable — the flag only tells the UI whether Cast devices can appear.
+    _out("%s cast=%d" % (OK, has_cast))
+
+
+def cmd_discover(seconds):
+    threads = [
+        threading.Thread(target=_discover_cast, args=(seconds,)),
+        threading.Thread(target=_discover_dlna, args=(seconds,)),
+    ]
+    for t in threads:
+        t.daemon = True
+        t.start()
+    for t in threads:
+        t.join(seconds + 4.0)
+    _out(DONE)
+
+
 def main():
     if len(sys.argv) < 2:
         _out("%s usage: cast.py <command>" % FAIL)
@@ -205,6 +541,12 @@ def main():
         cmd_stop(args[0], args[1], args[2], args[3])
     elif command == "volume" and len(args) >= 5:
         cmd_volume(args[0], args[1], args[2], args[3], args[4])
+    elif command == "dlna-play" and len(args) >= 3:
+        cmd_dlna_play(args[0], args[1], args[2], args[3] if len(args) > 3 else "")
+    elif command == "dlna-stop" and len(args) >= 1:
+        cmd_dlna_stop(args[0])
+    elif command == "dlna-volume" and len(args) >= 2:
+        cmd_dlna_volume(args[0], args[1])
     else:
         _out("%s bad arguments" % FAIL)
 
