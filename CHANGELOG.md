@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026.9
+
+Casting grew up: multi-room, Bluetooth outputs and a proper off switch.
+
+- **The cast menu now uses checkboxes** — tick several devices and the station plays on all of them at once. Unticking a device stops that device (previously, switching devices left the old one playing with no way to silence it from the widget — reported the same day 2026.8.1 shipped). "Stop casting everywhere" does what it says.
+- **"This computer" is part of the same list**: it uncheckes itself when you pick the first network device (no PC talking over the TV), and you can tick it back for whole-house listening — local playback plus every selected device.
+- **Pick the local output right in the menu** — headphones, HDMI or a paired Bluetooth speaker. The choice is remembered; if the Bluetooth speaker disconnects, playback falls back to the system default instead of going silent.
+- **Frontier Silicon radios (Ruark, Roberts…) now actually play.** These renderers silently discard a stream pushed with spec-escaped metadata and then refuse to start ("Transport is locked"); packing the same metadata as CDATA makes them play — verified on a Ruark R5se, from standby too. Other renderers still get the spec-compliant form as a fallback. A failed push also no longer strands the radio in an empty "Music player" screen.
+- Volume and station switches now reach every selected device, and one unreachable device no longer tears down casting on the rest.
+
 ## 2026.8.1
 
 - Fixed the cast menu showing blank rows: the device list gained a field named `model` in 2026.8, which shadowed the delegate's own model object in QML, so device names stopped rendering. Renamed the field and switched the delegate to per-role properties. Caught minutes after release; the 2026.8 casting backend itself was fine.

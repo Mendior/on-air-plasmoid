@@ -110,7 +110,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.8.1")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.9")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -2195,7 +2195,7 @@ PlasmaExtras.Representation {
                     x: -width + parent.width
                     padding: Kirigami.Units.smallSpacing
                     modal: false
-                    implicitWidth: Kirigami.Units.gridUnit * 14
+                    implicitWidth: Kirigami.Units.gridUnit * 16
 
                     contentItem: ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
@@ -2203,30 +2203,60 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.Label {
                             Layout.fillWidth: true
                             Layout.margins: Kirigami.Units.smallSpacing
-                            text: i18n("Cast to")
+                            text: i18n("Play on")
                             font.weight: Font.DemiBold
                             opacity: 0.7
                         }
 
-                        // "This computer" — return playback to the local output
-                        PlasmaComponents3.ItemDelegate {
+                        // This computer. While casting it becomes a checkbox:
+                        // tick it to ALSO play locally (multi-room), untick to
+                        // silence the local output. With no devices selected
+                        // it is simply the (checked) only output.
+                        PlasmaComponents3.CheckDelegate {
                             Layout.fillWidth: true
                             text: i18n("This computer")
                             icon.name: "computer"
-                            highlighted: !root._casting
-                            onClicked: {
-                                root.castDisconnect()
-                                castMenu.close()
+                            checked: root._castTargets.length === 0 || root._castLocalPlay
+                            enabled: root._castTargets.length > 0
+                            onToggled: root.castToggleLocal()
+                        }
+
+                        // Local output picker (Bluetooth speakers, HDMI,
+                        // headphones…). Only shown when there is a choice.
+                        PlasmaComponents3.ComboBox {
+                            id: outputCombo
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            Layout.rightMargin: Kirigami.Units.smallSpacing
+                            visible: mediaDevices.audioOutputs.length > 1
+                            model: {
+                                var names = [i18n("System default output")];
+                                var outs = mediaDevices.audioOutputs;
+                                for (var i = 0; i < outs.length; i++)
+                                    names.push(outs[i].description);
+                                return names;
+                            }
+                            currentIndex: {
+                                var wanted = Plasmoid.configuration.audioOutputDevice || "";
+                                if (wanted === "") return 0;
+                                var outs = mediaDevices.audioOutputs;
+                                for (var i = 0; i < outs.length; i++)
+                                    if (String(outs[i].id) === wanted) return i + 1;
+                                return 0;
+                            }
+                            onActivated: function(index) {
+                                var outs = mediaDevices.audioOutputs;
+                                root.setAudioOutputDevice(index === 0 ? "" : String(outs[index - 1].id));
                             }
                         }
 
                         Repeater {
                             model: castDevicesModel
                             // Per-role required properties, NOT `required
-                            // property var model`: the rows carried a role
-                            // whose value shadowed the model object and
-                            // left every row blank.
-                            delegate: PlasmaComponents3.ItemDelegate {
+                            // property var model`: a role named "model"
+                            // shadowed the delegate's model object and left
+                            // every row blank (2026.8).
+                            delegate: PlasmaComponents3.CheckDelegate {
                                 required property string kind
                                 required property string uuid
                                 required property string name
@@ -2237,11 +2267,23 @@ PlasmaExtras.Representation {
                                 Layout.fillWidth: true
                                 text: name
                                 icon.name: kind === "dlna" ? "speaker" : "video-television"
-                                highlighted: root._casting && root._castUuid === uuid
-                                onClicked: {
-                                    root.castTo(kind, uuid, name, host, port, deviceModel, location)
-                                    castMenu.close()
-                                }
+                                checked: root.castTargetIndex(uuid) >= 0
+                                onToggled: root.castToggleDevice({
+                                    "kind": kind, "uuid": uuid, "name": name, "host": host,
+                                    "port": port, "deviceModel": deviceModel, "location": location
+                                })
+                            }
+                        }
+
+                        // One-click way out: stop every device, back to local.
+                        PlasmaComponents3.ItemDelegate {
+                            Layout.fillWidth: true
+                            visible: root._castTargets.length > 0
+                            text: i18n("Stop casting everywhere")
+                            icon.name: "media-playback-stop"
+                            onClicked: {
+                                root.castDisconnect()
+                                castMenu.close()
                             }
                         }
 
