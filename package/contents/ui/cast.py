@@ -378,8 +378,13 @@ def _discover_dlna(seconds):
     for t in threads:
         t.join(max(0.1, deadline - time.time()))
 
+    # The join above is bounded, so a straggler thread may still be adding
+    # locations — snapshot under the lock or iteration can die mid-loop.
+    with lock:
+        found_locations = sorted(locations)
+
     seen_udns = set()
-    for loc in sorted(locations):
+    for loc in found_locations:
         dev = _describe_renderer(loc)
         if not dev or dev["udn"] in seen_udns:
             continue
