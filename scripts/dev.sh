@@ -19,7 +19,8 @@ Usage: scripts/dev.sh <command>
 
   install   sync repo package/contents/ -> local install (metadata.json and locale untouched)
   pull      sync local install -> repo package/contents/ (metadata.json and locale untouched)
-  lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json + po validation
+  lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json
+            + po validation + regression grep rules + unit tests (QMLLINT=none skips qmllint)
   check     lint + offscreen plasmoidviewer runtime smoke test (run before every release)
   i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
   locale-install  compile po/ catalogs into the LOCAL install (old plugin id domain)
@@ -41,17 +42,21 @@ case "${1:-}" in
     ;;
   lint)
     fail=0
-    while IFS= read -r -d '' f; do
-      rc=0; raw="$("$QMLLINT" "$f" 2>&1)" || rc=$?
-      # Only message lines (qmllint also prints code excerpts, which may
-      # contain the word "error"); Qt6 also warns on clean code ([unqualified]
-      # etc.), but duplicates/syntax/errors must fail the lint; a nonzero exit
-      # always fails it.
-      out="$(printf '%s\n' "$raw" | grep -E '^(Warning|Error):' | grep -Ei 'duplicat|syntax|unavailable|error' || true)"
-      if [ "$rc" -ne 0 ] || [ -n "$out" ]; then
-        printf '== %s (rc=%s)\n%s\n' "$f" "$rc" "${out:-$raw}"; fail=1
-      fi
-    done < <(find "$PKG" -name '*.qml' -print0)
+    # QMLLINT=none skips the qmllint pass only — for CI runners without Qt6;
+    # every other check below still runs there.
+    if [ "$QMLLINT" != "none" ]; then
+      while IFS= read -r -d '' f; do
+        rc=0; raw="$("$QMLLINT" "$f" 2>&1)" || rc=$?
+        # Only message lines (qmllint also prints code excerpts, which may
+        # contain the word "error"); Qt6 also warns on clean code ([unqualified]
+        # etc.), but duplicates/syntax/errors must fail the lint; a nonzero exit
+        # always fails it.
+        out="$(printf '%s\n' "$raw" | grep -E '^(Warning|Error):' | grep -Ei 'duplicat|syntax|unavailable|error' || true)"
+        if [ "$rc" -ne 0 ] || [ -n "$out" ]; then
+          printf '== %s (rc=%s)\n%s\n' "$f" "$rc" "${out:-$raw}"; fail=1
+        fi
+      done < <(find "$PKG" -name '*.qml' -print0)
+    fi
     # compile() also catches compile-phase SyntaxErrors (e.g. 'return' outside
     # a function) that ast.parse misses, and writes no __pycache__ litter.
     python3 -c 'import sys
@@ -64,6 +69,38 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       [ -e "$po" ] || continue
       msgfmt --check -o /dev/null "$po" || { echo "lint FAILED: $po"; exit 1; }
     done
+    # Static rules distilled from shipped regressions — qmllint and the
+    # runtime smoke are both blind to these classes.
+    #
+    # 1) A ListModel ROLE named "model" shadows the delegate's model object
+    #    and renders every row blank (2026.8 cast menu). Only the quoted key
+    #    form is a role — `required property var model` is the legitimate
+    #    model-object accessor and stays allowed.
+    bad_model="$(grep -rnE '"model"[[:space:]]*:' "$PKG/contents/ui" --include='*.qml' || true)"
+    if [ -n "$bad_model" ]; then
+      echo 'lint FAILED: a role/property named "model" shadows the delegate model object:'
+      printf '%s\n' "$bad_model"; fail=1
+    fi
+    # 2) Every versioned OnAir/<x.y> User-Agent must match metadata.json —
+    #    the release ritual used to rely on remembering a grep.
+    ver="$(python3 -c "import json; print(json.load(open('$PKG/metadata.json'))['KPlugin']['Version'])")"
+    bad_ua="$(grep -rhoE 'OnAir/[0-9][0-9.]*' "$PKG" | sort -u | grep -vx "OnAir/$ver" || true)"
+    if [ -n "$bad_ua" ]; then
+      echo "lint FAILED: User-Agent version(s) [$(printf '%s' "$bad_ua" | tr '\n' ' ')] do not match metadata.json Version $ver"
+      fail=1
+    fi
+    # Unit tests (cast.py dispatch/DLNA parsing, reader.py field extraction).
+    # pytest comes from the system or via uv; with neither present this only
+    # warns locally — CI always runs them.
+    if [ -d "$REPO_DIR/tests" ]; then
+      if python3 -c 'import pytest' 2>/dev/null; then
+        (cd "$REPO_DIR" && python3 -m pytest tests/ -q) || { echo "lint FAILED: unit tests"; exit 1; }
+      elif command -v uv >/dev/null 2>&1; then
+        (cd "$REPO_DIR" && uv run --with pytest python -m pytest tests/ -q) || { echo "lint FAILED: unit tests"; exit 1; }
+      else
+        echo "NB: pytest unavailable (no system pytest, no uv) — unit tests skipped here, CI runs them"
+      fi
+    fi
     if [ "$fail" -eq 0 ]; then echo "lint OK"; else echo "lint FAILED"; fi
     exit "$fail"
     ;;
