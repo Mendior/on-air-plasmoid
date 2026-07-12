@@ -29,7 +29,11 @@ PlasmoidItem {
     property bool isError: false
     property int lastPlay: 0
     property int view: 0
-    property bool isConnected: NetworkInformation.reachability === NetworkInformation.Reachability.Online
+    // Only a definite Disconnected counts as offline. A machine without a
+    // QNetworkInformation backend sits at Unknown forever, and Local/Site
+    // (LAN-only, captive portal) can still reach a LAN stream server — the
+    // old strict === Online disabled the whole station list on such setups.
+    property bool isConnected: NetworkInformation.reachability !== NetworkInformation.Reachability.Disconnected
     property var _artCache: ({})
 
     // ── 2026 signature palette: true black + emerald. Independent of the system
@@ -542,6 +546,11 @@ PlasmoidItem {
     // first sync may run before the network is up. Re-sync when it comes up —
     // cheap, because everything already cached is skipped.
     onIsConnectedChanged: if (isConnected) syncFavicons()
+
+    // Backendless systems never report a reachability edge at all, so the
+    // handler above may never fire — a stream that actually buffered proves
+    // the network is up. One extra sync per session, cached files skipped.
+    property bool _favSyncedOnPlay: false
 
     // ── Recording (REC) — stream capture with ffmpeg ─────────────────────────
     // A SECOND ffmpeg connection records the raw stream bit-exactly (-c copy,
@@ -2369,6 +2378,10 @@ PlasmoidItem {
                 stallTimer.restart();
             } else {
                 stallTimer.stop();
+            }
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && !root._favSyncedOnPlay) {
+                root._favSyncedOnPlay = true;
+                syncFavicons();
             }
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying() && !isError && !root._qtMetaWorks
                 && playMusic.source.toString().indexOf("file://") !== 0) {
