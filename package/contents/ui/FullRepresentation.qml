@@ -2212,6 +2212,7 @@ PlasmaExtras.Representation {
                 onClicked: {
                     if (!castMenu.opened) {
                         root.castDiscover()
+                        root.btList()
                         castMenu.open()
                     } else {
                         castMenu.close()
@@ -2276,6 +2277,37 @@ PlasmaExtras.Representation {
                             onActivated: function(index) {
                                 var outs = mediaDevices.audioOutputs;
                                 root.setAudioOutputDevice(index === 0 ? "" : String(outs[index - 1].id));
+                            }
+                        }
+
+                        // Paired Bluetooth speakers/headphones that are not
+                        // connected yet — one click connects and, once the
+                        // sink appears, playback is routed onto it. Connected
+                        // ones can be dropped the same way. Pairing itself
+                        // stays in System Settings.
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            visible: root._btAvailable && btDevicesModel.count > 0
+                            text: i18n("Bluetooth")
+                            font.weight: Font.DemiBold
+                            opacity: 0.7
+                        }
+
+                        Repeater {
+                            model: btDevicesModel
+                            delegate: PlasmaComponents3.CheckDelegate {
+                                required property string mac
+                                required property string name
+                                required property bool connected
+                                Layout.fillWidth: true
+                                text: root._btConnectingMac === mac
+                                      ? i18n("%1 — connecting…", name) : name
+                                icon.name: "network-bluetooth"
+                                checked: connected
+                                enabled: root._btConnectingMac === ""
+                                onToggled: connected ? root.btDisconnect(mac)
+                                                     : root.btConnect(mac, name)
                             }
                         }
 
