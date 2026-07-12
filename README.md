@@ -46,7 +46,7 @@ Optional (features degrade gracefully without them):
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.10.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.10.1.plasmoid
 ```
 
 ## Usage tips

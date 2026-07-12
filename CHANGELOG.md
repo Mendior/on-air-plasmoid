@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.10.1
+
+- Hovering the panel icon now shows what's playing — artist and title, with the station name underneath — instead of the stock widget name and description. While casting, the tooltip also says which device is playing. Requested by @CGA11 in issue #4. When nothing plays, the tooltip stays as before.
+
 ## 2026.10
 
 Cover art that actually shows up, Bluetooth speakers in the cast menu, and a safety net of tests under the whole thing.
