@@ -1253,11 +1253,23 @@ PlasmoidItem {
     // Shell-quote each argument and run cast.py with a sentinel prefix that the
     // onExited dispatcher matches on. Untrusted values (station name, URL) only
     // ever arrive as separate quoted argv entries, never as shell text.
+    property int _castExecSeq: 0
+
     function _castExec(sentinel, argv) {
         var cmd = ": " + sentinel + "; python3 '" + _castScript().replace(/'/g, "'\\''") + "'";
         for (var i = 0; i < argv.length; i++) {
             cmd += " '" + String(argv[i]).replace(/'/g, "'\\''") + "'";
         }
+        // The executable DataSource keys sources by the exact command string:
+        // re-issuing a byte-identical command while the previous one is still
+        // running is a silent no-op, and its result arrives only once. Quickly
+        // unchecking and re-checking the same device does exactly that (two
+        // identical stop commands) — the second stop would be swallowed and
+        // the device would keep playing. A trailing shell comment makes every
+        // invocation unique; the sentinel prefix matches are unaffected.
+        // Deliberately NOT applied to executable.exec() globally: reader.py
+        // polling relies on that dedup as its natural in-flight throttle.
+        cmd += " # " + (++_castExecSeq);
         executable.exec(cmd);
     }
 
