@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026.10
+
+Cover art that actually shows up, Bluetooth speakers in the cast menu, and a safety net of tests under the whole thing.
+
+- **Cover art is far more reliable.** Four separate causes, all fixed:
+  - A failed lookup (timeout, rate limit, network blip) was remembered as "this track has no art" for the whole session — and radio repeats its playlist, so one bad moment kept a track coverless all day. Only a real "no match" answer is cached now, and even that is retried after half an hour.
+  - Lookups now go to Deezer first, one request at a time — station zapping no longer trips iTunes' strict rate limit (which answers 403 and used to poison the cache, see above).
+  - Titles separated with "–", "—" or " / " now split into artist and title properly, and bitrate junk like "128 kbps" is stripped from search queries. This also fixes those tracks in the play history and the media controls.
+  - When an artwork URL turns out broken (404, dead image), the widget now falls back to the station image or logo instead of pinning the vinyl placeholder.
+- **Bluetooth speakers, one click.** The cast menu lists your paired Bluetooth audio devices with their connection state. Click one to connect — playback moves to it as soon as the system registers the speaker (matched by device address, so it can't grab the wrong output). Click again to disconnect; failures show a notification instead of nothing. Pairing new devices still lives in System Settings.
+- **Speaker groups and multi-room, honestly.** Devices ticked separately each buffer the stream on their own, so rooms can play a few seconds apart — that's inherent to Cast/DLNA live radio and no player can fix it. For perfectly synced speakers, group them in the Google Home app: the group appears in the cast menu as a single device (now labeled as a speaker group) and plays sample-accurate everywhere. The menu explains this when you pick multiple devices; the README has the full story.
+- If your chosen output device disappears mid-play (speaker off, HDMI unplugged), the widget now tells you it fell back to the system default instead of switching silently. Deliberately choosing "System default output" stays silent.
+- Un-ticking and quickly re-ticking the same cast device could leave it playing — the second, identical stop command was silently dropped by the command runner. Every cast command is now unique.
+- The station list no longer disables itself on systems where Qt cannot determine the network state (it stayed "offline" forever and blocked all playback); only a definite "disconnected" counts as offline now. Station logos also re-sync once a stream actually starts playing, which covers those systems after login.
+- DLNA discovery hardening: the device list is snapshotted under its lock, and the discovery socket is closed deterministically on error paths.
+- Under the hood: a unit-test suite for the Python helpers (argv dispatch, ICY field extraction, DLNA descriptor parsing), new lint rules distilled from past regressions, CI on every push — including a real QML load test on a current Plasma 6 stack — and a written release checklist (RELEASING.md).
+
 ## 2026.9.1
 
 - New translations: French, Italian and Dutch — complete catalogs, no partial ones, same as the rest. That makes 11 languages.
