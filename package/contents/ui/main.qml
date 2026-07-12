@@ -1306,6 +1306,10 @@ PlasmoidItem {
     // automatically. No BT scanning/pairing — that stays in System Settings.
     property bool _btAvailable: false        // bluetoothctl present?
     property bool _btListing: false
+    // A refresh wanted while one was in flight (fast connect/disconnect on a
+    // slow listing) — run one more when the current one lands, or the menu
+    // would show the pre-toggle Connected states.
+    property bool _btListAgain: false
     property string _btConnectingMac: ""     // MAC of an in-flight connect
     // Name of the last device the user clicked — matched against new sink
     // descriptions for the automatic routing, and used in error messages.
@@ -1318,13 +1322,17 @@ PlasmoidItem {
     }
 
     function btList() {
-        if (!_btAvailable || _btListing) return;
+        if (!_btAvailable) return;
+        if (_btListing) { _btListAgain = true; return; }
         _btListing = true;
-        // One shell round-trip for everything: paired devices (the older
-        // bluez spelling as a fallback), each filtered to audio sinks with
-        // its Connected state. Tab-separated so names may contain spaces.
-        executable.exec(": BT_LIST; list=$(bluetoothctl devices Paired 2>/dev/null); "
-            + '[ -n "$list" ] || list=$(bluetoothctl paired-devices 2>/dev/null); '
+        // One shell round-trip for everything: paired devices, each filtered
+        // to audio sinks with its Connected state. Both bluez spellings are
+        // asked and grep keeps only real device lines — whichever spelling a
+        // given bluez rejects prints its error to STDOUT, so an emptiness
+        // test on the raw output would take the error text for a device
+        // list. Tab-separated so names may contain spaces.
+        executable.exec(": BT_LIST; list=$({ bluetoothctl devices Paired; bluetoothctl paired-devices; } 2>/dev/null "
+            + "| grep '^Device ' | sort -u); "
             + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
             + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
             + 'info=$(bluetoothctl info "$mac" 2>/dev/null); '
@@ -1339,10 +1347,19 @@ PlasmoidItem {
         return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac);
     }
 
+    // Output ids that existed when the connect started — the auto-route only
+    // ever considers sinks that appeared AFTER it, so a device name like
+    // "Speaker" can never substring-match the built-in "Speakers" output.
+    property var _btOutputIdsBeforeConnect: ({})
+
     function btConnect(mac, name) {
         if (!_btValidMac(mac) || _btConnectingMac !== "") return;
         _btConnectingMac = mac;
         _btPendingSinkName = name || "";
+        var ids = {};
+        var outs = mediaDevices.audioOutputs;
+        for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
+        _btOutputIdsBeforeConnect = ids;
         btRouteTimeout.restart();
         executable.exec(": BT_CONNECT; timeout 12 bluetoothctl connect " + mac + "; true");
     }
@@ -2253,8 +2270,14 @@ PlasmoidItem {
                     if (btp.length < 4 || !_btValidMac(btp[1])) continue;
                     btDevicesModel.append({
                         "mac": btp[1], "connected": btp[2] === "yes",
-                        "name": btp[3] || btp[1]
+                        // A tab INSIDE the alias splits into extra fields —
+                        // rejoin them so the name survives (tabs as spaces).
+                        "name": btp.slice(3).join(" ").trim() || btp[1]
                     });
+                }
+                if (root._btListAgain) {
+                    root._btListAgain = false;
+                    btList();
                 }
                 return;
             }
@@ -2579,18 +2602,19 @@ PlasmoidItem {
                     return;
                 }
             }
-        }
-        if (_audioOutputWasRouted) {
-            _audioOutputWasRouted = false;
-            // Without a word, music silently jumping to the default output
-            // ("why is this suddenly on my desk speakers?") looks like a bug.
-            if (isPlaying()) {
+            // The configured device is gone mid-session. Without a word,
+            // music silently jumping to the default output ("why is this
+            // suddenly on my desk speakers?") looks like a bug.
+            if (_audioOutputWasRouted && isPlaying()) {
                 dlNotification.title = i18n("Audio output changed");
                 dlNotification.text = i18n("The chosen output device disappeared — using the system default instead.");
                 dlNotification.iconName = "audio-volume-high";
                 dlNotification.sendEvent();
             }
         }
+        // wanted === "" is the user deliberately picking the system default —
+        // never worth a notification.
+        _audioOutputWasRouted = false;
         playMusicOutput.device = mediaDevices.defaultAudioOutput;
     }
 
@@ -2601,16 +2625,31 @@ PlasmoidItem {
             // A Bluetooth device the user just connected from the cast menu:
             // route onto its sink the moment it appears (PipeWire needs a
             // couple of seconds) — that makes the click actually play there.
+            // Only sinks that appeared since the connect are considered; a
+            // name match picks among them, and a single new sink wins even
+            // without one (PipeWire descriptions don't always carry the
+            // Bluetooth alias verbatim).
             if (root._btPendingSinkName !== "") {
                 var pending = root._btPendingSinkName.toLowerCase();
                 var outs = mediaDevices.audioOutputs;
+                var fresh = [];
                 for (var i = 0; i < outs.length; i++) {
-                    if (String(outs[i].description).toLowerCase().indexOf(pending) !== -1) {
-                        root._btPendingSinkName = "";
-                        btRouteTimeout.stop();
-                        root.setAudioOutputDevice(String(outs[i].id));
-                        return; // setAudioOutputDevice re-applies the routing
+                    if (!root._btOutputIdsBeforeConnect[String(outs[i].id)])
+                        fresh.push(outs[i]);
+                }
+                var pick = null;
+                for (var j = 0; j < fresh.length; j++) {
+                    if (String(fresh[j].description).toLowerCase().indexOf(pending) !== -1) {
+                        pick = fresh[j];
+                        break;
                     }
+                }
+                if (!pick && fresh.length === 1) pick = fresh[0];
+                if (pick) {
+                    root._btPendingSinkName = "";
+                    btRouteTimeout.stop();
+                    root.setAudioOutputDevice(String(pick.id));
+                    return; // setAudioOutputDevice re-applies the routing
                 }
             }
             root._applyAudioOutputDevice()
