@@ -2563,6 +2563,11 @@ PlasmoidItem {
         _applyAudioOutputDevice();
     }
 
+    // True after the configured device was actually found and applied — the
+    // fallback below only notifies when that device VANISHES mid-session,
+    // never for a device that was already absent at startup.
+    property bool _audioOutputWasRouted: false
+
     function _applyAudioOutputDevice() {
         var wanted = Plasmoid.configuration.audioOutputDevice || "";
         var outs = mediaDevices.audioOutputs;
@@ -2570,8 +2575,20 @@ PlasmoidItem {
             for (var i = 0; i < outs.length; i++) {
                 if (String(outs[i].id) === wanted) {
                     playMusicOutput.device = outs[i];
+                    _audioOutputWasRouted = true;
                     return;
                 }
+            }
+        }
+        if (_audioOutputWasRouted) {
+            _audioOutputWasRouted = false;
+            // Without a word, music silently jumping to the default output
+            // ("why is this suddenly on my desk speakers?") looks like a bug.
+            if (isPlaying()) {
+                dlNotification.title = i18n("Audio output changed");
+                dlNotification.text = i18n("The chosen output device disappeared — using the system default instead.");
+                dlNotification.iconName = "audio-volume-high";
+                dlNotification.sendEvent();
             }
         }
         playMusicOutput.device = mediaDevices.defaultAudioOutput;
