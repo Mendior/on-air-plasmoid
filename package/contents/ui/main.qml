@@ -1262,23 +1262,24 @@ PlasmoidItem {
     // Shell-quote each argument and run cast.py with a sentinel prefix that the
     // onExited dispatcher matches on. Untrusted values (station name, URL) only
     // ever arrive as separate quoted argv entries, never as shell text.
-    property int _castExecSeq: 0
+    // _execSeq uniquifies command strings wherever a repeat must REALLY run:
+    // the DataSource dedupes identical in-flight commands AND hands a cached
+    // result to an identical command reconnected within its ~10 ms container
+    // lifetime. Shared by _castExec and btList.
+    property int _execSeq: 0
 
     function _castExec(sentinel, argv) {
         var cmd = ": " + sentinel + "; python3 '" + _castScript().replace(/'/g, "'\\''") + "'";
         for (var i = 0; i < argv.length; i++) {
             cmd += " '" + String(argv[i]).replace(/'/g, "'\\''") + "'";
         }
-        // The executable DataSource keys sources by the exact command string:
-        // re-issuing a byte-identical command while the previous one is still
-        // running is a silent no-op, and its result arrives only once. Quickly
-        // unchecking and re-checking the same device does exactly that (two
-        // identical stop commands) — the second stop would be swallowed and
-        // the device would keep playing. A trailing shell comment makes every
-        // invocation unique; the sentinel prefix matches are unaffected.
+        // Quickly unchecking and re-checking the same device issues two
+        // identical stop commands — without the suffix the second one would
+        // be swallowed and the device would keep playing. A trailing shell
+        // comment keeps the sentinel prefix matches unaffected.
         // Deliberately NOT applied to executable.exec() globally: reader.py
-        // polling relies on that dedup as its natural in-flight throttle.
-        cmd += " # " + (++_castExecSeq);
+        // polling relies on the dedup as its natural in-flight throttle.
+        cmd += " # " + (++_execSeq);
         executable.exec(cmd);
     }
 
@@ -1341,7 +1342,11 @@ PlasmoidItem {
             + 'info=$(bluetoothctl info "$mac" 2>/dev/null); '
             + "case \"$info\" in *'Audio Sink'*) ;; *) continue;; esac; "
             + "conn=no; case \"$info\" in *'Connected: yes'*) conn=yes;; esac; "
-            + 'printf \'BTDEV\\t%s\\t%s\\t%s\\n\' "$mac" "$conn" "$name"; done; true');
+            + 'printf \'BTDEV\\t%s\\t%s\\t%s\\n\' "$mac" "$conn" "$name"; done; true'
+            // Unique per run, or the queued refresh after a fast toggle would
+            // get the dataengine's CACHED pre-toggle output back instead of a
+            // fresh listing (identical strings reconnected within ~10 ms).
+            + " # " + (++_execSeq));
     }
 
     // MACs come from bluetoothctl's own output, but they pass through the
@@ -2636,8 +2641,9 @@ PlasmoidItem {
             // A Bluetooth device the user just connected from the cast menu:
             // route onto its sink the moment it appears (PipeWire needs a
             // couple of seconds) — that makes the click actually play there.
-            // The MAC embedded in the sink id (bluez_output.XX_XX_… on both
-            // PipeWire and Pulse) identifies the device exactly; the alias
+            // The MAC embedded in the sink id (bluez_output.XX_XX_… on
+            // PipeWire, bluez_sink.XX_XX_… on PulseAudio — the MAC substring
+            // is what matters) identifies the device exactly; the alias
             // in a description is only a fallback, and even then only among
             // sinks that appeared since the connect. No "any new sink" rule:
             // an HDMI plug landing in the wait window must never be routed
