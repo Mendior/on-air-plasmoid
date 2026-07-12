@@ -1590,10 +1590,13 @@ PlasmoidItem {
         executable.exec(cmd);
     }
 
-    property var _artPending: ({})
     // FIFO queue to bound _artCache — plasmashell runs for weeks, and an
     // unbounded cache would be a slow memory leak.
     property var _artCacheKeys: []
+    // Misses are retried after this long. Radio repeats its playlist all day,
+    // and a single bad moment on the first play (XHR timeout, iTunes 403,
+    // network blip) must not leave that track coverless for the whole session.
+    readonly property int _artNegativeTtlMs: 30 * 60 * 1000
 
     // Also used for the art-cache key: trackArtistTitleKey() and the lookup
     // query MUST normalize identically, or fetched art is silently never
@@ -1605,15 +1608,22 @@ PlasmoidItem {
                         .replace(/\s+/g, " ").trim();
     }
 
-    function _artFinish(cacheKey, url) {
-        console.log("[ARP] artFinish key=" + cacheKey.substring(0, 60) + " url=" + (url || "<empty>"));
-        if (_artCache[cacheKey] === undefined) {
-            _artCacheKeys.push(cacheKey);
-            if (_artCacheKeys.length > 200) {
-                delete _artCache[_artCacheKeys.shift()];
+    // definitive=false means the empty result came from a transient failure
+    // (timeout, HTTP error, rate limit) — it is NOT cached, so the next play
+    // of the same track simply tries again. Definitive empties are cached
+    // with a timestamp and expire after _artNegativeTtlMs.
+    function _artFinish(cacheKey, url, definitive) {
+        console.log("[ARP] artFinish key=" + cacheKey.substring(0, 60) + " url=" + (url || "<empty>")
+                    + (definitive ? "" : " (transient, not cached)"));
+        if (url || definitive) {
+            if (_artCache[cacheKey] === undefined) {
+                _artCacheKeys.push(cacheKey);
+                if (_artCacheKeys.length > 200) {
+                    delete _artCache[_artCacheKeys.shift()];
+                }
             }
+            _artCache[cacheKey] = { "url": url || "", "t": Date.now() };
         }
-        _artCache[cacheKey] = url || "";
         var currentKey = trackArtistTitleKey();
         console.log("[ARP] currentKey=" + currentKey.substring(0, 60));
         if (url && currentKey === cacheKey) {
@@ -1626,6 +1636,11 @@ PlasmoidItem {
         return _normalizeQuery((root.trackArtist + " " + root.trackTitle).trim() || root.title);
     }
 
+    // All three query callbacks are (url, definitive): definitive=true means
+    // the service really answered (with a result or a real "no match");
+    // definitive=false is a transient failure — timeout/abort (status 0),
+    // an HTTP error (iTunes rate-limits at ~20 req/min with 403), a quota
+    // error or an unparseable body — and must not be negative-cached.
     function _queryItunes(query, cacheKey, onResult) {
         console.log("[ARP] iTunes query: " + query);
         var xhr = new XMLHttpRequest;
@@ -1640,13 +1655,17 @@ PlasmoidItem {
                     if (data.results && data.results.length > 0) {
                         var artUrl = data.results[0].artworkUrl100 || "";
                         if (artUrl) {
-                            onResult(artUrl.replace("100x100bb", "300x300bb"));
+                            onResult(artUrl.replace("100x100bb", "300x300bb"), true);
                             return;
                         }
                     }
+                    if (data.results !== undefined) {
+                        onResult("", true);
+                        return;
+                    }
                 } catch(e) {}
             }
-            onResult("");
+            onResult("", false);
         };
         guard = _armXhrTimeout(xhr, 3500);
         xhr.send();
@@ -1663,17 +1682,23 @@ PlasmoidItem {
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    if (data.data && data.data.length > 0) {
-                        var album = data.data[0].album || {};
-                        var artUrl = album.cover_big || album.cover_medium || data.data[0].artist.picture_medium || "";
-                        if (artUrl) {
-                            onResult(artUrl);
-                            return;
+                    // Deezer reports quota/rate problems as 200 + {"error"} —
+                    // that is a transient failure, not "no such track".
+                    if (!data.error) {
+                        if (data.data && data.data.length > 0) {
+                            var album = data.data[0].album || {};
+                            var artUrl = album.cover_big || album.cover_medium || data.data[0].artist.picture_medium || "";
+                            if (artUrl) {
+                                onResult(artUrl, true);
+                                return;
+                            }
                         }
+                        onResult("", true);
+                        return;
                     }
                 } catch(e) {}
             }
-            onResult("");
+            onResult("", false);
         };
         guard = _armXhrTimeout(xhr, 3500);
         xhr.send();
@@ -1690,17 +1715,21 @@ PlasmoidItem {
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    if (data.data && data.data.length > 0) {
-                        var artist = data.data[0];
-                        var artUrl = artist.picture_big || artist.picture_medium || "";
-                        if (artUrl) {
-                            onResult(artUrl);
-                            return;
+                    if (!data.error) {
+                        if (data.data && data.data.length > 0) {
+                            var artist = data.data[0];
+                            var artUrl = artist.picture_big || artist.picture_medium || "";
+                            if (artUrl) {
+                                onResult(artUrl, true);
+                                return;
+                            }
                         }
+                        onResult("", true);
+                        return;
                     }
                 } catch(e) {}
             }
-            onResult("");
+            onResult("", false);
         };
         guard = _armXhrTimeout(xhr, 3500);
         xhr.send();
@@ -1735,69 +1764,56 @@ PlasmoidItem {
             albumArtUrl = "";
             return;
         }
-        if (_artCache[query] !== undefined) {
-            albumArtUrl = _artCache[query];
+        var hit = _artCache[query];
+        if (hit !== undefined && (hit.url !== "" || Date.now() - hit.t < _artNegativeTtlMs)) {
+            albumArtUrl = hit.url;
             return;
         }
 
-        var resolved = false;
-        var fallbacksStarted = false;
-        var pending = 2;
+        // One request at a time, Deezer first: its rate limit is far
+        // friendlier than iTunes' (~20 req/min per IP), so the common case
+        // costs a single Deezer call and iTunes only ever sees fallbacks.
+        // The old parallel-pair start burned both quotas on every track.
+        var attempts = [
+            {fn: _queryDeezer, q: query},
+            {fn: _queryItunes, q: query}
+        ];
+        var primary = _primaryArtist(parsed.artist);
+        if (primary && parsed.title) {
+            attempts.push({fn: _queryDeezer, q: primary + " " + parsed.title});
+            attempts.push({fn: _queryItunes, q: primary + " " + parsed.title});
+        }
+        if (primary) {
+            attempts.push({fn: _queryDeezerArtist, q: primary});
+        } else if (parsed.title) {
+            attempts.push({fn: _queryDeezer, q: parsed.title});
+            attempts.push({fn: _queryItunes, q: parsed.title});
+        }
 
-        function startFallbacks() {
-            if (fallbacksStarted) return;
-            fallbacksStarted = true;
-            var primary = _primaryArtist(parsed.artist);
-            var attempts = [];
-            if (primary && parsed.title) {
-                attempts.push({fn: _queryItunes, q: primary + " " + parsed.title});
-                attempts.push({fn: _queryDeezer, q: primary + " " + parsed.title});
-            }
-            if (primary) {
-                attempts.push({fn: _queryDeezerArtist, q: primary});
-            } else if (parsed.title) {
-                attempts.push({fn: _queryItunes, q: parsed.title});
-                attempts.push({fn: _queryDeezer, q: parsed.title});
-            }
+        var sawTransient = false;
 
-            function runNext() {
-                if (resolved) return;
-                if (attempts.length === 0) {
-                    _artFinish(query, "");
+        function runNext() {
+            // The track changed while the chain was running: stop burning
+            // requests on it. Nothing is cached (the chain is incomplete);
+            // the track's next play starts fresh.
+            if (trackArtistTitleKey() !== query) return;
+            if (attempts.length === 0) {
+                // Cache the miss only when every source really said "no
+                // match" — a timeout/quota blip must retry on the next play.
+                _artFinish(query, "", !sawTransient);
+                return;
+            }
+            var step = attempts.shift();
+            step.fn(step.q, query, function(url, definitive) {
+                if (url) {
+                    _artFinish(query, url, true);
                     return;
                 }
-                var step = attempts.shift();
-                step.fn(step.q, query, function(url) {
-                    if (resolved) return;
-                    if (url) {
-                        resolved = true;
-                        _artFinish(query, url);
-                    } else {
-                        runNext();
-                    }
-                });
-            }
-            runNext();
+                if (!definitive) sawTransient = true;
+                runNext();
+            });
         }
-
-        function tryDone(url) {
-            if (resolved) {
-                pending -= 1;
-                return;
-            }
-            pending -= 1;
-            if (url) {
-                resolved = true;
-                _artFinish(query, url);
-                return;
-            }
-            if (pending === 0) {
-                startFallbacks();
-            }
-        }
-
-        _queryItunes(query, query, tryDone);
-        _queryDeezer(query, query, tryDone);
+        runNext();
     }
 
     function parseTrackString(s) {
