@@ -228,6 +228,9 @@ def _msearch(st, wait, target=None):
     locations = set()
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    except OSError:
+        return locations
+    try:
         s.settimeout(wait)
         msg = "\r\n".join([
             "M-SEARCH * HTTP/1.1",
@@ -254,9 +257,12 @@ def _msearch(st, wait, target=None):
             for line in data.decode("utf-8", "replace").split("\r\n"):
                 if line.lower().startswith("location:"):
                     locations.add(line.split(":", 1)[1].strip())
-        s.close()
     except OSError:
+        # A send failure (unreachable network, buffer pressure) just means no
+        # results from this round — but the socket must not leak with it.
         pass
+    finally:
+        s.close()
     return locations
 
 
