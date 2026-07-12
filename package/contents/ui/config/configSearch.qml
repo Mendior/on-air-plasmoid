@@ -104,7 +104,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "AdvancedRadio/2.0")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.9.1")
     }
 
     function getStations(by, val) {
