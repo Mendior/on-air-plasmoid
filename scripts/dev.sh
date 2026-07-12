@@ -20,6 +20,7 @@ Usage: scripts/dev.sh <command>
   install   sync repo package/contents/ -> local install (metadata.json and locale untouched)
   pull      sync local install -> repo package/contents/ (metadata.json and locale untouched)
   lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json + po validation
+  check     lint + offscreen plasmoidviewer runtime smoke test (run before every release)
   i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
   locale-install  compile po/ catalogs into the LOCAL install (old plugin id domain)
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
@@ -65,6 +66,19 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     done
     if [ "$fail" -eq 0 ]; then echo "lint OK"; else echo "lint FAILED"; fi
     exit "$fail"
+    ;;
+  check)
+    "$0" lint
+    # Runtime smoke test. qmllint does not see engine-level load errors (e.g.
+    # nesting a child into a type with no default property — the exact bug
+    # that shipped broken in 2026.7.2), only the QML engine reports those.
+    # QT_FORCE_STDERR_LOGGING is required or Qt logs go to journald instead.
+    out="$(timeout 25 env QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 plasmoidviewer -a "$PKG" 2>&1 || true)"
+    # /usr/share/plasma is the viewer's own shell (desktopcontainment etc.),
+    # which emits unrelated TypeErrors — only our package's messages count.
+    bad="$(printf '%s\n' "$out" | grep -v '/usr/share/plasma/' | grep -Ei 'duplicat|syntax|unavailable|non-existent|binding loop|typeerror|referenceerror|error loading' || true)"
+    if [ -n "$bad" ]; then printf 'runtime FAILED:\n%s\n' "$bad"; exit 1; fi
+    echo "runtime OK"
     ;;
   build)
     ver="$(python3 -c "import json; print(json.load(open('$PKG/metadata.json'))['KPlugin']['Version'])")"
