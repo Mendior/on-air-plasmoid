@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.8.1
+
+- Fixed the cast menu showing blank rows: the device list gained a field named `model` in 2026.8, which shadowed the delegate's own model object in QML, so device names stopped rendering. Renamed the field and switched the delegate to per-role properties. Caught minutes after release; the 2026.8 casting backend itself was fine.
+
 ## 2026.8
 
 Casting now covers far more than Chromecast.

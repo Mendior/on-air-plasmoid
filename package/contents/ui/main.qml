@@ -1110,7 +1110,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.8");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.8.1");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -2013,9 +2013,12 @@ PlasmoidItem {
                     if (lines[ci].indexOf("DEV\t") !== 0) continue;
                     var p = lines[ci].split("\t");
                     if (p.length < 7) continue;
+                    // NB: the role must NOT be called "model" — a role with
+                    // that name shadows the delegate's standard model object
+                    // and every row renders blank.
                     castDevicesModel.append({
                         "kind": p[1], "uuid": p[2], "name": p[3], "host": p[4],
-                        "port": parseInt(p[5]) || 8009, "model": p[6],
+                        "port": parseInt(p[5]) || 8009, "deviceModel": p[6],
                         "location": p.length > 7 ? p[7] : ""
                     });
                 }
