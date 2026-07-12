@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.9.1
+
+- New translations: French, Italian and Dutch — complete catalogs, no partial ones, same as the rest. That makes 11 languages.
+
 ## 2026.9
 
 Casting grew up: multi-room, Bluetooth outputs and a proper off switch.

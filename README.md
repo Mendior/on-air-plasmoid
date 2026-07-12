@@ -17,7 +17,7 @@
 - 🎹 **MPRIS integration** — media keys and the Plasma media controls just work
 - 📺 **Cast to TVs, soundbars & network speakers** — Chromecast/Nest and any DLNA renderer (Samsung/LG/Sony TVs, Bose/Sonos soundbars, WiFi speakers). The stream goes straight to the device, which does the decoding, so your PC stays quiet and cool (a real help on older machines). Volume and station switching stay in the widget. DLNA needs no extra packages at all
 - ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
-- 🌐 **8 languages** — English, Estonian, German, Polish, Ukrainian, Spanish, Brazilian Portuguese, Swedish
+- 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
 ## Requirements
@@ -45,7 +45,7 @@ Optional (features degrade gracefully without them):
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.9.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.9.1.plasmoid
 ```
 
 ## Usage tips
