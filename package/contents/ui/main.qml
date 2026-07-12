@@ -2106,9 +2106,13 @@ PlasmoidItem {
                     // NB: the role must NOT be called "model" — a role with
                     // that name shadows the delegate's standard model object
                     // and every row renders blank.
+                    // Port: default 8009 only for an unparseable field — DLNA
+                    // lines carry a legitimate 0 (they are driven via location)
+                    // and `|| 8009` would silently rewrite it.
+                    var prt = parseInt(p[5], 10);
                     castDevicesModel.append({
                         "kind": p[1], "uuid": p[2], "name": p[3], "host": p[4],
-                        "port": parseInt(p[5]) || 8009, "deviceModel": p[6],
+                        "port": isNaN(prt) ? 8009 : prt, "deviceModel": p[6],
                         "location": p.length > 7 ? p[7] : ""
                     });
                 }
