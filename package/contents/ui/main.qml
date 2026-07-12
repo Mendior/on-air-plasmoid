@@ -1299,6 +1299,68 @@ PlasmoidItem {
         return -1;
     }
 
+    // ── Bluetooth (paired speakers/headphones in the cast menu) ─────────────
+    // One-shot bluetoothctl commands, same sentinel pattern as cast.py. A
+    // paired-but-unconnected speaker is one click away: connect it here and
+    // when its PipeWire sink appears (1–3 s) playback is routed onto it
+    // automatically. No BT scanning/pairing — that stays in System Settings.
+    property bool _btAvailable: false        // bluetoothctl present?
+    property bool _btListing: false
+    property string _btConnectingMac: ""     // MAC of an in-flight connect
+    // Name of the last device the user clicked — matched against new sink
+    // descriptions for the automatic routing, and used in error messages.
+    property string _btPendingSinkName: ""
+
+    ListModel { id: btDevicesModel }
+
+    function btProbe() {
+        executable.exec(": BT_PROBE; command -v bluetoothctl >/dev/null 2>&1 && echo __BT_YES__; true");
+    }
+
+    function btList() {
+        if (!_btAvailable || _btListing) return;
+        _btListing = true;
+        // One shell round-trip for everything: paired devices (the older
+        // bluez spelling as a fallback), each filtered to audio sinks with
+        // its Connected state. Tab-separated so names may contain spaces.
+        executable.exec(": BT_LIST; list=$(bluetoothctl devices Paired 2>/dev/null); "
+            + '[ -n "$list" ] || list=$(bluetoothctl paired-devices 2>/dev/null); '
+            + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
+            + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
+            + 'info=$(bluetoothctl info "$mac" 2>/dev/null); '
+            + "case \"$info\" in *'Audio Sink'*) ;; *) continue;; esac; "
+            + "conn=no; case \"$info\" in *'Connected: yes'*) conn=yes;; esac; "
+            + 'printf \'BTDEV\\t%s\\t%s\\t%s\\n\' "$mac" "$conn" "$name"; done; true');
+    }
+
+    // MACs come from bluetoothctl's own output, but they pass through the
+    // model and back — validate before they touch a shell line.
+    function _btValidMac(mac) {
+        return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac);
+    }
+
+    function btConnect(mac, name) {
+        if (!_btValidMac(mac) || _btConnectingMac !== "") return;
+        _btConnectingMac = mac;
+        _btPendingSinkName = name || "";
+        btRouteTimeout.restart();
+        executable.exec(": BT_CONNECT; timeout 12 bluetoothctl connect " + mac + "; true");
+    }
+
+    function btDisconnect(mac) {
+        if (!_btValidMac(mac)) return;
+        executable.exec(": BT_DISCONNECT; bluetoothctl disconnect " + mac + "; true");
+    }
+
+    Timer {
+        id: btRouteTimeout
+        // If the sink never shows up, stop waiting for it — a stale pending
+        // name must not hijack some later, unrelated output change.
+        interval: 20000
+        repeat: false
+        onTriggered: root._btPendingSinkName = ""
+    }
+
     function _castStreamUrl() {
         var url = _currentResolvedUrl || (playMusic.source ? playMusic.source.toString() : "");
         return (url === "" || url.indexOf("file://") === 0) ? "" : url;
@@ -2029,6 +2091,7 @@ PlasmoidItem {
         playMusicOutput.volume = targetVolume();
         _mprisStart();
         castProbe();
+        btProbe();
         _ensureMusicDir();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
@@ -2173,6 +2236,48 @@ PlasmoidItem {
             }
             if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0) {
                 return; // fire-and-forget
+            }
+            // Bluetooth: bluetoothctl availability probe
+            if (cmd.indexOf(": BT_PROBE;") === 0) {
+                root._btAvailable = (stdout || "").indexOf("__BT_YES__") !== -1;
+                return;
+            }
+            // Bluetooth: paired audio devices with their Connected state
+            if (cmd.indexOf(": BT_LIST;") === 0) {
+                root._btListing = false;
+                btDevicesModel.clear();
+                var btLines = (stdout || "").split("\n");
+                for (var bti = 0; bti < btLines.length; bti++) {
+                    if (btLines[bti].indexOf("BTDEV\t") !== 0) continue;
+                    var btp = btLines[bti].split("\t");
+                    if (btp.length < 4 || !_btValidMac(btp[1])) continue;
+                    btDevicesModel.append({
+                        "mac": btp[1], "connected": btp[2] === "yes",
+                        "name": btp[3] || btp[1]
+                    });
+                }
+                return;
+            }
+            // Bluetooth: connect finished. Success is judged on bluetoothctl's
+            // own words; the audio routing happens separately, when the new
+            // PipeWire sink appears in mediaDevices (see onAudioOutputsChanged).
+            if (cmd.indexOf(": BT_CONNECT;") === 0) {
+                root._btConnectingMac = "";
+                if ((stdout || "").indexOf("Connection successful") === -1) {
+                    btRouteTimeout.stop();
+                    dlNotification.title = i18n("Could not connect to %1",
+                        root._btPendingSinkName || i18n("the Bluetooth device"));
+                    dlNotification.text = i18n("Make sure the speaker is switched on and in range.");
+                    dlNotification.iconName = "network-bluetooth";
+                    dlNotification.sendEvent();
+                    root._btPendingSinkName = "";
+                }
+                btList();
+                return;
+            }
+            if (cmd.indexOf(": BT_DISCONNECT;") === 0) {
+                btList();
+                return;
             }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {
@@ -2475,7 +2580,24 @@ PlasmoidItem {
     Connections {
         target: mediaDevices
         // Keeps the routing correct when a Bluetooth speaker (dis)connects.
-        function onAudioOutputsChanged() { root._applyAudioOutputDevice() }
+        function onAudioOutputsChanged() {
+            // A Bluetooth device the user just connected from the cast menu:
+            // route onto its sink the moment it appears (PipeWire needs a
+            // couple of seconds) — that makes the click actually play there.
+            if (root._btPendingSinkName !== "") {
+                var pending = root._btPendingSinkName.toLowerCase();
+                var outs = mediaDevices.audioOutputs;
+                for (var i = 0; i < outs.length; i++) {
+                    if (String(outs[i].description).toLowerCase().indexOf(pending) !== -1) {
+                        root._btPendingSinkName = "";
+                        btRouteTimeout.stop();
+                        root.setAudioOutputDevice(String(outs[i].id));
+                        return; // setAudioOutputDevice re-applies the routing
+                    }
+                }
+            }
+            root._applyAudioOutputDevice()
+        }
     }
 
     NumberAnimation {
