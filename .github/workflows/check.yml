@@ -1,0 +1,43 @@
+# Two-tier gate, mirroring scripts/dev.sh:
+#   core — fast, Qt-free: Python compile + unit tests, translations,
+#          metadata.json, shell syntax, regression grep rules.
+#   qml  — the real thing on an Arch container (same package set as a
+#          rolling Plasma 6 desktop): Qt6 qmllint plus the offscreen
+#          plasmoidviewer smoke test that catches engine-level load errors
+#          qmllint cannot see.
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    name: python + translations + static rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gettext and pytest
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gettext python3-pytest
+      - name: Lint without QML
+        run: QMLLINT=none scripts/dev.sh lint
+
+  qml:
+    name: qmllint + runtime smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: archlinux:latest
+    steps:
+      - name: Install Plasma toolchain
+        run: >
+          pacman -Syu --noconfirm --needed
+          git which gettext python python-pytest ttf-dejavu dbus
+          qt6-declarative qt6-multimedia-ffmpeg
+          plasma-sdk plasma-workspace plasma5support knotifications
+      - uses: actions/checkout@v4
+      - name: Full check (lint + offscreen plasmoidviewer)
+        run: dbus-run-session -- scripts/dev.sh check
