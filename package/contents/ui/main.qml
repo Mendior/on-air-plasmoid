@@ -1311,9 +1311,12 @@ PlasmoidItem {
     // would show the pre-toggle Connected states.
     property bool _btListAgain: false
     property string _btConnectingMac: ""     // MAC of an in-flight connect
-    // Name of the last device the user clicked — matched against new sink
-    // descriptions for the automatic routing, and used in error messages.
+    // The device the user last clicked, for the automatic routing: the MAC
+    // (PipeWire/Pulse embed it in the sink id, bluez_output.XX_XX_…) is the
+    // authoritative match; the name is the fallback and the error-message
+    // text. Always set and cleared together.
     property string _btPendingSinkName: ""
+    property string _btPendingSinkMac: ""
 
     ListModel { id: btDevicesModel }
 
@@ -1356,6 +1359,7 @@ PlasmoidItem {
         if (!_btValidMac(mac) || _btConnectingMac !== "") return;
         _btConnectingMac = mac;
         _btPendingSinkName = name || "";
+        _btPendingSinkMac = mac;
         var ids = {};
         var outs = mediaDevices.audioOutputs;
         for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
@@ -1375,7 +1379,10 @@ PlasmoidItem {
         // name must not hijack some later, unrelated output change.
         interval: 20000
         repeat: false
-        onTriggered: root._btPendingSinkName = ""
+        onTriggered: {
+            root._btPendingSinkName = "";
+            root._btPendingSinkMac = "";
+        }
     }
 
     function _castStreamUrl() {
@@ -2179,8 +2186,11 @@ PlasmoidItem {
             const exitStatus = data["exit status"];
             const stdout = data["stdout"];
             const stderr = data["stderr"];
-            exited(sourceName, exitCode, exitStatus, stdout, stderr);
+            // Disconnect BEFORE emitting: a handler that re-issues the same
+            // command (the BT list refresh does) would otherwise hit the
+            // still-connected source and silently never run.
             disconnectSource(sourceName);
+            exited(sourceName, exitCode, exitStatus, stdout, stderr);
         }
     }
 
@@ -2294,6 +2304,7 @@ PlasmoidItem {
                     dlNotification.iconName = "network-bluetooth";
                     dlNotification.sendEvent();
                     root._btPendingSinkName = "";
+                    root._btPendingSinkMac = "";
                 }
                 btList();
                 return;
@@ -2625,28 +2636,31 @@ PlasmoidItem {
             // A Bluetooth device the user just connected from the cast menu:
             // route onto its sink the moment it appears (PipeWire needs a
             // couple of seconds) — that makes the click actually play there.
-            // Only sinks that appeared since the connect are considered; a
-            // name match picks among them, and a single new sink wins even
-            // without one (PipeWire descriptions don't always carry the
-            // Bluetooth alias verbatim).
-            if (root._btPendingSinkName !== "") {
-                var pending = root._btPendingSinkName.toLowerCase();
+            // The MAC embedded in the sink id (bluez_output.XX_XX_… on both
+            // PipeWire and Pulse) identifies the device exactly; the alias
+            // in a description is only a fallback, and even then only among
+            // sinks that appeared since the connect. No "any new sink" rule:
+            // an HDMI plug landing in the wait window must never be routed
+            // to, let alone persisted as the chosen output.
+            if (root._btPendingSinkMac !== "") {
+                var macToken = root._btPendingSinkMac.toLowerCase().replace(/:/g, "_");
+                var pendingName = root._btPendingSinkName.toLowerCase();
                 var outs = mediaDevices.audioOutputs;
-                var fresh = [];
-                for (var i = 0; i < outs.length; i++) {
-                    if (!root._btOutputIdsBeforeConnect[String(outs[i].id)])
-                        fresh.push(outs[i]);
-                }
                 var pick = null;
-                for (var j = 0; j < fresh.length; j++) {
-                    if (String(fresh[j].description).toLowerCase().indexOf(pending) !== -1) {
-                        pick = fresh[j];
-                        break;
+                for (var i = 0; i < outs.length && !pick; i++) {
+                    if (String(outs[i].id).toLowerCase().indexOf(macToken) !== -1)
+                        pick = outs[i];
+                }
+                if (!pick && pendingName !== "") {
+                    for (var j = 0; j < outs.length && !pick; j++) {
+                        if (!root._btOutputIdsBeforeConnect[String(outs[j].id)]
+                            && String(outs[j].description).toLowerCase().indexOf(pendingName) !== -1)
+                            pick = outs[j];
                     }
                 }
-                if (!pick && fresh.length === 1) pick = fresh[0];
                 if (pick) {
                     root._btPendingSinkName = "";
+                    root._btPendingSinkMac = "";
                     btRouteTimeout.stop();
                     root.setAudioOutputDevice(String(pick.id));
                     return; // setAudioOutputDevice re-applies the routing
