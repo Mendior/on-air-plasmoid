@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.10.2
+
+- **Device discovery no longer plays the lottery.** SSDP and mDNS run over UDP, and idle devices routinely sleep through a query — so each opening of the cast menu used to find a different subset of your speakers and TVs. Devices seen before are now remembered (30 days) and re-verified with one direct request each, which either proves them alive or they really are offline; six consecutive scans on a real five-device network now return the identical list. Also fixed the mDNS helper throwing away all of its output when listing took longer than the timeout — partial results are kept now.
+
 ## 2026.10.1
 
 - Hovering the panel icon now shows what's playing — artist and title, with the station name underneath — instead of the stock widget name and description. While casting, the tooltip also says which device is playing. Requested by @CGA11 in issue #4. When nothing plays, the tooltip stays as before.
