@@ -33,6 +33,8 @@ Commands (argv[1]):
 Every command prints a sentinel the QML side matches on and always exits 0, so
 a missing optional dependency is a clean "feature unavailable", never a crash.
 """
+import json
+import os
 import socket
 import subprocess
 import sys
@@ -103,6 +105,7 @@ def _disconnect(cast):
 
 
 def _discover_cast(seconds):
+    found = {}
     try:
         pychromecast = _import()
     except Exception:
@@ -112,18 +115,39 @@ def _discover_cast(seconds):
         casts, browser = pychromecast.get_chromecasts(timeout=seconds)
         for cast in casts:
             info = cast.cast_info
-            _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
-                info.uuid,
-                _clean(info.friendly_name) or "Cast device",
-                info.host or "",
-                info.port or 8009,
-                _clean(info.model_name),
-            ))
+            uuid = str(info.uuid)
+            found[uuid] = {
+                "kind": "cast",
+                "name": _clean(info.friendly_name) or "Cast device",
+                "host": info.host or "",
+                "port": info.port or 8009,
+                "model": _clean(info.model_name),
+                "location": "",
+            }
             _disconnect(cast)
     except Exception as exc:
         print("cast.py discover(cast): %r" % (exc,), file=sys.stderr)
     finally:
         _stop_browser(browser)
+    # mDNS is lossy — a device found last time but missed this round gets one
+    # direct connection attempt, which either proves it alive or it really is
+    # gone. This keeps the picker stable instead of flickering per round.
+    for uuid, dev in _cache_load().items():
+        if uuid in found or dev.get("kind") != "cast" or not dev.get("host"):
+            continue
+        cast = None
+        try:
+            cast = _connect_host(pychromecast, dev["host"], dev["port"],
+                                 uuid, dev.get("model", ""))
+            found[uuid] = dev
+        except Exception:
+            pass
+        finally:
+            _disconnect(cast)
+    for uuid, dev in found.items():
+        _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
+            uuid, dev["name"], dev["host"], dev["port"], dev["model"]))
+    _cache_save(found)
 
 
 def cmd_play(host, port, uuid, model, url, ctype, title, art):
@@ -306,37 +330,97 @@ def _describe_renderer(location):
     return None
 
 
+def _parse_avahi(out):
+    """Parse `avahi-browse -atrp` output into {IPv4: extra descriptor paths}.
+
+    Bose publishes its device GUID in the TXT record, and its descriptor
+    lives at :8091/<GUID>.xml — probing that is deterministic where its UDP
+    replies are not.
+    """
+    candidates = {}
+    for line in out.split("\n"):
+        parts = line.split(";")
+        if len(parts) > 9 and parts[0] == "=" and parts[2] == "IPv4":
+            ip = parts[7]
+            if ip.count(".") != 3 or ip.startswith("127."):
+                continue
+            extra = candidates.setdefault(ip, set())
+            for token in parts[9].split('" "'):
+                token = token.strip('"')
+                if token.startswith("GUID="):
+                    extra.add(":8091/%s.xml" % token[5:])
+    return candidates
+
+
 def _mdns_candidates():
     """Map of IPv4 -> extra descriptor paths for mDNS-visible devices.
 
     Renderers whose SSDP replies a firewall drops (or which sleep through
     M-SEARCH datagrams, like Bose soundbars) almost always advertise some
     service over mDNS, so their IPs make good direct-probe candidates.
-    Bose additionally publishes its device GUID in the TXT record, and its
-    descriptor lives at :8091/<GUID>.xml — probing that is deterministic
-    where its UDP replies are not. avahi-browse is optional; without it
-    this fallback just yields nothing.
+    avahi-browse is optional; without it this fallback just yields nothing.
+    NB: resolving can outlast the timeout — on expiry the PARTIAL output is
+    kept (killing the process used to throw everything away, which made
+    whole discovery rounds come back empty).
     """
-    candidates = {}
+    out = ""
     try:
-        out = subprocess.run(
+        proc = subprocess.Popen(
             ["avahi-browse", "-atrp"],
-            capture_output=True, text=True, timeout=3.5,
-        ).stdout
-        for line in out.split("\n"):
-            parts = line.split(";")
-            if len(parts) > 9 and parts[0] == "=" and parts[2] == "IPv4":
-                ip = parts[7]
-                if ip.count(".") != 3 or ip.startswith("127."):
-                    continue
-                extra = candidates.setdefault(ip, set())
-                for token in parts[9].split('" "'):
-                    token = token.strip('"')
-                    if token.startswith("GUID="):
-                        extra.add(":8091/%s.xml" % token[5:])
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        try:
+            out, _ = proc.communicate(timeout=3.5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out, _ = proc.communicate()
     except Exception:
         pass
-    return candidates
+    return _parse_avahi(out or "")
+
+
+# Devices seen in earlier rounds. SSDP/mDNS are lossy UDP and devices doze
+# through queries, so any single round finds a random subset — but a KNOWN
+# device can be re-verified with one direct TCP request, which either
+# succeeds or the device is really offline. This is what makes the picker
+# stable from the second use on.
+CACHE_PATH = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
+    "onair-cast-devices.json")
+CACHE_MAX_AGE_S = 30 * 24 * 3600
+# The cast and dlna threads both merge into the cache at the end of a round;
+# read-merge-write must not interleave or one side's devices get lost.
+_cache_write_lock = threading.Lock()
+
+
+def _cache_load():
+    try:
+        with open(CACHE_PATH) as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _cache_save(devices):
+    """Merge this round's devices into the cache, drop long-unseen ones."""
+    with _cache_write_lock:
+        now = time.time()
+        cache = _cache_load()
+        for uuid, dev in devices.items():
+            entry = dict(dev)
+            entry["last_seen"] = now
+            cache[uuid] = entry
+        cache = {u: d for u, d in cache.items()
+                 if now - d.get("last_seen", 0) < CACHE_MAX_AGE_S}
+        try:
+            os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+            tmp = CACHE_PATH + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(cache, fh)
+            os.replace(tmp, CACHE_PATH)
+        except Exception:
+            pass
 
 
 def _discover_dlna(seconds):
@@ -360,6 +444,14 @@ def _discover_dlna(seconds):
     # Firewall fallback: unicast M-SEARCH + well-known descriptor probes
     # against every mDNS-visible device.
     candidates = _mdns_candidates()
+    # Known devices from earlier rounds re-verify with one direct TCP
+    # request each — immune to the UDP lottery.
+    cached = _cache_load()
+    for dev in cached.values():
+        loc = dev.get("location", "")
+        if dev.get("kind") == "dlna" and loc:
+            with lock:
+                locations.add(loc)
     for ip in candidates:
         threads.append(threading.Thread(
             target=collect, args=(ST_RENDERER, min(2.5, seconds), ip)))
@@ -389,15 +481,23 @@ def _discover_dlna(seconds):
     with lock:
         found_locations = sorted(locations)
 
-    seen_udns = set()
+    fresh = {}
     for loc in found_locations:
         dev = _describe_renderer(loc)
-        if not dev or dev["udn"] in seen_udns:
+        if not dev or dev["udn"] in fresh:
             continue
-        seen_udns.add(dev["udn"])
-        host = urllib.parse.urlsplit(loc).hostname or ""
+        fresh[dev["udn"]] = {
+            "kind": "dlna",
+            "name": dev["name"],
+            "host": urllib.parse.urlsplit(loc).hostname or "",
+            "port": 0,
+            "model": dev["model"],
+            "location": loc,
+        }
         _out("DEV\tdlna\t%s\t%s\t%s\t%s\t%s\t%s" % (
-            dev["udn"], dev["name"], host, 0, dev["model"], loc))
+            dev["udn"], dev["name"], fresh[dev["udn"]]["host"], 0,
+            dev["model"], loc))
+    _cache_save(fresh)
 
 
 def _soap(control_url, service_type, action, args_xml, timeout=5.0):
