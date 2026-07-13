@@ -157,7 +157,8 @@ PlasmaExtras.Representation {
                         "favicon": r.favicon || "",
                         "country": r.country || "",
                         "bitrate": br,
-                        "codec": (r.codec || "").toUpperCase()
+                        "codec": (r.codec || "").toUpperCase(),
+                        "rbUuid": r.stationuuid || ""
                     })
                     if (webResultsModel.count >= 30) break
                 }
@@ -632,7 +633,7 @@ PlasmaExtras.Representation {
                                     opacity: webHover.hovered ? 1.0 : 0.55
                                     tooltipText: i18n("Add to my stations + favorites")
                                     onClicked: {
-                                        root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true)
+                                        root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid)
                                         webResultsModel.remove(webItem.index)
                                     }
                                 }
@@ -1165,6 +1166,43 @@ PlasmaExtras.Representation {
                         }
                     }
 
+                    // ❤️ — like the current song (local list on the My Music page)
+                    CircleButton {
+                        readonly property bool liked: root.isCurrentTrackLiked()
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: "love"
+                        iconScale: 0.55
+                        checkable: true
+                        checked: liked
+                        enabledState: root.trackTitle !== ""
+                        tooltipText: liked ? i18n("Remove from liked songs")
+                                           : i18n("Like this song (saved to My Music)")
+                        onClicked: root.toggleLikeCurrent()
+                    }
+
+                    // 👍 — vote for the station on radio-browser.info: raises
+                    // its ranking in the worldwide catalog every app searches.
+                    CircleButton {
+                        readonly property bool voted: root._voteStatus === "voted"
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: "arrow-up-double"
+                        iconScale: 0.55
+                        checkable: true
+                        checked: voted
+                        enabledState: root._voteStatus === "" && root._previewUrl === ""
+                                      && root._currentOrigUrl !== ""
+                        tooltipText: {
+                            if (voted) return i18n("Vote sent — thank you for supporting the station!")
+                            if (root._voteStatus === "busy") return i18n("Sending the vote…")
+                            return i18n("Vote for this station in the worldwide catalog")
+                        }
+                        onClicked: root.voteCurrentStation()
+                    }
+
                     // Download the currently playing track (yt-dlp, format from settings)
                     CircleButton {
                         Layout.alignment: Qt.AlignVCenter
@@ -1225,6 +1263,8 @@ PlasmaExtras.Representation {
             id: libraryPage
             // Scheduled-recordings panel visibility (toggled from the header row)
             property bool showSchedules: false
+            // History header shows either the play history or the liked songs
+            property bool showLiked: false
             spacing: 0
 
             FolderListModel {
@@ -1356,24 +1396,39 @@ PlasmaExtras.Representation {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 Layout.topMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
-                visible: historyModel.count > 0
+                visible: historyModel.count > 0 || likedModel.count > 0
 
                 Kirigami.Icon {
-                    source: "view-history"
+                    source: libraryPage.showLiked ? "love" : "view-history"
                     width: Kirigami.Units.iconSizes.small
                     height: width
                     color: root.accent
                 }
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
-                    text: i18n("Recently played") + " (" + historyModel.count + ")"
+                    text: (libraryPage.showLiked ? i18n("Liked songs") : i18n("Recently played"))
+                          + " (" + (libraryPage.showLiked ? likedModel.count : historyModel.count) + ")"
                     font.weight: Font.DemiBold
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: root.accent
                 }
+                // ❤️/🕐 — flip between the play history and the liked songs
                 CircleButton {
                     implicitWidth: Kirigami.Units.gridUnit * 1.8
                     implicitHeight: implicitWidth
+                    iconName: libraryPage.showLiked ? "view-history" : "love"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: libraryPage.showLiked
+                    opacity: 0.7
+                    tooltipText: libraryPage.showLiked ? i18n("Show play history")
+                                                       : i18n("Show liked songs")
+                    onClicked: libraryPage.showLiked = !libraryPage.showLiked
+                }
+                CircleButton {
+                    implicitWidth: Kirigami.Units.gridUnit * 1.8
+                    implicitHeight: implicitWidth
+                    visible: !libraryPage.showLiked
                     iconName: "edit-clear-history"
                     iconScale: 0.55
                     opacity: 0.6
@@ -1384,15 +1439,16 @@ PlasmaExtras.Representation {
 
             PlasmaComponents3.ScrollView {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(historyModel.count, 4) * Kirigami.Units.gridUnit * 2.3
-                visible: historyModel.count > 0
+                Layout.preferredHeight: Math.min((libraryPage.showLiked ? likedModel.count : historyModel.count), 4)
+                                        * Kirigami.Units.gridUnit * 2.3
+                visible: (libraryPage.showLiked ? likedModel.count : historyModel.count) > 0
                 PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
                 contentItem: ListView {
                     id: historyView
                     leftMargin: Kirigami.Units.smallSpacing
                     rightMargin: Kirigami.Units.smallSpacing
-                    model: historyModel
+                    model: libraryPage.showLiked ? likedModel : historyModel
                     boundsBehavior: Flickable.StopAtBounds
                     clip: true
                     spacing: 2
@@ -1468,6 +1524,17 @@ PlasmaExtras.Representation {
                                     opacity: histHover.hovered ? 1.0 : 0.5
                                     tooltipText: i18n("Download this track")
                                     onClicked: root.downloadTrack((histItem.model.artist ? histItem.model.artist + " - " : "") + histItem.model.trackName)
+                                }
+                                // Un-like straight from the list (liked view only)
+                                CircleButton {
+                                    implicitWidth: Kirigami.Units.gridUnit * 1.7
+                                    implicitHeight: implicitWidth
+                                    visible: libraryPage.showLiked
+                                    iconName: "edit-delete-remove"
+                                    iconScale: 0.55
+                                    opacity: histHover.hovered ? 1.0 : 0.5
+                                    tooltipText: i18n("Remove from liked songs")
+                                    onClicked: root.removeLiked(histItem.model.index)
                                 }
                             }
                         }
