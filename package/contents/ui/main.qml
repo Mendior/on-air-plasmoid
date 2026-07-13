@@ -262,7 +262,9 @@ PlasmoidItem {
         volumePersistTimer.restart();
         // While casting, the slider drives the DEVICE volume (debounced) — the
         // local output is muted anyway, so this is the level the user hears.
-        if (_castTargets.length > 0) _castSetVolume(vol);
+        // Gated on _casting, not on selection: a device that is merely
+        // checked but idle may be serving another app — don't touch it.
+        if (_casting) _castSetVolume(vol);
     }
 
     Timer {
@@ -1318,7 +1320,10 @@ PlasmoidItem {
     function castDiscover() {
         if (!_castAvailable || _castDiscovering) return;
         _castDiscovering = true;
-        castDevicesModel.clear();
+        // The model is NOT cleared here: rows survive the 6-10 s discovery
+        // window (results merge in the CAST_DISCOVER handler), so the checked
+        // row of a device currently being cast to — the only per-device
+        // uncheck control — never disappears from under the user.
         _castExec("CAST_DISCOVER", ["discover", "6"]);
     }
 
@@ -1326,6 +1331,84 @@ PlasmoidItem {
         for (var i = 0; i < _castTargets.length; i++)
             if (_castTargets[i].uuid === uuid) return i;
         return -1;
+    }
+
+    // ── Combined local output (every speaker in sync) ────────────────────────
+    // PipeWire's module-combine-sink plays one stream on several sinks at
+    // once with latency compensation: the faster (wired) outputs are delayed
+    // to match the slowest (typically Bluetooth, 100–250 ms), so all local
+    // speakers play together instead of echoing. Session-scoped by design —
+    // the module is unloaded on disable and orphans are swept at startup.
+    // Network devices (Cast/DLNA) can NOT join this: they pull the stream
+    // themselves and expose no latency control; Cast-to-Cast sync is what
+    // Google Home speaker groups are for.
+    property bool _combineAvailable: false   // pactl (pipewire-pulse) present?
+    // Intent vs acknowledgement: _combineWantActive flips synchronously with
+    // the user's toggle; _combineActive only once pactl has confirmed the
+    // module. Gating on the ack alone dropped a disable clicked during the
+    // load round-trip — the module then landed anyway, routed itself and
+    // stayed on against an unchecked box.
+    property bool _combineWantActive: false
+    property bool _combineActive: false
+    property string _combineModuleId: ""
+    property bool _combinePendingRoute: false
+    // The specific output that was selected before combining, so switching
+    // the sync mode off restores it instead of dumping to the default.
+    property string _combinePrevOutput: ""
+    readonly property string _combineSinkName: "onair_combined"
+
+    function combineOutputsEnable() {
+        if (!_combineAvailable || _combineWantActive) return;
+        var outs = mediaDevices.audioOutputs;
+        var slaves = [];
+        for (var i = 0; i < outs.length; i++) {
+            var oid = String(outs[i].id);
+            if (oid.indexOf(_combineSinkName) === -1) slaves.push(oid);
+        }
+        if (slaves.length < 2) return;
+        _combineWantActive = true;
+        _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
+        var safeSlaves = slaves.join(",").replace(/'/g, "'\\''");
+        // NB: comma is pactl's slave separator — PipeWire node names
+        // (alsa_output.*, bluez_output.*) never contain one.
+        executable.exec(": PW_COMBINE; pactl load-module module-combine-sink"
+                        + " sink_name=" + _combineSinkName
+                        + " slaves='" + safeSlaves + "'"
+                        + " latency_compensate=yes"
+                        + " # " + (++_execSeq));
+    }
+
+    function combineOutputsDisable() {
+        if (!_combineWantActive) return;
+        _combineWantActive = false;
+        if (!_combineActive && _combineModuleId === "") {
+            // The load is still in flight — the PW_COMBINE handler sees the
+            // intent withdrawn and unloads the module the moment it lands.
+            return;
+        }
+        _combineActive = false;
+        _combinePendingRoute = false;
+        // Route away FIRST — with the choice already off the combined sink,
+        // its removal is not a "device vanished" event worth a notification.
+        setAudioOutputDevice(_combinePrevOutput);
+        _combinePrevOutput = "";
+        if (_combineModuleId !== "") {
+            executable.exec(": PW_UNCOMBINE; pactl unload-module "
+                            + _combineModuleId + "; true");
+            _combineModuleId = "";
+        }
+    }
+
+    function _combineTryRoute() {
+        if (!_combinePendingRoute) return;
+        var outs = mediaDevices.audioOutputs;
+        for (var i = 0; i < outs.length; i++) {
+            if (String(outs[i].id).indexOf(_combineSinkName) !== -1) {
+                _combinePendingRoute = false;
+                setAudioOutputDevice(String(outs[i].id));
+                return;
+            }
+        }
     }
 
     // ── Bluetooth (paired speakers/headphones in the cast menu) ─────────────
@@ -1406,6 +1489,15 @@ PlasmoidItem {
 
     function btDisconnect(mac) {
         if (!_btValidMac(mac)) return;
+        // The user rejected this device — a still-armed pending route for it
+        // must not fire if its sink appears a moment later (connect/disconnect
+        // race), or playback would jump to a speaker they just unchecked and
+        // the choice would even be persisted.
+        if (_btPendingSinkMac === mac) {
+            _btPendingSinkMac = "";
+            _btPendingSinkName = "";
+            btRouteTimeout.stop();
+        }
         executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect " + mac + "; true");
     }
 
@@ -1422,6 +1514,11 @@ PlasmoidItem {
     }
 
     function _castStreamUrl() {
+        // Only what is AUDIBLE right now may be pushed to a device. After a
+        // stop, _currentResolvedUrl still holds the last station — checking a
+        // device then must select it silently, not autoplay a stale stream.
+        if (_casting && _castCurrentUrl !== "") return _castCurrentUrl;
+        if (!isPlaying()) return "";
         var url = _currentResolvedUrl || (playMusic.source ? playMusic.source.toString() : "");
         return (url === "" || url.indexOf("file://") === 0) ? "" : url;
     }
@@ -1443,20 +1540,25 @@ PlasmoidItem {
             }
             return;
         }
-        // First device picked: silence local playback unless the user has
-        // explicitly kept "This computer" checked (multi-room).
-        if (targets.length === 0 && !_castLocalPlay && isPlaying()) {
+        // Capture the stream BEFORE silencing local playback — and only
+        // silence it if the device can actually take over: a local file
+        // cannot be cast, and muting it would just leave total silence.
+        var url = _castStreamUrl();
+        if (targets.length === 0 && !_castLocalPlay && isPlaying() && url !== "") {
             playMusic.stop();
             playMusic.source = "";
             infoTimer.stop();
         }
         targets.push(dev);
         _castTargets = targets;
-        var url = _castStreamUrl();
         if (url !== "") {
-            _casting = true;
-            _castCurrentUrl = url;
-            _castPlayOn(dev, url, root.currentStation, root.currentStationFavicon);
+            if (!_casting) {
+                // Entering the casting state: devices checked earlier (while
+                // nothing was playing) must start too, not just this one.
+                _castPlay(url, root.currentStation, root.currentStationFavicon);
+            } else {
+                _castPlayOn(dev, url, root.currentStation, root.currentStationFavicon);
+            }
         }
     }
 
@@ -1586,6 +1688,11 @@ PlasmoidItem {
         root._previewUrl = "";
         // Casting: stop every device but keep them selected, so the next play
         // resumes on the same devices rather than silently falling back local.
+        // An INSTANT recording follows playback — stopping playback stops it
+        // whether it plays locally or on cast devices (a scheduled recording
+        // is independent and keeps running). Must run BEFORE the cast-only
+        // early return below, or Stop-while-casting leaves it recording.
+        if (recording && !_recScheduled) recStop();
         if (_casting) {
             _castStopAll();
             _casting = false;
@@ -1600,9 +1707,6 @@ PlasmoidItem {
                 return;
             }
         }
-        // An INSTANT recording follows playback — stopping playback stops it
-        // (a scheduled recording is independent and keeps running).
-        if (recording && !_recScheduled) recStop();
         // "Stop must NEVER start playback": a pending bitrate fallback would
         // otherwise restart the stream up to 600 ms after an explicit stop.
         bitrateFallbackTimer.stop();
@@ -2168,6 +2272,13 @@ PlasmoidItem {
         _mprisStart();
         castProbe();
         btProbe();
+        executable.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
+        // A crashed session can orphan the combined-output module — PipeWire
+        // keeps it loaded forever. Sweep any module of ours at startup (the
+        // sink name is our own constant, so this can't touch user modules).
+        executable.exec(": PW_COMBINE_CLEAN; for m in $(pactl list short modules 2>/dev/null"
+                        + " | awk '/module-combine-sink/ && /" + _combineSinkName + "/ {print $1}'); do"
+                        + " pactl unload-module \"$m\"; done; true");
         _ensureMusicDir();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
@@ -2183,6 +2294,9 @@ PlasmoidItem {
         _flushHistory();
         recStop();
         _mprisStop();
+        // Best effort — if the exec doesn't get out before teardown, the
+        // startup sweep above reclaims the module on the next session.
+        combineOutputsDisable();
     }
 
     StationsModel {
@@ -2272,10 +2386,14 @@ PlasmoidItem {
                 root._castAvailable = (stdout || "").indexOf("__CAST_OK__") !== -1;
                 return;
             }
-            // Casting: device discovery results (Cast + DLNA)
+            // Casting: device discovery results (Cast + DLNA). MERGED into the
+            // existing model, not rebuilt from scratch: rows stay put during
+            // the discovery window, and a device that vanished from the scan
+            // is dropped only if it isn't being cast to right now.
             if (cmd.indexOf(": CAST_DISCOVER;") === 0) {
                 root._castDiscovering = false;
                 var lines = (stdout || "").split("\n");
+                var seenUuids = {};
                 for (var ci = 0; ci < lines.length; ci++) {
                     if (lines[ci].indexOf("DEV\t") !== 0) continue;
                     var p = lines[ci].split("\t");
@@ -2287,11 +2405,26 @@ PlasmoidItem {
                     // lines carry a legitimate 0 (they are driven via location)
                     // and `|| 8009` would silently rewrite it.
                     var prt = parseInt(p[5], 10);
-                    castDevicesModel.append({
+                    var dev = {
                         "kind": p[1], "uuid": p[2], "name": p[3], "host": p[4],
                         "port": isNaN(prt) ? 8009 : prt, "deviceModel": p[6],
                         "location": p.length > 7 ? p[7] : ""
-                    });
+                    };
+                    seenUuids[dev.uuid] = true;
+                    var updated = false;
+                    for (var ui = 0; ui < castDevicesModel.count; ui++) {
+                        if (castDevicesModel.get(ui).uuid === dev.uuid) {
+                            castDevicesModel.set(ui, dev);
+                            updated = true;
+                            break;
+                        }
+                    }
+                    if (!updated) castDevicesModel.append(dev);
+                }
+                for (var ri = castDevicesModel.count - 1; ri >= 0; ri--) {
+                    var rUuid = castDevicesModel.get(ri).uuid;
+                    if (!seenUuids[rUuid] && castTargetIndex(rUuid) < 0)
+                        castDevicesModel.remove(ri);
                 }
                 return;
             }
@@ -2357,6 +2490,16 @@ PlasmoidItem {
                     dlNotification.sendEvent();
                     root._btPendingSinkName = "";
                     root._btPendingSinkMac = "";
+                } else {
+                    // Give the sink the FULL wait window from this moment —
+                    // armed at click time, a slow connect could eat most of
+                    // it and the route would expire while PipeWire was still
+                    // bringing the sink up.
+                    btRouteTimeout.restart();
+                    // The sink may already exist (device was auto-reconnected
+                    // behind a stale menu row) — then no outputs change will
+                    // ever fire and this immediate pass is the only route.
+                    root._btTryRoutePending();
                 }
                 btList();
                 return;
@@ -2364,6 +2507,40 @@ PlasmoidItem {
             if (cmd.indexOf(": BT_DISCONNECT;") === 0) {
                 btList();
                 return;
+            }
+            // Combined local output: pactl availability probe
+            if (cmd.indexOf(": PW_PROBE;") === 0) {
+                root._combineAvailable = (stdout || "").indexOf("__PACTL_YES__") !== -1;
+                return;
+            }
+            // Combined local output created — route onto it when its sink
+            // shows up in mediaDevices (usually instantly).
+            if (cmd.indexOf(": PW_COMBINE;") === 0) {
+                var modId = parseInt((stdout || "").trim(), 10);
+                if (isNaN(modId)) {
+                    root._combineWantActive = false;
+                    root._combinePrevOutput = "";
+                    dlNotification.title = i18n("Could not combine the outputs");
+                    dlNotification.text = ((stderr || "").split("\n")[0] || i18n("pactl refused to create the combined output.")).substring(0, 120);
+                    dlNotification.iconName = "dialog-warning";
+                    dlNotification.sendEvent();
+                    return;
+                }
+                if (!root._combineWantActive) {
+                    // Turned off while the module was loading — honor the
+                    // user's last word and unload it straight away.
+                    executable.exec(": PW_UNCOMBINE; pactl unload-module " + modId + "; true");
+                    root._combinePrevOutput = "";
+                    return;
+                }
+                root._combineModuleId = String(modId);
+                root._combineActive = true;
+                root._combinePendingRoute = true;
+                root._combineTryRoute();
+                return;
+            }
+            if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0) {
+                return; // fire-and-forget
             }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {
@@ -2662,17 +2839,18 @@ PlasmoidItem {
                 if (String(outs[i].id) === wanted) {
                     playMusicOutput.device = outs[i];
                     _audioOutputWasRouted = true;
+                    outputVanishNotify.stop();
                     return;
                 }
             }
             // The configured device is gone mid-session. Without a word,
             // music silently jumping to the default output ("why is this
-            // suddenly on my desk speakers?") looks like a bug.
+            // suddenly on my desk speakers?") looks like a bug. The
+            // notification is debounced, not sent inline: Bluetooth profile
+            // switches remove and re-add the sink within a second, and each
+            // flicker used to fire a spurious notification.
             if (_audioOutputWasRouted && isPlaying()) {
-                dlNotification.title = i18n("Audio output changed");
-                dlNotification.text = i18n("The chosen output device disappeared — using the system default instead.");
-                dlNotification.iconName = "audio-volume-high";
-                dlNotification.sendEvent();
+                outputVanishNotify.restart();
             }
         }
         // wanted === "" is the user deliberately picking the system default —
@@ -2681,44 +2859,73 @@ PlasmoidItem {
         playMusicOutput.device = mediaDevices.defaultAudioOutput;
     }
 
+    Timer {
+        id: outputVanishNotify
+        // Only a device still absent after the grace period deserves the
+        // notification — a sink that flickered back has already been
+        // re-routed to by then (the found-branch above stops this timer).
+        interval: 1500
+        repeat: false
+        onTriggered: {
+            var wanted = Plasmoid.configuration.audioOutputDevice || "";
+            if (wanted === "") return;
+            var outs = mediaDevices.audioOutputs;
+            for (var i = 0; i < outs.length; i++)
+                if (String(outs[i].id) === wanted) return;
+            dlNotification.title = i18n("Audio output changed");
+            dlNotification.text = i18n("The chosen output device disappeared — using the system default instead.");
+            dlNotification.iconName = "audio-volume-high";
+            dlNotification.sendEvent();
+        }
+    }
+
+    // Route to the just-connected Bluetooth device's sink. Called both when
+    // the device list changes AND right after a successful connect — the sink
+    // may already exist (speaker auto-reconnected earlier), in which case no
+    // audioOutputsChanged will ever fire for it and waiting would route
+    // nothing. The MAC embedded in the sink id (bluez_output.XX_XX_… on
+    // PipeWire, bluez_sink.XX_XX_… on PulseAudio — the MAC substring is what
+    // matters) identifies the device exactly; the alias in a description is
+    // only a fallback, and even then only when exactly ONE sink has appeared
+    // since the connect — two devices connecting in the same window with
+    // overlapping names ("Speaker", "Speaker 2") must never cross-route. No
+    // "any new sink" rule either: an HDMI plug landing in the wait window
+    // must not be routed to, let alone persisted as the chosen output.
+    function _btTryRoutePending() {
+        if (_btPendingSinkMac === "") return false;
+        var macToken = _btPendingSinkMac.toLowerCase().replace(/:/g, "_");
+        var pendingName = _btPendingSinkName.toLowerCase();
+        var outs = mediaDevices.audioOutputs;
+        var pick = null;
+        for (var i = 0; i < outs.length && !pick; i++) {
+            if (String(outs[i].id).toLowerCase().indexOf(macToken) !== -1)
+                pick = outs[i];
+        }
+        if (!pick && pendingName !== "") {
+            var fresh = [];
+            for (var j = 0; j < outs.length; j++) {
+                if (!_btOutputIdsBeforeConnect[String(outs[j].id)])
+                    fresh.push(outs[j]);
+            }
+            if (fresh.length === 1
+                && String(fresh[0].description).toLowerCase().indexOf(pendingName) !== -1)
+                pick = fresh[0];
+        }
+        if (!pick) return false;
+        _btPendingSinkName = "";
+        _btPendingSinkMac = "";
+        btRouteTimeout.stop();
+        setAudioOutputDevice(String(pick.id));
+        return true;
+    }
+
     Connections {
         target: mediaDevices
         // Keeps the routing correct when a Bluetooth speaker (dis)connects.
         function onAudioOutputsChanged() {
-            // A Bluetooth device the user just connected from the cast menu:
-            // route onto its sink the moment it appears (PipeWire needs a
-            // couple of seconds) — that makes the click actually play there.
-            // The MAC embedded in the sink id (bluez_output.XX_XX_… on
-            // PipeWire, bluez_sink.XX_XX_… on PulseAudio — the MAC substring
-            // is what matters) identifies the device exactly; the alias
-            // in a description is only a fallback, and even then only among
-            // sinks that appeared since the connect. No "any new sink" rule:
-            // an HDMI plug landing in the wait window must never be routed
-            // to, let alone persisted as the chosen output.
-            if (root._btPendingSinkMac !== "") {
-                var macToken = root._btPendingSinkMac.toLowerCase().replace(/:/g, "_");
-                var pendingName = root._btPendingSinkName.toLowerCase();
-                var outs = mediaDevices.audioOutputs;
-                var pick = null;
-                for (var i = 0; i < outs.length && !pick; i++) {
-                    if (String(outs[i].id).toLowerCase().indexOf(macToken) !== -1)
-                        pick = outs[i];
-                }
-                if (!pick && pendingName !== "") {
-                    for (var j = 0; j < outs.length && !pick; j++) {
-                        if (!root._btOutputIdsBeforeConnect[String(outs[j].id)]
-                            && String(outs[j].description).toLowerCase().indexOf(pendingName) !== -1)
-                            pick = outs[j];
-                    }
-                }
-                if (pick) {
-                    root._btPendingSinkName = "";
-                    root._btPendingSinkMac = "";
-                    btRouteTimeout.stop();
-                    root.setAudioOutputDevice(String(pick.id));
-                    return; // setAudioOutputDevice re-applies the routing
-                }
-            }
+            root._combineTryRoute();
+            if (root._btTryRoutePending())
+                return; // setAudioOutputDevice re-applies the routing
             root._applyAudioOutputDevice()
         }
     }
