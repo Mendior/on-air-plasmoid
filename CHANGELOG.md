@@ -8,6 +8,7 @@ One volume for the whole house, without flattening it.
 - **Volume moves ride the sync delays.** The master is applied to the stream itself, upstream of the combined output, so on local speakers a volume change travels through each speaker's own delay together with the music — turning the room down cannot smear the sync. Local balances go on the widget's own loopbacks only: other applications' audio and the speaker's own volume buttons stay untouched.
 - **A joining device keeps its loudness.** A network device picked into the group adopts the level it is already playing at (its ratio to the master becomes its balance) instead of jumping to the master level on the first slider move. Two new cast.py commands (get-volume, dlna-get-volume) read the level back, with dispatch tests to match.
 - Calibration raises the widget's own loopbacks to full for the clicks and puts the balance back right after — a heavily trimmed speaker would otherwise measure as silence.
+- The compact and full views now import QtQuick.Window explicitly — the `Window` attached property (the panel-equalizer gating and the focus walk behind the Space/M shortcuts) was used without its module.
 
 ## 2026.13
 
