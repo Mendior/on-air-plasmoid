@@ -50,9 +50,13 @@ KCM.ScrollViewKCM {
     // "Please wait…" forever. A Timer that calls abort() is the real thing:
     // abort drives readyState to DONE with status 0, which lands in the same
     // error/retry paths a failed request takes.
+    Component {
+        id: xhrTimeoutGuard
+        Timer { repeat: false }
+    }
+
     function _armXhrTimeout(xhr, ms) {
-        const t = Qt.createQmlObject("import QtQuick; Timer { repeat: false }", root, "xhrTimeoutGuard")
-        t.interval = ms
+        const t = xhrTimeoutGuard.createObject(root, { "interval": ms })
         t.triggered.connect(() => {
             try { xhr.abort() } catch(e) {}
             try { t.destroy() } catch(e) {}
