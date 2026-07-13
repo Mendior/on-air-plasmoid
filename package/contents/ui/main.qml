@@ -1147,7 +1147,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.11");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.12");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1444,8 +1444,17 @@ PlasmoidItem {
     // Swap the loopbacks under a live null sink: the player keeps feeding
     // onair_combined uninterrupted while the delays change (slider move,
     // Bluetooth sink came or went).
+    // Serialized: a second rebuild while one is in flight would read the
+    // id list as empty, skip the unloads, and leave every sink with two
+    // live loopbacks — audible phasing, the exact artifact this feature
+    // exists to prevent.
+    property bool _combineReloopBusy: false
+    property bool _combineReloopPending: false
+
     function _combineRebuildLoopbacks() {
         if (!_combineActive) return;
+        if (_combineReloopBusy) { _combineReloopPending = true; return; }
+        _combineReloopBusy = true;
         var sinks = _combineRealSinks();
         _combineSinksSnapshot = sinks.join("|");
         var un = "";
@@ -1597,7 +1606,9 @@ PlasmoidItem {
     property var _btOutputIdsBeforeConnect: ({})
 
     function btConnect(mac, name) {
-        if (!_btValidMac(mac) || _btConnectingMac !== "") return;
+        // A pairing in flight owns the shared pending-route state — a connect
+        // clicked meanwhile would re-arm it onto the wrong device.
+        if (!_btValidMac(mac) || _btConnectingMac !== "" || _btPairingMac !== "") return;
         _btConnectingMac = mac;
         _btPendingSinkName = name || "";
         _btPendingSinkMac = mac;
@@ -2846,6 +2857,11 @@ PlasmoidItem {
                     for (var ji = 0; ji < junk.length; ji++)
                         unj += "pactl unload-module " + junk[ji] + " 2>/dev/null; ";
                     if (unj !== "") executable.exec(": PW_UNCOMBINE; " + unj + "true");
+                    // A duplicate enable's failure (sink name already taken)
+                    // must not clobber the LIVE instance's state — the box
+                    // would read unchecked with the sink still running and
+                    // disable early-returning on the cleared intent.
+                    if (root._combineActive) return;
                     root._combineWantActive = false;
                     root._combinePrevOutput = "";
                     dlNotification.title = i18n("Could not combine the outputs");
@@ -2871,9 +2887,16 @@ PlasmoidItem {
             // Loopbacks swapped under the live null sink (slider / sink set
             // changed) — adopt the fresh module ids.
             if (cmd.indexOf(": PW_RELOOP;") === 0) {
+                root._combineReloopBusy = false;
                 var rlIds = [];
                 var rlRe = /LB (\d+)/g, rlM;
                 while ((rlM = rlRe.exec(stdout || "")) !== null) rlIds.push(rlM[1]);
+                if (root._combineReloopPending) {
+                    root._combineReloopPending = false;
+                    root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
+                    root._combineRebuildLoopbacks();
+                    return;
+                }
                 if (!root._combineActive) {
                     // Disabled while rebuilding — these are orphans now.
                     var unr = "";
