@@ -20,7 +20,7 @@
 - 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a live fine-tune slider, so nothing echoes; works on PipeWire and plain PulseAudio alike
 - 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker, the microphone times the arrivals, and the Bluetooth lag is measured and set automatically — remembered per device
 - 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, on by default, one switch in settings turns them off) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
-- 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info and saves it instead of leaving a dead entry
+- 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
 - ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
@@ -50,7 +50,7 @@ Optional (features degrade gracefully without them):
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.13.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.14.plasmoid
 ```
 
 ## Usage tips

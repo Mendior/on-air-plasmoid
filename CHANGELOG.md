@@ -1,13 +1,18 @@
 # Changelog
 
-## Unreleased
+## 2026.14
 
-One volume for the whole house, without flattening it.
+One volume for the whole house — and the sync engine went through a hardening pass on real hardware.
 
 - **Group volume with per-speaker balance.** The volume slider was already the master for every target; now each speaker and device also carries its own balance (5–100 % of the master), so quiet desk speakers and a boomy soundbar keep their relationship while one slider drives the room. Balance rows sit right under each picked device in the cast menu, and under the sync switch for local speakers. Every balance is remembered per device — Cast/DLNA by uuid, Bluetooth by address, wired outputs by sink — and survives restarts.
 - **Volume moves ride the sync delays.** The master is applied to the stream itself, upstream of the combined output, so on local speakers a volume change travels through each speaker's own delay together with the music — turning the room down cannot smear the sync. Local balances go on the widget's own loopbacks only: other applications' audio and the speaker's own volume buttons stay untouched.
 - **A joining device keeps its loudness.** A network device picked into the group adopts the level it is already playing at (its ratio to the master becomes its balance) instead of jumping to the master level on the first slider move. Two new cast.py commands (get-volume, dlna-get-volume) read the level back, with dispatch tests to match.
 - Calibration raises the widget's own loopbacks to full for the clicks and puts the balance back right after — a heavily trimmed speaker would otherwise measure as silence.
+- **Calibration now silences the radio for its clicks.** Calibrating while music played — the natural moment to reach for it — either drowned the clicks (every measurement failed) or let a drum hit win the peak search, and a plausible-but-wrong delay was remembered for the speaker. The stream mutes for the few seconds of measurement and comes right back; results up to 900 ms are accepted now (slow televisions are real), with the fine-tune slider to match.
+- **Sync engine edge cases, fixed on real PipeWire.** Flipping the sync switch off and on quickly could leave every speaker with two differently-delayed audio paths — the exact echo the feature exists to prevent — until the next login; stale setups now dismantle themselves on arrival. Connecting a Bluetooth speaker while the sync is on no longer steals the music onto that speaker alone: it joins the group. A crash while the sync was active no longer loses your chosen output device. Plain PulseAudio systems now take Bluetooth speakers into the group too (they name their sinks differently than PipeWire). Two widget instances no longer dismantle each other's sync at login.
+- **Station healing keeps your address book yours.** The catalog it heals from is publicly writable, so a name-lookalike entry could have permanently replaced a saved station's address. A healed address is saved only when it lives on the station's own domain; anything else plays as a session-only backup with a notification, and your saved address stays put.
+- **Clicks and votes stopped depending on mirror luck.** The station-identity lookup behind them picked one random directory mirror; a single slow mirror silently disabled both the listening click and the vote button for a day. Mirrors are now tried in order, only a real "not in the catalog" answer is remembered, and all directory calls identify themselves with the widget's User-Agent.
+- The cast menu scrolls when it outgrows the popup instead of clipping its top rows (the sync switch lives there), and the calibration signal path is pinned by unit tests in both directions — a detector that fires on noise would write a wrong delay into your settings.
 
 ## 2026.13
 
