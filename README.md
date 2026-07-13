@@ -17,6 +17,8 @@
 - 🎹 **MPRIS integration** — media keys and the Plasma media controls just work
 - 📺 **Cast to TVs, soundbars & network speakers** — Chromecast/Nest and any DLNA renderer (Samsung/LG/Sony TVs, Bose/Sonos soundbars, WiFi speakers). The stream goes straight to the device, which does the decoding, so your PC stays quiet and cool (a real help on older machines). Volume and station switching stay in the widget. DLNA needs no extra packages at all. Google Home speaker groups appear as one device and play in perfect sync
 - 🎧 **Bluetooth speakers, one click** — paired devices are listed right in the cast menu; click to connect and playback moves over as soon as the system picks the speaker up
+- 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, wired outputs delayed to keep step with Bluetooth (PipeWire latency compensation), so nothing echoes
+- 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info and saves it instead of leaving a dead entry
 - ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
@@ -46,7 +48,7 @@ Optional (features degrade gracefully without them):
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.10.2.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.11.plasmoid
 ```
 
 ## Usage tips
