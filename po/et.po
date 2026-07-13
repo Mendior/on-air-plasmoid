@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-13 14:58+0300\n"
+"POT-Creation-Date: 2026-07-13 15:20+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Estonian\n"
@@ -29,7 +29,7 @@ msgid "Audio"
 msgstr "Heli"
 
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2719
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2753
 msgid "Volume"
 msgstr "Helitugevus"
 
@@ -856,67 +856,79 @@ msgstr "Süngi peenhäälestus"
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Kui Bluetooth-kõlar jääb juhtmega kõlaritest ikka maha, tõsta seda, kuni nad mängivad koos."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2464
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2447
+msgid "Calibrate with the microphone"
+msgstr "Kalibreeri mikrofoniga"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2452
+msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
+msgstr "Mängib igast kõlarist paar valju klõpsu ja mõõdab mikrofoniga, kui palju Bluetooth-kõlar maha jääb — viide seatakse automaatselt."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2468
+msgid "Listening to the clicks…"
+msgstr "Kuulan klõpse…"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2498
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2479
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2513
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth on välja lülitatud või adapterit pole — kontrolli süsteemiseadeid."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2490
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2524
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Seotud Bluetooth-heliseadmeid pole — seo kõlar üks kord süsteemiseadetes ja see ilmub siia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2504
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2538
 msgid "%1 — connecting…"
 msgstr "%1 — ühendumine…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2522
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2556
 msgid "%1 — pairing…"
 msgstr "%1 — seon…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2523
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2557
 msgid "%1 — new, click to pair"
 msgstr "%1 — uus, klõpsa sidumiseks"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2534
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2568
 msgid "Pair a new speaker…"
 msgstr "Seo uus kõlar…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2550
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2584
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Otsin — pane kõlar sidumisrežiimi…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2571
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2605
 msgid "WiFi & network"
 msgstr "WiFi ja võrk"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2597
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2631
 msgid "%1 (speaker group)"
 msgstr "%1 (kõlarigrupp)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2622
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2656
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Iga seade puhverdab voogu omaette, mistõttu ruumid võivad mängida mõne sekundi nihkega. Täpselt sünkroonis kõlarite jaoks loo Google Home'i äpis kõlarigrupp — grupp ilmub siia ühe seadmena."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2632
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2666
 msgid "Stop casting everywhere"
 msgstr "Peata esitus kõigis seadmetes"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2650
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2684
 msgid "Searching for devices…"
 msgstr "Otsin seadmeid…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2659
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2693
 msgid "No devices found on your network"
 msgstr "Võrgust ei leitud ühtegi seadet"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2680
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
 msgid "Volume: "
 msgstr "Helitugevus: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2680
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
 msgid "(scroll to adjust)"
 msgstr "(keri muutmiseks)"
 
@@ -948,124 +960,140 @@ msgstr "%1 — teine salvestus juba käib."
 msgid "%1 devices"
 msgstr "%1 seadet"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1410
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1469
 msgid "All local outputs (On Air)"
 msgstr "Kõik kohalikud väljundid (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2001
 msgid "Station found at a new address"
 msgstr "Jaam leitud uuelt aadressilt"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1931
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2002
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 kolis — uus aadress salvestati sinu nimekirja."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2925
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2996
 msgid "Casting needs python-chromecast"
 msgstr "Ülekanne vajab python-chromecasti"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2926
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2997
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Seadmetesse ülekandmiseks paigalda python-chromecast."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3001
 msgid "the device"
 msgstr "seade"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3001
 msgid "Could not cast to %1"
 msgstr "Seadmesse %1 ei õnnestunud üle kanda"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2931
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3002
 msgid "The device could not play this station."
 msgstr "Seade ei suutnud seda jaama esitada."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2976
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3036
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3047
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3107
 msgid "the Bluetooth device"
 msgstr "Bluetooth-seadmega"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2975
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3046
 msgid "Could not connect to %1"
 msgstr "Ei õnnestunud ühenduda: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2977
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3048
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Veendu, et kõlar on sisse lülitatud ja levialas."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3035
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3106
 msgid "Could not pair with %1"
 msgstr "Sidumine ebaõnnestus: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3037
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3108
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Pane kõlar sidumisrežiimi (hoia selle Bluetooth-nuppu all) ja proovi uuesti."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3074
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3145
 msgid "Could not combine the outputs"
 msgstr "Väljundite kombineerimine ebaõnnestus"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3075
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3146
 msgid "pactl refused to create the combined output."
 msgstr "pactl keeldus kombineeritud väljundit loomast."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3199
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3208
+msgid "Speakers calibrated"
+msgstr "Kõlarid kalibreeritud"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3209
+msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
+msgstr "Bluetooth-kõlar jääb %1 ms maha — viide on seatud ja jääb sellele seadmele meelde."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3212
+msgid "Calibration did not succeed"
+msgstr "Kalibratsioon ei õnnestunud"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3213
+msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
+msgstr "Veendu, et mikrofon pole kaetud ja mõlemat kõlarit on kuulda, siis proovi uuesti."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3297
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg pole paigaldatud"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3200
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3298
 msgid "Install ffmpeg to record radio."
 msgstr "Raadio salvestamiseks paigalda ffmpeg."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3203
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3301
 msgid "Recording saved ✓ (%1)"
 msgstr "Salvestus valmis ✓ (%1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3207
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3305
 msgid "Recording interrupted (%1 captured)"
 msgstr "Salvestus katkes (%1 salvestatud)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3209
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3307
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — fail on oodatust palju väiksem."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3213
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3311
 msgid "Recording failed"
 msgstr "Salvestamine ebaõnnestus"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3214
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3312
 msgid "The stream could not be captured."
 msgstr "Voogu ei õnnestunud salvestada."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3236
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3334
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp pole paigaldatud"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3237
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3335
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Lugude allalaadimiseks paigalda yt-dlp (ja ffmpeg)."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3240
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3338
 msgid "Track downloaded ✓"
 msgstr "Lugu alla laaditud ✓"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3241
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3339
 msgid "Saved to: "
 msgstr "Salvestatud: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3244
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3342
 msgid "Download failed"
 msgstr "Allalaadimine ebaõnnestus"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3245
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3343
 msgid "Unknown error"
 msgstr "Tundmatu viga"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3478
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3576
 msgid "Audio output changed"
 msgstr "Heliväljund muutus"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3479
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3577
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Valitud väljundseade kadus — kasutusel on süsteemi vaikeväljund."
 

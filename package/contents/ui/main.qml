@@ -1381,21 +1381,80 @@ PlasmoidItem {
         return res;
     }
 
+    function _btMacOfSink(sinkId) {
+        var m = String(sinkId).match(/^bluez_output\.([0-9A-Fa-f_]{17})/);
+        return m ? m[1].replace(/_/g, ":").toUpperCase() : "";
+    }
+
+    // The measured/tuned lag of one Bluetooth sink: its own calibration if
+    // the device has been calibrated (keyed by MAC — a JBL and AirPods lag
+    // differently), the global slider value otherwise.
+    function _lagForSink(sinkId) {
+        var mac = _btMacOfSink(sinkId);
+        if (mac !== "") {
+            try {
+                var map = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
+                if (map[mac] !== undefined)
+                    return Math.max(0, Math.min(500, parseInt(map[mac], 10) || 0));
+            } catch (e) {}
+        }
+        return Math.max(0, Math.min(500, Plasmoid.configuration.syncOffsetMs || 0));
+    }
+
     // One loopback per hardware sink, each with a REAL buffer delay
     // (latency_msec) — deterministic, unlike latency compensation that
-    // trusts what a Bluetooth box claims about itself. Bluetooth keeps the
-    // base only (its in-box buffering IS the lag being matched); the wired
-    // outputs wait by the user-tuned offset on top. Stereo is pinned.
+    // trusts what a Bluetooth box claims about itself. Every sink is held
+    // back to the SLOWEST device's schedule: wired outputs wait the full
+    // worst lag, a faster Bluetooth device waits the difference. Stereo is
+    // pinned.
     function _combineLoopbackCmds(sinks) {
-        var ms = Math.max(0, Math.min(500, Plasmoid.configuration.syncOffsetMs || 0));
+        var maxLag = 0;
+        var lags = {};
+        for (var j = 0; j < sinks.length; j++) {
+            if (sinks[j].indexOf("bluez_") === 0) {
+                lags[sinks[j]] = _lagForSink(sinks[j]);
+                if (lags[sinks[j]] > maxLag) maxLag = lags[sinks[j]];
+            }
+        }
         var cmds = "";
         for (var i = 0; i < sinks.length; i++) {
             var s = sinks[i].replace(/'/g, "'\\''");
-            var d = 60 + (sinks[i].indexOf("bluez_") === 0 ? 0 : ms);
+            var d = 60 + (sinks[i].indexOf("bluez_") === 0
+                          ? (maxLag - lags[sinks[i]]) : maxLag);
             cmds += "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
                  + " sink='" + s + "' latency_msec=" + d + " channels=2) && echo \"LB $id\"; ";
         }
         return cmds;
+    }
+
+    // ── Microphone auto-calibration ──────────────────────────────────────────
+    // calibrate.py plays clicks through the wired reference and the Bluetooth
+    // speaker and times, with the microphone, when each actually arrives —
+    // the difference IS the lag, no ears needed. Volumes are raised for the
+    // clicks (a too-quiet speaker measures as silence) and restored after.
+    property bool _calibrating: false
+
+    function calibrateSync() {
+        if (_calibrating || !_combineActive) return;
+        var sinks = _combineRealSinks();
+        var wired = "", bt = "";
+        for (var i = 0; i < sinks.length; i++) {
+            if (sinks[i].indexOf("bluez_") === 0) { if (bt === "") bt = sinks[i]; }
+            else if (wired === "") wired = sinks[i];
+        }
+        if (wired === "" || bt === "") return;
+        _calibrating = true;
+        var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
+        var w = wired.replace(/'/g, "'\\''");
+        var b = bt.replace(/'/g, "'\\''");
+        executable.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
+            + " w='" + w + "'; b='" + b + "';"
+            + " wv=$(pactl get-sink-volume \"$w\" | grep -o '[0-9]*%' | head -1);"
+            + " bv=$(pactl get-sink-volume \"$b\" | grep -o '[0-9]*%' | head -1);"
+            + " pactl set-sink-volume \"$w\" 55%; pactl set-sink-volume \"$b\" 55%;"
+            + " python3 '" + script + "' \"$w\" \"$b\";"
+            + " pactl set-sink-volume \"$w\" \"${wv:-50%}\"; pactl set-sink-volume \"$b\" \"${bv:-50%}\";"
+            + " true # " + (++_execSeq));
     }
 
     function combineOutputsEnable() {
@@ -1470,6 +1529,18 @@ PlasmoidItem {
 
     function setSyncOffset(ms) {
         Plasmoid.configuration.syncOffsetMs = Math.round(ms);
+        // The slider speaks for the CONNECTED device(s) — remember the value
+        // per MAC so each speaker keeps its own lag across sessions.
+        try {
+            var map = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
+            var sinks = _combineRealSinks();
+            var touched = false;
+            for (var i = 0; i < sinks.length; i++) {
+                var mac = _btMacOfSink(sinks[i]);
+                if (mac !== "") { map[mac] = Math.round(ms); touched = true; }
+            }
+            if (touched) Plasmoid.configuration.syncOffsetMap = JSON.stringify(map);
+        } catch (e) {}
         syncOffsetDebounce.restart();
     }
 
@@ -3117,6 +3188,33 @@ PlasmoidItem {
             }
             if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0) {
                 return; // fire-and-forget
+            }
+            // Microphone calibration finished — apply and remember the lag.
+            if (cmd.indexOf(": PW_CALIB") === 0) {
+                root._calibrating = false;
+                var okM = (stdout || "").match(/CALIB_OK (\d+)/);
+                var macM = cmd.match(/^: PW_CALIB ([0-9A-F:]{17}) /);
+                if (okM) {
+                    var calMs = Math.max(0, Math.min(500, parseInt(okM[1], 10)));
+                    Plasmoid.configuration.syncOffsetMs = calMs;
+                    if (macM) {
+                        try {
+                            var calMap = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
+                            calMap[macM[1]] = calMs;
+                            Plasmoid.configuration.syncOffsetMap = JSON.stringify(calMap);
+                        } catch (e) {}
+                    }
+                    root._combineRebuildLoopbacks();
+                    dlNotification.title = i18n("Speakers calibrated");
+                    dlNotification.text = i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
+                    dlNotification.iconName = "audio-input-microphone";
+                } else {
+                    dlNotification.title = i18n("Calibration did not succeed");
+                    dlNotification.text = i18n("Make sure the microphone is not covered and both speakers can be heard, then try again.");
+                    dlNotification.iconName = "dialog-warning";
+                }
+                dlNotification.sendEvent();
+                return;
             }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {

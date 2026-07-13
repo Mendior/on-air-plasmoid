@@ -2437,6 +2437,40 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // One button instead of ears: clicks through each
+                        // speaker, the microphone times the arrivals, the
+                        // slider sets itself.
+                        PlasmaComponents3.ItemDelegate {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            visible: root._combineWantActive && !root._calibrating
+                            text: i18n("Calibrate with the microphone")
+                            icon.name: "audio-input-microphone"
+                            onClicked: root.calibrateSync()
+
+                            PlasmaComponents3.ToolTip {
+                                text: i18n("Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically.")
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.smallSpacing
+                            visible: root._calibrating
+                            PlasmaComponents3.BusyIndicator {
+                                implicitWidth: Kirigami.Units.iconSizes.small
+                                implicitHeight: implicitWidth
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Listening to the clicks…")
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.7
+                            }
+                        }
+
                         // Paired Bluetooth speakers/headphones that are not
                         // connected yet — one click connects and, once the
                         // sink appears, playback is routed onto it. Connected

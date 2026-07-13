@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-13 14:58+0300\n"
+"POT-Creation-Date: 2026-07-13 15:20+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -29,7 +29,7 @@ msgid "Audio"
 msgstr "Áudio"
 
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2719
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2753
 msgid "Volume"
 msgstr "Volume"
 
@@ -856,67 +856,79 @@ msgstr "Ajuste fino de sincronia"
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Se a caixa Bluetooth ainda ficar atrás das com fio, aumente isto até tocarem juntas."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2464
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2447
+msgid "Calibrate with the microphone"
+msgstr "Calibrar com o microfone"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2452
+msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
+msgstr "Toca alguns cliques altos em cada caixa e mede com o microfone o quanto a caixa Bluetooth atrasa — o atraso é definido automaticamente."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2468
+msgid "Listening to the clicks…"
+msgstr "Ouvindo os cliques…"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2498
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2479
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2513
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "O Bluetooth está desligado ou nenhum adaptador está disponível — verifique as Configurações do Sistema."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2490
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2524
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Nenhum dispositivo de áudio Bluetooth pareado — pareie a caixa de som uma vez nas Configurações do Sistema e ela aparecerá aqui."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2504
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2538
 msgid "%1 — connecting…"
 msgstr "%1 — conectando…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2522
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2556
 msgid "%1 — pairing…"
 msgstr "%1 — pareando…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2523
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2557
 msgid "%1 — new, click to pair"
 msgstr "%1 — novo, clique para parear"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2534
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2568
 msgid "Pair a new speaker…"
 msgstr "Parear uma nova caixa de som…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2550
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2584
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Procurando — coloque a caixa em modo de pareamento…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2571
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2605
 msgid "WiFi & network"
 msgstr "WiFi e rede"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2597
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2631
 msgid "%1 (speaker group)"
 msgstr "%1 (grupo de alto-falantes)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2622
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2656
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Cada dispositivo armazena o fluxo em seu próprio buffer, então os cômodos podem tocar com alguns segundos de diferença. Para alto-falantes perfeitamente sincronizados, agrupe-os no app Google Home — o grupo aparece aqui como um único dispositivo."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2632
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2666
 msgid "Stop casting everywhere"
 msgstr "Parar a transmissão em todos os dispositivos"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2650
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2684
 msgid "Searching for devices…"
 msgstr "Procurando dispositivos…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2659
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2693
 msgid "No devices found on your network"
 msgstr "Nenhum dispositivo encontrado na sua rede"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2680
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
 msgid "Volume: "
 msgstr "Volume: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2680
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
 msgid "(scroll to adjust)"
 msgstr "(role para ajustar)"
 
@@ -948,124 +960,140 @@ msgstr "%1 — outra gravação já está em andamento."
 msgid "%1 devices"
 msgstr "%1 dispositivos"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1410
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1469
 msgid "All local outputs (On Air)"
 msgstr "Todas as saídas locais (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2001
 msgid "Station found at a new address"
 msgstr "Estação encontrada em um novo endereço"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1931
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2002
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 se mudou — o novo endereço foi salvo na sua lista."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2925
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2996
 msgid "Casting needs python-chromecast"
 msgstr "A transmissão precisa do python-chromecast"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2926
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2997
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Instale o pacote python-chromecast para transmitir para seus dispositivos."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3001
 msgid "the device"
 msgstr "o dispositivo"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3001
 msgid "Could not cast to %1"
 msgstr "Não foi possível transmitir para %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2931
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3002
 msgid "The device could not play this station."
 msgstr "O dispositivo não conseguiu reproduzir esta estação."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2976
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3036
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3047
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3107
 msgid "the Bluetooth device"
 msgstr "o dispositivo Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2975
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3046
 msgid "Could not connect to %1"
 msgstr "Não foi possível conectar a %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2977
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3048
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Verifique se o alto-falante está ligado e dentro do alcance."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3035
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3106
 msgid "Could not pair with %1"
 msgstr "Não foi possível parear com %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3037
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3108
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Coloque a caixa em modo de pareamento (segure o botão Bluetooth) e tente novamente."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3074
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3145
 msgid "Could not combine the outputs"
 msgstr "Não foi possível combinar as saídas"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3075
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3146
 msgid "pactl refused to create the combined output."
 msgstr "O pactl recusou-se a criar a saída combinada."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3199
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3208
+msgid "Speakers calibrated"
+msgstr "Caixas calibradas"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3209
+msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
+msgstr "A caixa Bluetooth atrasa %1 ms — o atraso foi definido e memorizado para este dispositivo."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3212
+msgid "Calibration did not succeed"
+msgstr "A calibração não teve êxito"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3213
+msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
+msgstr "Verifique se o microfone não está coberto e se as duas caixas podem ser ouvidas, depois tente de novo."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3297
 msgid "ffmpeg is not installed"
 msgstr "O ffmpeg não está instalado"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3200
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3298
 msgid "Install ffmpeg to record radio."
 msgstr "Instale o ffmpeg para gravar rádio."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3203
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3301
 msgid "Recording saved ✓ (%1)"
 msgstr "Gravação salva ✓ (%1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3207
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3305
 msgid "Recording interrupted (%1 captured)"
 msgstr "Gravação interrompida (%1 capturado)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3209
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3307
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — o arquivo é muito menor que o esperado."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3213
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3311
 msgid "Recording failed"
 msgstr "Falha na gravação"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3214
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3312
 msgid "The stream could not be captured."
 msgstr "Não foi possível capturar a transmissão."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3236
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3334
 msgid "yt-dlp is not installed"
 msgstr "O yt-dlp não está instalado"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3237
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3335
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Instale o yt-dlp (e o ffmpeg) para baixar faixas."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3240
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3338
 msgid "Track downloaded ✓"
 msgstr "Faixa baixada ✓"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3241
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3339
 msgid "Saved to: "
 msgstr "Salvo em: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3244
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3342
 msgid "Download failed"
 msgstr "Falha no download"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3245
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3343
 msgid "Unknown error"
 msgstr "Erro desconhecido"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3478
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3576
 msgid "Audio output changed"
 msgstr "Saída de áudio alterada"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3479
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3577
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "O dispositivo de saída escolhido desapareceu — usando a saída padrão do sistema."
 
