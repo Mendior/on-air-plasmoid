@@ -126,7 +126,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.11")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.12")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -2354,7 +2354,7 @@ PlasmaExtras.Representation {
                                 id: syncSlider
                                 Layout.fillWidth: true
                                 from: 0
-                                to: 400
+                                to: 500
                                 stepSize: 10
                                 value: Plasmoid.configuration.syncOffsetMs || 0
                                 onMoved: root.setSyncOffset(value)
@@ -2437,7 +2437,7 @@ PlasmaExtras.Representation {
                                       ? i18n("%1 — connecting…", name) : name
                                 icon.name: "network-bluetooth"
                                 checked: connected
-                                enabled: root._btConnectingMac === ""
+                                enabled: root._btConnectingMac === "" && root._btPairingMac === ""
                                 onToggled: connected ? root.btDisconnect(mac)
                                                      : root.btConnect(mac, name)
                             }

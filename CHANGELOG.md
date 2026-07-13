@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026.12
+
+The sync that actually syncs, and Bluetooth pairing without leaving the menu.
+
+- **The combined output was rebuilt on real delays.** The first version leaned on latency compensation, which trusts what a Bluetooth box claims about itself — and an A2DP speaker keeps its real buffering to itself, so the wired outputs never waited long enough. It also combined every sink it saw, including an equalizer's effect input, which doubled the audio through a second path with phasing no delay could fix. Now one null sink feeds one loopback per real hardware output, each with an actual buffer delay; Bluetooth keeps the base, the wired outputs wait the slider amount on top. Tuning is audible within a second without interrupting playback, stereo is pinned, the whole thing runs on plain PulseAudio just as well (only `pactl` is used), and it costs about half a percent of CPU while active — nothing when off.
+- **Pair a new speaker from the menu.** "Pair a new speaker…" scans for nearby unpaired audio devices and one click pairs, trusts and connects — the music follows onto it, and failures say what to do instead of nothing. System Settings no longer needed for the common case.
+- **The menu says how everything is connected.** A proper title row, WiFi and Bluetooth section headers with icons, connection-type icons on every device row, and honest hints for an empty Bluetooth list: a dead adapter ("check System Settings") reads differently from "nothing paired yet". The combined output introduces itself by a human name in every output picker instead of a raw node id. Speakers that only announce themselves via the device-class icon (LE-Audio models) pass the device filter now.
+- Review fixes before this went out: overlapping slider moves can no longer double the loopbacks, pairing and connecting can't fight over the auto-route, and a too-fast enable/disable/enable can't strand the sync switch in an unswitchable state.
+
 ## 2026.11
 
 Every local speaker at once, stations that follow their streams when they move, and a cast/Bluetooth layer gone over with a fine-tooth comb.
