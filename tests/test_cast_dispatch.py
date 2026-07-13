@@ -13,8 +13,8 @@ def run_main(cast, monkeypatch, argv):
     """Run cast.main() with argv, recording which cmd_* was called and how."""
     calls = []
     for name in ("cmd_probe", "cmd_discover", "cmd_play", "cmd_stop",
-                 "cmd_volume", "cmd_dlna_play", "cmd_dlna_stop",
-                 "cmd_dlna_volume"):
+                 "cmd_volume", "cmd_get_volume", "cmd_dlna_play",
+                 "cmd_dlna_stop", "cmd_dlna_volume", "cmd_dlna_get_volume"):
         monkeypatch.setattr(
             cast, name,
             lambda *a, _n=name, **kw: calls.append((_n, a)),
@@ -84,13 +84,22 @@ def test_dlna_commands(cast, monkeypatch):
         == [("cmd_dlna_volume", ("http://loc", "0.3"))]
 
 
+def test_get_volume_commands(cast, monkeypatch):
+    assert run_main(cast, monkeypatch, ["get-volume", "h", "8009", "u", "m"]) \
+        == [("cmd_get_volume", ("h", "8009", "u", "m"))]
+    assert run_main(cast, monkeypatch, ["dlna-get-volume", "http://loc"]) \
+        == [("cmd_dlna_get_volume", ("http://loc",))]
+
+
 @pytest.mark.parametrize("argv", [
     ["play", "h", "8009", "u", "m", "http://s"],   # ctype missing
     ["stop", "h", "8009", "u"],                    # model missing
     ["volume", "h", "8009", "u", "m"],             # level missing
+    ["get-volume", "h", "8009", "u"],              # model missing
     ["dlna-play", "http://loc", "http://s"],       # ctype missing
     ["dlna-stop"],
     ["dlna-volume", "http://loc"],
+    ["dlna-get-volume"],
     ["no-such-command"],
 ])
 def test_short_or_unknown_argv_is_bad_arguments(cast, monkeypatch, capsys, argv):

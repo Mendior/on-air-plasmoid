@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-13 15:20+0300\n"
+"POT-Creation-Date: 2026-07-13 15:57+0000\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Swedish\n"
@@ -15,332 +15,841 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:50
+#: /home/user/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:50
 msgid "%1 — recording"
 msgstr "%1 — spelar in"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:52
+#: /home/user/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:52
 msgid "%1 — playing %2"
 msgstr "%1 — spelar %2"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:36
+#: /home/user/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:36
 msgid "Audio"
 msgstr "Ljud"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2753
+#: /home/user/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2842
 msgid "Volume"
 msgstr "Volym"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:87
+#: /home/user/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:87
 msgid "Muted"
 msgstr "Tystad"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:41
-msgid "Default volume:"
-msgstr "Standardvolym:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:60
-msgid "Smooth fade:"
-msgstr "Mjuk toning:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:61
-msgid "Fade volume when changing stations"
-msgstr "Tona volymen vid stationsbyte"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:66
-msgid "Fade duration (ms):"
-msgstr "Toningens längd (ms):"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:75
-msgid "Stream quality:"
-msgstr "Strömkvalitet:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:76
-msgid "Automatically switch to the highest-bitrate variant of a station"
-msgstr "Byt automatiskt till stationens variant med högst bithastighet"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:79
-msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
-msgstr "Slår upp stationen på radio-browser.info och väljer strömmen med bäst kvalitet"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:84
-msgid "Find a station's new address when its stream dies"
-msgstr "Hitta en stations nya adress när dess ström dör"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:87
-msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
-msgstr "Stationer byter servrar; om uppspelningen misslyckas slås stationen upp på radio-browser.info och adressen som fungerar nu sparas i din lista"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:92
-msgid "Count my listening in the worldwide station catalog"
-msgstr "Räkna mitt lyssnande i den globala stationskatalogen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:95
-msgid "When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone"
-msgstr "När en station börjar spela rapporteras ett anonymt klick till radio-browser.info (bara stations-id, inget om dig) — populära stationer blir lättare att hitta för alla"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:103
-msgid "Visuals"
-msgstr "Utseende"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:109
-msgid "Album art:"
-msgstr "Omslagsbild:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:110
-msgid "Look up cover art via iTunes"
-msgstr "Hämta omslagsbilder via iTunes"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:115
-msgid "Backdrop:"
-msgstr "Bakgrund:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:116
-msgid "Blurred album art behind now playing"
-msgstr "Suddig omslagsbild bakom nu spelas-vyn"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:122
-msgid "Accent color:"
-msgstr "Accentfärg:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:123
-msgid "Follow the system accent color instead of the built-in emerald"
-msgstr "Följ systemets accentfärg i stället för den inbyggda smaragdgröna"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:131
-msgid "Integration"
-msgstr "Integration"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:137
-msgid "System integration:"
-msgstr "Systemintegration:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:138
-msgid "Allow control via media keys (MPRIS)"
-msgstr "Tillåt styrning via mediatangenter (MPRIS)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:146
-msgid "Downloads"
-msgstr "Nedladdningar"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:152
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:26
-msgid "Format:"
-msgstr "Format:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:154
-msgid "Best quality (no re-encode)"
-msgstr "Bästa kvalitet (ingen omkodning)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:155
-msgid "MP3"
-msgstr "MP3"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:156
-msgid "Opus"
-msgstr "Opus"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:157
-msgid "MP4 (video)"
-msgstr "MP4 (video)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:167
-msgid "Save to folder:"
-msgstr "Spara i mapp:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:174
-msgid "Title cleanup:"
-msgstr "Titelrensning:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:175
-msgid "Use Claude CLI to clean up messy titles before download (optional)"
-msgstr "Använd Claude CLI för att städa upp röriga titlar före nedladdning (valfritt)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:183
-msgid "Behavior"
-msgstr "Beteende"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:188
-msgid "Marquee speed:"
-msgstr "Rullande textens hastighet:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:206
-msgid "Slower"
-msgstr "Långsammare"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:208
-msgid "Faster"
-msgstr "Snabbare"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:214
-msgid "Panel click:"
-msgstr "Panelklick:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:215
-msgid "Middle click to toggle last station"
-msgstr "Mittenklick spelar/stoppar den senaste stationen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:219
-msgid "Middle-click the panel icon to play or stop the last station"
-msgstr "Mittenklicka på panelikonen för att spela eller stoppa den senaste stationen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:123
-msgid "All stations already have a logo."
-msgstr "Alla stationer har redan en logotyp."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:137
-msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
-msgstr "Logotyphämtning klar: %1 / %2 stationer uppdaterade. Klicka på Verkställ för att spara."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:139
-msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
-msgstr "Logotyphämtning klar: %1 / %2 stationer uppdaterade (%3 kunde inte hittas automatiskt). Klicka på Verkställ för att spara."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:529
-msgid "No stations to refresh."
-msgstr "Inga stationer att uppdatera."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:614
-msgid "Edit"
-msgstr "Redigera"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:622
-msgid "Hide"
-msgstr "Dölj"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:622
-msgid "Show"
-msgstr "Visa"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:632
-msgid "Remove"
-msgstr "Ta bort"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:751
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:482
-msgid "Add Station"
-msgstr "Lägg till station"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:751
-msgid "Edit station"
-msgstr "Redigera station"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:798
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:660
-msgid "Name:"
-msgstr "Namn:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:804
-msgid "URL:"
-msgstr "URL:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:811
-msgid "Logo URL:"
-msgstr "Logotypens URL:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:812
-msgid "e.g. https://example.com/logo.png"
-msgstr "t.ex. https://example.com/logo.png"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:820
-msgid "Active"
-msgstr "Aktiv"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:892
-msgid "Configuration has been loaded. Click 'Apply' to save changes."
-msgstr "Inställningarna har lästs in. Klicka på ”Verkställ” för att spara ändringarna."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:894
-msgid "Error loading configuration. Try choosing a different file."
-msgstr "Fel vid inläsning av inställningarna. Prova att välja en annan fil."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:898
-msgid "Your configuration was saved successfully."
-msgstr "Dina inställningar sparades."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:900
-msgid "Error, make sure the selected directory is writable!"
-msgstr "Fel — kontrollera att den valda mappen är skrivbar!"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:960
-msgid "Add…"
-msgstr "Lägg till…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:969
-msgid "Fetching… %1 / %2"
-msgstr "Hämtar… %1 / %2"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:970
-msgid "Fetch missing logos"
-msgstr "Hämta saknade logotyper"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:979
-msgid "Re-fetch all"
-msgstr "Hämta om alla"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:984
-msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
-msgstr "Hämta nya logotyper för alla stationer; befintliga behålls om inget bättre hittas"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:999
-msgid "Import…"
-msgstr "Importera…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1005
-msgid "Export…"
-msgstr "Exportera…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:20
-msgid "Stream recording"
-msgstr "Strominspelning"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:28
-msgid "Original stream (bit-exact copy, recommended)"
-msgstr "Originalström (bitexakt kopia, rekommenderas)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:29
-msgid "MP3 (re-encode — max compatibility)"
-msgstr "MP3 (omkodning — bäst kompatibilitet)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:30
-msgid "WAV (uncompressed — very large files)"
-msgstr "WAV (okomprimerat — mycket stora filer)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:39
-msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
-msgstr "Radioströmmar är redan komprimerade — den bitexakta kopian ÄR den maximala kvaliteten. Omkodning (MP3) eller uppackning (WAV) kan aldrig tillföra kvalitet; välj dem bara för enhetskompatibilitet eller redigering."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:48
-msgid "Max length:"
-msgstr "Maximal längd:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:52
-msgid "%1 min"
-msgstr "%1 min"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:57
-msgid "A hard safety cap for one recording — protects the disk if you forget to stop."
-msgstr "En hård längdgräns för en inspelning — skyddar disken om du glömmer att stoppa."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:69
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1579
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1640
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:323
+msgid "Search station or country… (e.g. Finland, jazz)"
+msgstr "Sök station eller land… (t.ex. Finland, jazz)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:344
+msgid "Show all stations"
+msgstr "Visa alla stationer"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:344
+msgid "Show only favorites"
+msgstr "Visa endast favoriter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:475
+msgid "Searching the web…"
+msgstr "Söker på webben…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:476
+msgid "From the web"
+msgstr "Från webben"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:507
+msgid "Stop preview: %1"
+msgstr "Stoppa förhandslyssning: %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:508
+msgid "Preview: %1"
+msgstr "Förhandslyssna: %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:634
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1157
+msgid "Add to my stations + favorites"
+msgstr "Lägg till i mina stationer + favoriter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:649
+msgid "Click = stop preview"
+msgstr "Klick = stoppa förhandslyssning"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:650
+msgid "Click = preview · ⭐ = add to my stations"
+msgstr "Klick = förhandslyssna · ⭐ = lägg till i mina stationer"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:675
+msgid "No favorite stations yet"
+msgstr "Inga favoritstationer ännu"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:676
+msgid "No matching stations"
+msgstr "Inga matchande stationer"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:676
+msgid "No stations"
+msgstr "Inga stationer"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:689
+msgid "Tap the heart on a station to add it here"
+msgstr "Tryck på hjärtat på en station för att lägga till den här"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:690
+msgid "Try a different search term"
+msgstr "Prova ett annat sökord"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:959
+msgid "LIVE"
+msgstr "LIVE"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1065
+msgid "Nothing playing"
+msgstr "Inget spelas"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1082
+msgid "Previous station"
+msgstr "Föregående station"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1100
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:522
+msgid "Stop"
+msgstr "Stoppa"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1100
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:522
+msgid "Play"
+msgstr "Spela"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1120
+msgid "Next station"
+msgstr "Nästa station"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1143
+msgid "Search this track on YouTube"
+msgstr "Sök det här spåret på YouTube"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1158
+#: /home/user/on-air-plasmoid/package/contents/ui/MediaListItem.qml:350
+msgid "Remove from favorites"
+msgstr "Ta bort från favoriter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1158
+#: /home/user/on-air-plasmoid/package/contents/ui/MediaListItem.qml:350
+msgid "Add to favorites"
+msgstr "Lägg till i favoriter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1180
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1536
+msgid "Remove from liked songs"
+msgstr "Ta bort från gillade låtar"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1181
+msgid "Like this song (saved to My Music)"
+msgstr "Gilla den här låten (sparas i Min musik)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1199
+msgid "Vote sent — thank you for supporting the station!"
+msgstr "Röst skickad — tack för att du stödjer stationen!"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1200
+msgid "Sending the vote…"
+msgstr "Skickar rösten…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1201
+msgid "Vote for this station in the worldwide catalog"
+msgstr "Rösta på den här stationen i den globala katalogen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1220
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2242
+msgid "Downloading…"
+msgstr "Laddar ner…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1221
+msgid "Download this track (for offline listening)"
+msgstr "Ladda ner det här spåret (för lyssning offline)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1246
+msgid "A scheduled recording is running (%1)"
+msgstr "En schemalagd inspelning pågår (%1)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1248
+msgid "Recording %1 — click to stop"
+msgstr "Spelar in: %1 — klicka för att stoppa"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1250
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1798
+msgid "This source cannot be recorded"
+msgstr "Den här källan kan inte spelas in"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1251
+msgid "Record this station (personal use only)"
+msgstr "Spela in den här stationen (endast för personligt bruk)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1333
+msgid "Downloading: "
+msgstr "Laddar ner: "
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1386
+msgid "Stop recording"
+msgstr "Stoppa inspelningen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1409
+msgid "Liked songs"
+msgstr "Gillade låtar"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1409
+msgid "Recently played"
+msgstr "Nyligen spelat"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1424
+msgid "Show play history"
+msgstr "Visa uppspelningshistorik"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1425
+msgid "Show liked songs"
+msgstr "Visa gillade låtar"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1435
+msgid "Clear history"
+msgstr "Rensa historiken"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1466
+msgid "Search YouTube for %1"
+msgstr "Sök på YouTube efter %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1525
+msgid "Download this track"
+msgstr "Ladda ner det här spåret"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1549
+msgid "Click = search on YouTube · ⬇ = download"
+msgstr "Klick = sök på YouTube · ⬇ = ladda ner"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1568
+#: /home/user/on-air-plasmoid/package/contents/ui/Heading.qml:24
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:909
+msgid "My Music"
+msgstr "Min musik"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1579
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1640
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:69
 msgid "Scheduled recordings"
 msgstr "Schemalagda inspelningar"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:74
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1607
+msgid "Open folder in file manager"
+msgstr "Öppna mappen i filhanteraren"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1667
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1765
+msgid "Daily"
+msgstr "Dagligen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1668
+msgid "Every %1"
+msgstr "Varje %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1683
+msgid "Remove this schedule"
+msgstr "Ta bort det här schemat"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1691
+msgid "No scheduled recordings yet — add one below."
+msgstr "Inga schemalagda inspelningar ännu — lägg till en nedan."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1706
+msgid "Station:"
+msgstr "Station:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1714
+msgid "Station"
+msgstr "Station"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1718
+msgid "Start:"
+msgstr "Start:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1729
+msgid "Start hour"
+msgstr "Starttimme"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1739
+msgid "Start minute"
+msgstr "Startminut"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1744
+msgid "Duration:"
+msgstr "Längd:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1754
+msgid "Duration in minutes"
+msgstr "Längd i minuter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1758
+msgid "Repeat:"
+msgstr "Upprepning:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1765
+msgid "Once"
+msgstr "En gång"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1765
+msgid "Weekly"
+msgstr "Varje vecka"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1766
+msgid "Repeat"
+msgstr "Upprepning"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1774
+msgid "Weekday"
+msgstr "Veckodag"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1785
+msgid "Recordings are for personal use only."
+msgstr "Inspelningar är endast för personligt bruk."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1810
+msgid "Add"
+msgstr "Lägg till"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1864
+msgid "Stop: %1"
+msgstr "Stoppa: %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1864
+msgid "Play: %1"
+msgstr "Spela: %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1949
+msgid "Click again to confirm delete"
+msgstr "Klicka igen för att bekräfta borttagning"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1949
+msgid "Delete file"
+msgstr "Ta bort filen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1995
+msgid "Nothing here yet"
+msgstr "Här finns inget ännu"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2006
+msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
+msgstr "När en bra låt spelas på radion, tryck på ⬇ — den sparas här för lyssning offline"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2151
+msgid "My Music (downloaded tracks)"
+msgstr "Min musik (nedladdade spår)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2165
+msgid "Sleep timer: "
+msgstr "Sovtimer: "
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2166
+msgid "Sleep timer"
+msgstr "Sovtimer"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2198
+msgid "Sleep in 15 minutes"
+msgstr "Somna om 15 minuter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2199
+msgid "Sleep in 30 minutes"
+msgstr "Somna om 30 minuter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2200
+msgid "Sleep in 60 minutes"
+msgstr "Somna om 60 minuter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2201
+msgid "Sleep in 90 minutes"
+msgstr "Somna om 90 minuter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2204
+msgid "Cancel timer"
+msgstr "Avbryt timern"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2239
+msgid "Sleeping in "
+msgstr "Somnar om "
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2245
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:62
+msgid "Casting to %1"
+msgstr "Castar till %1"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2248
+msgid "Check internet connection…"
+msgstr "Kontrollera internetanslutningen…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2250
+msgid "Error: "
+msgstr "Fel: "
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2253
+msgid "Bitrate: "
+msgstr "Bithastighet: "
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2255
+msgid "Playing"
+msgstr "Spelar"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2255
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2258
+msgid "Connecting…"
+msgstr "Ansluter…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2260
+msgid "Choose station and enjoy…"
+msgstr "Välj en station och njut…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2279
+msgid "Casting to %1 — click to choose or stop"
+msgstr "Castar till %1 — klicka för att välja eller stoppa"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2280
+msgid "Play on a device (Chromecast, TV, speaker)"
+msgstr "Spela på en enhet (Chromecast, TV, högtalare)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2329
+msgid "Play on"
+msgstr "Spela på"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2342
+msgid "This computer"
+msgstr "Den här datorn"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2358
+msgid "System default output"
+msgstr "Systemets standardutgång"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2385
+msgid "All local outputs, in sync"
+msgstr "Alla lokala utgångar, i synk"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2402
+msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
+msgstr "Spelar på alla anslutna högtalare samtidigt — trådbundna utgångar fördröjs för att hålla takten med Bluetooth."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2416
+msgid "Sync fine-tune"
+msgstr "Finjustera synk"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2430
+msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
+msgstr "Om Bluetooth-högtalaren fortfarande släpar efter de trådbundna, höj detta tills de spelar ihop."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2447
+msgid "Calibrate with the microphone"
+msgstr "Kalibrera med mikrofonen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2452
+msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
+msgstr "Spelar några höga klick genom varje högtalare och mäter med mikrofonen hur mycket Bluetooth-högtalaren släpar efter — fördröjningen ställs in automatiskt."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2468
+msgid "Listening to the clicks…"
+msgstr "Lyssnar på klicken…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2507
+msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device."
+msgstr "Den här högtalarens andel av volymen — balansen följer varje rörelse av huvudreglaget och sparas för enheten."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2542
+msgid "Bluetooth"
+msgstr "Bluetooth"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2557
+msgid "Bluetooth is off or no adapter is available — check System Settings."
+msgstr "Bluetooth är avstängt eller ingen adapter finns — kontrollera Systeminställningar."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2568
+msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
+msgstr "Inga parkopplade Bluetooth-ljudenheter — parkoppla högtalaren en gång i Systeminställningar så visas den här."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2582
+msgid "%1 — connecting…"
+msgstr "%1 — ansluter…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2600
+msgid "%1 — pairing…"
+msgstr "%1 — parkopplar…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2601
+msgid "%1 — new, click to pair"
+msgstr "%1 — ny, klicka för att parkoppla"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2612
+msgid "Pair a new speaker…"
+msgstr "Parkoppla en ny högtalare…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2628
+msgid "Searching — put the speaker in pairing mode…"
+msgstr "Söker — sätt högtalaren i parkopplingsläge…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2649
+msgid "WiFi & network"
+msgstr "WiFi & nätverk"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2681
+msgid "%1 (speaker group)"
+msgstr "%1 (högtalargrupp)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2709
+msgid "Balance"
+msgstr "Balans"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2723
+msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
+msgstr "Den här enhetens andel av volymen — balansen följer varje rörelse av huvudreglaget och sparas för enheten."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2745
+msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
+msgstr "Varje enhet buffrar strömmen för sig, så rummen kan spela några sekunder isär. För perfekt synkade högtalare, gruppera dem i Google Home-appen — gruppen visas här som en enda enhet."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2755
+msgid "Stop casting everywhere"
+msgstr "Sluta casta på alla enheter"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2773
+msgid "Searching for devices…"
+msgstr "Söker efter enheter…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2782
+msgid "No devices found on your network"
+msgstr "Inga enheter hittades i ditt nätverk"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2803
+msgid "Volume: "
+msgstr "Volym: "
+
+#: /home/user/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2803
+msgid "(scroll to adjust)"
+msgstr "(rulla för att ändra)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/Heading.qml:37
+msgid "Back to stations"
+msgstr "Tillbaka till stationerna"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/Heading.qml:123
+msgid "Show now playing"
+msgstr "Visa nu spelas-vyn"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/MediaListItem.qml:257
+msgid "Move up"
+msgstr "Flytta upp"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/MediaListItem.qml:281
+msgid "Move down"
+msgstr "Flytta ner"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/MediaListItem.qml:313
+msgid "Click again to confirm removal"
+msgstr "Klicka igen för att bekräfta borttagning"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/MediaListItem.qml:314
+msgid "Remove station from list"
+msgstr "Ta bort stationen från listan"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:41
+msgid "Default volume:"
+msgstr "Standardvolym:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:60
+msgid "Smooth fade:"
+msgstr "Mjuk toning:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:61
+msgid "Fade volume when changing stations"
+msgstr "Tona volymen vid stationsbyte"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:66
+msgid "Fade duration (ms):"
+msgstr "Toningens längd (ms):"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:75
+msgid "Stream quality:"
+msgstr "Strömkvalitet:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:76
+msgid "Automatically switch to the highest-bitrate variant of a station"
+msgstr "Byt automatiskt till stationens variant med högst bithastighet"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:79
+msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
+msgstr "Slår upp stationen på radio-browser.info och väljer strömmen med bäst kvalitet"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:84
+msgid "Find a station's new address when its stream dies"
+msgstr "Hitta en stations nya adress när dess ström dör"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:87
+msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
+msgstr "Stationer byter servrar; om uppspelningen misslyckas slås stationen upp på radio-browser.info och adressen som fungerar nu sparas i din lista"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:92
+msgid "Count my listening in the worldwide station catalog"
+msgstr "Räkna mitt lyssnande i den globala stationskatalogen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:95
+msgid "When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone"
+msgstr "När en station börjar spela rapporteras ett anonymt klick till radio-browser.info (bara stations-id, inget om dig) — populära stationer blir lättare att hitta för alla"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:103
+msgid "Visuals"
+msgstr "Utseende"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:109
+msgid "Album art:"
+msgstr "Omslagsbild:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:110
+msgid "Look up cover art via iTunes"
+msgstr "Hämta omslagsbilder via iTunes"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:115
+msgid "Backdrop:"
+msgstr "Bakgrund:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:116
+msgid "Blurred album art behind now playing"
+msgstr "Suddig omslagsbild bakom nu spelas-vyn"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:122
+msgid "Accent color:"
+msgstr "Accentfärg:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:123
+msgid "Follow the system accent color instead of the built-in emerald"
+msgstr "Följ systemets accentfärg i stället för den inbyggda smaragdgröna"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:131
+msgid "Integration"
+msgstr "Integration"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:137
+msgid "System integration:"
+msgstr "Systemintegration:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:138
+msgid "Allow control via media keys (MPRIS)"
+msgstr "Tillåt styrning via mediatangenter (MPRIS)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:146
+msgid "Downloads"
+msgstr "Nedladdningar"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:152
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:26
+msgid "Format:"
+msgstr "Format:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:154
+msgid "Best quality (no re-encode)"
+msgstr "Bästa kvalitet (ingen omkodning)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:155
+msgid "MP3"
+msgstr "MP3"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:156
+msgid "Opus"
+msgstr "Opus"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:157
+msgid "MP4 (video)"
+msgstr "MP4 (video)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:167
+msgid "Save to folder:"
+msgstr "Spara i mapp:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:174
+msgid "Title cleanup:"
+msgstr "Titelrensning:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:175
+msgid "Use Claude CLI to clean up messy titles before download (optional)"
+msgstr "Använd Claude CLI för att städa upp röriga titlar före nedladdning (valfritt)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:183
+msgid "Behavior"
+msgstr "Beteende"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:188
+msgid "Marquee speed:"
+msgstr "Rullande textens hastighet:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:206
+msgid "Slower"
+msgstr "Långsammare"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:208
+msgid "Faster"
+msgstr "Snabbare"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:214
+msgid "Panel click:"
+msgstr "Panelklick:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:215
+msgid "Middle click to toggle last station"
+msgstr "Mittenklick spelar/stoppar den senaste stationen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:219
+msgid "Middle-click the panel icon to play or stop the last station"
+msgstr "Mittenklicka på panelikonen för att spela eller stoppa den senaste stationen"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:123
+msgid "All stations already have a logo."
+msgstr "Alla stationer har redan en logotyp."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:137
+msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
+msgstr "Logotyphämtning klar: %1 / %2 stationer uppdaterade. Klicka på Verkställ för att spara."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:139
+msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
+msgstr "Logotyphämtning klar: %1 / %2 stationer uppdaterade (%3 kunde inte hittas automatiskt). Klicka på Verkställ för att spara."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:529
+msgid "No stations to refresh."
+msgstr "Inga stationer att uppdatera."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:614
+msgid "Edit"
+msgstr "Redigera"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:622
+msgid "Hide"
+msgstr "Dölj"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:622
+msgid "Show"
+msgstr "Visa"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:632
+msgid "Remove"
+msgstr "Ta bort"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:751
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:482
+msgid "Add Station"
+msgstr "Lägg till station"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:751
+msgid "Edit station"
+msgstr "Redigera station"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:798
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:660
+msgid "Name:"
+msgstr "Namn:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:804
+msgid "URL:"
+msgstr "URL:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:811
+msgid "Logo URL:"
+msgstr "Logotypens URL:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:812
+msgid "e.g. https://example.com/logo.png"
+msgstr "t.ex. https://example.com/logo.png"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:820
+msgid "Active"
+msgstr "Aktiv"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:892
+msgid "Configuration has been loaded. Click 'Apply' to save changes."
+msgstr "Inställningarna har lästs in. Klicka på ”Verkställ” för att spara ändringarna."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:894
+msgid "Error loading configuration. Try choosing a different file."
+msgstr "Fel vid inläsning av inställningarna. Prova att välja en annan fil."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:898
+msgid "Your configuration was saved successfully."
+msgstr "Dina inställningar sparades."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:900
+msgid "Error, make sure the selected directory is writable!"
+msgstr "Fel — kontrollera att den valda mappen är skrivbar!"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:960
+msgid "Add…"
+msgstr "Lägg till…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:969
+msgid "Fetching… %1 / %2"
+msgstr "Hämtar… %1 / %2"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:970
+msgid "Fetch missing logos"
+msgstr "Hämta saknade logotyper"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:979
+msgid "Re-fetch all"
+msgstr "Hämta om alla"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:984
+msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
+msgstr "Hämta nya logotyper för alla stationer; befintliga behålls om inget bättre hittas"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:999
+msgid "Import…"
+msgstr "Importera…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1005
+msgid "Export…"
+msgstr "Exportera…"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:20
+msgid "Stream recording"
+msgstr "Strominspelning"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:28
+msgid "Original stream (bit-exact copy, recommended)"
+msgstr "Originalström (bitexakt kopia, rekommenderas)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:29
+msgid "MP3 (re-encode — max compatibility)"
+msgstr "MP3 (omkodning — bäst kompatibilitet)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:30
+msgid "WAV (uncompressed — very large files)"
+msgstr "WAV (okomprimerat — mycket stora filer)"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:39
+msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
+msgstr "Radioströmmar är redan komprimerade — den bitexakta kopian ÄR den maximala kvaliteten. Omkodning (MP3) eller uppackning (WAV) kan aldrig tillföra kvalitet; välj dem bara för enhetskompatibilitet eller redigering."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:48
+msgid "Max length:"
+msgstr "Maximal längd:"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:52
+msgid "%1 min"
+msgstr "%1 min"
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:57
+msgid "A hard safety cap for one recording — protects the disk if you forget to stop."
+msgstr "En hård längdgräns för en inspelning — skyddar disken om du glömmer att stoppa."
+
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:74
 msgid "Schedules are managed in the widget itself: open the popup, press the music-note button in the footer to open My Music, then press the stopwatch button next to \"My Music\". Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing."
 msgstr "Scheman hanteras i själva widgeten: öppna popupen, tryck på notknappen i sidfoten för att öppna Min musik och sedan på stoppursknappen bredvid ”Min musik”. Välj station, starttid, längd och upprepning (en gång / dagligen / varje vecka) — widgeten spelar in i bakgrunden, även när inget spelas."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:81
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configRecording.qml:81
 msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
 msgstr "Inspelningar sparas i din musikmapp och är endast för personligt bruk — sprid dem inte vidare."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:125
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:183
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:580
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:125
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:183
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:580
 msgid ""
 "Get list of stations\n"
 "Please wait…"
@@ -348,7 +857,7 @@ msgstr ""
 "Hämtar stationslistan\n"
 "Vänta…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:182
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:182
 msgid ""
 "Nothing found\n"
 "Try changing your query"
@@ -356,762 +865,265 @@ msgstr ""
 "Inget hittades\n"
 "Prova att ändra sökningen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:195
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:208
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:195
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:208
 msgid "Error: Could not connect to API servers"
 msgstr "Fel: Kunde inte ansluta till API-servrarna"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:317
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:317
 msgid "Search Station"
 msgstr "Sök station"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:323
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:323
 msgid "Search by"
 msgstr "Sök efter"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:330
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:330
 msgid "name"
 msgstr "namn"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:331
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:331
 msgid "country"
 msgstr "land"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:332
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:332
 msgid "language"
 msgstr "språk"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:333
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:333
 msgid "tags"
 msgstr "taggar"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:452
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:766
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:452
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:766
 msgid "kBit/s"
 msgstr "kbit/s"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:465
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:465
 msgid "Info"
 msgstr "Info"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:507
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:507
 msgid "Station is added. Click 'Apply' to save changes."
 msgstr "Stationen har lagts till. Klicka på ”Verkställ” för att spara ändringarna."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:522
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1100
-msgid "Stop"
-msgstr "Stoppa"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:522
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1100
-msgid "Play"
-msgstr "Spela"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:626
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:626
 msgid "Search…"
 msgstr "Sök…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:636
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:636
 msgid "Clear Results"
 msgstr "Rensa resultaten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:654
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:654
 msgid "Station Info"
 msgstr "Stationsinfo"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:671
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:671
 msgid "Favicon:"
 msgstr "Logotyp:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:683
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:683
 msgid "Homepage:"
 msgstr "Webbplats:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:693
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:693
 msgid "Stream URL:"
 msgstr "Strömmens URL:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:707
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:707
 msgid "OK"
 msgstr "OK"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:709
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:825
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:709
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:825
 msgid "Error"
 msgstr "Fel"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:716
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:716
 msgid "Server status:"
 msgstr "Serverstatus:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:727
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:727
 msgid "last check: "
 msgstr "senaste kontroll: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:749
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:749
 msgid "Codec:"
 msgstr "Kodek:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:760
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:760
 msgid "Bitrate:"
 msgstr "Bithastighet:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:778
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:778
 msgid "Country:"
 msgstr "Land:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:786
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:786
 msgid "Language:"
 msgstr "Språk:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:794
+#: /home/user/on-air-plasmoid/package/contents/ui/config/configSearch.qml:794
 msgid "Tags:"
 msgstr "Taggar:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:323
-msgid "Search station or country… (e.g. Finland, jazz)"
-msgstr "Sök station eller land… (t.ex. Finland, jazz)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:344
-msgid "Show all stations"
-msgstr "Visa alla stationer"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:344
-msgid "Show only favorites"
-msgstr "Visa endast favoriter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:475
-msgid "Searching the web…"
-msgstr "Söker på webben…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:476
-msgid "From the web"
-msgstr "Från webben"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:507
-msgid "Stop preview: %1"
-msgstr "Stoppa förhandslyssning: %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:508
-msgid "Preview: %1"
-msgstr "Förhandslyssna: %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:634
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1157
-msgid "Add to my stations + favorites"
-msgstr "Lägg till i mina stationer + favoriter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:649
-msgid "Click = stop preview"
-msgstr "Klick = stoppa förhandslyssning"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:650
-msgid "Click = preview · ⭐ = add to my stations"
-msgstr "Klick = förhandslyssna · ⭐ = lägg till i mina stationer"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:675
-msgid "No favorite stations yet"
-msgstr "Inga favoritstationer ännu"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:676
-msgid "No matching stations"
-msgstr "Inga matchande stationer"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:676
-msgid "No stations"
-msgstr "Inga stationer"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:689
-msgid "Tap the heart on a station to add it here"
-msgstr "Tryck på hjärtat på en station för att lägga till den här"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:690
-msgid "Try a different search term"
-msgstr "Prova ett annat sökord"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:959
-msgid "LIVE"
-msgstr "LIVE"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1065
-msgid "Nothing playing"
-msgstr "Inget spelas"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1082
-msgid "Previous station"
-msgstr "Föregående station"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1120
-msgid "Next station"
-msgstr "Nästa station"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1143
-msgid "Search this track on YouTube"
-msgstr "Sök det här spåret på YouTube"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1158
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:350
-msgid "Remove from favorites"
-msgstr "Ta bort från favoriter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1158
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:350
-msgid "Add to favorites"
-msgstr "Lägg till i favoriter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1180
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1536
-msgid "Remove from liked songs"
-msgstr "Ta bort från gillade låtar"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1181
-msgid "Like this song (saved to My Music)"
-msgstr "Gilla den här låten (sparas i Min musik)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1199
-msgid "Vote sent — thank you for supporting the station!"
-msgstr "Röst skickad — tack för att du stödjer stationen!"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1200
-msgid "Sending the vote…"
-msgstr "Skickar rösten…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1201
-msgid "Vote for this station in the worldwide catalog"
-msgstr "Rösta på den här stationen i den globala katalogen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1220
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2242
-msgid "Downloading…"
-msgstr "Laddar ner…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1221
-msgid "Download this track (for offline listening)"
-msgstr "Ladda ner det här spåret (för lyssning offline)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1246
-msgid "A scheduled recording is running (%1)"
-msgstr "En schemalagd inspelning pågår (%1)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1248
-msgid "Recording %1 — click to stop"
-msgstr "Spelar in: %1 — klicka för att stoppa"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1250
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1798
-msgid "This source cannot be recorded"
-msgstr "Den här källan kan inte spelas in"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1251
-msgid "Record this station (personal use only)"
-msgstr "Spela in den här stationen (endast för personligt bruk)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1333
-msgid "Downloading: "
-msgstr "Laddar ner: "
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1386
-msgid "Stop recording"
-msgstr "Stoppa inspelningen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1409
-msgid "Liked songs"
-msgstr "Gillade låtar"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1409
-msgid "Recently played"
-msgstr "Nyligen spelat"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1424
-msgid "Show play history"
-msgstr "Visa uppspelningshistorik"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1425
-msgid "Show liked songs"
-msgstr "Visa gillade låtar"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1435
-msgid "Clear history"
-msgstr "Rensa historiken"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1466
-msgid "Search YouTube for %1"
-msgstr "Sök på YouTube efter %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1525
-msgid "Download this track"
-msgstr "Ladda ner det här spåret"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1549
-msgid "Click = search on YouTube · ⬇ = download"
-msgstr "Klick = sök på YouTube · ⬇ = ladda ner"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1568
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:24
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:909
-msgid "My Music"
-msgstr "Min musik"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1607
-msgid "Open folder in file manager"
-msgstr "Öppna mappen i filhanteraren"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1667
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1765
-msgid "Daily"
-msgstr "Dagligen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1668
-msgid "Every %1"
-msgstr "Varje %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1683
-msgid "Remove this schedule"
-msgstr "Ta bort det här schemat"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1691
-msgid "No scheduled recordings yet — add one below."
-msgstr "Inga schemalagda inspelningar ännu — lägg till en nedan."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1706
-msgid "Station:"
-msgstr "Station:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1714
-msgid "Station"
-msgstr "Station"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1718
-msgid "Start:"
-msgstr "Start:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1729
-msgid "Start hour"
-msgstr "Starttimme"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1739
-msgid "Start minute"
-msgstr "Startminut"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1744
-msgid "Duration:"
-msgstr "Längd:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1754
-msgid "Duration in minutes"
-msgstr "Längd i minuter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1758
-msgid "Repeat:"
-msgstr "Upprepning:"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1765
-msgid "Once"
-msgstr "En gång"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1765
-msgid "Weekly"
-msgstr "Varje vecka"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1766
-msgid "Repeat"
-msgstr "Upprepning"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1774
-msgid "Weekday"
-msgstr "Veckodag"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1785
-msgid "Recordings are for personal use only."
-msgstr "Inspelningar är endast för personligt bruk."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1810
-msgid "Add"
-msgstr "Lägg till"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1864
-msgid "Stop: %1"
-msgstr "Stoppa: %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1864
-msgid "Play: %1"
-msgstr "Spela: %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1949
-msgid "Click again to confirm delete"
-msgstr "Klicka igen för att bekräfta borttagning"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1949
-msgid "Delete file"
-msgstr "Ta bort filen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1995
-msgid "Nothing here yet"
-msgstr "Här finns inget ännu"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2006
-msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
-msgstr "När en bra låt spelas på radion, tryck på ⬇ — den sparas här för lyssning offline"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2151
-msgid "My Music (downloaded tracks)"
-msgstr "Min musik (nedladdade spår)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2165
-msgid "Sleep timer: "
-msgstr "Sovtimer: "
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2166
-msgid "Sleep timer"
-msgstr "Sovtimer"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2198
-msgid "Sleep in 15 minutes"
-msgstr "Somna om 15 minuter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2199
-msgid "Sleep in 30 minutes"
-msgstr "Somna om 30 minuter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2200
-msgid "Sleep in 60 minutes"
-msgstr "Somna om 60 minuter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2201
-msgid "Sleep in 90 minutes"
-msgstr "Somna om 90 minuter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2204
-msgid "Cancel timer"
-msgstr "Avbryt timern"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2239
-msgid "Sleeping in "
-msgstr "Somnar om "
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2245
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:62
-msgid "Casting to %1"
-msgstr "Castar till %1"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2248
-msgid "Check internet connection…"
-msgstr "Kontrollera internetanslutningen…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2250
-msgid "Error: "
-msgstr "Fel: "
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2253
-msgid "Bitrate: "
-msgstr "Bithastighet: "
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2255
-msgid "Playing"
-msgstr "Spelar"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2255
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2258
-msgid "Connecting…"
-msgstr "Ansluter…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2260
-msgid "Choose station and enjoy…"
-msgstr "Välj en station och njut…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2279
-msgid "Casting to %1 — click to choose or stop"
-msgstr "Castar till %1 — klicka för att välja eller stoppa"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2280
-msgid "Play on a device (Chromecast, TV, speaker)"
-msgstr "Spela på en enhet (Chromecast, TV, högtalare)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2329
-msgid "Play on"
-msgstr "Spela på"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2342
-msgid "This computer"
-msgstr "Den här datorn"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2358
-msgid "System default output"
-msgstr "Systemets standardutgång"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2385
-msgid "All local outputs, in sync"
-msgstr "Alla lokala utgångar, i synk"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2402
-msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
-msgstr "Spelar på alla anslutna högtalare samtidigt — trådbundna utgångar fördröjs för att hålla takten med Bluetooth."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2416
-msgid "Sync fine-tune"
-msgstr "Finjustera synk"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2430
-msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
-msgstr "Om Bluetooth-högtalaren fortfarande släpar efter de trådbundna, höj detta tills de spelar ihop."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2447
-msgid "Calibrate with the microphone"
-msgstr "Kalibrera med mikrofonen"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2452
-msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
-msgstr "Spelar några höga klick genom varje högtalare och mäter med mikrofonen hur mycket Bluetooth-högtalaren släpar efter — fördröjningen ställs in automatiskt."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2468
-msgid "Listening to the clicks…"
-msgstr "Lyssnar på klicken…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2498
-msgid "Bluetooth"
-msgstr "Bluetooth"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2513
-msgid "Bluetooth is off or no adapter is available — check System Settings."
-msgstr "Bluetooth är avstängt eller ingen adapter finns — kontrollera Systeminställningar."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2524
-msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
-msgstr "Inga parkopplade Bluetooth-ljudenheter — parkoppla högtalaren en gång i Systeminställningar så visas den här."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2538
-msgid "%1 — connecting…"
-msgstr "%1 — ansluter…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2556
-msgid "%1 — pairing…"
-msgstr "%1 — parkopplar…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2557
-msgid "%1 — new, click to pair"
-msgstr "%1 — ny, klicka för att parkoppla"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2568
-msgid "Pair a new speaker…"
-msgstr "Parkoppla en ny högtalare…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2584
-msgid "Searching — put the speaker in pairing mode…"
-msgstr "Söker — sätt högtalaren i parkopplingsläge…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2605
-msgid "WiFi & network"
-msgstr "WiFi & nätverk"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2631
-msgid "%1 (speaker group)"
-msgstr "%1 (högtalargrupp)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2656
-msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
-msgstr "Varje enhet buffrar strömmen för sig, så rummen kan spela några sekunder isär. För perfekt synkade högtalare, gruppera dem i Google Home-appen — gruppen visas här som en enda enhet."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2666
-msgid "Stop casting everywhere"
-msgstr "Sluta casta på alla enheter"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2684
-msgid "Searching for devices…"
-msgstr "Söker efter enheter…"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2693
-msgid "No devices found on your network"
-msgstr "Inga enheter hittades i ditt nätverk"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
-msgid "Volume: "
-msgstr "Volym: "
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
-msgid "(scroll to adjust)"
-msgstr "(rulla för att ändra)"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:37
-msgid "Back to stations"
-msgstr "Tillbaka till stationerna"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:123
-msgid "Show now playing"
-msgstr "Visa nu spelas-vyn"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:724
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:724
 msgid "Scheduled recording started"
 msgstr "Schemalagd inspelning startade"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:843
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:843
 msgid "Scheduled recording missed"
 msgstr "Schemalagd inspelning missades"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:851
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:851
 msgid "Scheduled recording skipped"
 msgstr "Schemalagd inspelning hoppades över"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:852
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:852
 msgid "%1 — another recording is already running."
 msgstr "%1 — en annan inspelning pågår redan."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1279
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:1279
 msgid "%1 devices"
 msgstr "%1 enheter"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1469
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:1646
 msgid "All local outputs (On Air)"
 msgstr "Alla lokala utgångar (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2001
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:2182
 msgid "Station found at a new address"
 msgstr "Stationen hittad på en ny adress"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2002
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:2183
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 har flyttat — den nya adressen sparades i din lista."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2996
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3183
 msgid "Casting needs python-chromecast"
 msgstr "Casting kräver python-chromecast"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2997
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3184
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Installera paketet python-chromecast för att casta till dina enheter."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3001
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3188
 msgid "the device"
 msgstr "enheten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3001
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3188
 msgid "Could not cast to %1"
 msgstr "Kunde inte casta till %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3002
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3189
 msgid "The device could not play this station."
 msgstr "Enheten kunde inte spela den här stationen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3047
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3107
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3277
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3337
 msgid "the Bluetooth device"
 msgstr "Bluetooth-enheten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3046
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3276
 msgid "Could not connect to %1"
 msgstr "Kunde inte ansluta till %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3048
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3278
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Kontrollera att högtalaren är på och inom räckhåll."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3106
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3336
 msgid "Could not pair with %1"
 msgstr "Kunde inte parkoppla med %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3108
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3338
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Sätt högtalaren i parkopplingsläge (håll in Bluetooth-knappen) och försök igen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3145
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3379
 msgid "Could not combine the outputs"
 msgstr "Kunde inte kombinera utgångarna"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3146
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3380
 msgid "pactl refused to create the combined output."
 msgstr "pactl vägrade skapa den kombinerade utgången."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3208
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3448
 msgid "Speakers calibrated"
 msgstr "Högtalare kalibrerade"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3209
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3449
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Bluetooth-högtalaren släpar efter %1 ms — fördröjningen är inställd och sparad för den här enheten."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3212
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3452
 msgid "Calibration did not succeed"
 msgstr "Kalibreringen lyckades inte"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3213
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3453
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Se till att mikrofonen inte är övertäckt och att båda högtalarna hörs, försök sedan igen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3297
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3537
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg är inte installerat"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3298
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3538
 msgid "Install ffmpeg to record radio."
 msgstr "Installera ffmpeg för att spela in radio."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3301
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3541
 msgid "Recording saved ✓ (%1)"
 msgstr "Inspelning sparad ✓ (%1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3305
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3545
 msgid "Recording interrupted (%1 captured)"
 msgstr "Inspelningen avbröts (%1 inspelat)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3307
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3547
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — filen är mycket mindre än väntat."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3311
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3551
 msgid "Recording failed"
 msgstr "Inspelningen misslyckades"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3312
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3552
 msgid "The stream could not be captured."
 msgstr "Strömmen kunde inte spelas in."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3334
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3574
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp är inte installerat"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3335
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3575
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installera yt-dlp (och ffmpeg) för att ladda ner spår."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3338
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3578
 msgid "Track downloaded ✓"
 msgstr "Spår nedladdat ✓"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3339
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3579
 msgid "Saved to: "
 msgstr "Sparad i: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3342
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3582
 msgid "Download failed"
 msgstr "Nedladdningen misslyckades"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3343
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3583
 msgid "Unknown error"
 msgstr "Okänt fel"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3576
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3816
 msgid "Audio output changed"
 msgstr "Ljudutgång ändrad"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3577
+#: /home/user/on-air-plasmoid/package/contents/ui/main.qml:3817
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Den valda utgångsenheten försvann — systemets standard används i stället."
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:257
-msgid "Move up"
-msgstr "Flytta upp"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:281
-msgid "Move down"
-msgstr "Flytta ner"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:313
-msgid "Click again to confirm removal"
-msgstr "Klicka igen för att bekräfta borttagning"
-
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:314
-msgid "Remove station from list"
-msgstr "Ta bort stationen från listan"
 
 #~ msgid "Cast to"
 #~ msgstr "Casta till"

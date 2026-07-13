@@ -2471,6 +2471,50 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // Per-speaker balance while the combined output runs:
+                        // the volume slider stays the master for the room,
+                        // each speaker keeps its share of it. Applied to our
+                        // own loopback only — other applications' audio and
+                        // the speaker's own buttons are left alone.
+                        Repeater {
+                            model: root._combineWantActive ? root._combineRealSinks() : []
+                            delegate: RowLayout {
+                                id: balanceRow
+                                required property string modelData
+                                readonly property string trimKey: root._trimKeyForSink(modelData)
+                                Layout.fillWidth: true
+                                Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                                Layout.rightMargin: Kirigami.Units.smallSpacing
+                                spacing: Kirigami.Units.smallSpacing
+
+                                PlasmaComponents3.Label {
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                    text: root.outputDescription(balanceRow.modelData)
+                                    font: Kirigami.Theme.smallFont
+                                    opacity: 0.7
+                                    elide: Text.ElideRight
+                                }
+                                PlasmaComponents3.Slider {
+                                    id: balanceSlider
+                                    Layout.fillWidth: true
+                                    from: 5
+                                    to: 100
+                                    stepSize: 1
+                                    value: { void root._trimRev; return Math.round(root.trimOf(balanceRow.trimKey) * 100) }
+                                    onMoved: root.setDeviceTrim(balanceRow.trimKey, value / 100)
+
+                                    PlasmaComponents3.ToolTip {
+                                        text: i18n("This speaker's share of the volume — the balance follows every master move and is remembered for the device.")
+                                    }
+                                }
+                                PlasmaComponents3.Label {
+                                    text: Math.round(balanceSlider.value) + "%"
+                                    font: Kirigami.Theme.smallFont
+                                    opacity: 0.7
+                                }
+                            }
+                        }
+
                         // Paired Bluetooth speakers/headphones that are not
                         // connected yet — one click connects and, once the
                         // sink appears, playback is routed onto it. Connected
@@ -2614,7 +2658,8 @@ PlasmaExtras.Representation {
                             // property var model`: a role named "model"
                             // shadowed the delegate's model object and left
                             // every row blank (2026.8).
-                            delegate: PlasmaComponents3.CheckDelegate {
+                            delegate: ColumnLayout {
+                                id: castRow
                                 required property string kind
                                 required property string uuid
                                 required property string name
@@ -2627,19 +2672,63 @@ PlasmaExtras.Representation {
                                 // Google keeps the members sample-synced —
                                 // the only true whole-home sync we can offer.
                                 readonly property bool isGroup: deviceModel === "Google Cast Group"
+                                readonly property bool isTarget: root.castTargetIndex(uuid) >= 0
                                 Layout.fillWidth: true
-                                text: isGroup ? i18n("%1 (speaker group)", name) : name
-                                // The icon answers "how is this connected?" —
-                                // WiFi fan vs Bluetooth rune vs the group
-                                // glyph — so the menu reads at a glance which
-                                // radio a device is on (asked for explicitly:
-                                // everything connectable from one place).
-                                icon.name: isGroup ? "audio-speakers-symbolic" : "network-wireless"
-                                checked: root.castTargetIndex(uuid) >= 0
-                                onToggled: root.castToggleDevice({
-                                    "kind": kind, "uuid": uuid, "name": name, "host": host,
-                                    "port": port, "deviceModel": deviceModel, "location": location
-                                })
+                                spacing: 0
+
+                                PlasmaComponents3.CheckDelegate {
+                                    Layout.fillWidth: true
+                                    text: castRow.isGroup ? i18n("%1 (speaker group)", castRow.name) : castRow.name
+                                    // The icon answers "how is this connected?" —
+                                    // WiFi fan vs Bluetooth rune vs the group
+                                    // glyph — so the menu reads at a glance which
+                                    // radio a device is on (asked for explicitly:
+                                    // everything connectable from one place).
+                                    icon.name: castRow.isGroup ? "audio-speakers-symbolic" : "network-wireless"
+                                    checked: castRow.isTarget
+                                    onToggled: root.castToggleDevice({
+                                        "kind": castRow.kind, "uuid": castRow.uuid, "name": castRow.name,
+                                        "host": castRow.host, "port": castRow.port,
+                                        "deviceModel": castRow.deviceModel, "location": castRow.location
+                                    })
+                                }
+
+                                // Balance for a picked device — its share of
+                                // the master volume, so one slider drives all
+                                // rooms without flattening their levels. A
+                                // freshly joined device adopts the loudness
+                                // it already had.
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.leftMargin: Kirigami.Units.gridUnit * 2
+                                    Layout.rightMargin: Kirigami.Units.smallSpacing
+                                    spacing: Kirigami.Units.smallSpacing
+                                    visible: castRow.isTarget
+
+                                    PlasmaComponents3.Label {
+                                        text: i18n("Balance")
+                                        font: Kirigami.Theme.smallFont
+                                        opacity: 0.7
+                                    }
+                                    PlasmaComponents3.Slider {
+                                        id: castBalanceSlider
+                                        Layout.fillWidth: true
+                                        from: 5
+                                        to: 100
+                                        stepSize: 1
+                                        value: { void root._trimRev; return Math.round(root.trimOf(castRow.uuid) * 100) }
+                                        onMoved: root.setDeviceTrim(castRow.uuid, value / 100)
+
+                                        PlasmaComponents3.ToolTip {
+                                            text: i18n("This device's share of the volume — the balance follows every master move and is remembered for the device.")
+                                        }
+                                    }
+                                    PlasmaComponents3.Label {
+                                        text: Math.round(castBalanceSlider.value) + "%"
+                                        font: Kirigami.Theme.smallFont
+                                        opacity: 0.7
+                                    }
+                                }
                             }
                         }
 

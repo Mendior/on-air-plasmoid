@@ -1340,6 +1340,161 @@ PlasmoidItem {
         return -1;
     }
 
+    // ── Group volume: one master, per-device balance ─────────────────────────
+    // The volume slider stays the MASTER for everything at once; each device
+    // additionally carries a balance factor (0.05–1.0) so a boomy soundbar
+    // and quiet desk speakers can hold their relative levels while one
+    // slider drives the room: effective = master × balance.
+    //
+    // WHERE the balance is applied decides whether the sync survives:
+    //   • the master stays ON THE STREAM (playMusicOutput.volume) — upstream
+    //     of the combined sink, so a master move is baked into the samples
+    //     and arrives at every local speaker delayed exactly like the music
+    //     itself. Moving the master can never smear the sync.
+    //   • a local balance goes on OUR loopback's sink-input — never on the
+    //     sink, which belongs to the user (and, on Bluetooth, to the
+    //     speaker's own AVRCP buttons); other applications are not touched.
+    //   • a network device gets master × balance pushed as its device
+    //     volume — wall-clock only; its buffer sits seconds away by nature.
+    // Keyed by the most stable id each device has: Cast/DLNA uuid, Bluetooth
+    // MAC, plain sink name for wired outputs. Kept across restarts.
+    property var _deviceTrims: ({})
+    // UI rebind tick — bindings can't observe key writes inside a JS object.
+    property int _trimRev: 0
+
+    function _loadDeviceTrims() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.deviceTrims || "{}");
+            _deviceTrims = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _deviceTrims = {};
+        }
+        _trimRev++;
+    }
+
+    function trimOf(id) {
+        var t = _deviceTrims[id];
+        return (typeof t === "number" && t >= 0.05 && t <= 1) ? t : 1.0;
+    }
+
+    // Balance key for a local sink: the Bluetooth MAC when there is one (the
+    // sink NAME can change between connects, the MAC never), the sink name
+    // for wired outputs.
+    function _trimKeyForSink(sink) {
+        return _btMacOfSink(sink) || String(sink);
+    }
+
+    function setDeviceTrim(id, factor) {
+        var f = Math.max(0.05, Math.min(1, factor));
+        var m = {};
+        for (var k in _deviceTrims) m[k] = _deviceTrims[k];
+        if (f >= 0.995) delete m[id]; // full level = no entry, the default
+        else m[id] = Math.round(f * 100) / 100;
+        _deviceTrims = m;
+        _trimRev++;
+        trimsPersistTimer.restart();
+        // Live targets follow the slider immediately (debounced): the
+        // matching loopback's sink-input locally, the device volume for a
+        // casting network target. Idle devices just keep the stored value.
+        if (_combineActive) {
+            var mod = _combineModuleForKey(id);
+            if (mod !== "") {
+                _trimPendingLocal[mod] = Math.round(trimOf(id) * 100);
+                trimApplyTimer.restart();
+            }
+        }
+        if (_casting && castTargetIndex(id) >= 0) {
+            _trimPendingCast[id] = true;
+            trimApplyTimer.restart();
+        }
+    }
+
+    Timer {
+        id: trimsPersistTimer
+        interval: 1000
+        repeat: false
+        onTriggered: Plasmoid.configuration.deviceTrims = JSON.stringify(root._deviceTrims)
+    }
+
+    // One debounce for both directions — a slider drag lands as a single
+    // pactl call / volume command per device, not one per pixel.
+    property var _trimPendingLocal: ({})  // loopback module id → percent
+    property var _trimPendingCast: ({})   // device uuid → true
+
+    Timer {
+        id: trimApplyTimer
+        interval: 250
+        repeat: false
+        onTriggered: {
+            var cmd = "";
+            for (var mod in root._trimPendingLocal)
+                cmd += root._sinkInputVolCmd(mod, root._trimPendingLocal[mod]);
+            root._trimPendingLocal = {};
+            if (cmd !== "") executable.exec(": PW_TRIM; " + cmd + "true # " + (++root._execSeq));
+            var master = root.targetVolume();
+            for (var uuid in root._trimPendingCast) {
+                var ti = root.castTargetIndex(uuid);
+                if (ti < 0) continue;
+                var dev = root._castTargets[ti];
+                var eff = Math.min(1, master * root.trimOf(uuid)).toFixed(3);
+                if (dev.kind === "dlna") {
+                    root._castExec("CAST_VOL", ["dlna-volume", dev.location, eff]);
+                } else {
+                    root._castExec("CAST_VOL", ["volume", dev.host, dev.port, dev.uuid,
+                                                dev.deviceModel, eff]);
+                }
+            }
+            root._trimPendingCast = {};
+        }
+    }
+
+    // Set OUR loopback's sink-input to a percentage — resolved by owner
+    // module id at apply time, because load-module does not print the
+    // sink-input id. Only ever touches inputs owned by modules we loaded.
+    // moduleId is either digits (parsed from a pactl echo) or the literal
+    // "$id" when baked into the same shell round that loaded the module.
+    function _sinkInputVolCmd(moduleId, pct) {
+        var mod = String(moduleId) === "$id"
+                  ? "\"$id\"" : String(moduleId).replace(/\D/g, "");
+        var p = Math.max(5, Math.min(100, Math.round(pct)));
+        if (mod === "") return "";
+        return "si=$(pactl list sink-inputs 2>/dev/null | awk -v m=" + mod
+             + " '/^Sink Input #/{si=substr($3,2)} $1==\"Owner\" && $2==\"Module:\" && $3==m {print si; exit}');"
+             + " [ -n \"$si\" ] && pactl set-sink-input-volume \"$si\" " + p + "% 2>/dev/null; ";
+    }
+
+    // Which loopback module serves the sink behind a balance key ("" = none).
+    property var _combineLoopbackSinkByModule: ({})
+
+    function _combineModuleForKey(key) {
+        for (var mod in _combineLoopbackSinkByModule)
+            if (_trimKeyForSink(_combineLoopbackSinkByModule[mod]) === key) return mod;
+        return "";
+    }
+
+    // A network device joining the group ADOPTS the loudness it already has:
+    // its current level / master becomes its balance, so the first master
+    // move scales it from where it stands instead of yanking it to the
+    // master level. Only when the user has not set a balance by hand.
+    function _castAdoptTrim(dev) {
+        if (!dev || !dev.uuid || _deviceTrims[dev.uuid] !== undefined) return;
+        if (dev.kind === "dlna") {
+            _castExec("CAST_ADOPT " + dev.uuid, ["dlna-get-volume", dev.location]);
+        } else {
+            _castExec("CAST_ADOPT " + dev.uuid, ["get-volume", dev.host, dev.port,
+                                                 dev.uuid, dev.deviceModel]);
+        }
+    }
+
+    // Description of a local output for the balance rows (falls back to the
+    // raw sink name — better than an empty label if the device just left).
+    function outputDescription(sinkId) {
+        var outs = mediaDevices.audioOutputs;
+        for (var i = 0; i < outs.length; i++)
+            if (String(outs[i].id) === String(sinkId)) return outs[i].description;
+        return String(sinkId);
+    }
+
     // ── Combined local output (every speaker in sync) ────────────────────────
     // PipeWire's module-combine-sink plays one stream on several sinks at
     // once with latency compensation: the faster (wired) outputs are delayed
@@ -1421,8 +1576,15 @@ PlasmoidItem {
             var s = sinks[i].replace(/'/g, "'\\''");
             var d = 60 + (sinks[i].indexOf("bluez_") === 0
                           ? (maxLag - lags[sinks[i]]) : maxLag);
+            // The sink rides along in the echo so the handler can pair module
+            // ids with sinks for the balance — /LB (\d+)/ readers are
+            // unaffected. The balance itself is baked in right here, in the
+            // same shell round, so every (re)build restores it atomically.
             cmds += "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
-                 + " sink='" + s + "' latency_msec=" + d + " channels=2) && echo \"LB $id\"; ";
+                 + " sink='" + s + "' latency_msec=" + d + " channels=2) && echo \"LB $id " + s + "\"";
+            var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
+            if (pct < 100) cmds += " && { " + _sinkInputVolCmd("$id", pct) + "}";
+            cmds += "; ";
         }
         return cmds;
     }
@@ -1447,13 +1609,28 @@ PlasmoidItem {
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
         var w = wired.replace(/'/g, "'\\''");
         var b = bt.replace(/'/g, "'\\''");
+        // A balance-trimmed loopback would mute the clicks on that speaker
+        // and the measurement would read as silence — raise OUR sink-inputs
+        // to full for the clicks and put the balance back right after.
+        var pre = "", post = "";
+        var calSinks = [wired, bt];
+        for (var ci = 0; ci < calSinks.length; ci++) {
+            var mod = _combineModuleForKey(_trimKeyForSink(calSinks[ci]));
+            var pct = Math.round(trimOf(_trimKeyForSink(calSinks[ci])) * 100);
+            if (mod !== "" && pct < 100) {
+                pre += _sinkInputVolCmd(mod, 100);
+                post += _sinkInputVolCmd(mod, pct);
+            }
+        }
         executable.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
             + " w='" + w + "'; b='" + b + "';"
             + " wv=$(pactl get-sink-volume \"$w\" | grep -o '[0-9]*%' | head -1);"
             + " bv=$(pactl get-sink-volume \"$b\" | grep -o '[0-9]*%' | head -1);"
             + " pactl set-sink-volume \"$w\" 55%; pactl set-sink-volume \"$b\" 55%;"
+            + " " + pre
             + " python3 '" + script + "' \"$w\" \"$b\";"
             + " pactl set-sink-volume \"$w\" \"${wv:-50%}\"; pactl set-sink-volume \"$b\" \"${bv:-50%}\";"
+            + " " + post
             + " true # " + (++_execSeq));
     }
 
@@ -1481,6 +1658,7 @@ PlasmoidItem {
         for (var i = 0; i < ids.length; i++)
             cmd += "pactl unload-module " + ids[i] + " 2>/dev/null; ";
         _combineLoopbackIds = [];
+        _combineLoopbackSinkByModule = {};
         _combineNullId = "";
         return cmd;
     }
@@ -1856,9 +2034,12 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (root._pendingCastVolumePct < 0 || root._castTargets.length === 0) return;
-            var level = (root._pendingCastVolumePct / 100).toFixed(3);
             for (var i = 0; i < root._castTargets.length; i++) {
                 var dev = root._castTargets[i];
+                // Master × balance: the one slider drives every room while
+                // each device keeps its own relative level.
+                var level = Math.min(1, (root._pendingCastVolumePct / 100)
+                                        * root.trimOf(dev.uuid)).toFixed(3);
                 if (dev.kind === "dlna") {
                     _castExec("CAST_VOL", ["dlna-volume", dev.location, level]);
                 } else {
@@ -2826,6 +3007,7 @@ PlasmoidItem {
         _loadHistory();
         _loadLiked();
         _loadRecSchedules();
+        _loadDeviceTrims();
         syncFavicons();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
@@ -2890,6 +3072,11 @@ PlasmoidItem {
         }
         function onRecSchedulesChanged() {
             _loadRecSchedules();
+        }
+        function onDeviceTrimsChanged() {
+            // Written back by our own persist timer too — reloading is cheap
+            // and keeps a second widget instance's balances in step.
+            _loadDeviceTrims();
         }
         target: Plasmoid.configuration
     }
@@ -3002,10 +3189,53 @@ PlasmoidItem {
                     dlNotification.text = i18n("The device could not play this station.");
                     dlNotification.iconName = "dialog-error";
                     dlNotification.sendEvent();
+                } else {
+                    // Playing — a device without a stored balance adopts the
+                    // loudness it is at right now (see _castAdoptTrim). The
+                    // uuid is read back from the argv this very command
+                    // carried, so a delayed result can't tag the wrong device.
+                    var puM = cmd.match(/'play' '[^']*' '[^']*' '([^']*)'/);
+                    var pUuid = puM ? puM[1] : "";
+                    if (pUuid === "") {
+                        var plM = cmd.match(/'dlna-play' '((?:'\\''|[^'])*)'/);
+                        if (plM) {
+                            var pLoc = plM[1].replace(/'\\''/g, "'");
+                            for (var pti = 0; pti < root._castTargets.length; pti++)
+                                if (root._castTargets[pti].location === pLoc) {
+                                    pUuid = root._castTargets[pti].uuid;
+                                    break;
+                                }
+                        }
+                    }
+                    var pIdx = root.castTargetIndex(pUuid);
+                    if (pIdx >= 0) root._castAdoptTrim(root._castTargets[pIdx]);
                 }
                 return;
             }
-            if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0) {
+            // Balance adoption: the device told us its current level; its
+            // ratio to the master becomes the stored balance — unless the
+            // user set one by hand while this was in flight.
+            if (cmd.indexOf(": CAST_ADOPT ") === 0) {
+                var adM = cmd.match(/^: CAST_ADOPT (\S+);/);
+                var adVol = (stdout || "").match(/__CAST_VOL__ ([0-9.]+)/);
+                if (adM && adVol && root._deviceTrims[adM[1]] === undefined) {
+                    var ratio = parseFloat(adVol[1]) / Math.max(0.05, root.targetVolume());
+                    if (isFinite(ratio)) {
+                        var adF = Math.max(0.05, Math.min(1, Math.round(ratio * 100) / 100));
+                        if (adF < 0.995) {
+                            var adTrims = {};
+                            for (var adK in root._deviceTrims) adTrims[adK] = root._deviceTrims[adK];
+                            adTrims[adM[1]] = adF;
+                            root._deviceTrims = adTrims;
+                            root._trimRev++;
+                            trimsPersistTimer.restart();
+                        }
+                    }
+                }
+                return;
+            }
+            if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0
+                || cmd.indexOf(": PW_TRIM;") === 0) {
                 return; // fire-and-forget
             }
             // Bluetooth: bluetoothctl availability + controller probe
@@ -3125,8 +3355,12 @@ PlasmoidItem {
                 var pwOut = stdout || "";
                 var nullM = pwOut.match(/NULL (\d+)/);
                 var lbIds = [];
-                var lbRe = /LB (\d+)/g, lbM;
-                while ((lbM = lbRe.exec(pwOut)) !== null) lbIds.push(lbM[1]);
+                var lbPairs = {};
+                var lbRe = /LB (\d+)(?: (\S+))?/g, lbM;
+                while ((lbM = lbRe.exec(pwOut)) !== null) {
+                    lbIds.push(lbM[1]);
+                    if (lbM[2]) lbPairs[lbM[1]] = lbM[2];
+                }
                 if (!nullM || lbIds.length === 0) {
                     // Nothing usable came up — take down whatever half did.
                     var junk = lbIds.slice();
@@ -3150,6 +3384,7 @@ PlasmoidItem {
                 }
                 root._combineNullId = nullM[1];
                 root._combineLoopbackIds = lbIds;
+                root._combineLoopbackSinkByModule = lbPairs;
                 if (!root._combineWantActive) {
                     // Turned off while loading — honor the user's last word.
                     var unw = root._combineUnloadCmd();
@@ -3167,8 +3402,12 @@ PlasmoidItem {
             if (cmd.indexOf(": PW_RELOOP;") === 0) {
                 root._combineReloopBusy = false;
                 var rlIds = [];
-                var rlRe = /LB (\d+)/g, rlM;
-                while ((rlM = rlRe.exec(stdout || "")) !== null) rlIds.push(rlM[1]);
+                var rlPairs = {};
+                var rlRe = /LB (\d+)(?: (\S+))?/g, rlM;
+                while ((rlM = rlRe.exec(stdout || "")) !== null) {
+                    rlIds.push(rlM[1]);
+                    if (rlM[2]) rlPairs[rlM[1]] = rlM[2];
+                }
                 if (root._combineReloopPending) {
                     root._combineReloopPending = false;
                     root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
@@ -3184,6 +3423,7 @@ PlasmoidItem {
                     return;
                 }
                 root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
+                root._combineLoopbackSinkByModule = rlPairs;
                 return;
             }
             if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0) {

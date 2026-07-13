@@ -79,6 +79,10 @@
             <label>Per-device Bluetooth lag in ms, keyed by MAC (JSON)</label>
             <default>{}</default>
         </entry>
+        <entry name="deviceTrims" type="String">
+            <label>Per-device volume balance, 0.05-1.0 of the master level (JSON: device id to factor)</label>
+            <default>{}</default>
+        </entry>
         <entry name="syncOffsetMs" type="Int">
             <label>Extra latency reported for Bluetooth sinks while the combined output is active (ms)</label>
             <default>0</default>
