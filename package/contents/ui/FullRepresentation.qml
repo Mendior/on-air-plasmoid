@@ -2309,7 +2309,22 @@ PlasmaExtras.Representation {
                     // page-switch handler.
                     focus: true
 
-                    contentItem: ColumnLayout {
+                    // The menu grew past what a small popup window can show
+                    // (headers, pairing, sync controls, three device lists) —
+                    // a QQC2 Popup cannot extend beyond its window, so
+                    // without a scroll container the TOP rows silently
+                    // clipped away on a minimum-height widget.
+                    contentItem: PlasmaComponents3.ScrollView {
+                        id: castMenuScroll
+                        implicitWidth: castMenuColumn.implicitWidth
+                        implicitHeight: Math.min(
+                            castMenuColumn.implicitHeight,
+                            fullRepresentation.height - Kirigami.Units.gridUnit * 3)
+                        contentWidth: availableWidth
+
+                        ColumnLayout {
+                        id: castMenuColumn
+                        width: castMenuScroll.availableWidth
                         spacing: Kirigami.Units.smallSpacing
 
                         // Title row — the menu is the one place everything
@@ -2785,6 +2800,7 @@ PlasmaExtras.Representation {
                             wrapMode: Text.Wrap
                             opacity: 0.6
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
                         }
                     }
                 }
