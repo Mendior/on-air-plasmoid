@@ -29,6 +29,8 @@ Commands (argv[1]):
   dlna-play   <location> <url> <ctype> <title>
   dlna-stop   <location>
   dlna-volume <location> <0.0..1.0>
+  get-volume      <host> <port> <uuid> <model>  -> "__CAST_VOL__ <0.0..1.0>"
+  dlna-get-volume <location>                    -> "__CAST_VOL__ <0.0..1.0>"
 
 Every command prints a sentinel the QML side matches on and always exits 0, so
 a missing optional dependency is a clean "feature unavailable", never a crash.
@@ -36,6 +38,7 @@ a missing optional dependency is a clean "feature unavailable", never a crash.
 import http.client
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -51,6 +54,7 @@ NO_LIB = "__NO_PYCHROMECAST__"
 OK = "__CAST_OK__"
 FAIL = "__CAST_FAIL__"
 DONE = "__CAST_DONE__"
+VOL = "__CAST_VOL__"
 
 # mDNS/SSDP discovery is bounded so the picker never spins forever on a
 # network with no devices; direct connections use a shorter socket timeout.
@@ -694,6 +698,46 @@ def cmd_dlna_volume(location, level):
         _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
 
 
+# Volume READS back the device's current level so the group-volume balance
+# can adopt it: a device joining the group keeps the loudness it already has
+# (its level/master ratio becomes its balance) instead of jumping to the
+# master level on the first slider move.
+
+def cmd_get_volume(host, port, uuid, model):
+    try:
+        pychromecast = _import()
+    except Exception:
+        _out(NO_LIB)
+        return
+    cast = None
+    try:
+        cast = _connect_host(pychromecast, host, port, uuid, model)
+        # wait() in _connect_host has already pulled a status; volume_level
+        # is 0.0–1.0 and covers speaker groups too (the group's own level).
+        _out("%s %.3f" % (VOL, max(0.0, min(1.0, float(cast.status.volume_level)))))
+    except Exception as exc:
+        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+    finally:
+        _disconnect(cast)
+
+
+def cmd_dlna_get_volume(location):
+    try:
+        dev = _describe_renderer(location)
+        if not dev or not dev["rendering"]:
+            _out("%s no RenderingControl" % FAIL)
+            return
+        data = _soap(dev["rendering"], RC_SERVICE, "GetVolume",
+                     "<InstanceID>0</InstanceID><Channel>Master</Channel>")
+        m = re.search(r"<CurrentVolume>\s*(\d+)", data)
+        if not m:
+            _out("%s no CurrentVolume in reply" % FAIL)
+            return
+        _out("%s %.3f" % (VOL, max(0.0, min(1.0, int(m.group(1)) / 100.0))))
+    except Exception as exc:
+        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+
+
 # ── entry points ─────────────────────────────────────────────────────────────
 
 def cmd_probe():
@@ -751,6 +795,10 @@ def main():
         cmd_dlna_stop(args[0])
     elif command == "dlna-volume" and len(args) >= 2:
         cmd_dlna_volume(args[0], args[1])
+    elif command == "get-volume" and len(args) >= 4:
+        cmd_get_volume(args[0], args[1], args[2], args[3])
+    elif command == "dlna-get-volume" and len(args) >= 1:
+        cmd_dlna_get_volume(args[0])
     else:
         _out("%s bad arguments" % FAIL)
 
