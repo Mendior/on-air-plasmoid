@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-13 12:09+0300\n"
+"POT-Creation-Date: 2026-07-13 12:34+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Ukrainian\n"
@@ -29,7 +29,7 @@ msgid "Audio"
 msgstr "Звук"
 
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2574
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2652
 msgid "Volume"
 msgstr "Гучність"
 
@@ -807,51 +807,75 @@ msgstr "Усі локальні виходи, синхронно"
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Грає одночасно на всіх під'єднаних колонках — дротові виходи затримуються, щоб іти в ногу з Bluetooth."
 
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2349
+msgid "Sync fine-tune"
+msgstr "Точне налаштування синхронізації"
+
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2363
+msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
+msgstr "Якщо Bluetooth-колонка все ще відстає від дротових, збільшуйте це, доки вони не заграють разом."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2397
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2378
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2412
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth вимкнено або адаптер недоступний — перевірте Системні параметри."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2389
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2423
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Немає спарованих Bluetooth-аудіопристроїв — спаруйте колонку один раз у Системних параметрах, і вона з'явиться тут."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2403
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2437
 msgid "%1 — connecting…"
 msgstr "%1 — з'єднання…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2426
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2455
+msgid "%1 — pairing…"
+msgstr "%1 — спарювання…"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2456
+msgid "%1 — new, click to pair"
+msgstr "%1 — новий, натисніть щоб спарувати"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2467
+msgid "Pair a new speaker…"
+msgstr "Спарувати нову колонку…"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2483
+msgid "Searching — put the speaker in pairing mode…"
+msgstr "Пошук — переведіть колонку в режим спарювання…"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2504
 msgid "WiFi & network"
 msgstr "WiFi та мережа"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2452
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2530
 msgid "%1 (speaker group)"
 msgstr "%1 (група динаміків)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2477
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2555
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Кожен пристрій буферизує потік самостійно, тому кімнати можуть грати з різницею в кілька секунд. Для ідеально синхронних динаміків згрупуйте їх у застосунку Google Home — група з'явиться тут як один пристрій."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2487
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2565
 msgid "Stop casting everywhere"
 msgstr "Зупинити відтворення на всіх пристроях"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2505
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2583
 msgid "Searching for devices…"
 msgstr "Пошук пристроїв…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2514
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2592
 msgid "No devices found on your network"
 msgstr "У вашій мережі не знайдено жодного пристрою"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2535
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2613
 msgid "Volume: "
 msgstr "Гучність: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2535
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2613
 msgid "(scroll to adjust)"
 msgstr "(прокрутіть, щоб змінити)"
 
@@ -887,111 +911,120 @@ msgstr "%1 пристроїв"
 msgid "All local outputs (On Air)"
 msgstr "Усі локальні виходи (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1812
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1880
 msgid "Station found at a new address"
 msgstr "Станцію знайдено за новою адресою"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1813
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1881
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 переїхала — нову адресу збережено у вашому списку."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2603
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2671
 msgid "Casting needs python-chromecast"
 msgstr "Трансляція потребує python-chromecast"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2604
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2672
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Встановіть пакунок python-chromecast, щоб транслювати на свої пристрої."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2608
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2676
 msgid "the device"
 msgstr "пристрій"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2608
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2676
 msgid "Could not cast to %1"
 msgstr "Не вдалося транслювати на %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2609
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2677
 msgid "The device could not play this station."
 msgstr "Пристрій не зміг відтворити цю станцію."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2654
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2722
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2782
 msgid "the Bluetooth device"
 msgstr "пристроєм Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2653
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2721
 msgid "Could not connect to %1"
 msgstr "Не вдалося з'єднатися з %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2655
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2723
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Переконайтеся, що динамік увімкнено і він у межах досяжності."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2690
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2781
+msgid "Could not pair with %1"
+msgstr "Не вдалося спарувати з %1"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2783
+msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
+msgstr "Переведіть колонку в режим спарювання (утримуйте кнопку Bluetooth) і спробуйте ще раз."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2804
 msgid "Could not combine the outputs"
 msgstr "Не вдалося об'єднати виходи"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2691
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2805
 msgid "pactl refused to create the combined output."
 msgstr "pactl відмовився створити об'єднаний вихід."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2790
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2905
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg не встановлено"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2791
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2906
 msgid "Install ffmpeg to record radio."
 msgstr "Встановіть ffmpeg, щоб записувати радіо."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2794
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2909
 msgid "Recording saved ✓ (%1)"
 msgstr "Запис збережено ✓ (%1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2798
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2913
 msgid "Recording interrupted (%1 captured)"
 msgstr "Запис перервано (записано %1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2800
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2915
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — файл значно менший, ніж очікувалося."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2804
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2919
 msgid "Recording failed"
 msgstr "Не вдалося записати"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2805
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2920
 msgid "The stream could not be captured."
 msgstr "Не вдалося захопити потік."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2827
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2942
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp не встановлено"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2828
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2943
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Встановіть yt-dlp (і ffmpeg), щоб завантажувати композиції."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2831
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2946
 msgid "Track downloaded ✓"
 msgstr "Композицію завантажено ✓"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2832
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2947
 msgid "Saved to: "
 msgstr "Збережено до: "
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2835
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2950
 msgid "Download failed"
 msgstr "Не вдалося завантажити"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2836
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2951
 msgid "Unknown error"
 msgstr "Невідома помилка"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3062
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3177
 msgid "Audio output changed"
 msgstr "Аудіовихід змінено"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3178
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Вибраний пристрій виводу зник — використовується типовий системний вихід."
 

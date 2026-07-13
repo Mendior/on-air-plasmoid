@@ -2336,6 +2336,40 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // Bluetooth speakers buffer more than they admit —
+                        // this nudges the wired outputs back until they match.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            Layout.rightMargin: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.smallSpacing
+                            visible: root._combineWantActive
+
+                            PlasmaComponents3.Label {
+                                text: i18n("Sync fine-tune")
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.7
+                            }
+                            PlasmaComponents3.Slider {
+                                id: syncSlider
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 400
+                                stepSize: 10
+                                value: Plasmoid.configuration.syncOffsetMs || 0
+                                onMoved: root.setSyncOffset(value)
+
+                                PlasmaComponents3.ToolTip {
+                                    text: i18n("If the Bluetooth speaker still trails the wired ones, raise this until they play together.")
+                                }
+                            }
+                            PlasmaComponents3.Label {
+                                text: Math.round(syncSlider.value) + " ms"
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.7
+                            }
+                        }
+
                         // Paired Bluetooth speakers/headphones that are not
                         // connected yet — one click connects and, once the
                         // sink appears, playback is routed onto it. Connected
@@ -2406,6 +2440,50 @@ PlasmaExtras.Representation {
                                 enabled: root._btConnectingMac === ""
                                 onToggled: connected ? root.btDisconnect(mac)
                                                      : root.btConnect(mac, name)
+                            }
+                        }
+
+                        // Freshly discovered, not yet paired — one click
+                        // pairs, trusts and connects, and the music follows.
+                        Repeater {
+                            model: btFoundModel
+                            delegate: PlasmaComponents3.ItemDelegate {
+                                required property string mac
+                                required property string name
+                                Layout.fillWidth: true
+                                text: root._btPairingMac === mac
+                                      ? i18n("%1 — pairing…", name)
+                                      : i18n("%1 — new, click to pair", name)
+                                icon.name: "list-add"
+                                enabled: root._btPairingMac === ""
+                                onClicked: root.btPairNew(mac, name)
+                            }
+                        }
+
+                        PlasmaComponents3.ItemDelegate {
+                            Layout.fillWidth: true
+                            visible: root._btAvailable && root._btControllerUp
+                                     && !root._btScanning
+                            text: i18n("Pair a new speaker…")
+                            icon.name: "edit-find"
+                            onClicked: root.btScan()
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            visible: root._btScanning
+                            spacing: Kirigami.Units.smallSpacing
+                            PlasmaComponents3.BusyIndicator {
+                                implicitWidth: Kirigami.Units.iconSizes.small
+                                implicitHeight: implicitWidth
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Searching — put the speaker in pairing mode…")
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.7
+                                wrapMode: Text.WordWrap
                             }
                         }
 
