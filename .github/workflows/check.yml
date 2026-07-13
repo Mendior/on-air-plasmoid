@@ -37,7 +37,7 @@ jobs:
           pacman -Syu --noconfirm --needed
           git which gettext python python-pytest ttf-dejavu dbus
           qt6-declarative qt6-multimedia-ffmpeg
-          plasma-sdk plasma-workspace plasma5support knotifications
+          plasma-sdk plasma-workspace plasma-desktop plasma5support knotifications
       - uses: actions/checkout@v4
       - name: Full check (lint + offscreen plasmoidviewer)
         run: dbus-run-session -- scripts/dev.sh check
