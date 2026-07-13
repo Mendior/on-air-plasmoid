@@ -2421,7 +2421,9 @@ PlasmaExtras.Representation {
                                 id: syncSlider
                                 Layout.fillWidth: true
                                 from: 0
-                                to: 500
+                                // Matches the calibration's sanity ceiling —
+                                // slow televisions really sit past 500 ms.
+                                to: 900
                                 stepSize: 10
                                 value: Plasmoid.configuration.syncOffsetMs || 0
                                 onMoved: root.setSyncOffset(value)

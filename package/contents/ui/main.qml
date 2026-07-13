@@ -1519,7 +1519,10 @@ PlasmoidItem {
     // The specific output that was selected before combining, so switching
     // the sync mode off restores it instead of dumping to the default.
     property string _combinePrevOutput: ""
-    readonly property string _combineSinkName: "onair_combined"
+    // Per-instance suffix (the stable applet id, same as MPRIS uses): the
+    // startup sweep may only reclaim THIS instance's orphans — a second
+    // widget or a plasmoidviewer run must not tear down a live combine.
+    readonly property string _combineSinkName: "onair_combined_" + _mprisId
 
     // Only real hardware ends. Virtual sinks (an equalizer's effect input,
     // other apps' null sinks) either double the audio through their own
@@ -1529,15 +1532,17 @@ PlasmoidItem {
         var res = [];
         for (var i = 0; i < outs.length; i++) {
             var oid = String(outs[i].id);
-            if (/^(alsa_output|bluez_output)/.test(oid)
-                && oid.indexOf(_combineSinkName) === -1)
+            // bluez_output = PipeWire, bluez_sink = plain PulseAudio — the
+            // combine must take Bluetooth along on both stacks.
+            if (/^(alsa_output|bluez_output|bluez_sink)/.test(oid)
+                && oid.indexOf("onair_combined") === -1)
                 res.push(oid);
         }
         return res;
     }
 
     function _btMacOfSink(sinkId) {
-        var m = String(sinkId).match(/^bluez_output\.([0-9A-Fa-f_]{17})/);
+        var m = String(sinkId).match(/^bluez_(?:output|sink)\.([0-9A-Fa-f_]{17})/);
         return m ? m[1].replace(/_/g, ":").toUpperCase() : "";
     }
 
@@ -1550,10 +1555,10 @@ PlasmoidItem {
             try {
                 var map = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
                 if (map[mac] !== undefined)
-                    return Math.max(0, Math.min(500, parseInt(map[mac], 10) || 0));
+                    return Math.max(0, Math.min(900, parseInt(map[mac], 10) || 0));
             } catch (e) {}
         }
-        return Math.max(0, Math.min(500, Plasmoid.configuration.syncOffsetMs || 0));
+        return Math.max(0, Math.min(900, Plasmoid.configuration.syncOffsetMs || 0));
     }
 
     // One loopback per hardware sink, each with a REAL buffer delay
@@ -1595,6 +1600,8 @@ PlasmoidItem {
     // the difference IS the lag, no ears needed. Volumes are raised for the
     // clicks (a too-quiet speaker measures as silence) and restored after.
     property bool _calibrating: false
+    // Stream volume to put back after calibration (-1 = nothing to restore).
+    property real _calibVolumeBefore: -1
 
     function calibrateSync() {
         if (_calibrating || !_combineActive) return;
@@ -1606,6 +1613,15 @@ PlasmoidItem {
         }
         if (wired === "" || bt === "") return;
         _calibrating = true;
+        // The natural moment to calibrate is WHILE listening — but program
+        // audio through the live loopbacks either drowns the clicks (every
+        // measurement fails) or a drum hit beats them in the peak search and
+        // a plausible-but-wrong lag gets persisted for the device. Silence
+        // the stream at its source for the measurement; the clicks are
+        // played straight at the sinks and don't pass through it.
+        _calibVolumeBefore = playMusicOutput.volume;
+        playMusicOutput.volume = 0;
+        calibGuardTimer.restart();
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
         var w = wired.replace(/'/g, "'\\''");
         var b = bt.replace(/'/g, "'\\''");
@@ -1624,15 +1640,26 @@ PlasmoidItem {
         }
         executable.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
             + " w='" + w + "'; b='" + b + "';"
-            + " wv=$(pactl get-sink-volume \"$w\" | grep -o '[0-9]*%' | head -1);"
-            + " bv=$(pactl get-sink-volume \"$b\" | grep -o '[0-9]*%' | head -1);"
+            + " wv=$(pactl get-sink-volume \"$w\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
+            + " bv=$(pactl get-sink-volume \"$b\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
             + " pactl set-sink-volume \"$w\" 55%; pactl set-sink-volume \"$b\" 55%;"
             + " " + pre
             + " python3 '" + script + "' \"$w\" \"$b\";"
-            + " pactl set-sink-volume \"$w\" \"${wv:-50%}\"; pactl set-sink-volume \"$b\" \"${bv:-50%}\";"
+            // Unquoted on purpose: $wv/$bv hold one %-value PER CHANNEL and
+            // word-splitting hands pactl each as its own argument, so a
+            // left/right balance survives the round-trip. An unreadable
+            // volume falls back to the 55% the calibration itself used.
+            + " pactl set-sink-volume \"$w\" ${wv:-55%}; pactl set-sink-volume \"$b\" ${bv:-55%};"
             + " " + post
             + " true # " + (++_execSeq));
     }
+
+    // Every load carries this generation: PipeWire happily loads a SECOND
+    // null sink under the same name, so a stale in-flight load landing after
+    // an enable→disable→enable would otherwise be adopted next to the live
+    // set — every speaker gets two differently-delayed loopbacks (phasing)
+    // and the first set leaks until the next session's sweep.
+    property int _combineLoadSeq: 0
 
     function combineOutputsEnable() {
         if (!_combineAvailable || _combineWantActive) return;
@@ -1640,11 +1667,12 @@ PlasmoidItem {
         if (sinks.length < 2) return;
         _combineWantActive = true;
         _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
+        Plasmoid.configuration.combinePrevOutput = _combinePrevOutput;
         _combineSinksSnapshot = sinks.join("|");
         // Human name for the sink — this is what the output picker (ours and
         // the system volume applet) shows instead of the raw node name.
         var desc = i18n("All local outputs (On Air)").replace(/"/g, "").replace(/'/g, "'\\''");
-        executable.exec(": PW_COMBINE; m=$(pactl load-module module-null-sink"
+        executable.exec(": PW_COMBINE " + (++_combineLoadSeq) + "; m=$(pactl load-module module-null-sink"
                         + " sink_name=" + _combineSinkName + " channels=2"
                         + " sink_properties='device.description=\"" + desc + "\"')"
                         + " && echo \"NULL $m\" && " + _combineLoopbackCmds(sinks) + "true"
@@ -1677,6 +1705,7 @@ PlasmoidItem {
         // its removal is not a "device vanished" event worth a notification.
         setAudioOutputDevice(_combinePrevOutput);
         _combinePrevOutput = "";
+        Plasmoid.configuration.combinePrevOutput = "";
         var un = _combineUnloadCmd();
         if (un !== "") executable.exec(": PW_UNCOMBINE; " + un + "true");
     }
@@ -1727,6 +1756,26 @@ PlasmoidItem {
         interval: 300
         repeat: false
         onTriggered: root._combineRebuildLoopbacks()
+    }
+
+    // Restore the stream volume muted for the calibration clicks. Skipped if
+    // the user moved the slider themselves meanwhile — their word wins.
+    function _calibRestoreVolume() {
+        if (_calibVolumeBefore >= 0 && playMusicOutput.volume === 0)
+            playMusicOutput.volume = _calibVolumeBefore;
+        _calibVolumeBefore = -1;
+    }
+
+    Timer {
+        id: calibGuardTimer
+        // calibrate.py is internally bounded well under this — the guard only
+        // exists so a lost result can't leave the stream muted forever.
+        interval: 60000
+        repeat: false
+        onTriggered: {
+            root._calibrating = false;
+            root._calibRestoreVolume();
+        }
     }
 
     function _combineTryRoute() {
@@ -3015,11 +3064,20 @@ PlasmoidItem {
         btProbe();
         executable.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
         // A crashed session can orphan the combined-output module — PipeWire
-        // keeps it loaded forever. Sweep any module of ours at startup (the
-        // sink name is our own constant, so this can't touch user modules).
+        // keeps it loaded forever. Sweep THIS instance's modules at startup
+        // (per-instance sink name; a second widget's live combine survives),
+        // plus the suffix-less name pre-2026.14 versions used.
         executable.exec(": PW_COMBINE_CLEAN; for m in $(pactl list short modules 2>/dev/null"
-                        + " | awk '/" + _combineSinkName + "/ {print $1}'); do"
+                        + " | awk '/" + _combineSinkName + "([^0-9]|$)|onair_combined([^_0-9]|$)/ {print $1}'); do"
                         + " pactl unload-module \"$m\"; done; true");
+        // The same crash leaves the persisted output pointing at the sink
+        // that was just swept — put the user's real choice back before the
+        // routing below applies it. (In-session disable restores it itself;
+        // this only ever runs after an unclean shutdown.)
+        if ((Plasmoid.configuration.audioOutputDevice || "").indexOf("onair_combined") !== -1) {
+            Plasmoid.configuration.audioOutputDevice = Plasmoid.configuration.combinePrevOutput || "";
+            Plasmoid.configuration.combinePrevOutput = "";
+        }
         _ensureMusicDir();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
@@ -3322,6 +3380,14 @@ PlasmoidItem {
                     for (var pi = btFoundModel.count - 1; pi >= 0; pi--)
                         if (btFoundModel.get(pi).mac === pairedMac) btFoundModel.remove(pi);
                     if (pairOut.indexOf("Connection successful") !== -1) {
+                        // Pairing may legitimately outlast the route timeout
+                        // (agent prompts, slow speakers): the pending MAC may
+                        // already be swept. Re-arm it from the MAC this very
+                        // command paired and give the sink the FULL wait
+                        // window from now, like the plain-connect path does.
+                        if (root._btPendingSinkMac === "" && pairedMac !== "")
+                            root._btPendingSinkMac = pairedMac;
+                        btRouteTimeout.restart();
                         // The sink may already be up — route now, not never.
                         root._btTryRoutePending();
                     } else {
@@ -3351,7 +3417,7 @@ PlasmoidItem {
             }
             // Combined local output created — route onto it when its sink
             // shows up in mediaDevices (usually instantly).
-            if (cmd.indexOf(": PW_COMBINE;") === 0) {
+            if (/^: PW_COMBINE \d+;/.test(cmd)) {
                 var pwOut = stdout || "";
                 var nullM = pwOut.match(/NULL (\d+)/);
                 var lbIds = [];
@@ -3360,6 +3426,20 @@ PlasmoidItem {
                 while ((lbM = lbRe.exec(pwOut)) !== null) {
                     lbIds.push(lbM[1]);
                     if (lbM[2]) lbPairs[lbM[1]] = lbM[2];
+                }
+                // A load from a superseded enable (enable→disable→enable
+                // while it was in flight): its modules are strays next to
+                // the current generation's — unload them, touch no state.
+                var seqM = cmd.match(/^: PW_COMBINE (\d+);/);
+                if (!seqM || parseInt(seqM[1], 10) !== root._combineLoadSeq
+                    || root._combineActive) {
+                    var stale = lbIds.slice();
+                    if (nullM) stale.push(nullM[1]);
+                    var uns = "";
+                    for (var sui = 0; sui < stale.length; sui++)
+                        uns += "pactl unload-module " + stale[sui] + " 2>/dev/null; ";
+                    if (uns !== "") executable.exec(": PW_UNCOMBINE; " + uns + "true");
+                    return;
                 }
                 if (!nullM || lbIds.length === 0) {
                     // Nothing usable came up — take down whatever half did.
@@ -3408,18 +3488,22 @@ PlasmoidItem {
                     rlIds.push(rlM[1]);
                     if (rlM[2]) rlPairs[rlM[1]] = rlM[2];
                 }
-                if (root._combineReloopPending) {
-                    root._combineReloopPending = false;
-                    root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
-                    root._combineRebuildLoopbacks();
-                    return;
-                }
+                // Disabled-while-rebuilding must win over a queued rebuild:
+                // the pending branch used to run first, adopt the fresh ids
+                // into a rebuild that early-returns on !_combineActive, and
+                // strand the modules for the whole session.
                 if (!root._combineActive) {
-                    // Disabled while rebuilding — these are orphans now.
+                    root._combineReloopPending = false;
                     var unr = "";
                     for (var ri = 0; ri < rlIds.length; ri++)
                         unr += "pactl unload-module " + rlIds[ri] + " 2>/dev/null; ";
                     if (unr !== "") executable.exec(": PW_UNCOMBINE; " + unr + "true");
+                    return;
+                }
+                if (root._combineReloopPending) {
+                    root._combineReloopPending = false;
+                    root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
+                    root._combineRebuildLoopbacks();
                     return;
                 }
                 root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
@@ -3432,10 +3516,15 @@ PlasmoidItem {
             // Microphone calibration finished — apply and remember the lag.
             if (cmd.indexOf(": PW_CALIB") === 0) {
                 root._calibrating = false;
+                calibGuardTimer.stop();
+                root._calibRestoreVolume();
                 var okM = (stdout || "").match(/CALIB_OK (\d+)/);
                 var macM = cmd.match(/^: PW_CALIB ([0-9A-F:]{17}) /);
                 if (okM) {
-                    var calMs = Math.max(0, Math.min(500, parseInt(okM[1], 10)));
+                    // Same ceiling as calibrate.py's own sanity window — a
+                    // 600 ms television is a real measurement, not an error,
+                    // and clamping it to 500 would report a made-up number.
+                    var calMs = Math.max(0, Math.min(900, parseInt(okM[1], 10)));
                     Plasmoid.configuration.syncOffsetMs = calMs;
                     if (macM) {
                         try {
@@ -3834,6 +3923,17 @@ PlasmoidItem {
     // must not be routed to, let alone persisted as the chosen output.
     function _btTryRoutePending() {
         if (_btPendingSinkMac === "") return false;
+        // While the combined output is (becoming) active it owns the
+        // routing: a just-connected speaker JOINS it through the loopback
+        // rebuild. Stealing the stream onto the speaker alone would leave
+        // the combined sink feeding silence to every other output — with
+        // the sync checkbox still reading on.
+        if (_combineWantActive || _combineActive) {
+            _btPendingSinkMac = "";
+            _btPendingSinkName = "";
+            btRouteTimeout.stop();
+            return false;
+        }
         var macToken = _btPendingSinkMac.toLowerCase().replace(/:/g, "_");
         var pendingName = _btPendingSinkName.toLowerCase();
         var outs = mediaDevices.audioOutputs;

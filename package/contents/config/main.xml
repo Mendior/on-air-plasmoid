@@ -87,6 +87,10 @@
             <label>Extra latency reported for Bluetooth sinks while the combined output is active (ms)</label>
             <default>0</default>
         </entry>
+        <entry name="combinePrevOutput" type="String">
+            <label>Output device chosen before the combined output was enabled — restored when a session ends uncleanly</label>
+            <default></default>
+        </entry>
         <entry name="autoHeal" type="bool">
             <label>When a saved station's stream dies, look up its current address on radio-browser.info and follow it</label>
             <default>true</default>
