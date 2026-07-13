@@ -25,6 +25,7 @@ KCM.SimpleKCM {
     property alias cfg_mprisEnabled: mprisCheck.checked
     property alias cfg_autoBitrate: autoBitrateCheck.checked
     property alias cfg_autoHeal: autoHealCheck.checked
+    property alias cfg_reportClicks: reportClicksCheck.checked
     property alias cfg_followSystemAccent: accentCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
@@ -84,6 +85,14 @@ KCM.SimpleKCM {
 
             QQC2.ToolTip.visible: hovered
             QQC2.ToolTip.text: i18n("Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list")
+        }
+
+        QQC2.CheckBox {
+            id: reportClicksCheck
+            text: i18n("Count my listening in the worldwide station catalog")
+
+            QQC2.ToolTip.visible: hovered
+            QQC2.ToolTip.text: i18n("When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone")
         }
 
         Kirigami.Separator {

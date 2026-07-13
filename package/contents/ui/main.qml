@@ -1046,7 +1046,7 @@ PlasmoidItem {
     // ⭐ on an internet result: add the station PERMANENTLY to the list + favorites.
     // Playback is NOT started; if the same station is already previewing, it
     // continues uninterrupted (now as an "own" station).
-    function addStationToList(name, url, favicon, makeFavorite) {
+    function addStationToList(name, url, favicon, makeFavorite, rbUuid) {
         if (!url) return;
         const keepPlaying = isPlaying() && root._previewUrl === url;
         // The config write below stops playback (onServersChanged). If a regular
@@ -1065,7 +1065,10 @@ PlasmoidItem {
                 }
             }
             const stName = (name || url).toString();
-            servers.push({ "active": true, "hostname": url, "name": stName, "favicon": favicon || "" });
+            // The radio-browser uuid rides along from the search result — it
+            // is the station's identity for clicks/votes, free at add time.
+            servers.push({ "active": true, "hostname": url, "name": stName,
+                           "favicon": favicon || "", "uuid": rbUuid || "" });
             // This triggers onServersChanged → reloadStationsModel (stop + reload),
             // so we continue only after an event-loop cycle.
             Plasmoid.configuration.servers = JSON.stringify(servers);
@@ -1935,6 +1938,204 @@ PlasmoidItem {
         }
     }
 
+    // ── Thanking stations: clicks and votes on radio-browser.info ───────────
+    // The catalog this widget already searches and heals from ranks stations
+    // by clicks and votes. Reporting a click when playback actually starts
+    // (anonymous — station id only) and letting the user vote is how every
+    // well-behaved radio-browser app gives back; stations become easier to
+    // find for everyone. Clicks can be turned off in settings.
+    property var _clickSent: ({})        // orig url → epoch ms of last click
+    property var _voteLockMap: ({})      // orig url → epoch ms of last vote
+    property string _voteStatus: ""      // ""|"busy"|"voted" for the CURRENT station
+    property var _uuidFailed: ({})       // orig url → epoch ms of failed resolve
+
+    // The config entry of the station playing NOW (by the configured URL).
+    function _stationEntry() {
+        if (_currentOrigUrl === "" || root._previewUrl !== "") return null;
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            for (var i = 0; i < servers.length; i++)
+                if ((servers[i].hostname || "") === _currentOrigUrl) return servers[i];
+        } catch (e) {}
+        return null;
+    }
+
+    // radio-browser identity of the current station. Stored with the station
+    // on first resolve; stations added from the search carry it from birth.
+    function _rbResolveUuid(onUuid) {
+        var entry = _stationEntry();
+        if (!entry) return;
+        if (entry.uuid) { onUuid(entry.uuid); return; }
+        var orig = entry.hostname;
+        var now = Date.now();
+        if (_uuidFailed[orig] !== undefined && now - _uuidFailed[orig] < 86400000) return;
+        var name = (entry.name || "").toString();
+        if (name === "") return;
+        var servers = ["de1", "de2", "nl1", "at1", "fi1"];
+        var srv = servers[Math.floor(Math.random() * servers.length)];
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
+                + encodeURIComponent(name) + "&limit=30");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== xhr.DONE) return;
+            _clearXhrTimeout(guard);
+            var uuid = "";
+            if (xhr.status === 200) {
+                try {
+                    var results = JSON.parse(xhr.responseText) || [];
+                    var origNoProto = orig.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
+                    for (var i = 0; i < results.length; i++) {
+                        var u = (results[i].url_resolved || results[i].url || "").toString()
+                                .replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
+                        if (u === origNoProto) { uuid = results[i].stationuuid || ""; break; }
+                    }
+                } catch (e) {}
+            }
+            if (uuid === "") { _uuidFailed[orig] = Date.now(); return; }
+            _rbStoreUuid(orig, uuid);
+            onUuid(uuid);
+        };
+        guard = _armXhrTimeout(xhr, 5000);
+        xhr.send();
+    }
+
+    function _rbStoreUuid(orig, uuid) {
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            for (var i = 0; i < servers.length; i++) {
+                if ((servers[i].hostname || "") !== orig) continue;
+                servers[i].uuid = uuid;
+                _reorderKeepPlaying = true; // identity write must not stop playback
+                Plasmoid.configuration.servers = JSON.stringify(servers);
+                return;
+            }
+        } catch (e) {}
+    }
+
+    // Anonymous "someone is listening" ping, at most once per station per 4 h.
+    function _maybeSendClick() {
+        if (!Plasmoid.configuration.reportClicks) return;
+        var entry = _stationEntry();
+        if (!entry) return;
+        var now = Date.now();
+        if (_clickSent[entry.hostname] !== undefined
+            && now - _clickSent[entry.hostname] < 14400000) return;
+        _clickSent[entry.hostname] = now;
+        _rbResolveUuid(function(uuid) {
+            var servers = ["de1", "de2", "nl1", "at1", "fi1"];
+            var srv = servers[Math.floor(Math.random() * servers.length)];
+            var xhr = new XMLHttpRequest();
+            var guard = null;
+            xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/url/" + uuid);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== xhr.DONE) return;
+                _clearXhrTimeout(guard);
+            };
+            guard = _armXhrTimeout(xhr, 4000);
+            xhr.send();
+        });
+    }
+
+    // The 👍 — one vote per station per 10 minutes (the API's own limit).
+    function voteCurrentStation() {
+        var entry = _stationEntry();
+        if (!entry || _voteStatus !== "") return;
+        _voteStatus = "busy";
+        var votedUrl = entry.hostname;
+        _rbResolveUuid(function(uuid) {
+            var servers = ["de1", "de2", "nl1", "at1", "fi1"];
+            var srv = servers[Math.floor(Math.random() * servers.length)];
+            var xhr = new XMLHttpRequest();
+            var guard = null;
+            xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/vote/" + uuid);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== xhr.DONE) return;
+                _clearXhrTimeout(guard);
+                var ok = false;
+                try { ok = JSON.parse(xhr.responseText).ok === true; } catch (e) {}
+                if (ok) {
+                    root._voteLockMap[votedUrl] = Date.now();
+                    if (root._currentOrigUrl === votedUrl) root._voteStatus = "voted";
+                } else if (root._currentOrigUrl === votedUrl && root._voteStatus === "busy") {
+                    root._voteStatus = "";
+                }
+            };
+            guard = _armXhrTimeout(xhr, 5000);
+            xhr.send();
+        });
+        // The resolve may fail silently — release the button after a beat.
+        voteResetTimer.restart();
+    }
+
+    Timer {
+        id: voteResetTimer
+        interval: 8000
+        repeat: false
+        onTriggered: if (root._voteStatus === "busy") root._voteStatus = ""
+    }
+
+    // ── Liked songs (❤️) — a local list, persisted like the history ──────────
+    ListModel { id: likedModel }
+    property int _likedRev: 0
+
+    function _loadLiked() {
+        try {
+            const arr = JSON.parse(Plasmoid.configuration.likedSongs || "[]");
+            likedModel.clear();
+            for (var i = 0; i < arr.length && i < 500; i++)
+                likedModel.append({ "artist": arr[i].artist || "", "trackName": arr[i].trackName || "",
+                                    "station": arr[i].station || "", "when": arr[i].when || "" });
+        } catch (e) {}
+        _likedRev++;
+    }
+
+    function _saveLiked() {
+        const arr = [];
+        for (var i = 0; i < likedModel.count; i++) {
+            const l = likedModel.get(i);
+            arr.push({ "artist": l.artist, "trackName": l.trackName, "station": l.station, "when": l.when });
+        }
+        Plasmoid.configuration.likedSongs = JSON.stringify(arr);
+    }
+
+    function _likedIndexOf(artist, trackName) {
+        for (var i = 0; i < likedModel.count; i++) {
+            const l = likedModel.get(i);
+            if (l.trackName === trackName && l.artist === artist) return i;
+        }
+        return -1;
+    }
+
+    function isCurrentTrackLiked() {
+        void _likedRev; // rebinds the UI when the list changes
+        if (root.trackTitle === "") return false;
+        return _likedIndexOf(root.trackArtist, root.trackTitle) !== -1;
+    }
+
+    function toggleLikeCurrent() {
+        if (root.trackTitle === "") return;
+        var idx = _likedIndexOf(root.trackArtist, root.trackTitle);
+        if (idx !== -1) {
+            likedModel.remove(idx);
+        } else {
+            var d = new Date();
+            var when = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+            likedModel.insert(0, { "artist": root.trackArtist, "trackName": root.trackTitle,
+                                   "station": root.currentStation, "when": when });
+            while (likedModel.count > 500) likedModel.remove(likedModel.count - 1);
+        }
+        _likedRev++;
+        _saveLiked();
+    }
+
+    function removeLiked(index) {
+        if (index < 0 || index >= likedModel.count) return;
+        likedModel.remove(index);
+        _likedRev++;
+        _saveLiked();
+    }
+
     function _playStation(station) {
         // A user-initiated play always outranks a heal audition in flight.
         _healClearPending();
@@ -2536,7 +2737,12 @@ PlasmoidItem {
         _mprisQueueWrite();
     }
 
-    onCurrentStationChanged: _mprisQueueWrite()
+    onCurrentStationChanged: {
+        _mprisQueueWrite();
+        var e = _stationEntry();
+        _voteStatus = (e && _voteLockMap[e.hostname] !== undefined
+                       && Date.now() - _voteLockMap[e.hostname] < 600000) ? "voted" : "";
+    }
     onAlbumArtUrlChanged: _mprisQueueWrite()
 
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground | PlasmaCore.Types.ConfigurableBackground
@@ -2547,6 +2753,7 @@ PlasmoidItem {
         console.log("[ARP] widget loaded");
         reloadStationsModel();
         _loadHistory();
+        _loadLiked();
         _loadRecSchedules();
         syncFavicons();
         playMusicOutput.volume = targetVolume();
@@ -3158,6 +3365,13 @@ PlasmoidItem {
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && !root._favSyncedOnPlay) {
                 root._favSyncedOnPlay = true;
                 syncFavicons();
+            }
+            // Playback REALLY started — worth an anonymous click for the
+            // station's catalog ranking (not on the play button; a stream
+            // that never buffers earned nothing).
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying()
+                && playMusic.source.toString().indexOf("file://") !== 0) {
+                _maybeSendClick();
             }
             // A healed address proves itself by actually buffering — only
             // then is it saved over the dead one.
