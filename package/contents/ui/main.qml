@@ -1354,44 +1354,81 @@ PlasmoidItem {
     // stayed on against an unchecked box.
     property bool _combineWantActive: false
     property bool _combineActive: false
-    property string _combineModuleId: ""
+    property string _combineNullId: ""
+    property var _combineLoopbackIds: []
+    property string _combineSinksSnapshot: ""
     property bool _combinePendingRoute: false
     // The specific output that was selected before combining, so switching
     // the sync mode off restores it instead of dumping to the default.
     property string _combinePrevOutput: ""
     readonly property string _combineSinkName: "onair_combined"
 
-    function combineOutputsEnable() {
-        if (!_combineAvailable || _combineWantActive) return;
+    // Only real hardware ends. Virtual sinks (an equalizer's effect input,
+    // other apps' null sinks) either double the audio through their own
+    // output path — audible phasing no delay can ever fix — or lead nowhere.
+    function _combineRealSinks() {
         var outs = mediaDevices.audioOutputs;
-        var slaves = [];
+        var res = [];
         for (var i = 0; i < outs.length; i++) {
             var oid = String(outs[i].id);
-            if (oid.indexOf(_combineSinkName) === -1) slaves.push(oid);
+            if (/^(alsa_output|bluez_output)/.test(oid)
+                && oid.indexOf(_combineSinkName) === -1)
+                res.push(oid);
         }
-        if (slaves.length < 2) return;
+        return res;
+    }
+
+    // One loopback per hardware sink, each with a REAL buffer delay
+    // (latency_msec) — deterministic, unlike latency compensation that
+    // trusts what a Bluetooth box claims about itself. Bluetooth keeps the
+    // base only (its in-box buffering IS the lag being matched); the wired
+    // outputs wait by the user-tuned offset on top. Stereo is pinned.
+    function _combineLoopbackCmds(sinks) {
+        var ms = Math.max(0, Math.min(500, Plasmoid.configuration.syncOffsetMs || 0));
+        var cmds = "";
+        for (var i = 0; i < sinks.length; i++) {
+            var s = sinks[i].replace(/'/g, "'\\''");
+            var d = 60 + (sinks[i].indexOf("bluez_") === 0 ? 0 : ms);
+            cmds += "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
+                 + " sink='" + s + "' latency_msec=" + d + " channels=2) && echo \"LB $id\"; ";
+        }
+        return cmds;
+    }
+
+    function combineOutputsEnable() {
+        if (!_combineAvailable || _combineWantActive) return;
+        var sinks = _combineRealSinks();
+        if (sinks.length < 2) return;
         _combineWantActive = true;
         _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
-        var safeSlaves = slaves.join(",").replace(/'/g, "'\\''");
+        _combineSinksSnapshot = sinks.join("|");
         // Human name for the sink — this is what the output picker (ours and
         // the system volume applet) shows instead of the raw node name.
         var desc = i18n("All local outputs (On Air)").replace(/"/g, "").replace(/'/g, "'\\''");
-        // NB: comma is pactl's slave separator — PipeWire node names
-        // (alsa_output.*, bluez_output.*) never contain one.
-        executable.exec(": PW_COMBINE; pactl load-module module-combine-sink"
-                        + " sink_name=" + _combineSinkName
-                        + " slaves='" + safeSlaves + "'"
-                        + " sink_properties='device.description=\"" + desc + "\"'"
-                        + " latency_compensate=yes"
+        executable.exec(": PW_COMBINE; m=$(pactl load-module module-null-sink"
+                        + " sink_name=" + _combineSinkName + " channels=2"
+                        + " sink_properties='device.description=\"" + desc + "\"')"
+                        + " && echo \"NULL $m\" && " + _combineLoopbackCmds(sinks) + "true"
                         + " # " + (++_execSeq));
+    }
+
+    function _combineUnloadCmd() {
+        var ids = _combineLoopbackIds.slice();
+        if (_combineNullId !== "") ids.push(_combineNullId);
+        var cmd = "";
+        for (var i = 0; i < ids.length; i++)
+            cmd += "pactl unload-module " + ids[i] + " 2>/dev/null; ";
+        _combineLoopbackIds = [];
+        _combineNullId = "";
+        return cmd;
     }
 
     function combineOutputsDisable() {
         if (!_combineWantActive) return;
         _combineWantActive = false;
-        if (!_combineActive && _combineModuleId === "") {
+        if (!_combineActive && _combineNullId === "") {
             // The load is still in flight — the PW_COMBINE handler sees the
-            // intent withdrawn and unloads the module the moment it lands.
+            // intent withdrawn and unloads everything the moment it lands.
             return;
         }
         _combineActive = false;
@@ -1400,24 +1437,23 @@ PlasmoidItem {
         // its removal is not a "device vanished" event worth a notification.
         setAudioOutputDevice(_combinePrevOutput);
         _combinePrevOutput = "";
-        if (_combineModuleId !== "") {
-            executable.exec(": PW_UNCOMBINE; pactl unload-module "
-                            + _combineModuleId + "; true");
-            _combineModuleId = "";
-        }
+        var un = _combineUnloadCmd();
+        if (un !== "") executable.exec(": PW_UNCOMBINE; " + un + "true");
     }
 
-    // Residual Bluetooth lag: A2DP speakers buffer inside the box beyond
-    // what they report, so latency compensation alone can leave them
-    // trailing ~100-200 ms. The user-tuned offset is fed to PipeWire as
-    // extra reported latency on every Bluetooth sink — the combined output
-    // then holds the wired speakers back by that much more.
-    function _applySyncOffset() {
-        var ns = Math.max(0, Math.min(500, Plasmoid.configuration.syncOffsetMs || 0)) * 1000000;
-        executable.exec(": PW_OFFSET; for n in $(pactl list short sinks 2>/dev/null"
-            + " | cut -f2 | grep '^bluez_output'); do"
-            + " pw-cli set-param \"$n\" Props '{ latencyOffsetNsec: " + ns + " }' >/dev/null 2>&1;"
-            + " done; true # " + (++_execSeq));
+    // Swap the loopbacks under a live null sink: the player keeps feeding
+    // onair_combined uninterrupted while the delays change (slider move,
+    // Bluetooth sink came or went).
+    function _combineRebuildLoopbacks() {
+        if (!_combineActive) return;
+        var sinks = _combineRealSinks();
+        _combineSinksSnapshot = sinks.join("|");
+        var un = "";
+        for (var i = 0; i < _combineLoopbackIds.length; i++)
+            un += "pactl unload-module " + _combineLoopbackIds[i] + " 2>/dev/null; ";
+        _combineLoopbackIds = [];
+        executable.exec(": PW_RELOOP; " + un + _combineLoopbackCmds(sinks) + "true"
+                        + " # " + (++_execSeq));
     }
 
     function setSyncOffset(ms) {
@@ -1429,7 +1465,7 @@ PlasmoidItem {
         id: syncOffsetDebounce
         interval: 300
         repeat: false
-        onTriggered: root._applySyncOffset()
+        onTriggered: root._combineRebuildLoopbacks()
     }
 
     function _combineTryRoute() {
@@ -2511,7 +2547,7 @@ PlasmoidItem {
         // keeps it loaded forever. Sweep any module of ours at startup (the
         // sink name is our own constant, so this can't touch user modules).
         executable.exec(": PW_COMBINE_CLEAN; for m in $(pactl list short modules 2>/dev/null"
-                        + " | awk '/module-combine-sink/ && /" + _combineSinkName + "/ {print $1}'); do"
+                        + " | awk '/" + _combineSinkName + "/ {print $1}'); do"
                         + " pactl unload-module \"$m\"; done; true");
         _ensureMusicDir();
         _applyAudioOutputDevice();
@@ -2797,8 +2833,19 @@ PlasmoidItem {
             // Combined local output created — route onto it when its sink
             // shows up in mediaDevices (usually instantly).
             if (cmd.indexOf(": PW_COMBINE;") === 0) {
-                var modId = parseInt((stdout || "").trim(), 10);
-                if (isNaN(modId)) {
+                var pwOut = stdout || "";
+                var nullM = pwOut.match(/NULL (\d+)/);
+                var lbIds = [];
+                var lbRe = /LB (\d+)/g, lbM;
+                while ((lbM = lbRe.exec(pwOut)) !== null) lbIds.push(lbM[1]);
+                if (!nullM || lbIds.length === 0) {
+                    // Nothing usable came up — take down whatever half did.
+                    var junk = lbIds.slice();
+                    if (nullM) junk.push(nullM[1]);
+                    var unj = "";
+                    for (var ji = 0; ji < junk.length; ji++)
+                        unj += "pactl unload-module " + junk[ji] + " 2>/dev/null; ";
+                    if (unj !== "") executable.exec(": PW_UNCOMBINE; " + unj + "true");
                     root._combineWantActive = false;
                     root._combinePrevOutput = "";
                     dlNotification.title = i18n("Could not combine the outputs");
@@ -2807,18 +2854,35 @@ PlasmoidItem {
                     dlNotification.sendEvent();
                     return;
                 }
+                root._combineNullId = nullM[1];
+                root._combineLoopbackIds = lbIds;
                 if (!root._combineWantActive) {
-                    // Turned off while the module was loading — honor the
-                    // user's last word and unload it straight away.
-                    executable.exec(": PW_UNCOMBINE; pactl unload-module " + modId + "; true");
+                    // Turned off while loading — honor the user's last word.
+                    var unw = root._combineUnloadCmd();
+                    if (unw !== "") executable.exec(": PW_UNCOMBINE; " + unw + "true");
                     root._combinePrevOutput = "";
                     return;
                 }
-                root._combineModuleId = String(modId);
                 root._combineActive = true;
                 root._combinePendingRoute = true;
-                root._applySyncOffset();
                 root._combineTryRoute();
+                return;
+            }
+            // Loopbacks swapped under the live null sink (slider / sink set
+            // changed) — adopt the fresh module ids.
+            if (cmd.indexOf(": PW_RELOOP;") === 0) {
+                var rlIds = [];
+                var rlRe = /LB (\d+)/g, rlM;
+                while ((rlM = rlRe.exec(stdout || "")) !== null) rlIds.push(rlM[1]);
+                if (!root._combineActive) {
+                    // Disabled while rebuilding — these are orphans now.
+                    var unr = "";
+                    for (var ri = 0; ri < rlIds.length; ri++)
+                        unr += "pactl unload-module " + rlIds[ri] + " 2>/dev/null; ";
+                    if (unr !== "") executable.exec(": PW_UNCOMBINE; " + unr + "true");
+                    return;
+                }
+                root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
                 return;
             }
             if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0) {
@@ -3226,9 +3290,13 @@ PlasmoidItem {
         // Keeps the routing correct when a Bluetooth speaker (dis)connects.
         function onAudioOutputsChanged() {
             root._combineTryRoute();
-            // A Bluetooth sink that (re)appeared while the combined output is
-            // live starts with a zero offset — re-stamp the tuned one.
-            if (root._combineActive) root._applySyncOffset();
+            // A hardware sink came or went while the combined output is live
+            // (Bluetooth reconnect, HDMI plug) — rebuild the loopbacks for
+            // the CURRENT set. Snapshot-compared, or the null sink's own
+            // appearance would trigger a rebuild and double every loopback.
+            if (root._combineActive
+                && root._combineRealSinks().join("|") !== root._combineSinksSnapshot)
+                syncOffsetDebounce.restart();
             if (root._btTryRoutePending())
                 return; // setAudioOutputDevice re-applies the routing
             root._applyAudioOutputDevice()
