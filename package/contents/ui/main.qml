@@ -2152,6 +2152,7 @@ PlasmoidItem {
         var guard = null;
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.13");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -2280,6 +2281,10 @@ PlasmoidItem {
 
     // radio-browser identity of the current station. Stored with the station
     // on first resolve; stations added from the search carry it from birth.
+    // Mirrors are tried IN ORDER (the same de1→nl1→… convention the search
+    // uses — a single random pick made it unreliable), and only a mirror
+    // that actually answered may negative-cache the station: one slow
+    // mirror used to silently disable clicks AND votes for 24 hours.
     function _rbResolveUuid(onUuid) {
         var entry = _stationEntry();
         if (!entry) return;
@@ -2289,17 +2294,22 @@ PlasmoidItem {
         if (_uuidFailed[orig] !== undefined && now - _uuidFailed[orig] < 86400000) return;
         var name = (entry.name || "").toString();
         if (name === "") return;
-        var servers = ["de1", "de2", "nl1", "at1", "fi1"];
-        var srv = servers[Math.floor(Math.random() * servers.length)];
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
-                + encodeURIComponent(name) + "&limit=30");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            _clearXhrTimeout(guard);
-            var uuid = "";
-            if (xhr.status === 200) {
+        var mirrors = ["de1", "nl1", "de2", "at1", "fi1"];
+        var attempt = 0;
+
+        function tryNext() {
+            if (attempt >= mirrors.length) return; // all transient — retry next time
+            var srv = mirrors[attempt++];
+            var xhr = new XMLHttpRequest();
+            var guard = null;
+            xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
+                    + encodeURIComponent(name) + "&limit=30");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.13");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== xhr.DONE) return;
+                _clearXhrTimeout(guard);
+                if (xhr.status !== 200) { tryNext(); return; }
+                var uuid = "";
                 try {
                     var results = JSON.parse(xhr.responseText) || [];
                     var origNoProto = orig.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
@@ -2308,14 +2318,20 @@ PlasmoidItem {
                                 .replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
                         if (u === origNoProto) { uuid = results[i].stationuuid || ""; break; }
                     }
-                } catch (e) {}
-            }
-            if (uuid === "") { _uuidFailed[orig] = Date.now(); return; }
-            _rbStoreUuid(orig, uuid);
-            onUuid(uuid);
-        };
-        guard = _armXhrTimeout(xhr, 5000);
-        xhr.send();
+                } catch (e) { tryNext(); return; }
+                if (uuid === "") {
+                    // A real answer with no match — the station is genuinely
+                    // not in the catalog; remembering that for a day is fair.
+                    _uuidFailed[orig] = Date.now();
+                    return;
+                }
+                _rbStoreUuid(orig, uuid);
+                onUuid(uuid);
+            };
+            guard = _armXhrTimeout(xhr, 5000);
+            xhr.send();
+        }
+        tryNext();
     }
 
     function _rbStoreUuid(orig, uuid) {
@@ -2323,9 +2339,17 @@ PlasmoidItem {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             for (var i = 0; i < servers.length; i++) {
                 if ((servers[i].hostname || "") !== orig) continue;
+                // Two concurrent resolves (click + vote racing on a station
+                // without a stored uuid) both land here. The second write is
+                // value-identical, the config skips it, serversChanged never
+                // fires — and the keep-playing flag would stay armed and eat
+                // the NEXT real add/remove's stop. Bail before arming it.
+                if ((servers[i].uuid || "") === uuid) return;
                 servers[i].uuid = uuid;
+                var out = JSON.stringify(servers);
+                if (out === Plasmoid.configuration.servers) return;
                 _reorderKeepPlaying = true; // identity write must not stop playback
-                Plasmoid.configuration.servers = JSON.stringify(servers);
+                Plasmoid.configuration.servers = out;
                 return;
             }
         } catch (e) {}
@@ -2346,6 +2370,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/url/" + uuid);
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.13");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -2367,6 +2392,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/vote/" + uuid);
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.13");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
