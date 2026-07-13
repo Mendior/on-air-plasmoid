@@ -2228,6 +2228,15 @@ PlasmaExtras.Representation {
                     padding: Kirigami.Units.smallSpacing
                     modal: false
                     implicitWidth: Kirigami.Units.gridUnit * 16
+                    // CloseOnPressOutsideParent (not ...Outside): the default
+                    // policy closed the popup on the toggle button's own
+                    // press, so the click's release always saw opened=false
+                    // and REOPENED it — the close branch was dead code.
+                    closePolicy: QQC2.Popup.CloseOnEscape | QQC2.Popup.CloseOnPressOutsideParent
+                    // Keyboard: focus the list so arrow keys reach the rows
+                    // and Esc closes the menu instead of leaking to the
+                    // page-switch handler.
+                    focus: true
 
                     contentItem: ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
@@ -2279,6 +2288,34 @@ PlasmaExtras.Representation {
                             onActivated: function(index) {
                                 var outs = mediaDevices.audioOutputs;
                                 root.setAudioOutputDevice(index === 0 ? "" : String(outs[index - 1].id));
+                            }
+                        }
+
+                        // Every local output at once, in sync: a PipeWire
+                        // combined sink with latency compensation delays the
+                        // wired outputs to match Bluetooth, so multiple
+                        // speakers play together instead of echoing.
+                        PlasmaComponents3.CheckDelegate {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            text: i18n("All local outputs, in sync")
+                            icon.name: "speaker"
+                            visible: root._combineAvailable
+                                     && (root._combineWantActive || mediaDevices.audioOutputs.length >= 2)
+                            // Bound to the INTENT flag (flips with the click),
+                            // not the async pactl ack — and re-bound after
+                            // every toggle, because the click itself severs a
+                            // declarative binding. A failed load resets the
+                            // intent and the box unchecks itself.
+                            checked: root._combineWantActive
+                            onToggled: {
+                                if (checked) root.combineOutputsEnable()
+                                else root.combineOutputsDisable()
+                                checked = Qt.binding(function() { return root._combineWantActive })
+                            }
+
+                            PlasmaComponents3.ToolTip {
+                                text: i18n("Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth.")
                             }
                         }
 

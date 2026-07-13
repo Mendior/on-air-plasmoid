@@ -33,6 +33,7 @@ Commands (argv[1]):
 Every command prints a sentinel the QML side matches on and always exits 0, so
 a missing optional dependency is a clean "feature unavailable", never a crash.
 """
+import http.client
 import json
 import os
 import socket
@@ -40,6 +41,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -129,25 +131,49 @@ def _discover_cast(seconds):
         print("cast.py discover(cast): %r" % (exc,), file=sys.stderr)
     finally:
         _stop_browser(browser)
+    # Fresh mDNS results are proven alive — print them NOW, before the cache
+    # re-verification below. Printing everything only at the end meant one
+    # offline cached device (its 6 s connect timeout) could push this thread
+    # past cmd_discover's join budget and the daemonized kill dropped even
+    # the devices that had already been found.
+    for uuid, dev in found.items():
+        _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
+            uuid, dev["name"], dev["host"], dev["port"], dev["model"]))
+
     # mDNS is lossy — a device found last time but missed this round gets one
     # direct connection attempt, which either proves it alive or it really is
     # gone. This keeps the picker stable instead of flickering per round.
-    for uuid, dev in _cache_load().items():
-        if uuid in found or dev.get("kind") != "cast" or not dev.get("host"):
-            continue
+    # Verified in PARALLEL: each offline device costs its own connect timeout,
+    # and serially two dead entries already blow the whole discovery budget.
+    def verify_cached(uuid, dev):
         cast = None
         try:
             cast = _connect_host(pychromecast, dev["host"], dev["port"],
                                  uuid, dev.get("model", ""))
-            found[uuid] = dev
+            with _cache_write_lock:
+                found[uuid] = dev
+            _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
+                uuid, dev["name"], dev["host"], dev["port"], dev["model"]))
         except Exception:
             pass
         finally:
             _disconnect(cast)
-    for uuid, dev in found.items():
-        _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
-            uuid, dev["name"], dev["host"], dev["port"], dev["model"]))
-    _cache_save(found)
+
+    verifiers = []
+    for uuid, dev in _cache_load().items():
+        if uuid in found or dev.get("kind") != "cast" or not dev.get("host"):
+            continue
+        t = threading.Thread(target=verify_cached, args=(uuid, dev))
+        t.daemon = True
+        t.start()
+        verifiers.append(t)
+    for t in verifiers:
+        t.join(CONNECT_TIMEOUT + 1.0)
+    # Snapshot under the lock: a verifier that outlived its join timeout may
+    # still be inserting while _cache_save iterates.
+    with _cache_write_lock:
+        snapshot = dict(found)
+    _cache_save(snapshot)
 
 
 def cmd_play(host, port, uuid, model, url, ctype, title, art):
@@ -481,12 +507,18 @@ def _discover_dlna(seconds):
     with lock:
         found_locations = sorted(locations)
 
+    # Describe every location in PARALLEL and print each renderer the moment
+    # it proves alive. The serial loop paid up to 3 s per dead cached URL —
+    # entries that happened to sort first starved live renderers of the
+    # remaining budget, and everything after the kill was silently dropped.
     fresh = {}
-    for loc in found_locations:
+    fresh_lock = threading.Lock()
+
+    def describe_loc(loc):
         dev = _describe_renderer(loc)
-        if not dev or dev["udn"] in fresh:
-            continue
-        fresh[dev["udn"]] = {
+        if not dev:
+            return
+        entry = {
             "kind": "dlna",
             "name": dev["name"],
             "host": urllib.parse.urlsplit(loc).hostname or "",
@@ -494,10 +526,25 @@ def _discover_dlna(seconds):
             "model": dev["model"],
             "location": loc,
         }
+        with fresh_lock:
+            if dev["udn"] in fresh:
+                return
+            fresh[dev["udn"]] = entry
         _out("DEV\tdlna\t%s\t%s\t%s\t%s\t%s\t%s" % (
-            dev["udn"], dev["name"], fresh[dev["udn"]]["host"], 0,
-            dev["model"], loc))
-    _cache_save(fresh)
+            dev["udn"], dev["name"], entry["host"], 0, dev["model"], loc))
+
+    describers = [threading.Thread(target=describe_loc, args=(loc,))
+                  for loc in found_locations]
+    for t in describers:
+        t.daemon = True
+        t.start()
+    for t in describers:
+        t.join(max(0.1, deadline - time.time()))
+    # Snapshot under the lock — a describer that outlived its join may still
+    # be inserting while _cache_save iterates.
+    with fresh_lock:
+        snapshot = dict(fresh)
+    _cache_save(snapshot)
 
 
 def _soap(control_url, service_type, action, args_xml, timeout=5.0):
@@ -507,17 +554,41 @@ def _soap(control_url, service_type, action, args_xml, timeout=5.0):
         's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
         "<s:Body><u:%s xmlns:u=\"%s\">%s</u:%s></s:Body></s:Envelope>"
     ) % (action, service_type, args_xml, action)
-    req = urllib.request.Request(
-        control_url,
-        data=body.encode("utf-8"),
-        headers={
-            "Content-Type": 'text/xml; charset="utf-8"',
-            "SOAPACTION": '"%s#%s"' % (service_type, action),
-            "User-Agent": "OnAir",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", "replace")
+    # http.client instead of urllib: urllib normalizes header names to
+    # Capitalized-Form and sends "Soapaction:" — embedded UPnP stacks that
+    # match the header name case-sensitively (against the HTTP spec, but
+    # common in cheap renderer firmware) then reject every command.
+    parts = urllib.parse.urlsplit(control_url)
+    if parts.scheme == "https":
+        conn = http.client.HTTPSConnection(parts.hostname, parts.port or 443,
+                                           timeout=timeout)
+    else:
+        conn = http.client.HTTPConnection(parts.hostname, parts.port or 80,
+                                          timeout=timeout)
+    try:
+        path = parts.path or "/"
+        if parts.query:
+            path += "?" + parts.query
+        payload = body.encode("utf-8")
+        conn.putrequest("POST", path)
+        conn.putheader("Content-Type", 'text/xml; charset="utf-8"')
+        conn.putheader("SOAPACTION", '"%s#%s"' % (service_type, action))
+        conn.putheader("User-Agent", "OnAir")
+        conn.putheader("Content-Length", str(len(payload)))
+        conn.endheaders()
+        conn.send(payload)
+        resp = conn.getresponse()
+        data = resp.read().decode("utf-8", "replace")
+        # Parity with urlopen: a SOAP fault (HTTP 500 etc.) must raise, the
+        # callers' except blocks turn it into FAIL sentinels / fallbacks.
+        # >= 300 because http.client does not follow redirects — a 3xx here
+        # would otherwise pass as a silent bogus success.
+        if resp.status >= 300:
+            raise urllib.error.HTTPError(control_url, resp.status,
+                                         data[:200], resp.headers, None)
+        return data
+    finally:
+        conn.close()
 
 
 # DLNA.ORG_PN profile tokens. Several renderers (Frontier Silicon based
