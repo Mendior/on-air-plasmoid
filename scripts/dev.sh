@@ -60,7 +60,7 @@ case "${1:-}" in
     # compile() also catches compile-phase SyntaxErrors (e.g. 'return' outside
     # a function) that ast.parse misses, and writes no __pycache__ litter.
     python3 -c 'import sys
-for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/reader.py" "$PKG/contents/ui/mpris.py" "$PKG/contents/ui/cast.py"
+for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/reader.py" "$PKG/contents/ui/mpris.py" "$PKG/contents/ui/cast.py" "$PKG/contents/ui/calibrate.py"
     python3 -c "import json; json.load(open('$PKG/metadata.json'))"
     bash -n "$PKG/contents/ui/start-mpris.sh"
     # Translations: every .po must compile cleanly (a bad one would silently
