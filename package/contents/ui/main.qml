@@ -2199,11 +2199,28 @@ PlasmoidItem {
         xhr.send();
     }
 
-    // The auditioned address buffered for real — make it permanent.
+    // The auditioned address buffered for real. Make it permanent ONLY when
+    // it lives on the station's own domain: the radio-browser catalog is
+    // publicly writable, so a name-matched entry from elsewhere is good
+    // enough to PLAY as a stopgap but must never silently overwrite the
+    // saved address — a squatted catalog name would otherwise repoint the
+    // user's station for good.
     function _healCommit() {
         var newUrl = _healPendingUrl;
         var oldUrl = _healOrigUrl;
         _healClearPending();
+        var oldBase = _baseDomain(_hostOf(oldUrl));
+        if (oldBase === "" || _baseDomain(_hostOf(newUrl)) !== oldBase) {
+            // The audition WORKED — release the per-station retry lock so a
+            // stop-and-replay inside the lock window heals again right away
+            // (the saved address is still the dead one, on purpose).
+            delete _healTried[oldUrl];
+            dlNotification.title = i18n("Playing from a backup address");
+            dlNotification.text = i18n("The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept.");
+            dlNotification.iconName = "network-connect";
+            dlNotification.sendEvent();
+            return;
+        }
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             for (var i = 0; i < servers.length; i++) {
