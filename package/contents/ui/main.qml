@@ -1407,6 +1407,31 @@ PlasmoidItem {
         }
     }
 
+    // Residual Bluetooth lag: A2DP speakers buffer inside the box beyond
+    // what they report, so latency compensation alone can leave them
+    // trailing ~100-200 ms. The user-tuned offset is fed to PipeWire as
+    // extra reported latency on every Bluetooth sink — the combined output
+    // then holds the wired speakers back by that much more.
+    function _applySyncOffset() {
+        var ns = Math.max(0, Math.min(500, Plasmoid.configuration.syncOffsetMs || 0)) * 1000000;
+        executable.exec(": PW_OFFSET; for n in $(pactl list short sinks 2>/dev/null"
+            + " | cut -f2 | grep '^bluez_output'); do"
+            + " pw-cli set-param \"$n\" Props '{ latencyOffsetNsec: " + ns + " }' >/dev/null 2>&1;"
+            + " done; true # " + (++_execSeq));
+    }
+
+    function setSyncOffset(ms) {
+        Plasmoid.configuration.syncOffsetMs = Math.round(ms);
+        syncOffsetDebounce.restart();
+    }
+
+    Timer {
+        id: syncOffsetDebounce
+        interval: 300
+        repeat: false
+        onTriggered: root._applySyncOffset()
+    }
+
     function _combineTryRoute() {
         if (!_combinePendingRoute) return;
         var outs = mediaDevices.audioOutputs;
@@ -1485,6 +1510,49 @@ PlasmoidItem {
     // model and back — validate before they touch a shell line.
     function _btValidMac(mac) {
         return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac);
+    }
+
+    // ── In-menu pairing — a NEW speaker is one click away too ────────────────
+    property bool _btScanning: false
+    property string _btPairingMac: ""
+    ListModel { id: btFoundModel }
+
+    // Discover unpaired audio devices. The scan feeds bluez's device cache;
+    // the info pass filters to audio (Icon comes from the Class of Device —
+    // LE-only random-address adverts carry none, which conveniently drops
+    // the duplicate ghost entries speakers broadcast).
+    function btScan() {
+        if (!_btAvailable || !_btControllerUp || _btScanning) return;
+        _btScanning = true;
+        btFoundModel.clear();
+        executable.exec(": BT_SCAN; timeout 16 bluetoothctl --timeout 12 scan on >/dev/null 2>&1; "
+            + 'list=$(timeout 3 bluetoothctl devices 2>/dev/null | grep "^Device "); '
+            + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
+            + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
+            + 'info=$(timeout 3 bluetoothctl info "$mac" 2>/dev/null); '
+            + "case \"$info\" in *'Paired: yes'*) continue;; esac; "
+            + "case \"$info\" in *'Icon: audio'*) ;; *) continue;; esac; "
+            + 'printf \'BTFOUND\\t%s\\t%s\\n\' "$mac" "$name"; done; true'
+            + " # " + (++_execSeq));
+    }
+
+    // One click: pair + trust + connect. Trust makes bluez reconnect it on
+    // its own next time; the pending-sink route (same path as btConnect)
+    // moves the music over the moment the sink appears.
+    function btPairNew(mac, name) {
+        if (!_btValidMac(mac) || _btPairingMac !== "" || _btConnectingMac !== "") return;
+        _btPairingMac = mac;
+        _btPendingSinkName = name || "";
+        _btPendingSinkMac = mac;
+        var ids = {};
+        var outs = mediaDevices.audioOutputs;
+        for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
+        _btOutputIdsBeforeConnect = ids;
+        btRouteTimeout.restart();
+        executable.exec(": BT_PAIRNEW; timeout 25 bluetoothctl pair " + mac
+                        + " && timeout 5 bluetoothctl trust " + mac
+                        + " && timeout 15 bluetoothctl connect " + mac + "; true"
+                        + " # " + (++_execSeq));
     }
 
     // Output ids that existed when the connect started — the auto-route only
@@ -2675,6 +2743,52 @@ PlasmoidItem {
                 btList();
                 return;
             }
+            // Bluetooth: scan for NEW (unpaired) audio devices finished
+            if (cmd.indexOf(": BT_SCAN;") === 0) {
+                root._btScanning = false;
+                var fLines = (stdout || "").split("\n");
+                for (var fi = 0; fi < fLines.length; fi++) {
+                    if (fLines[fi].indexOf("BTFOUND\t") !== 0) continue;
+                    var fp = fLines[fi].split("\t");
+                    if (fp.length < 3 || !_btValidMac(fp[1])) continue;
+                    btFoundModel.append({ "mac": fp[1],
+                        "name": fp.slice(2).join(" ").trim() || fp[1] });
+                }
+                return;
+            }
+            // Bluetooth: in-menu pair+trust+connect finished
+            if (cmd.indexOf(": BT_PAIRNEW;") === 0) {
+                var pairedMac = root._btPairingMac;
+                root._btPairingMac = "";
+                var pairOut = stdout || "";
+                if (pairOut.indexOf("Pairing successful") !== -1) {
+                    // From now on it lives in the paired section (btList
+                    // below) — drop the "new device" row.
+                    for (var pi = btFoundModel.count - 1; pi >= 0; pi--)
+                        if (btFoundModel.get(pi).mac === pairedMac) btFoundModel.remove(pi);
+                    if (pairOut.indexOf("Connection successful") !== -1) {
+                        // The sink may already be up — route now, not never.
+                        root._btTryRoutePending();
+                    } else {
+                        // Paired but would not connect (still tied to the
+                        // phone?) — its paired-list row connects it later.
+                        btRouteTimeout.stop();
+                        root._btPendingSinkName = "";
+                        root._btPendingSinkMac = "";
+                    }
+                } else {
+                    btRouteTimeout.stop();
+                    dlNotification.title = i18n("Could not pair with %1",
+                        root._btPendingSinkName || i18n("the Bluetooth device"));
+                    dlNotification.text = i18n("Put the speaker in pairing mode (hold its Bluetooth button) and try again.");
+                    dlNotification.iconName = "network-bluetooth";
+                    dlNotification.sendEvent();
+                    root._btPendingSinkName = "";
+                    root._btPendingSinkMac = "";
+                }
+                btList();
+                return;
+            }
             // Combined local output: pactl availability probe
             if (cmd.indexOf(": PW_PROBE;") === 0) {
                 root._combineAvailable = (stdout || "").indexOf("__PACTL_YES__") !== -1;
@@ -2703,6 +2817,7 @@ PlasmoidItem {
                 root._combineModuleId = String(modId);
                 root._combineActive = true;
                 root._combinePendingRoute = true;
+                root._applySyncOffset();
                 root._combineTryRoute();
                 return;
             }
@@ -3111,6 +3226,9 @@ PlasmoidItem {
         // Keeps the routing correct when a Bluetooth speaker (dis)connects.
         function onAudioOutputsChanged() {
             root._combineTryRoute();
+            // A Bluetooth sink that (re)appeared while the combined output is
+            // live starts with a zero offset — re-stamp the tuned one.
+            if (root._combineActive) root._applySyncOffset();
             if (root._btTryRoutePending())
                 return; // setAudioOutputDevice re-applies the routing
             root._applyAudioOutputDevice()
