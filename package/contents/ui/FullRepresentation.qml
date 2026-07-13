@@ -2214,6 +2214,10 @@ PlasmaExtras.Representation {
                 onClicked: {
                     if (!castMenu.opened) {
                         root.castDiscover()
+                        // Re-probe too: an adapter that came up after login
+                        // (module reload, rfkill) should be noticed here, not
+                        // only at the next plasmashell restart.
+                        root.btProbe()
                         root.btList()
                         castMenu.open()
                     } else {
@@ -2227,7 +2231,7 @@ PlasmaExtras.Representation {
                     x: -width + parent.width
                     padding: Kirigami.Units.smallSpacing
                     modal: false
-                    implicitWidth: Kirigami.Units.gridUnit * 16
+                    implicitWidth: Kirigami.Units.gridUnit * 18
                     // CloseOnPressOutsideParent (not ...Outside): the default
                     // policy closed the popup on the toggle button's own
                     // press, so the click's release always saw opened=false
@@ -2241,13 +2245,26 @@ PlasmaExtras.Representation {
                     contentItem: ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
 
-                        PlasmaComponents3.Label {
+                        // Title row — the menu is the one place everything
+                        // audio-out lives, so it gets a proper header.
+                        RowLayout {
                             Layout.fillWidth: true
                             Layout.margins: Kirigami.Units.smallSpacing
-                            text: i18n("Play on")
-                            font.weight: Font.DemiBold
-                            opacity: 0.7
+                            spacing: Kirigami.Units.smallSpacing
+                            Kirigami.Icon {
+                                source: "media-playback-cast"
+                                color: root.accent
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                                Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Play on")
+                                font.weight: Font.DemiBold
+                            }
                         }
+
+                        Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
 
                         // This computer. While casting it becomes a checkbox:
                         // tick it to ALSO play locally (multi-room), untick to
@@ -2324,13 +2341,55 @@ PlasmaExtras.Representation {
                         // sink appears, playback is routed onto it. Connected
                         // ones can be dropped the same way. Pairing itself
                         // stays in System Settings.
+                        Kirigami.Separator {
+                            Layout.fillWidth: true
+                            visible: root._btAvailable
+                            opacity: 0.4
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.smallSpacing
+                            visible: root._btAvailable
+                            Kirigami.Icon {
+                                source: "network-bluetooth"
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                opacity: 0.7
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Bluetooth")
+                                font.weight: Font.DemiBold
+                                opacity: 0.7
+                            }
+                        }
+
+                        // An empty device list is ambiguous — say WHY. A dead
+                        // adapter (firmware, rfkill, no hardware) and "nothing
+                        // paired yet" look identical otherwise, and users
+                        // blame the widget for the system's Bluetooth being
+                        // down.
                         PlasmaComponents3.Label {
                             Layout.fillWidth: true
                             Layout.margins: Kirigami.Units.smallSpacing
-                            visible: root._btAvailable && btDevicesModel.count > 0
-                            text: i18n("Bluetooth")
-                            font.weight: Font.DemiBold
-                            opacity: 0.7
+                            visible: root._btAvailable && !root._btControllerUp
+                            text: i18n("Bluetooth is off or no adapter is available — check System Settings.")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.6
+                            wrapMode: Text.WordWrap
+                        }
+
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            visible: root._btAvailable && root._btControllerUp
+                                     && btDevicesModel.count === 0 && !root._btListing
+                            text: i18n("No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here.")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.6
+                            wrapMode: Text.WordWrap
                         }
 
                         Repeater {
@@ -2347,6 +2406,26 @@ PlasmaExtras.Representation {
                                 enabled: root._btConnectingMac === ""
                                 onToggled: connected ? root.btDisconnect(mac)
                                                      : root.btConnect(mac, name)
+                            }
+                        }
+
+                        Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.smallSpacing
+                            Kirigami.Icon {
+                                source: "network-wireless"
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                opacity: 0.7
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("WiFi & network")
+                                font.weight: Font.DemiBold
+                                opacity: 0.7
                             }
                         }
 
@@ -2371,8 +2450,12 @@ PlasmaExtras.Representation {
                                 readonly property bool isGroup: deviceModel === "Google Cast Group"
                                 Layout.fillWidth: true
                                 text: isGroup ? i18n("%1 (speaker group)", name) : name
-                                icon.name: isGroup ? "audio-speakers-symbolic"
-                                          : kind === "dlna" ? "speaker" : "video-television"
+                                // The icon answers "how is this connected?" —
+                                // WiFi fan vs Bluetooth rune vs the group
+                                // glyph — so the menu reads at a glance which
+                                // radio a device is on (asked for explicitly:
+                                // everything connectable from one place).
+                                icon.name: isGroup ? "audio-speakers-symbolic" : "network-wireless"
                                 checked: root.castTargetIndex(uuid) >= 0
                                 onToggled: root.castToggleDevice({
                                     "kind": kind, "uuid": uuid, "name": name, "host": host,
