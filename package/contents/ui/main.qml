@@ -890,6 +890,10 @@ PlasmoidItem {
             stopWithFade();
             return;
         }
+        // Playing a local file outranks a heal audition in flight.
+        _healClearPending();
+        _healSeq++;
+        healTimer.stop();
         root._previewUrl = "";
         root.lastPlay = -1;
         root.currentStationFavicon = "";
@@ -1663,7 +1667,150 @@ PlasmoidItem {
         }
     }
 
+    // ── Self-healing stations ────────────────────────────────────────────────
+    // Stations change servers; the saved URL then rots as a dead entry. When
+    // playback of a LIST station fails, look the station up on radio-browser
+    // (whose server-side health check marks candidates that work RIGHT NOW),
+    // audition the best match, and only once it actually buffers save the new
+    // address to the list. Preview/local playback never heals; one lookup per
+    // station per 10 minutes, so a station that is simply offline isn't
+    // hammered with searches.
+    property var _healTried: ({})        // dead url → epoch ms of last lookup
+    property string _healPendingUrl: ""  // candidate being auditioned
+    property string _healOrigUrl: ""     // the dead configured url it replaces
+    property int _healSeq: 0
+
+    function _healNormName(s) {
+        return (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+    }
+
+    function _healClearPending() {
+        _healPendingUrl = "";
+        _healOrigUrl = "";
+    }
+
+    Timer {
+        id: healTimer
+        // Runs a beat after a playback error so the auto-bitrate fallback
+        // (600 ms) gets its chance first — heal only what stays dead.
+        interval: 2500
+        repeat: false
+        onTriggered: root._tryHealStation()
+    }
+
+    function _tryHealStation() {
+        if (!Plasmoid.configuration.autoHeal) return;
+        if (isPlaying() || _casting) return;
+        if (root._previewUrl !== "" || lastPlay < 0 || lastPlay >= stationsModel.count) return;
+        var st = stationsModel.get(lastPlay);
+        var orig = (st.hostname || "").toString();
+        // Only heal the station we actually failed on.
+        if (orig === "" || orig.indexOf("file://") === 0 || orig !== root._currentOrigUrl) return;
+        var now = Date.now();
+        if (_healTried[orig] !== undefined && now - _healTried[orig] < 600000) return;
+        _healTried[orig] = now;
+        var name = (st.name || "").toString();
+        var norm = _healNormName(name);
+        if (norm === "") return;
+        var mySeq = ++_healSeq;
+        var servers = ["de1", "de2", "nl1", "at1", "fi1"];
+        var srv = servers[Math.floor(Math.random() * servers.length)];
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
+                + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== xhr.DONE) return;
+            _clearXhrTimeout(guard);
+            if (mySeq !== _healSeq) return;          // superseded by a newer heal
+            if (isPlaying() || lastPlay < 0) return; // user moved on / recovered
+            if (xhr.status !== 200) return;
+            var best = null, bestScore = -1;
+            try {
+                var results = JSON.parse(xhr.responseText) || [];
+                var origBase = _baseDomain(_hostOf(orig));
+                for (var i = 0; i < results.length; i++) {
+                    var r = results[i];
+                    // lastcheckok: radio-browser's own probe reached this URL
+                    // on its latest sweep — the whole point of asking them.
+                    if (String(r.lastcheckok) !== "1") continue;
+                    var cand = (r.url_resolved || r.url || "").toString();
+                    if (!cand || cand === orig) continue;
+                    var fmt = _streamFormat(cand);
+                    if (fmt === "hls" || fmt === "playlist") continue;
+                    var rn = _healNormName(r.name);
+                    // Exact name beats contains-match; same base domain (the
+                    // station merely changed port/mount) beats everything.
+                    var score = -1;
+                    if (rn === norm) score = 2;
+                    else if (rn.indexOf(norm) !== -1) score = 1;
+                    if (score < 0) continue;
+                    if (origBase !== "" && _baseDomain(_hostOf(cand)) === origBase) score += 2;
+                    // results arrive votes-ordered, so the first hit at a
+                    // score level is also the most-voted one.
+                    if (score > bestScore) { bestScore = score; best = cand; }
+                }
+            } catch (e) {
+                console.log("[ARP] heal parse: " + e);
+            }
+            if (!best) return;
+            console.log("[ARP] heal: auditioning " + best + " for dead " + orig);
+            root._healOrigUrl = orig;
+            root._healPendingUrl = best;
+            root._currentOrigUrl = orig;
+            root._currentResolvedUrl = best;
+            startWithFade({ "name": name, "hostname": best,
+                            "favicon": st.favicon || "", "active": true });
+        };
+        guard = _armXhrTimeout(xhr, 5000);
+        xhr.send();
+    }
+
+    // The auditioned address buffered for real — make it permanent.
+    function _healCommit() {
+        var newUrl = _healPendingUrl;
+        var oldUrl = _healOrigUrl;
+        _healClearPending();
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            for (var i = 0; i < servers.length; i++) {
+                if ((servers[i].hostname || "") !== oldUrl) continue;
+                servers[i].hostname = newUrl;
+                // Restore the invariant "_currentOrigUrl == the configured
+                // hostname of what is playing" — leaving it on the dead url
+                // would misfire the bitrate fallback on the NEXT error (600 ms
+                // of the known-dead stream), block a second heal, and break
+                // removeStation's resume while a healed station plays.
+                root._currentOrigUrl = newUrl;
+                root._currentResolvedUrl = newUrl;
+                var stName = servers[i].name || "";
+                // A pure address swap — the reload must not stop playback.
+                _reorderKeepPlaying = true;
+                Plasmoid.configuration.servers = JSON.stringify(servers);
+                Qt.callLater(function() {
+                    for (var k = 0; k < stationsModel.count; k++) {
+                        if (stationsModel.get(k).hostname === newUrl) {
+                            lastPlay = k;
+                            break;
+                        }
+                    }
+                });
+                dlNotification.title = i18n("Station found at a new address");
+                dlNotification.text = i18n("%1 moved — the new address was saved to your list.", stName);
+                dlNotification.iconName = "network-connect";
+                dlNotification.sendEvent();
+                return;
+            }
+        } catch (e) {
+            console.log("[ARP] healCommit: " + e);
+        }
+    }
+
     function _playStation(station) {
+        // A user-initiated play always outranks a heal audition in flight.
+        _healClearPending();
+        _healSeq++;
+        healTimer.stop();
         bitrateFallbackTimer.stop();
         bitrateFallbackTimer.fallbackUrl = "";
         const mySeq = ++_resolveCallSeq;
@@ -1686,6 +1833,11 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         root._previewUrl = "";
+        // An explicit stop also cancels a heal audition in flight — "stop
+        // must never start playback" applies to healing too.
+        _healClearPending();
+        _healSeq++;
+        healTimer.stop();
         // Casting: stop every device but keep them selected, so the next play
         // resumes on the same devices rather than silently falling back local.
         // An INSTANT recording follows playback — stopping playback stops it
@@ -2731,6 +2883,13 @@ PlasmoidItem {
             // Auto-bitrate fallback: if the URL we're playing is an auto-upgrade
             // (different from the user's configured URL), the upgrade just failed.
             // Negative-cache it and retry with the original URL.
+            if (root._healPendingUrl !== ""
+                && playMusic.source.toString() === root._healPendingUrl) {
+                // The auditioned replacement is dead too — give up quietly
+                // (_healTried caps how soon this station is looked up again).
+                root._healClearPending();
+                return;
+            }
             if (root._currentOrigUrl !== ""
                 && root._currentResolvedUrl !== ""
                 && root._currentOrigUrl !== root._currentResolvedUrl
@@ -2743,6 +2902,12 @@ PlasmoidItem {
                 // URL won't re-enter this branch.
                 root._currentResolvedUrl = root._currentOrigUrl;
                 bitrateFallbackTimer.restart();
+            } else if (playMusic.source.toString() !== ""
+                       && playMusic.source.toString().indexOf("file://") !== 0
+                       && root._previewUrl === "") {
+                // The configured address itself is dead — once the dust
+                // settles, ask radio-browser where the station lives now.
+                healTimer.restart();
             }
         }
         onPlayingChanged: {
@@ -2776,6 +2941,13 @@ PlasmoidItem {
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && !root._favSyncedOnPlay) {
                 root._favSyncedOnPlay = true;
                 syncFavicons();
+            }
+            // A healed address proves itself by actually buffering — only
+            // then is it saved over the dead one.
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia
+                && root._healPendingUrl !== ""
+                && playMusic.source.toString() === root._healPendingUrl) {
+                _healCommit();
             }
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying() && !isError && !root._qtMetaWorks
                 && playMusic.source.toString().indexOf("file://") !== 0) {

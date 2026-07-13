@@ -75,6 +75,10 @@
             <label>Automatically pick highest available bitrate via radio-browser.info</label>
             <default>true</default>
         </entry>
+        <entry name="autoHeal" type="bool">
+            <label>When a saved station's stream dies, look up its current address on radio-browser.info and follow it</label>
+            <default>true</default>
+        </entry>
         <entry name="downloadFormat" type="String">
             <label>Download format: best (max quality, no re-encode), mp3, opus, mp4 (video)</label>
             <default>best</default>
