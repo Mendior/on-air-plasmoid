@@ -1373,11 +1373,15 @@ PlasmoidItem {
         _combineWantActive = true;
         _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
         var safeSlaves = slaves.join(",").replace(/'/g, "'\\''");
+        // Human name for the sink — this is what the output picker (ours and
+        // the system volume applet) shows instead of the raw node name.
+        var desc = i18n("All local outputs (On Air)").replace(/"/g, "").replace(/'/g, "'\\''");
         // NB: comma is pactl's slave separator — PipeWire node names
         // (alsa_output.*, bluez_output.*) never contain one.
         executable.exec(": PW_COMBINE; pactl load-module module-combine-sink"
                         + " sink_name=" + _combineSinkName
                         + " slaves='" + safeSlaves + "'"
+                        + " sink_properties='device.description=\"" + desc + "\"'"
                         + " latency_compensate=yes"
                         + " # " + (++_execSeq));
     }
@@ -1436,8 +1440,15 @@ PlasmoidItem {
 
     ListModel { id: btDevicesModel }
 
+    // Whether a Bluetooth CONTROLLER is actually up — bluetoothctl existing
+    // says nothing about the adapter (dead firmware, rfkill, no hardware).
+    // Without this the menu just showed an empty list with no explanation.
+    property bool _btControllerUp: false
+
     function btProbe() {
-        executable.exec(": BT_PROBE; command -v bluetoothctl >/dev/null 2>&1 && echo __BT_YES__; true");
+        executable.exec(": BT_PROBE; command -v bluetoothctl >/dev/null 2>&1 && echo __BT_YES__; "
+                        + "timeout 3 bluetoothctl list 2>/dev/null | grep -q . && echo __BT_CTRL__; true"
+                        + " # " + (++_execSeq));
     }
 
     function btList() {
@@ -1458,7 +1469,10 @@ PlasmoidItem {
             + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
             + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
             + 'info=$(timeout 3 bluetoothctl info "$mac" 2>/dev/null); '
-            + "case \"$info\" in *'Audio Sink'*) ;; *) continue;; esac; "
+            // 'Audio Sink' is the classic A2DP UUID; LE-Audio-only speakers
+            // (newer JBLs, notably) don't expose it — their audio nature
+            // shows in the Icon field (audio-card/audio-headset/…) instead.
+            + "case \"$info\" in *'Audio Sink'*|*'Icon: audio'*) ;; *) continue;; esac; "
             + "conn=no; case \"$info\" in *'Connected: yes'*) conn=yes;; esac; "
             + 'printf \'BTDEV\\t%s\\t%s\\t%s\\n\' "$mac" "$conn" "$name"; done; true'
             // Unique per run, or the queued refresh after a fast toggle would
@@ -2601,9 +2615,10 @@ PlasmoidItem {
             if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0) {
                 return; // fire-and-forget
             }
-            // Bluetooth: bluetoothctl availability probe
+            // Bluetooth: bluetoothctl availability + controller probe
             if (cmd.indexOf(": BT_PROBE;") === 0) {
                 root._btAvailable = (stdout || "").indexOf("__BT_YES__") !== -1;
+                root._btControllerUp = (stdout || "").indexOf("__BT_CTRL__") !== -1;
                 return;
             }
             // Bluetooth: paired audio devices with their Connected state
