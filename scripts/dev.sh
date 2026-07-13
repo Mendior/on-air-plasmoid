@@ -129,6 +129,10 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     LOAD_MARKER='[ARP] widget loaded'
     if ! printf '%s\n' "$out" | grep -qF "$LOAD_MARKER"; then
       echo "runtime FAILED: load marker \"$LOAD_MARKER\" missing from viewer output"
+      # A failing gate must show its evidence — without the raw viewer output
+      # there is nothing to diagnose a load failure from (especially in CI).
+      echo "--- viewer output (last 100 lines) ---"
+      printf '%s\n' "$out" | tail -n 100
       exit 1
     fi
     echo "runtime OK"
