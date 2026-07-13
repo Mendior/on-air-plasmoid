@@ -18,6 +18,8 @@
 - 📺 **Cast to TVs, soundbars & network speakers** — Chromecast/Nest and any DLNA renderer (Samsung/LG/Sony TVs, Bose/Sonos soundbars, WiFi speakers). The stream goes straight to the device, which does the decoding, so your PC stays quiet and cool (a real help on older machines). Volume and station switching stay in the widget. DLNA needs no extra packages at all. Google Home speaker groups appear as one device and play in perfect sync
 - 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up
 - 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a live fine-tune slider, so nothing echoes; works on PipeWire and plain PulseAudio alike
+- 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker, the microphone times the arrivals, and the Bluetooth lag is measured and set automatically — remembered per device
+- 👍 **Thank the stations** — a vote button and (optional, anonymous) listening clicks feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info and saves it instead of leaving a dead entry
 - ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
@@ -48,7 +50,7 @@ Optional (features degrade gracefully without them):
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.12.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.13.plasmoid
 ```
 
 ## Usage tips

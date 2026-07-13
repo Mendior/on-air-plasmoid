@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026.13
+
+The sync calibrates itself, and the stations finally get thanked.
+
+- **Microphone auto-calibration.** Tuning the sync slider by ear works, but nobody should have to: "Calibrate with the microphone" plays a few loud clicks through the wired reference and the Bluetooth speaker, records them with the computer's microphone, and times when each click actually arrived — the difference IS the lag, measured acoustically the way commercial room-calibration systems do it. Speaker volumes are raised for the clicks and restored right after. Verified on real hardware: a JBL Xtreme 3 measured 166 ms behind a wired desk speaker, squarely in the expected A2DP range.
+- **Per-device sync memory.** A JBL and a pair of AirPods lag differently, so each speaker's calibration is remembered by its address and the right number loads whenever that speaker connects. Several Bluetooth speakers at once are all held to the slowest one's schedule, each faster device waiting exactly its share. The manual slider stays for fine-tuning and updates the connected device's memory too.
+- **Thank the stations.** The worldwide catalog this widget searches ranks stations by clicks and votes — and until now we took without giving back. When a station actually starts playing, an anonymous click goes to radio-browser.info (station id only, nothing about you; off-switch in settings). The 👍 on the now-playing page casts a real vote — the same votes the search results are ordered by, one per station per ten minutes.
+- **❤️ Liked songs.** Liking saves the track to a local list behind a flip on the My Music history header — same rows, same download button, per-row removal. Five hundred entries, kept locally, nothing leaves the machine.
+- A standalone-app plan (Kirigami + Flathub, for every Linux desktop) now lives in docs/STANDALONE-APP.md.
+
 ## 2026.12
 
 The sync that actually syncs, and Bluetooth pairing without leaving the menu.
