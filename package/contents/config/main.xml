@@ -75,6 +75,10 @@
             <label>Automatically pick highest available bitrate via radio-browser.info</label>
             <default>true</default>
         </entry>
+        <entry name="syncOffsetMap" type="String">
+            <label>Per-device Bluetooth lag in ms, keyed by MAC (JSON)</label>
+            <default>{}</default>
+        </entry>
         <entry name="syncOffsetMs" type="Int">
             <label>Extra latency reported for Bluetooth sinks while the combined output is active (ms)</label>
             <default>0</default>
