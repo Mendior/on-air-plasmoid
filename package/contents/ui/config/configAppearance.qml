@@ -24,6 +24,7 @@ KCM.SimpleKCM {
     property alias cfg_blurBackdrop: blurCheck.checked
     property alias cfg_mprisEnabled: mprisCheck.checked
     property alias cfg_autoBitrate: autoBitrateCheck.checked
+    property alias cfg_autoHeal: autoHealCheck.checked
     property alias cfg_followSystemAccent: accentCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
@@ -75,6 +76,14 @@ KCM.SimpleKCM {
 
             QQC2.ToolTip.visible: hovered
             QQC2.ToolTip.text: i18n("Looks the station up on radio-browser.info and picks the best-quality stream URL")
+        }
+
+        QQC2.CheckBox {
+            id: autoHealCheck
+            text: i18n("Find a station's new address when its stream dies")
+
+            QQC2.ToolTip.visible: hovered
+            QQC2.ToolTip.text: i18n("Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list")
         }
 
         Kirigami.Separator {
