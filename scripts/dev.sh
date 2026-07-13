@@ -110,11 +110,27 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # nesting a child into a type with no default property — the exact bug
     # that shipped broken in 2026.7.2), only the QML engine reports those.
     # QT_FORCE_STDERR_LOGGING is required or Qt logs go to journald instead.
-    out="$(timeout 25 env QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 plasmoidviewer -a "$PKG" 2>&1 || true)"
+    command -v plasmoidviewer >/dev/null 2>&1 \
+      || { echo "runtime FAILED: plasmoidviewer not installed (plasma-sdk)"; exit 1; }
+    # QT_LOGGING_RULES: console.log must reach stderr even when the developer's
+    # environment disables qml/js debug output — the positive assertion below
+    # would otherwise false-FAIL a perfectly healthy widget.
+    out="$(timeout 25 env QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
+           QT_LOGGING_RULES='qml.debug=true;js.debug=true;default.debug=true' \
+           plasmoidviewer -a "$PKG" 2>&1 || true)"
     # /usr/share/plasma is the viewer's own shell (desktopcontainment etc.),
     # which emits unrelated TypeErrors — only our package's messages count.
     bad="$(printf '%s\n' "$out" | grep -v '/usr/share/plasma/' | grep -Ei 'duplicat|syntax|unavailable|non-existent|binding loop|typeerror|referenceerror|error loading' || true)"
     if [ -n "$bad" ]; then printf 'runtime FAILED:\n%s\n' "$bad"; exit 1; fi
+    # Positive assertion: the widget must PROVE it came up — main.qml logs this
+    # marker from Component.onCompleted (keep the two literals in sync). The
+    # keyword grep above passed vacuously when the viewer crashed instantly or
+    # a load failure was phrased outside its keyword set ("is not a type").
+    LOAD_MARKER='[ARP] widget loaded'
+    if ! printf '%s\n' "$out" | grep -qF "$LOAD_MARKER"; then
+      echo "runtime FAILED: load marker \"$LOAD_MARKER\" missing from viewer output"
+      exit 1
+    fi
     echo "runtime OK"
     ;;
   build)

@@ -1992,8 +1992,10 @@ PlasmaExtras.Representation {
 
     Connections {
         target: stationsModel
+        // clear()+append() is the model's only mutation path (main.qml
+        // reloadStationsModel), so count changes cover every reload; nothing
+        // calls setProperty on it, so a dataChanged handler would be dead code.
         function onCountChanged() { rebuildFilteredModel() }
-        function onDataChanged() { rebuildFilteredModel() }
     }
 
     Connections {

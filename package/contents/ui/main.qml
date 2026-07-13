@@ -414,8 +414,12 @@ PlasmoidItem {
         // ": DL_YTDLP;" is a no-op sentinel PREFIX for the onExited dispatcher —
         // matching on a substring like "yt-dlp" would also match commands whose
         // text embeds an untrusted ICY title (same pattern as ": AI_CLEAN;").
+        // timeout 1800: a wedged yt-dlp (stalled connection) otherwise never
+        // exits, onExited never fires and `downloading` blocks every future
+        // download for the rest of the session — same hard-bound principle as
+        // the recorder's ffmpeg "-t" cap. 30 min is far above any real track.
         executable.exec(": DL_YTDLP; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
-                        + "mkdir -p '" + safeDir + "' && yt-dlp --no-playlist " + fmtArgs
+                        + "mkdir -p '" + safeDir + "' && timeout 1800 yt-dlp --no-playlist " + fmtArgs
                         + " -o '" + safeDir + "/%(title)s.%(ext)s' 'ytsearch1:" + safeQuery + "'");
     }
 
@@ -1218,9 +1222,15 @@ PlasmoidItem {
     }
 
     // --- A working timeout for QML XHR (xhr.timeout/ontimeout do nothing in Qt) ---
+    // Declared once instead of Qt.createQmlObject's per-call string compile —
+    // every art/bitrate lookup used to run the QML parser just to get a Timer.
+    Component {
+        id: xhrTimeoutGuard
+        Timer { repeat: false }
+    }
+
     function _armXhrTimeout(xhr, ms) {
-        var timer = Qt.createQmlObject("import QtQuick; Timer { repeat: false }", root, "xhrTimeoutGuard");
-        timer.interval = ms;
+        var timer = xhrTimeoutGuard.createObject(root, { "interval": ms });
         timer.triggered.connect(function() {
             try { xhr.abort(); } catch (e) {}
             try { timer.destroy(); } catch (e) {}
@@ -1353,11 +1363,14 @@ PlasmoidItem {
         // given bluez rejects prints its error to STDOUT, so an emptiness
         // test on the raw output would take the error text for a device
         // list. Tab-separated so names may contain spaces.
-        executable.exec(": BT_LIST; list=$({ bluetoothctl devices Paired; bluetoothctl paired-devices; } 2>/dev/null "
+        // Every bluetoothctl call is capped (like btConnect's timeout 12):
+        // a wedged bluez daemon otherwise hangs the whole listing, onExited
+        // never fires and _btListing stays true for the rest of the session.
+        executable.exec(": BT_LIST; list=$({ timeout 3 bluetoothctl devices Paired; timeout 3 bluetoothctl paired-devices; } 2>/dev/null "
             + "| grep '^Device ' | sort -u); "
             + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
             + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
-            + 'info=$(bluetoothctl info "$mac" 2>/dev/null); '
+            + 'info=$(timeout 3 bluetoothctl info "$mac" 2>/dev/null); '
             + "case \"$info\" in *'Audio Sink'*) ;; *) continue;; esac; "
             + "conn=no; case \"$info\" in *'Connected: yes'*) conn=yes;; esac; "
             + 'printf \'BTDEV\\t%s\\t%s\\t%s\\n\' "$mac" "$conn" "$name"; done; true'
@@ -1393,7 +1406,7 @@ PlasmoidItem {
 
     function btDisconnect(mac) {
         if (!_btValidMac(mac)) return;
-        executable.exec(": BT_DISCONNECT; bluetoothctl disconnect " + mac + "; true");
+        executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect " + mac + "; true");
     }
 
     Timer {
@@ -2131,6 +2144,9 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground | PlasmaCore.Types.ConfigurableBackground
 
     Component.onCompleted: {
+        // Load marker asserted by the dev.sh check smoke test — keep the text
+        // in sync with LOAD_MARKER there.
+        console.log("[ARP] widget loaded");
         reloadStationsModel();
         _loadHistory();
         _loadRecSchedules();
