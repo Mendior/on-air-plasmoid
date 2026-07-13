@@ -1793,6 +1793,16 @@ PlasmoidItem {
         xhr.send();
     }
 
+    // A Deezer entity without an image still returns a VALID URL — it just
+    // has an empty image id ("…/images/artist//250x250-….jpg") and serves a
+    // grey placeholder silhouette. Accepting one poisons the art cache with
+    // junk for the whole session; treat it as "no image".
+    function _deezerRealArt(url) {
+        var u = (url || "").toString();
+        if (u === "" || /\/images\/\w+\/\//.test(u)) return "";
+        return u;
+    }
+
     function _queryDeezer(query, cacheKey, onResult) {
         console.log("[ARP] Deezer query: " + query);
         var xhr = new XMLHttpRequest;
@@ -1809,7 +1819,9 @@ PlasmoidItem {
                     if (!data.error) {
                         if (data.data && data.data.length > 0) {
                             var album = data.data[0].album || {};
-                            var artUrl = album.cover_big || album.cover_medium || data.data[0].artist.picture_medium || "";
+                            var artUrl = _deezerRealArt(album.cover_big)
+                                         || _deezerRealArt(album.cover_medium)
+                                         || _deezerRealArt((data.data[0].artist || {}).picture_medium);
                             if (artUrl) {
                                 onResult(artUrl, true);
                                 return;
@@ -1840,7 +1852,8 @@ PlasmoidItem {
                     if (!data.error) {
                         if (data.data && data.data.length > 0) {
                             var artist = data.data[0];
-                            var artUrl = artist.picture_big || artist.picture_medium || "";
+                            var artUrl = _deezerRealArt(artist.picture_big)
+                                         || _deezerRealArt(artist.picture_medium);
                             if (artUrl) {
                                 onResult(artUrl, true);
                                 return;
