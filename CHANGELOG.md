@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026.14.1
+
+Hotfix round for the sync, found on real hardware within hours of 2026.14.
+
+- **The volume keys move the whole room now.** They act on the system default sink, which stayed on the wired output the whole time — so "volume up" never reached the Bluetooth speaker. While the sync is on, the combined output takes over as the system default (its volume provably scales every speaker's feed) and hands the default back on disable, on failed loads, and after a crash. The master starts at 100% so enabling never jumps the loudness.
+- **A speaker mid-connect can no longer poison the sync.** Loading a loopback whose sink is still registering does not fail — pactl quietly attaches it to the default sink, which while the sync is on is the combined sink itself: a silent feedback loop, and the just-connected speaker sat out of the group until the sync was toggled by hand. Every loopback load is now gated on its sink actually existing, with a short-fuse retry for the skipped one.
+- **"Playing" but silent, fixed.** Re-enabling the sync recreates the combined sink under the same name, and the same-id device assignment looked like a no-op — the player's stream stayed bound to the dead node. The route now bounces through another output first, forcing a real re-attach.
+- **Bluetooth connects verify themselves.** The verdict comes from the device's actual Connected state (bluez can finish a connect after the client times out), a sleeping speaker gets one automatic retry, and the route window covers the whole retry path. An awake speaker connects in about three seconds, measured.
+
 ## 2026.14
 
 One volume for the whole house — and the sync engine went through a hardening pass on real hardware.
