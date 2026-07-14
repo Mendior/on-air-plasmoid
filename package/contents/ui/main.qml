@@ -15,6 +15,8 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support 2.0 as P5Support
 import org.kde.plasma.plasmoid
 
+import "AlarmLogic.js" as AlarmLogic
+
 PlasmoidItem {
     id: root
 
@@ -747,19 +749,10 @@ PlasmoidItem {
         Plasmoid.configuration.recSchedules = JSON.stringify(recSchedules);
     }
 
-    // Next occurrence of hh:mm strictly after fromMs. Recomputed from the wall
-    // clock each time (not "+24h") so DST changes don't drift the start time.
+    // Next occurrence of hh:mm strictly after fromMs — the wall-clock (DST
+    // safe) math lives in AlarmLogic.js, where qmltestrunner covers it.
     function _nextOccurrence(hh, mm, repeat, weekday, fromMs) {
-        var d = new Date(fromMs);
-        d.setHours(hh, mm, 0, 0);
-        if (repeat === "weekly") {
-            var delta = (weekday - d.getDay() + 7) % 7;
-            d.setDate(d.getDate() + delta);
-            if (d.getTime() <= fromMs) d.setDate(d.getDate() + 7);
-        } else if (d.getTime() <= fromMs) {
-            d.setDate(d.getDate() + 1);
-        }
-        return d.getTime();
+        return AlarmLogic.nextOccurrence(hh, mm, repeat, weekday, fromMs);
     }
 
     function addRecSchedule(stationName, url, hh, mm, durationMin, repeat, weekday) {
@@ -880,6 +873,178 @@ PlasmoidItem {
         repeat: true
         running: root.recording
         onTriggered: root.recElapsedSec += 1
+    }
+
+    // ── Wake-up alarms ───────────────────────────────────────────────────────
+    // Entries: { station, url, favicon, hh, mm, repeat: "once"|"daily"|"weekly",
+    //            weekday: 0-6, volumePct, keepAwake, nextRun: epoch ms }.
+    // Same wall-clock scheduling as the recordings above (AlarmLogic.js), but
+    // a SEPARATE list on purpose: a recording entry means "capture the rest
+    // of its window", an alarm means "start playing, loud enough to wake" —
+    // mixing the two semantics in one list is how scheduler bugs are born.
+    property var alarms: []
+
+    function _loadAlarms() {
+        alarms = AlarmLogic.sanitizeAlarms(Plasmoid.configuration.alarms);
+    }
+
+    function _saveAlarms() {
+        Plasmoid.configuration.alarms = JSON.stringify(alarms);
+    }
+
+    function addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake) {
+        if (!url) return;
+        var list = alarms.slice();
+        list.push({
+            "station": stationName || url,
+            "url": url,
+            "favicon": favicon || "",
+            "hh": hh, "mm": mm,
+            "repeat": repeat || "once",
+            "weekday": weekday === undefined ? new Date().getDay() : weekday,
+            "volumePct": Math.max(15, Math.min(100, volumePct || 40)),
+            "keepAwake": keepAwake === true,
+            "nextRun": AlarmLogic.nextOccurrence(hh, mm, repeat || "once", weekday, Date.now())
+        });
+        alarms = list;
+        _saveAlarms();
+        _alarmArmInhibit();
+    }
+
+    function removeAlarm(index) {
+        if (index < 0 || index >= alarms.length) return;
+        var list = alarms.slice();
+        list.splice(index, 1);
+        alarms = list;
+        _saveAlarms();
+        _alarmArmInhibit();
+    }
+
+    Timer {
+        id: alarmTimer
+        interval: 30000
+        repeat: true
+        running: root.alarms.length > 0
+        onTriggered: root._alarmTick()
+    }
+
+    function _alarmTick() {
+        var now = Date.now();
+        var list = alarms.slice();
+        var changed = false;
+        var toFire = null;
+        for (var i = list.length - 1; i >= 0; i--) {
+            var a = list[i];
+            var dec = AlarmLogic.fireDecision(a.nextRun, now, AlarmLogic.GRACE_MS);
+            if (dec === "wait") continue;
+            if (dec === "missed") {
+                dlNotification.title = i18n("Wake-up alarm missed");
+                dlNotification.text = i18n("%1 was set for %2 — the computer was off or asleep at that time.",
+                                           a.station, _pad2(a.hh) + ":" + _pad2(a.mm));
+                dlNotification.iconName = "dialog-warning";
+                dlNotification.sendEvent();
+            } else {
+                toFire = a;
+            }
+            // The entry advances (or leaves) BEFORE any side effect — a fire
+            // path that throws must never leave a due entry behind to re-fire
+            // on every subsequent tick.
+            var next = AlarmLogic.advance(a, now);
+            if (next < 0) list.splice(i, 1);
+            else a.nextRun = next;
+            changed = true;
+        }
+        if (changed) {
+            alarms = list;
+            _saveAlarms();
+            _alarmArmInhibit();
+        }
+        if (toFire !== null) _alarmFire(toFire);
+    }
+
+    // Fire = the reason this feature exists, so every step is belt and
+    // braces: a wake-up must never end in silence.
+    function _alarmFire(a) {
+        // The alarm outranks whatever the evening left behind: a sleep fade
+        // mid-flight would drag the volume right back down, and a pending
+        // sleep timer would stop the just-started station minutes later.
+        cancelSleepTimer();
+        // Volume floor, written straight into the config so startWithFade's
+        // fade-in target picks it up immediately — the debounced
+        // setUserVolume path would lose the race against the fade.
+        Plasmoid.configuration.defaultVolume = Math.max(15, Math.min(100, a.volumePct || 40));
+        // If cast devices are checked, startWithFade routes the alarm to
+        // them — waking up to the same bedroom speaker the evening ended on
+        // is correct, and the fallback below knows local silence is fine.
+        startWithFade({ "name": a.station, "hostname": a.url,
+                        "favicon": a.favicon || "", "active": true });
+        _alarmFallbackArmed = true;
+        alarmFallbackTimer.restart();
+        // Keep the station list's playing-row marker honest when the alarm
+        // station is in the visible list (same courtesy the heal path pays).
+        Qt.callLater(function() {
+            for (var k = 0; k < stationsModel.count; k++) {
+                if (stationsModel.get(k).hostname === a.url) { lastPlay = k; break; }
+            }
+        });
+        dlNotification.title = i18n("Wake-up alarm");
+        dlNotification.text = a.station;
+        dlNotification.iconName = "clock";
+        dlNotification.sendEvent();
+    }
+
+    // The wake tone: if the station has not become audibly alive within the
+    // window (network down, stream dead, resolver hung), the bundled chime
+    // takes over. An alarm that fails must fail LOUDLY. Disarmed by an
+    // explicit stop or a manual station pick — either one means "I'm up".
+    property bool _alarmFallbackArmed: false
+
+    Timer {
+        id: alarmFallbackTimer
+        interval: 25000
+        repeat: false
+        onTriggered: {
+            if (!root._alarmFallbackArmed) return;
+            root._alarmFallbackArmed = false;
+            // Casting-only is a healthy route: the play command went to the
+            // device, and the muted local side is by design.
+            if (root._casting && !root._castLocalPlay) return;
+            if (isPlaying() && playMusic.mediaStatus === MediaPlayer.BufferedMedia) return;
+            dlNotification.title = i18n("Wake-up alarm");
+            dlNotification.text = i18n("The station could not start — playing the built-in tone instead.");
+            dlNotification.iconName = "dialog-warning";
+            dlNotification.sendEvent();
+            // file:// skips the cast branch in startWithFade — the tone
+            // plays locally, which is exactly where the sleeper is.
+            startWithFade({ "name": i18n("Wake-up alarm"),
+                            "hostname": Qt.resolvedUrl("../sounds/alarm-fallback.ogg"),
+                            "favicon": "", "active": true });
+        }
+    }
+
+    // "Keep the computer awake" holder: one short-lived process group —
+    // setsid + systemd-inhibit + sleep holds the inhibit fd until just past
+    // the soonest keep-awake alarm, then everything exits by itself. No
+    // daemon, nothing to leak. Re-arming kills the previous group first,
+    // identity-checked: a pid file can survive a reboot and the number may
+    // belong to an innocent process by then.
+    readonly property string _alarmInhibitPidFile: _mprisRunDir + "/arp-alarm-inhibit-" + _mprisId + ".pid"
+
+    function _alarmArmInhibit() {
+        var until = AlarmLogic.earliestKeepAwake(alarms);
+        var pf = _alarmInhibitPidFile.replace(/'/g, "'\\''");
+        var cmd = ": ALARM_INHIBIT; "
+            + "if [ -f '" + pf + "' ]; then p=$(cat '" + pf + "' 2>/dev/null); "
+            + "[ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'systemd-inhibit.*On Air' "
+            + "&& kill -- -\"$p\" 2>/dev/null; rm -f '" + pf + "'; fi; ";
+        if (until > 0) {
+            var secs = Math.max(60, Math.round((until - Date.now()) / 1000) + 120);
+            cmd += "command -v systemd-inhibit >/dev/null 2>&1 && { "
+                + "setsid systemd-inhibit --what=sleep --who='On Air' "
+                + "--why='Wake-up alarm' sleep " + secs + " >/dev/null 2>&1 & "
+                + "echo $! > '" + pf + "'; }; ";
+        }
+        executable.exec(cmd + "true # " + (++_execSeq));
     }
 
     // Play a downloaded file (My Music page)
@@ -2949,7 +3114,10 @@ PlasmoidItem {
     }
 
     function _playStation(station) {
-        // A user-initiated play always outranks a heal audition in flight.
+        // A user-initiated play always outranks a heal audition in flight —
+        // and someone picking a station is awake: the wake tone stands down.
+        _alarmFallbackArmed = false;
+        alarmFallbackTimer.stop();
         _healClearPending();
         _healSeq++;
         healTimer.stop();
@@ -2974,6 +3142,10 @@ PlasmoidItem {
 
     function stopWithFade() {
         infoTimer.stop();
+        // A stop inside the wake-tone window is the person saying "I'm up" —
+        // the fallback chime must not blare over it half a minute later.
+        _alarmFallbackArmed = false;
+        alarmFallbackTimer.stop();
         root._previewUrl = "";
         // An explicit stop also cancels a heal audition in flight — "stop
         // must never start playback" applies to healing too.
@@ -3567,6 +3739,10 @@ PlasmoidItem {
         _loadHistory();
         _loadLiked();
         _loadRecSchedules();
+        // Alarms re-arm their keep-awake holder every start: the pid file
+        // kill-and-rearm cycle also cleans up after a crashed session.
+        _loadAlarms();
+        _alarmArmInhibit();
         // Seed the steal-watch snapshot (sync is never active this early, so
         // this only records the current sink set — no suspects, no action).
         _combineDefaultStealWatch();
@@ -4137,7 +4313,8 @@ PlasmoidItem {
                 root._combineHandleMiss(stdout || "");
                 return;
             }
-            if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0) {
+            if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0
+                || cmd.indexOf(": ALARM_INHIBIT;") === 0) {
                 return; // fire-and-forget
             }
             // Disable's teardown ran to completion — only now is the persisted

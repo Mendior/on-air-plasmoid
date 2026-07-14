@@ -1263,6 +1263,8 @@ PlasmaExtras.Representation {
             id: libraryPage
             // Scheduled-recordings panel visibility (toggled from the header row)
             property bool showSchedules: false
+            // Wake-up alarms panel visibility (its own toggle, same header row)
+            property bool showAlarms: false
             // History header shows either the play history or the liked songs
             property bool showLiked: false
             spacing: 0
@@ -1602,6 +1604,36 @@ PlasmaExtras.Representation {
                 CircleButton {
                     implicitWidth: Kirigami.Units.gridUnit * 2
                     implicitHeight: implicitWidth
+                    iconName: "clock"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: libraryPage.showAlarms
+                    tooltipText: i18n("Wake-up alarms")
+                    onClicked: libraryPage.showAlarms = !libraryPage.showAlarms
+
+                    // Badge with the number of set alarms
+                    Rectangle {
+                        visible: root.alarms.length > 0
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.topMargin: -2
+                        anchors.rightMargin: -2
+                        width: Kirigami.Units.gridUnit * 0.85
+                        height: width
+                        radius: width / 2
+                        color: root.accent
+                        PlasmaComponents3.Label {
+                            anchors.centerIn: parent
+                            text: root.alarms.length
+                            color: "#0B0F0D"
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 2
+                            font.weight: Font.Bold
+                        }
+                    }
+                }
+                CircleButton {
+                    implicitWidth: Kirigami.Units.gridUnit * 2
+                    implicitHeight: implicitWidth
                     iconName: "folder-open"
                     iconScale: 0.55
                     tooltipText: i18n("Open folder in file manager")
@@ -1818,6 +1850,206 @@ PlasmaExtras.Representation {
                                                     schedDuration.value,
                                                     repeats[schedRepeat.currentIndex],
                                                     schedWeekday.currentIndex)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Wake-up alarms panel ─────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                visible: libraryPage.showAlarms
+                implicitHeight: alarmCol.implicitHeight + Kirigami.Units.smallSpacing * 3
+                radius: Kirigami.Units.smallSpacing * 1.5
+                color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
+                border.width: 1
+                border.color: Qt.alpha(root.accent, 0.25)
+
+                ColumnLayout {
+                    id: alarmCol
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                    spacing: Kirigami.Units.smallSpacing
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        Kirigami.Icon {
+                            source: "clock"
+                            width: Kirigami.Units.iconSizes.small
+                            height: width
+                            color: root.accent
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Wake-up alarms")
+                            font.weight: Font.DemiBold
+                            color: root.accent
+                        }
+                    }
+
+                    // Existing alarms
+                    Repeater {
+                        model: root.alarms
+
+                        RowLayout {
+                            id: alarmItem
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: {
+                                    var a = alarmItem.modelData
+                                    var when = root._pad2(a.hh) + ":" + root._pad2(a.mm)
+                                    // Fixed English day names — the UI language is
+                                    // English by design, Qt.locale() would leak the
+                                    // system locale here.
+                                    var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                    var d = new Date(a.nextRun)
+                                    var rep = a.repeat === "daily" ? i18n("Daily")
+                                            : a.repeat === "weekly" ? i18n("Every %1", days[a.weekday])
+                                            : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
+                                    return "⏰ " + rep + " " + when + " · " + a.volumePct + "% · " + a.station
+                                }
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            }
+                            CircleButton {
+                                implicitWidth: Kirigami.Units.gridUnit * 1.6
+                                implicitHeight: implicitWidth
+                                iconName: "edit-delete"
+                                iconScale: 0.5
+                                opacity: 0.7
+                                tooltipText: i18n("Remove this alarm")
+                                onClicked: root.removeAlarm(alarmItem.index)
+                            }
+                        }
+                    }
+
+                    PlasmaComponents3.Label {
+                        visible: root.alarms.length === 0
+                        text: i18n("No alarms yet — add one below.")
+                        opacity: 0.55
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
+
+                    Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
+
+                    // Add form: station · time · repeat · volume · [+]
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: Kirigami.Units.smallSpacing
+                        rowSpacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Station:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.ComboBox {
+                            id: alarmStation
+                            Layout.fillWidth: true
+                            model: stationsModel
+                            textRole: "name"
+                            Accessible.name: i18n("Station")
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Start:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.SpinBox {
+                                id: alarmHH
+                                from: 0; to: 23
+                                value: 7
+                                textFromValue: function(v) { return root._pad2(v) }
+                                wrap: true
+                                Accessible.name: i18n("Start hour")
+                            }
+                            PlasmaComponents3.Label { text: ":" }
+                            QQC2.SpinBox {
+                                id: alarmMM
+                                from: 0; to: 59
+                                stepSize: 5
+                                value: 0
+                                textFromValue: function(v) { return root._pad2(v) }
+                                wrap: true
+                                Accessible.name: i18n("Start minute")
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Repeat:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.ComboBox {
+                                id: alarmRepeat
+                                model: [i18n("Once"), i18n("Daily"), i18n("Weekly")]
+                                currentIndex: 1
+                                Accessible.name: i18n("Repeat")
+                            }
+                            QQC2.ComboBox {
+                                id: alarmWeekday
+                                visible: alarmRepeat.currentIndex === 2
+                                // Fixed English day names (UI language is English by design)
+                                model: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                currentIndex: new Date().getDay()
+                                Accessible.name: i18n("Weekday")
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Volume:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.SpinBox {
+                            id: alarmVolume
+                            // The floor is 15%: an alarm must never be silent.
+                            from: 15; to: 100
+                            stepSize: 5
+                            value: 40
+                            textFromValue: function(v) { return v + "%" }
+                            valueFromText: function(t) { return parseInt(t) || 40 }
+                            Accessible.name: i18n("Volume")
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.CheckBox {
+                            id: alarmAwake
+                            Layout.fillWidth: true
+                            text: i18n("Keep the computer awake until the alarm")
+                            checked: true
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.Button {
+                            icon.name: "list-add"
+                            text: i18n("Add")
+                            enabled: alarmStation.currentIndex >= 0
+                                     && alarmStation.currentIndex < stationsModel.count
+                            onClicked: {
+                                var st = stationsModel.get(alarmStation.currentIndex)
+                                if (!st || !st.hostname) return
+                                var repeats = ["once", "daily", "weekly"]
+                                root.addAlarm(st.name, st.hostname, st.favicon || "",
+                                              alarmHH.value, alarmMM.value,
+                                              repeats[alarmRepeat.currentIndex],
+                                              alarmWeekday.currentIndex,
+                                              alarmVolume.value, alarmAwake.checked)
                             }
                         }
                     }
