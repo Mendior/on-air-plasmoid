@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.15
+
+The sync looks after itself now: speakers walk themselves into the group, and the calibration levels the room's loudness while it is at it.
+
+- **A Bluetooth speaker that connects without its audio no longer needs a second try.** Some speakers (the JBL Xtreme 3 on the test bench, notoriously) report "Connected: yes" with no audio profile behind it, so their output never appears — and the fix everyone eventually finds by hand is "connect it again". The widget now watches every connect that should join the sync all the way in: a missing loopback gets a rebuild, a sink that never shows up gets the connection cycled once automatically, and if half a minute of that leads nowhere it says so instead of leaving a silently absent speaker.
+- **The mid-build retry window covers slow sinks now.** A Bluetooth sink can register up to ~6 s after the connect finishes; the old window gave up at 4.5 s, right before the speaker arrived.
+- **One calibration, two results: delay and loudness.** The microphone already times every speaker's click — now it reads each click's height too. With every sink parked at the same volume for the run, the amplitude ratio between speakers is their real loudness difference at the listening position: the quietest speaker becomes the reference and the louder ones are trimmed down to it, straight into the per-speaker balances (software volumes are cubic, so the ratio lands as its cube root). Every speaker in the group is measured, not just the timed pair, and nothing is ever boosted — no headroom surprises, no clipping.
+
 ## 2026.14.1
 
 Hotfix round for the sync, found on real hardware within hours of 2026.14.

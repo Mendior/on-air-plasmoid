@@ -1150,7 +1150,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.14.1");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1631,15 +1631,28 @@ PlasmoidItem {
         // played straight at the sinks and don't pass through it.
         _calibVolumeBefore = playMusicOutput.volume;
         playMusicOutput.volume = 0;
-        calibGuardTimer.restart();
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
-        var w = wired.replace(/'/g, "'\\''");
-        var b = bt.replace(/'/g, "'\\''");
+        // The timing pair goes first; EVERY other speaker in the group rides
+        // along for the loudness measurement, all parked at the same 55% so
+        // the click amplitudes compare speaker against speaker, nothing else.
+        // Capped to what calibrate.py will measure (2 + MAX_EXTRA_SINKS) —
+        // parking the volume of a sink nobody clicks would be a pointless
+        // save/restore cycle.
+        var calSinks = [wired, bt];
+        for (var e = 0; e < sinks.length; e++)
+            if (sinks[e] !== wired && sinks[e] !== bt) calSinks.push(sinks[e]);
+        calSinks = calSinks.slice(0, 8);
+        // The guard must outlast the WORST run, not the typical one: every
+        // extra speaker adds two clicks, and a dying sink holds each click
+        // for paplay's full 5 s timeout — a fixed 60 s fired mid-run with a
+        // full group, unmuting the radio INTO the tail measurements and
+        // persisting music-contaminated levels.
+        calibGuardTimer.interval = 60000 + (calSinks.length - 2) * 15000;
+        calibGuardTimer.restart();
         // A balance-trimmed loopback would mute the clicks on that speaker
         // and the measurement would read as silence — raise OUR sink-inputs
         // to full for the clicks and put the balance back right after.
         var pre = "", post = "";
-        var calSinks = [wired, bt];
         for (var ci = 0; ci < calSinks.length; ci++) {
             var mod = _combineModuleForKey(_trimKeyForSink(calSinks[ci]));
             var pct = Math.round(trimOf(_trimKeyForSink(calSinks[ci])) * 100);
@@ -1648,18 +1661,26 @@ PlasmoidItem {
                 post += _sinkInputVolCmd(mod, pct);
             }
         }
-        executable.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
-            + " w='" + w + "'; b='" + b + "';"
-            + " wv=$(pactl get-sink-volume \"$w\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
-            + " bv=$(pactl get-sink-volume \"$b\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
-            + " pactl set-sink-volume \"$w\" 55%; pactl set-sink-volume \"$b\" 55%;"
-            + " " + pre
-            + " python3 '" + script + "' \"$w\" \"$b\";"
-            // Unquoted on purpose: $wv/$bv hold one %-value PER CHANNEL and
+        var setup = "", restore = "", argv = "";
+        for (var si = 0; si < calSinks.length; si++) {
+            var esc = calSinks[si].replace(/'/g, "'\\''");
+            setup += " s" + si + "='" + esc + "';"
+                  + " v" + si + "=$(pactl get-sink-volume \"$s" + si + "\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
+                  + " pactl set-sink-volume \"$s" + si + "\" 55%;";
+            // Unquoted on purpose: $vN holds one %-value PER CHANNEL and
             // word-splitting hands pactl each as its own argument, so a
             // left/right balance survives the round-trip. An unreadable
             // volume falls back to the 55% the calibration itself used.
-            + " pactl set-sink-volume \"$w\" ${wv:-55%}; pactl set-sink-volume \"$b\" ${bv:-55%};"
+            restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-55%};";
+            argv += " \"$s" + si + "\"";
+            if (si === 1) argv += " ''"; // the mic placeholder sits between
+                                         // the timing pair and the extras
+        }
+        executable.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
+            + setup
+            + " " + pre
+            + " python3 '" + script + "'" + argv + ";"
+            + restore
             + " " + post
             + " true # " + (++_execSeq));
     }
@@ -1679,6 +1700,10 @@ PlasmoidItem {
         _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
         Plasmoid.configuration.combinePrevOutput = _combinePrevOutput;
         _combineSinksSnapshot = sinks.join("|");
+        // Sync switched on while a speaker is still connecting: its sink is
+        // not in the snapshot yet, so the join watchdog walks it in.
+        if (_btConnectingMac !== "")
+            _btJoinWatchArm(_btConnectingMac, _btPendingSinkName);
         // Human name for the sink — this is what the output picker (ours and
         // the system volume applet) shows instead of the raw node name.
         var desc = i18n("All local outputs (On Air)").replace(/"/g, "").replace(/'/g, "'\\''");
@@ -1732,6 +1757,7 @@ PlasmoidItem {
         _combinePendingRoute = false;
         _combineLbRetries = 0;
         combineLbRetry.stop();
+        _btJoinWatchStop();
         // Route away FIRST — with the choice already off the combined sink,
         // its removal is not a "device vanished" event worth a notification.
         setAudioOutputDevice(_combinePrevOutput);
@@ -1811,8 +1837,9 @@ PlasmoidItem {
 
     Timer {
         id: calibGuardTimer
-        // calibrate.py is internally bounded well under this — the guard only
-        // exists so a lost result can't leave the stream muted forever.
+        // Interval is set per run by calibrateSync (it grows with the group's
+        // size, sized to calibrate.py's worst case) — the guard only exists
+        // so a lost result can't leave the stream muted forever.
         interval: 60000
         repeat: false
         onTriggered: {
@@ -1862,7 +1889,10 @@ PlasmoidItem {
             _combineLbRetries = 0;
             return;
         }
-        if (_combineActive && _combineLbRetries < 3) {
+        // 8 × 1.5 s: a Bluetooth speaker's sink registers up to ~6 s after
+        // the connect (measured on a JBL Xtreme 3) — the old 3-try window
+        // closed before the sink existed and the speaker never joined.
+        if (_combineActive && _combineLbRetries < 8) {
             _combineLbRetries++;
             combineLbRetry.restart();
         }
@@ -2027,6 +2057,12 @@ PlasmoidItem {
             _btPendingSinkName = "";
             btRouteTimeout.stop();
         }
+        // The user sent this device away — the watchdog must not fight them
+        // by reconnecting it.
+        if (_btJoinWatchMac === mac) _btJoinWatchStop();
+        // A kick already in flight for it will reconnect it in a few seconds
+        // regardless — flag it so the kick's landing undoes that.
+        if (_btKickMac === mac) _btKickAbort = true;
         executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect " + mac + "; true");
     }
 
@@ -2042,6 +2078,105 @@ PlasmoidItem {
         onTriggered: {
             root._btPendingSinkName = "";
             root._btPendingSinkMac = "";
+        }
+    }
+
+    // ── Sync join watchdog ───────────────────────────────────────────────────
+    // bluetoothctl saying "Connected: yes" does not mean audio: some speakers
+    // (JBLs, notoriously) come up without their A2DP profile on the first
+    // page, so no sink ever appears — the fix a human eventually finds is
+    // "connect it again". This watchdog does exactly that, once, on its own:
+    // after a connect that should JOIN the sync it checks every 2 s that the
+    // speaker's sink and its loopback actually materialized, nudges a rebuild
+    // if only the loopback is missing, and cycles the Bluetooth connection if
+    // the sink itself never showed up. Bounded; gives up with a note.
+    property string _btJoinWatchMac: ""
+    property string _btJoinWatchName: ""
+    property int _btJoinWatchTicks: 0
+    property bool _btJoinKicked: false
+    // The kick shell lives for up to ~21 s and its reconnect phase cannot be
+    // recalled — if the user clicks Disconnect inside that window, their
+    // choice would be silently reverted. Tracked so the kick's handler can
+    // undo its own reconnect the moment it lands.
+    property string _btKickMac: ""
+    property bool _btKickAbort: false
+
+    function _btJoinWatchArm(mac, name) {
+        if (!(_combineWantActive || _combineActive) || !_btValidMac(mac)) return;
+        _btJoinWatchMac = mac;
+        _btJoinWatchName = name || "";
+        _btJoinWatchTicks = 0;
+        _btJoinKicked = false;
+        btJoinWatch.restart();
+    }
+
+    function _btJoinWatchStop() {
+        btJoinWatch.stop();
+        _btJoinWatchMac = "";
+        _btJoinWatchName = "";
+    }
+
+    Timer {
+        id: btJoinWatch
+        interval: 2000
+        repeat: true
+        onTriggered: root._btJoinWatchTick()
+    }
+
+    function _btJoinWatchTick() {
+        if (!(_combineActive || _combineWantActive) || _btJoinWatchMac === "") {
+            _btJoinWatchStop();
+            return;
+        }
+        // The connect/pair attempt itself is still in flight — its retry path
+        // pages a sleeping speaker for up to ~36 s, and a kick's disconnect
+        // here would sabotage the very attempt being guarded. Hold the count
+        // until bluez has given its verdict (the handler re-arms on success
+        // and stops the watch on failure).
+        if (_btConnectingMac !== "" || _btPairingMac !== "") return;
+        _btJoinWatchTicks++;
+        var token = _btJoinWatchMac.toLowerCase().replace(/:/g, "_");
+        var outs = mediaDevices.audioOutputs;
+        var sinkUp = false;
+        for (var i = 0; i < outs.length; i++)
+            if (String(outs[i].id).toLowerCase().indexOf(token) !== -1) { sinkUp = true; break; }
+        if (sinkUp) {
+            for (var mod in _combineLoopbackSinkByModule) {
+                if (String(_combineLoopbackSinkByModule[mod]).toLowerCase().indexOf(token) !== -1) {
+                    _btJoinWatchStop(); // in the group — done, all is well
+                    return;
+                }
+            }
+            // Sink is up but no loopback feeds it — the outputs-changed
+            // signal was missed somehow; ask for a rebuild. Every OTHER tick,
+            // and only when no rebuild or retry is already scheduled: each
+            // rebuild swaps every loopback (a blink on all speakers), so the
+            // nudge must never turn into a drumbeat.
+            if (_btJoinWatchTicks % 2 === 1 && !_combineReloopBusy
+                && !syncOffsetDebounce.running && !combineLbRetry.running)
+                syncOffsetDebounce.restart();
+        } else if (_btJoinWatchTicks >= 4 && !_btJoinKicked) {
+            // ~8 s connected with no sink: the audio profile did not come up.
+            // Cycle the connection once — re-paging renegotiates A2DP.
+            _btJoinKicked = true;
+            _btKickMac = _btJoinWatchMac;
+            _btKickAbort = false;
+            executable.exec(": BT_KICK; timeout 5 bluetoothctl disconnect " + _btJoinWatchMac
+                + " >/dev/null 2>&1; sleep 1;"
+                + " timeout 15 bluetoothctl connect " + _btJoinWatchMac + " >/dev/null 2>&1; true"
+                + " # " + (++_execSeq));
+        }
+        if (_btJoinWatchTicks >= 15) {
+            // ~30 s is past every observed good case — stop, and say why the
+            // speaker is absent instead of leaving a silently missing device.
+            var gaveUpName = _btJoinWatchName || _btJoinWatchMac;
+            _btJoinWatchStop();
+            dlNotification.title = i18n("%1 did not join the sync", gaveUpName);
+            dlNotification.text = sinkUp
+                ? i18n("The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it.")
+                : i18n("The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again.");
+            dlNotification.iconName = "network-bluetooth";
+            dlNotification.sendEvent();
         }
     }
 
@@ -2250,7 +2385,7 @@ PlasmoidItem {
         var guard = null;
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.14.1");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -2402,7 +2537,7 @@ PlasmoidItem {
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                     + encodeURIComponent(name) + "&limit=30");
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.14.1");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -2468,7 +2603,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/url/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.14.1");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -2490,7 +2625,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/vote/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.14.1");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -3488,12 +3623,21 @@ PlasmoidItem {
             // own words; the audio routing happens separately, when the new
             // PipeWire sink appears in mediaDevices (see onAudioOutputsChanged).
             if (cmd.indexOf(": BT_CONNECT;") === 0) {
+                var connMac = root._btConnectingMac;
+                var connName = root._btPendingSinkName;
                 root._btConnectingMac = "";
                 // Verdict comes from the __BT_CONN_*__ sentinel (the device's
                 // real Connected state, post-retry) — bluetoothctl's own
                 // chatter is unreliable when the client gets timeout-killed.
                 if ((stdout || "").indexOf("__BT_CONN_OK__") === -1) {
                     btRouteTimeout.stop();
+                    // A watchdog armed for this very attempt (sync switched on
+                    // while the connect was in flight) has nothing left to
+                    // guard — left ticking it would kick a device the user
+                    // was just told did not connect, then contradict this
+                    // message with a second one.
+                    if (connMac !== "" && root._btJoinWatchMac === connMac)
+                        root._btJoinWatchStop();
                     dlNotification.title = i18n("Could not connect to %1",
                         root._btPendingSinkName || i18n("the Bluetooth device"));
                     dlNotification.text = i18n("Make sure the speaker is switched on and in range.");
@@ -3511,11 +3655,28 @@ PlasmoidItem {
                     // behind a stale menu row) — then no outputs change will
                     // ever fire and this immediate pass is the only route.
                     root._btTryRoutePending();
+                    // With the sync on, "connected" is only half the story —
+                    // the watchdog sees the speaker all the way into the group.
+                    root._btJoinWatchArm(connMac, connName);
                 }
                 btList();
                 return;
             }
             if (cmd.indexOf(": BT_DISCONNECT;") === 0) {
+                btList();
+                return;
+            }
+            // Watchdog's one-shot connection cycle finished — the sink's
+            // appearance (or not) flows back through the normal watch ticks;
+            // only the menu's Connected states need refreshing here. Unless
+            // the user clicked Disconnect while the cycle was mid-flight:
+            // its reconnect phase just reverted their choice — undo that.
+            if (cmd.indexOf(": BT_KICK;") === 0) {
+                if (root._btKickAbort && root._btValidMac(root._btKickMac))
+                    executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect "
+                                    + root._btKickMac + "; true");
+                root._btKickMac = "";
+                root._btKickAbort = false;
                 btList();
                 return;
             }
@@ -3551,6 +3712,9 @@ PlasmoidItem {
                         if (root._btPendingSinkMac === "" && pairedMac !== "")
                             root._btPendingSinkMac = pairedMac;
                         btRouteTimeout.restart();
+                        // Armed before the route pass — that pass clears the
+                        // pending name the watchdog wants for its messages.
+                        root._btJoinWatchArm(pairedMac, root._btPendingSinkName);
                         // The sink may already be up — route now, not never.
                         root._btTryRoutePending();
                     } else {
@@ -3714,9 +3878,33 @@ PlasmoidItem {
                             Plasmoid.configuration.syncOffsetMap = JSON.stringify(calMap);
                         } catch (e) {}
                     }
+                    // Loudness matching, from the same run: each level line is
+                    // one speaker's click peak at the microphone, all taken at
+                    // the same sink volume. The QUIETEST speaker becomes the
+                    // reference (nothing is ever boosted — no headroom games)
+                    // and louder ones are trimmed down to it. Software volumes
+                    // are cubic in PulseAudio/PipeWire, so a linear amplitude
+                    // ratio lands as its cube root.
+                    var lvls = [], lvlRe = /CALIB_LVL (\S+) (\d+)/g, lvlM;
+                    while ((lvlM = lvlRe.exec(stdout || "")) !== null) {
+                        var lvlAmp = parseInt(lvlM[2], 10);
+                        if (lvlAmp > 0) lvls.push({ sink: lvlM[1], amp: lvlAmp });
+                    }
+                    var leveled = false;
+                    if (lvls.length >= 2) {
+                        var refAmp = lvls[0].amp;
+                        for (var li = 1; li < lvls.length; li++)
+                            if (lvls[li].amp < refAmp) refAmp = lvls[li].amp;
+                        for (var lj = 0; lj < lvls.length; lj++)
+                            setDeviceTrim(_trimKeyForSink(lvls[lj].sink),
+                                          Math.pow(refAmp / lvls[lj].amp, 1 / 3));
+                        leveled = true;
+                    }
                     root._combineRebuildLoopbacks();
                     dlNotification.title = i18n("Speakers calibrated");
-                    dlNotification.text = i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
+                    dlNotification.text = leveled
+                        ? i18n("The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered.", calMs)
+                        : i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
                     dlNotification.iconName = "audio-input-microphone";
                 } else {
                     dlNotification.title = i18n("Calibration did not succeed");

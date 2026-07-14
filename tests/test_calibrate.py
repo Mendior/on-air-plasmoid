@@ -52,30 +52,52 @@ def test_make_click_is_short_and_bounded(calib, tmp_path):
     assert 10000 < peak <= 24000  # audible but never clipping
 
 
-def test_peak_time_finds_a_click_where_it_is(calib, tmp_path):
+def inject_click(samples, rate, at, amp):
+    for i in range(int(rate * 0.01)):
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / int(rate * 0.01)))
+        samples[int(at * rate) + i] = int(amp * env
+                                          * math.sin(2.0 * math.pi * 2200.0 * i / rate))
+
+
+def test_peak_of_finds_a_click_where_it_is(calib, tmp_path):
     rate = calib["RATE"]
     skip = calib["ANALYSIS_SKIP"]
     at = 0.9  # seconds — safely past the skipped warm-up window
     samples = [0] * int(rate * 1.5)
-    for i in range(int(rate * 0.01)):
-        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / int(rate * 0.01)))
-        samples[int(at * rate) + i] = int(20000 * env
-                                          * math.sin(2.0 * math.pi * 2200.0 * i / rate))
+    inject_click(samples, rate, at, 20000)
     p = tmp_path / "rec.wav"
     write_wav(p, samples, rate)
-    t = calib["peak_time"](str(p))
-    assert t is not None
+    got = calib["peak_of"](str(p))
+    assert got is not None
+    t, amp = got
     assert abs(t - at) < 0.01
     assert t > skip  # the AGC-pop window must never win
+    assert 18000 < amp <= 20000  # the peak's own height rides along
 
 
-def test_peak_time_rejects_silence(calib, tmp_path):
+def test_peak_of_amplitudes_keep_their_ratio(calib, tmp_path):
+    # The loudness matching stands on this: a speaker heard at half the
+    # amplitude must MEASURE at half the amplitude.
+    rate = calib["RATE"]
+    amps = []
+    for k, target in enumerate((24000, 12000)):
+        samples = [0] * int(rate * 1.5)
+        inject_click(samples, rate, 0.9, target)
+        p = tmp_path / ("rec%d.wav" % k)
+        write_wav(p, samples, rate)
+        got = calib["peak_of"](str(p))
+        assert got is not None
+        amps.append(got[1])
+    assert abs(amps[1] / amps[0] - 0.5) < 0.02
+
+
+def test_peak_of_rejects_silence(calib, tmp_path):
     p = tmp_path / "silence.wav"
     write_wav(p, [0] * calib["RATE"], calib["RATE"])
-    assert calib["peak_time"](str(p)) is None
+    assert calib["peak_of"](str(p)) is None
 
 
-def test_peak_time_rejects_steady_noise(calib, tmp_path):
+def test_peak_of_rejects_steady_noise(calib, tmp_path):
     # Loud but NOT impulsive — a click must stand far above the noise floor,
     # otherwise music/room noise would measure as a click.
     rate = calib["RATE"]
@@ -83,13 +105,13 @@ def test_peak_time_rejects_steady_noise(calib, tmp_path):
                for i in range(rate)]
     p = tmp_path / "noise.wav"
     write_wav(p, samples, rate)
-    assert calib["peak_time"](str(p)) is None
+    assert calib["peak_of"](str(p)) is None
 
 
-def test_peak_time_rejects_too_short_recording(calib, tmp_path):
+def test_peak_of_rejects_too_short_recording(calib, tmp_path):
     p = tmp_path / "short.wav"
     write_wav(p, [0] * int(calib["RATE"] * 0.1), calib["RATE"])
-    assert calib["peak_time"](str(p)) is None
+    assert calib["peak_of"](str(p)) is None
 
 
 def test_median_takes_the_middle(calib):
