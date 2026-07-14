@@ -1,0 +1,426 @@
+// SPDX-FileCopyrightText: 2026 Egon Greenberg
+// SPDX-License-Identifier: LGPL-2.0-or-later
+// The sync engine's state machine, driven end to end through a mock app and
+// a mock config — the exact seam SyncEngine.qml was extracted to create.
+// Everything here used to be untestable inside main.qml: enable/disable
+// round-trips, superseded-generation acks, the loopback shell command
+// construction (quoting, delays, channel maps), the calibration loudness
+// math with its cubic fold-back, the join watchdog's kick cycle and the
+// default-sink steal watch.
+//
+// The mocks are QtObjects, not plain JS objects: a JS object handed through
+// createObject's initial properties is copied, and the engine would write
+// into a twin the assertions never see.
+import QtQuick
+import QtTest
+
+import "../../package/contents/ui"
+
+Item {
+    id: harness
+
+    // Engine notifications call i18n(); qmltestrunner has no KLocalizedContext,
+    // so the scope chain finds this stand-in (production resolves the real one
+    // from the plasmoid context — main.qml defines no such function).
+    function i18n(s) {
+        var out = s;
+        for (var i = 1; i < arguments.length; i++)
+            out = out.replace("%" + i, arguments[i]);
+        return out;
+    }
+
+    Component {
+        id: engineComp
+        SyncEngine {}
+    }
+
+    Component {
+        id: mockAppComp
+        QtObject {
+            property var execLog: []
+            property int seqN: 0
+            property var notes: []
+            property var lastOutputDevice: null
+            property int btListed: 0
+            property var castApplied: []
+            property bool playing: false
+            property var mediaDevs: ({ audioOutputs: [] })
+            property var playerOutput: ({ volume: 0.5, device: null })
+            property string instanceId: "7"
+            property string _btConnectingMac: ""
+            property string _btPairingMac: ""
+            property string _btPendingSinkName: ""
+            function exec(cmd) { execLog.push(cmd); }
+            function nextSeq() { return ++seqN; }
+            function notify(t, x, i) { notes.push({ title: t, text: x, icon: i }); }
+            function isPlaying() { return playing; }
+            function setAudioOutputDevice(id) { lastOutputDevice = id; }
+            function btList() { btListed++; }
+            function _btValidMac(mac) { return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac); }
+            function castTrimActive(id) { return false; }
+            function applyCastTrim(uuid) { castApplied.push(uuid); }
+        }
+    }
+
+    Component {
+        id: mockCfgComp
+        QtObject {
+            property int syncOffsetMs: 0
+            property string syncOffsetMap: "{}"
+            property string deviceTrims: "{}"
+            property string deviceChannels: "{}"
+            property string syncExcluded: "{}"
+            property string combinePrevOutput: ""
+            property string combinePrevDefault: ""
+            property string audioOutputDevice: ""
+        }
+    }
+
+    TestCase {
+        name: "SyncEngine"
+
+        readonly property string wired: "alsa_output.pci-0000_00_1f.3.analog-stereo"
+        readonly property string wired2: "alsa_output.usb-dock.analog-stereo"
+        readonly property string btSink: "bluez_output.AA_BB_CC_DD_EE_FF.1"
+        readonly property string btMac: "AA:BB:CC:DD:EE:FF"
+
+        function dev(id) { return { id: id, description: "desc of " + id }; }
+
+        function rig(outputs, cfgProps) {
+            var mock = createTemporaryObject(mockAppComp, harness);
+            verify(mock !== null);
+            mock.mediaDevs = { audioOutputs: outputs || [] };
+            var cfg = createTemporaryObject(mockCfgComp, harness, cfgProps || {});
+            verify(cfg !== null);
+            var e = createTemporaryObject(engineComp, harness, { app: mock, cfg: cfg });
+            verify(e !== null);
+            return { e: e, mock: mock, cfg: cfg };
+        }
+
+        function activate(r) {
+            // enable + a clean ack — the shortest path to a live engine.
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            var ok = r.e.handleExec(": PW_COMBINE " + r.e._combineLoadSeq + ";",
+                                    "PREVDEF usb_dac\nNULL 77\nLB 101 " + wired
+                                    + "\nLB 102 " + btSink + "\n", "");
+            verify(ok);
+            verify(r.e._combineActive);
+        }
+
+        // ── enable: command construction ──────────────────────────────────
+
+        function test_enable_builds_the_load_command() {
+            var r = rig([dev(wired), dev(btSink)], { syncOffsetMs: 200 });
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            compare(r.mock.execLog.length, 1);
+            var cmd = r.mock.execLog[0];
+            verify(cmd.indexOf(": PW_COMBINE 1;") === 0);
+            verify(cmd.indexOf("module-null-sink") !== -1);
+            verify(cmd.indexOf("sink_name=onair_combined_7") !== -1);
+            verify(cmd.indexOf("pactl set-default-sink onair_combined_7") !== -1);
+            // The slowest device sets the schedule: wired waits the full lag,
+            // the lagging Bluetooth sink itself waits nothing extra.
+            verify(cmd.indexOf("sink='" + wired + "' latency_msec=260") !== -1);
+            verify(cmd.indexOf("sink='" + btSink + "' latency_msec=60") !== -1);
+            verify(r.e._combineWantActive);
+            verify(!r.e._combineActive);       // ack not in yet
+        }
+
+        function test_enable_quotes_hostile_sink_names() {
+            var evil = "alsa_output.it's.analog";
+            var r = rig([dev(evil), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            verify(r.mock.execLog[0].indexOf("sink='alsa_output.it'\\''s.analog'") !== -1);
+        }
+
+        function test_enable_respects_channel_and_balance() {
+            var r = rig([dev(wired), dev(btSink)],
+                        { deviceChannels: JSON.stringify({ "AA:BB:CC:DD:EE:FF": "L" }) });
+            r.e._loadDeviceChannels();
+            r.e.setDeviceTrim(wired, 0.5);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf("channels=1 channel_map=front-left") !== -1);   // the L pair half
+            verify(cmd.indexOf("set-sink-input-volume \"$si\" 50%") !== -1);   // the balance
+        }
+
+        // ── the PW_COMBINE ack ────────────────────────────────────────────
+
+        function test_ack_activates_and_remembers_the_previous_default() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            compare(r.e._combinePrevDefault, "usb_dac");
+            compare(r.cfg.combinePrevDefault, "usb_dac");
+            compare(r.e._combineLoopbackIds.length, 2);
+        }
+
+        function test_ack_never_adopts_our_own_sink_as_previous_default() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            r.e.handleExec(": PW_COMBINE 1;",
+                           "PREVDEF onair_combined_7\nNULL 77\nLB 101 " + wired + "\n", "");
+            compare(r.e._combinePrevDefault, "");
+            compare(r.cfg.combinePrevDefault, "");
+        }
+
+        function test_stale_generation_ack_is_unloaded_not_adopted() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();        // generation 1 in flight
+            var before = r.mock.execLog.length;
+            var ok = r.e.handleExec(": PW_COMBINE 99;", "NULL 88\nLB 200 " + wired + "\n", "");
+            verify(ok);
+            verify(!r.e._combineActive);       // state untouched
+            verify(r.e._combineWantActive);
+            var cleanup = r.mock.execLog[before];
+            verify(cleanup.indexOf(": PW_UNCOMBINE;") === 0);
+            verify(cleanup.indexOf("unload-module 88") !== -1);
+            verify(cleanup.indexOf("unload-module 200") !== -1);
+        }
+
+        function test_disable_during_load_clears_the_persisted_key_on_ack() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            r.cfg.combinePrevOutput = wired;   // as if a device had been chosen
+            r.e.combineOutputsDisable();       // withdrawn while in flight
+            r.e.handleExec(": PW_COMBINE 1;",
+                           "PREVDEF usb_dac\nNULL 77\nLB 101 " + wired + "\n", "");
+            verify(!r.e._combineActive);
+            // The stale-key bug: this used to survive and re-point the system
+            // default on every later login.
+            compare(r.cfg.combinePrevOutput, "");
+        }
+
+        function test_all_lbmiss_enable_waits_instead_of_failing() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            r.e.handleExec(": PW_COMBINE 1;",
+                           "PREVDEF usb_dac\nNULL 77\nLBMISS " + wired
+                           + "\nLBMISS " + btSink + "\n", "");
+            verify(r.e._combineActive);        // healthy build, waiting for its sinks
+            compare(r.mock.notes.length, 0);   // no failure notification
+            verify(r.e._combineLbRetries > 0); // retry pass armed
+        }
+
+        // ── disable: conditional default hand-back ────────────────────────
+
+        function test_disable_hands_the_default_back_conditionally() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            var before = r.mock.execLog.length;
+            r.e.combineOutputsDisable();
+            var cmd = r.mock.execLog[before];
+            verify(cmd.indexOf(": PW_UNCOMBINE_DONE;") === 0);
+            verify(cmd.indexOf("d=$(pactl get-default-sink") !== -1);
+            verify(cmd.indexOf("unload-module 77") !== -1);
+            // Restore happens only when the default is still ours.
+            verify(cmd.indexOf("[ \"$d\" = \"onair_combined_7\" ] && pactl set-default-sink 'usb_dac'") !== -1);
+            // The persisted key survives until the teardown's own ack.
+            compare(r.cfg.combinePrevDefault, "usb_dac");
+            r.e.handleExec(": PW_UNCOMBINE_DONE; x", "", "");
+            compare(r.cfg.combinePrevDefault, "");
+        }
+
+        // ── rebuilds: generation guard and retry budget ───────────────────
+
+        function test_stale_reloop_ack_keeps_hands_off_the_busy_flag() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._combineReloopBusy = true;     // the live generation is rebuilding
+            r.e._combineLoadSeq = 5;           // ...and the ack below is from gen 1
+            var before = r.mock.execLog.length;
+            r.e.handleExec(": PW_RELOOP 1; x", "LB 300 " + wired + "\n", "");
+            verify(r.e._combineReloopBusy);    // untouched
+            verify(r.mock.execLog[before].indexOf("unload-module 300") !== -1);
+        }
+
+        function test_matching_reloop_ack_adopts_and_clears_busy() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._combineReloopBusy = true;
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+                           "LB 300 " + wired + "\nLB 301 " + btSink + "\n", "");
+            verify(!r.e._combineReloopBusy);
+            verify(r.e._combineLoopbackIds.indexOf("300") >= 0);
+        }
+
+        function test_a_new_missing_sink_gets_a_fresh_retry_budget() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            for (var i = 0; i < 10; i++) r.e._combineHandleMiss("LBMISS sink_a");
+            compare(r.e._combineLbRetries, 8); // budget exhausted against sink_a
+            r.e._combineHandleMiss("LBMISS sink_b");
+            compare(r.e._combineLbRetries, 1); // sink_b starts over
+            r.e._combineHandleMiss("");
+            compare(r.e._combineLbRetries, 0); // clean build resets everything
+        }
+
+        // ── calibration: the loudness math ────────────────────────────────
+
+        function test_calibration_folds_the_real_sink_volume_back_in() {
+            var r = rig([dev(wired), dev(btSink)]);
+            // wired parked from 110%: it plays (110/55)^3 = 8× louder than the
+            // parked click measured; bt parked from its true 55%.
+            var out = "CALIBVOL " + wired + " 110% 110%\n"
+                    + "CALIBVOL " + btSink + " 55% 55%\n"
+                    + "CALIB_LVL " + wired + " 20000\n"
+                    + "CALIB_LVL " + btSink + " 10000\n"
+                    + "CALIB_OK 150\n";
+            r.e.handleExec(": PW_CALIB " + btMac + " ;", out, "");
+            compare(r.cfg.syncOffsetMs, 150);
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 150);
+            // wired: effective amp 20000*8=160000 vs bt 10000 → trim (1/16)^(1/3)
+            fuzzyCompare(r.e.trimOf(wired), 0.4, 0.011);
+            compare(r.e.trimOf(btMac), 1.0);   // the quietest is the reference
+            compare(r.mock.notes.length, 1);
+            compare(r.mock.notes[0].title, "Speakers calibrated");
+        }
+
+        function test_calibrate_builds_the_full_measurement_shell() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            verify(r.e._calibrating);
+            compare(r.mock.playerOutput.volume, 0);        // stream muted for the clicks
+            compare(r.e._calibVolumeBefore, 0.5);
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_CALIB " + btMac + " ;") === 0);
+            // Park, echo the real level for the loudness math, restore after.
+            verify(cmd.indexOf("pactl set-sink-volume \"$s0\" 55%") !== -1);
+            verify(cmd.indexOf("echo \"CALIBVOL $s0 ${v0:-55%}\"") !== -1);
+            verify(cmd.indexOf("pactl set-sink-volume \"$s0\" ${v0:-55%}") !== -1);
+            // The mic placeholder sits between the timing pair and the extras.
+            verify(cmd.indexOf("\"$s1\" ''") !== -1);
+            // A wedged measurement dies INSIDE the guard window (60s - 10s).
+            verify(cmd.indexOf(" timeout 50 python3 '") !== -1);
+        }
+
+        function test_sync_offset_persists_per_mac_and_rebuilds() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.setSyncOffset(250);
+            compare(r.cfg.syncOffsetMs, 250);
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 250);
+            var before = r.mock.execLog.length;
+            wait(500);                          // the 300 ms rebuild debounce
+            verify(r.mock.execLog.length > before);
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_RELOOP " + r.e._combineLoadSeq + ";") === 0);
+            verify(cmd.indexOf("sink='" + wired + "' latency_msec=310") !== -1);
+            verify(cmd.indexOf("sink='" + btSink + "' latency_msec=60") !== -1);
+        }
+
+        function test_calibration_failure_is_a_notification_not_a_crash() {
+            var r = rig([]);
+            r.e.handleExec(": PW_CALIB " + btMac + " ;", "CALIB_FAIL no click heard\n", "");
+            compare(r.mock.notes.length, 1);
+            compare(r.mock.notes[0].icon, "dialog-warning");
+        }
+
+        // ── balance adoption (cast devices joining the group) ────────────
+
+        function test_adopt_trim_keeps_a_remembered_choice() {
+            var r = rig([]);
+            r.e.adoptTrim("uuid-1", 0.6);
+            fuzzyCompare(r.e.trimOf("uuid-1"), 0.6, 0.001);
+            verify(r.e.hasTrim("uuid-1"));
+            r.e.adoptTrim("uuid-1", 0.2);       // a stored balance always wins
+            fuzzyCompare(r.e.trimOf("uuid-1"), 0.6, 0.001);
+        }
+
+        function test_adopt_trim_ignores_full_level_and_clamps() {
+            var r = rig([]);
+            r.e.adoptTrim("uuid-2", 1.0);       // full level = no entry
+            verify(!r.e.hasTrim("uuid-2"));
+            r.e.adoptTrim("uuid-3", 3.7);       // clamped into the valid range
+            verify(!r.e.hasTrim("uuid-3"));     // ...which lands on full level
+            r.e.adoptTrim("uuid-4", 0.001);
+            fuzzyCompare(r.e.trimOf("uuid-4"), 0.05, 0.001);
+        }
+
+        // ── the join watchdog ─────────────────────────────────────────────
+
+        function test_watchdog_kicks_once_then_waits_out_its_own_cure() {
+            // Two wired devices make the sync; the WATCHED Bluetooth sink
+            // never appears — the watchdog's reason to exist.
+            var r = rig([dev(wired), dev(wired2)]);
+            activate(r);
+            r.e._btJoinWatchMac = btMac;
+            r.e._btJoinWatchName = "JBL";
+            for (var i = 0; i < 4; i++) r.e._btJoinWatchTick();
+            compare(r.e._btJoinWatchTicks, 4);
+            verify(r.e._btKickInFlight);
+            var kick = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(kick.indexOf(": BT_KICK;") === 0);
+            verify(kick.indexOf("bluetoothctl connect " + btMac) !== -1);
+            // Held while the kick is in flight — the countdown must not
+            // starve the cure it started itself.
+            r.e._btJoinWatchTick();
+            compare(r.e._btJoinWatchTicks, 4);
+            // The kick landing resets the window for the reconnect.
+            r.e.handleExec(": BT_KICK; x", "", "");
+            compare(r.e._btJoinWatchTicks, 0);
+            verify(!r.e._btKickInFlight);
+            compare(r.mock.btListed, 1);
+        }
+
+        function test_watchdog_gives_up_with_a_note_after_the_window() {
+            var r = rig([dev(wired), dev(wired2)]);
+            activate(r);
+            r.e._btJoinWatchMac = btMac;
+            r.e._btJoinWatchName = "JBL";
+            r.e._btJoinKicked = true;          // the kick already happened
+            for (var i = 0; i < 15; i++) r.e._btJoinWatchTick();
+            compare(r.e._btJoinWatchMac, "");  // watch stopped
+            compare(r.mock.notes.length, 1);
+            compare(r.mock.notes[0].title, "JBL did not join the sync");
+        }
+
+        function test_watchdog_holds_while_a_connect_is_in_flight() {
+            var r = rig([dev(wired), dev(wired2)]);
+            activate(r);
+            r.e._btJoinWatchMac = btMac;
+            r.mock._btConnectingMac = btMac;
+            r.e._btJoinWatchTick();
+            compare(r.e._btJoinWatchTicks, 0); // held, not counted
+        }
+
+        // ── the steal watch ───────────────────────────────────────────────
+
+        function test_steal_watch_takes_back_only_just_appeared_sinks() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineDefaultStealWatch();   // startup seed, sync still off
+            compare(r.e._defaultStealSuspects.length, 0);
+            activate(r);
+            r.e._combineDefaultStealWatch();   // same set: nothing new
+            compare(r.e._defaultStealSuspects.length, 0);
+            var newcomer = "bluez_output.11_22_33_44_55_66.1";
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(btSink), dev(newcomer)] };
+            r.e._combineDefaultStealWatch();
+            compare(r.e._defaultStealSuspects.length, 1);
+            compare(r.e._defaultStealSuspects[0], newcomer);
+            var before = r.mock.execLog.length;
+            wait(1400);                        // the deliberate WirePlumber-race delay
+            verify(r.mock.execLog.length > before);
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_STEALBACK;") === 0);
+            verify(cmd.indexOf("[ \"$d\" = '" + newcomer + "' ] && pactl set-default-sink onair_combined_7") !== -1);
+            compare(r.e._defaultStealSuspects.length, 0);
+        }
+
+        function test_steal_watch_is_inert_while_the_sync_is_off() {
+            var r = rig([dev(wired)]);
+            r.e._combineDefaultStealWatch();
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(btSink)] };
+            r.e._combineDefaultStealWatch();
+            compare(r.e._defaultStealSuspects.length, 0);
+        }
+    }
+}
