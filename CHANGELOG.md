@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026.18
 
 - **The sync engine moved into its own home.** Everything combined-output — the loopbacks and their delays, per-speaker balances and channel modes, exclusions, the microphone calibration, the join watchdog and the default-sink etiquette — now lives in `SyncEngine.qml` behind one narrow seam, instead of being woven through the widget's main file. The seam is what makes it testable: a mock-driven harness now exercises the whole state machine end to end — enable/disable round-trips, answers arriving from superseded generations, the exact shell commands built for the loopbacks (delays, channel maps, quoting of hostile device names), the calibration loudness math with its cubic fold-back, the watchdog's reconnect cycle and the default-sink steal watch. Twenty-five new tests; the main file shed a quarter of its weight; the extraction was cross-checked line by line against the previous code, which caught four missed call-site rewrites before they could ship. No behavior change intended, none found after the fixes.
 
