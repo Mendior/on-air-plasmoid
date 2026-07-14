@@ -1588,11 +1588,18 @@ PlasmoidItem {
             // ids with sinks for the balance — /LB (\d+)/ readers are
             // unaffected. The balance itself is baked in right here, in the
             // same shell round, so every (re)build restores it atomically.
-            cmds += "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
+            // EXISTENCE GATE, learned the hard way: loading a loopback whose
+            // sink is not registered yet (a Bluetooth speaker mid-connect)
+            // does NOT fail — pactl attaches it to the DEFAULT sink, which is
+            // now the combined sink itself: a silent feedback loop, and the
+            // speaker plays nothing. Skip it, report LBMISS, and the retry
+            // pass picks it up once the sink is really there.
+            cmds += "if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
+                 + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
                  + " sink='" + s + "' latency_msec=" + d + " channels=2) && echo \"LB $id " + s + "\"";
             var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
             if (pct < 100) cmds += " && { " + _sinkInputVolCmd("$id", pct) + "}";
-            cmds += "; ";
+            cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
         }
         return cmds;
     }
@@ -1723,6 +1730,8 @@ PlasmoidItem {
         }
         _combineActive = false;
         _combinePendingRoute = false;
+        _combineLbRetries = 0;
+        combineLbRetry.stop();
         // Route away FIRST — with the choice already off the combined sink,
         // its removal is not a "device vanished" event worth a notification.
         setAudioOutputDevice(_combinePrevOutput);
@@ -1818,9 +1827,44 @@ PlasmoidItem {
         for (var i = 0; i < outs.length; i++) {
             if (String(outs[i].id).indexOf(_combineSinkName) !== -1) {
                 _combinePendingRoute = false;
+                // Bounce through another device first while playing: a
+                // re-enable recreates the combined sink under the SAME name,
+                // and Qt treats the same-id assignment as a no-op — the live
+                // stream stays bound to the DEAD node, silent while claiming
+                // to play. Seen live: four orphaned streams on one session.
+                if (isPlaying()) {
+                    for (var b = 0; b < outs.length; b++) {
+                        if (String(outs[b].id).indexOf(_combineSinkName) === -1) {
+                            playMusicOutput.device = outs[b];
+                            break;
+                        }
+                    }
+                }
                 setAudioOutputDevice(String(outs[i].id));
                 return;
             }
+        }
+    }
+
+    // A loopback skipped mid-build because its sink was still registering —
+    // bounded retries; the outputs-changed rebuild covers anything later.
+    property int _combineLbRetries: 0
+
+    Timer {
+        id: combineLbRetry
+        interval: 1500
+        repeat: false
+        onTriggered: root._combineRebuildLoopbacks()
+    }
+
+    function _combineHandleMiss(out) {
+        if ((out || "").indexOf("LBMISS") === -1) {
+            _combineLbRetries = 0;
+            return;
+        }
+        if (_combineActive && _combineLbRetries < 3) {
+            _combineLbRetries++;
+            combineLbRetry.restart();
         }
     }
 
@@ -1929,9 +1973,15 @@ PlasmoidItem {
         for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
         _btOutputIdsBeforeConnect = ids;
         btRouteTimeout.restart();
+        // Same verified-connect treatment as btConnect: the verdict is the
+        // device's real Connected state, with one retry for sleepy speakers.
         executable.exec(": BT_PAIRNEW; timeout 25 bluetoothctl pair " + mac
                         + " && timeout 5 bluetoothctl trust " + mac
-                        + " && timeout 15 bluetoothctl connect " + mac + "; true"
+                        + " && { timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
+                        + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
+                        + " || timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1; };"
+                        + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
+                        + " && echo __BT_CONN_OK__; true"
                         + " # " + (++_execSeq));
     }
 
@@ -1952,7 +2002,18 @@ PlasmoidItem {
         for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
         _btOutputIdsBeforeConnect = ids;
         btRouteTimeout.restart();
-        executable.exec(": BT_CONNECT; timeout 12 bluetoothctl connect " + mac + "; true");
+        // Robust connect, measured on real hardware: a sleeping speaker
+        // routinely ignores the first page attempt, and bluez may finish a
+        // connect AFTER the client was timeout-killed — so the verdict comes
+        // from the device's actual Connected state, never from parsing the
+        // client's output, and a failed first attempt gets one retry before
+        // anyone is told anything.
+        executable.exec(": BT_CONNECT; timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
+            + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
+            + " || timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
+            + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
+            + " && echo __BT_CONN_OK__ || echo __BT_CONN_FAIL__; true"
+            + " # " + (++_execSeq));
     }
 
     function btDisconnect(mac) {
@@ -1972,8 +2033,11 @@ PlasmoidItem {
     Timer {
         id: btRouteTimeout
         // If the sink never shows up, stop waiting for it — a stale pending
-        // name must not hijack some later, unrelated output change.
-        interval: 20000
+        // name must not hijack some later, unrelated output change. Wide
+        // enough to cover the connect's retry path (up to ~36 s of paging a
+        // sleeping speaker twice) plus the sink's own appearance; safe to be
+        // generous, the route is MAC-matched.
+        interval: 45000
         repeat: false
         onTriggered: {
             root._btPendingSinkName = "";
@@ -3425,7 +3489,10 @@ PlasmoidItem {
             // PipeWire sink appears in mediaDevices (see onAudioOutputsChanged).
             if (cmd.indexOf(": BT_CONNECT;") === 0) {
                 root._btConnectingMac = "";
-                if ((stdout || "").indexOf("Connection successful") === -1) {
+                // Verdict comes from the __BT_CONN_*__ sentinel (the device's
+                // real Connected state, post-retry) — bluetoothctl's own
+                // chatter is unreliable when the client gets timeout-killed.
+                if ((stdout || "").indexOf("__BT_CONN_OK__") === -1) {
                     btRouteTimeout.stop();
                     dlNotification.title = i18n("Could not connect to %1",
                         root._btPendingSinkName || i18n("the Bluetooth device"));
@@ -3475,7 +3542,7 @@ PlasmoidItem {
                     // below) — drop the "new device" row.
                     for (var pi = btFoundModel.count - 1; pi >= 0; pi--)
                         if (btFoundModel.get(pi).mac === pairedMac) btFoundModel.remove(pi);
-                    if (pairOut.indexOf("Connection successful") !== -1) {
+                    if (pairOut.indexOf("__BT_CONN_OK__") !== -1) {
                         // Pairing may legitimately outlast the route timeout
                         // (agent prompts, slow speakers): the pending MAC may
                         // already be swept. Re-arm it from the MAC this very
@@ -3587,6 +3654,7 @@ PlasmoidItem {
                 Plasmoid.configuration.combinePrevDefault = prevDef;
                 root._combinePendingRoute = true;
                 root._combineTryRoute();
+                root._combineHandleMiss(pwOut);
                 return;
             }
             // Loopbacks swapped under the live null sink (slider / sink set
@@ -3620,6 +3688,7 @@ PlasmoidItem {
                 }
                 root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
                 root._combineLoopbackSinkByModule = rlPairs;
+                root._combineHandleMiss(stdout || "");
                 return;
             }
             if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0) {
