@@ -91,6 +91,10 @@
             <label>Output device chosen before the combined output was enabled — restored when a session ends uncleanly</label>
             <default></default>
         </entry>
+        <entry name="combinePrevDefault" type="String">
+            <label>System default sink before the combined output took it over — restored when a session ends uncleanly</label>
+            <default></default>
+        </entry>
         <entry name="autoHeal" type="bool">
             <label>When a saved station's stream dies, look up its current address on radio-browser.info and follow it</label>
             <default>true</default>

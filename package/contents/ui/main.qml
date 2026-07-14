@@ -1519,6 +1519,9 @@ PlasmoidItem {
     // The specific output that was selected before combining, so switching
     // the sync mode off restores it instead of dumping to the default.
     property string _combinePrevOutput: ""
+    // The sink that was the system default before the sync took it over —
+    // restored on disable, and from config after a crash.
+    property string _combinePrevDefault: ""
     // Per-instance suffix (the stable applet id, same as MPRIS uses): the
     // startup sweep may only reclaim THIS instance's orphans — a second
     // widget or a plasmoidviewer run must not tear down a live combine.
@@ -1672,10 +1675,29 @@ PlasmoidItem {
         // Human name for the sink — this is what the output picker (ours and
         // the system volume applet) shows instead of the raw node name.
         var desc = i18n("All local outputs (On Air)").replace(/"/g, "").replace(/'/g, "'\\''");
-        executable.exec(": PW_COMBINE " + (++_combineLoadSeq) + "; m=$(pactl load-module module-null-sink"
+        // The combined output also becomes the system DEFAULT sink while the
+        // sync is on: the volume keys and the panel applet act on the default
+        // sink, and pointing them anywhere else meant "volume up" reached the
+        // wired speakers but never the Bluetooth ones. The null sink's volume
+        // provably scales its monitor, so one keypress now moves the whole
+        // room. The previous default's level is copied over first — becoming
+        // the default must not jump the loudness.
+        executable.exec(": PW_COMBINE " + (++_combineLoadSeq) + ";"
+                        + " d=$(pactl get-default-sink); echo \"PREVDEF $d\";"
+                        + " m=$(pactl load-module module-null-sink"
                         + " sink_name=" + _combineSinkName + " channels=2"
                         + " sink_properties='device.description=\"" + desc + "\"')"
-                        + " && echo \"NULL $m\" && " + _combineLoopbackCmds(sinks) + "true"
+                        // Master starts at 100% = acoustic passthrough: every
+                        // hardware sink keeps its own level, so enabling never
+                        // jumps the loudness (copying one device's level here
+                        // would double-apply it to that device). The default
+                        // switch is best-effort — `true` keeps the group's
+                        // exit status from gating the loopbacks, which are
+                        // the actual feature.
+                        + " && { echo \"NULL $m\";"
+                        + " pactl set-sink-volume " + _combineSinkName + " 100% 2>/dev/null;"
+                        + " pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true; }"
+                        + " && " + _combineLoopbackCmds(sinks) + "true"
                         + " # " + (++_execSeq));
     }
 
@@ -1707,6 +1729,13 @@ PlasmoidItem {
         _combinePrevOutput = "";
         Plasmoid.configuration.combinePrevOutput = "";
         var un = _combineUnloadCmd();
+        // Hand the system default back to whoever held it before the sync.
+        if (_combinePrevDefault !== "") {
+            un += "pactl set-default-sink '"
+                  + _combinePrevDefault.replace(/'/g, "'\\''") + "' 2>/dev/null; ";
+            _combinePrevDefault = "";
+        }
+        Plasmoid.configuration.combinePrevDefault = "";
         if (un !== "") executable.exec(": PW_UNCOMBINE; " + un + "true");
     }
 
@@ -1730,7 +1759,12 @@ PlasmoidItem {
         for (var i = 0; i < _combineLoopbackIds.length; i++)
             un += "pactl unload-module " + _combineLoopbackIds[i] + " 2>/dev/null; ";
         _combineLoopbackIds = [];
-        executable.exec(": PW_RELOOP; " + un + _combineLoopbackCmds(sinks) + "true"
+        // Re-assert the default while we're here: WirePlumber's
+        // switch-on-connect policy hands the default to a freshly-connected
+        // sink (the very Bluetooth speaker that just joined the group), and
+        // the volume keys would silently start moving one device, not the room.
+        executable.exec(": PW_RELOOP; " + un + _combineLoopbackCmds(sinks)
+                        + "pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true"
                         + " # " + (++_execSeq));
     }
 
@@ -3117,9 +3151,28 @@ PlasmoidItem {
         // that was just swept — put the user's real choice back before the
         // routing below applies it. (In-session disable restores it itself;
         // this only ever runs after an unclean shutdown.)
+        // Read BEFORE the block below clears it — the default-sink fallback
+        // needs the same value.
+        var prevOutCfg = Plasmoid.configuration.combinePrevOutput || "";
         if ((Plasmoid.configuration.audioOutputDevice || "").indexOf("onair_combined") !== -1) {
-            Plasmoid.configuration.audioOutputDevice = Plasmoid.configuration.combinePrevOutput || "";
+            Plasmoid.configuration.audioOutputDevice = prevOutCfg;
             Plasmoid.configuration.combinePrevOutput = "";
+        }
+        // Same story for the system default sink: a crash while the sync was
+        // on leaves it pointing at the swept combined sink. PulseAudio falls
+        // back to *something* on its own — put back what the user actually had.
+        // If the crash hit the load window (PREVDEF never made it back), the
+        // user's chosen output is a strictly better guess than PA's fallback
+        // (prevOutCfg is only ever non-empty between an enable and its clean
+        // disable, so this can't fire on a normal start).
+        var prevDefCfg = Plasmoid.configuration.combinePrevDefault || "";
+        if (prevDefCfg === "" && prevOutCfg !== "") {
+            prevDefCfg = prevOutCfg;
+        }
+        if (prevDefCfg !== "") {
+            executable.exec(": PW_DEFAULT_RESTORE; pactl set-default-sink '"
+                            + prevDefCfg.replace(/'/g, "'\\''") + "' 2>/dev/null; true");
+            Plasmoid.configuration.combinePrevDefault = "";
         }
         _ensureMusicDir();
         _applyAudioOutputDevice();
@@ -3463,6 +3516,13 @@ PlasmoidItem {
             if (/^: PW_COMBINE \d+;/.test(cmd)) {
                 var pwOut = stdout || "";
                 var nullM = pwOut.match(/NULL (\d+)/);
+                // What was the default before this load switched it? Own
+                // stale combined name means a crash left it pointing at us —
+                // nothing real to restore then.
+                var prevDefM = pwOut.match(/PREVDEF (\S+)/);
+                var prevDef = (prevDefM && prevDefM[1] !== _combineSinkName) ? prevDefM[1] : "";
+                var restoreDef = prevDef !== ""
+                    ? "pactl set-default-sink '" + prevDef.replace(/'/g, "'\\''") + "' 2>/dev/null; " : "";
                 var lbIds = [];
                 var lbPairs = {};
                 var lbRe = /LB (\d+)(?: (\S+))?/g, lbM;
@@ -3481,7 +3541,11 @@ PlasmoidItem {
                     var uns = "";
                     for (var sui = 0; sui < stale.length; sui++)
                         uns += "pactl unload-module " + stale[sui] + " 2>/dev/null; ";
-                    if (uns !== "") executable.exec(": PW_UNCOMBINE; " + uns + "true");
+                    // A live OR WANTED instance keeps the default it owns —
+                    // a pending re-enable (wanted, not yet acked) must not
+                    // have its default stolen back by the superseded load.
+                    if (uns !== "") executable.exec(": PW_UNCOMBINE; " + uns
+                        + ((root._combineActive || root._combineWantActive) ? "" : restoreDef) + "true");
                     return;
                 }
                 if (!nullM || lbIds.length === 0) {
@@ -3491,7 +3555,9 @@ PlasmoidItem {
                     var unj = "";
                     for (var ji = 0; ji < junk.length; ji++)
                         unj += "pactl unload-module " + junk[ji] + " 2>/dev/null; ";
-                    if (unj !== "") executable.exec(": PW_UNCOMBINE; " + unj + "true");
+                    if (unj !== "" || (nullM && restoreDef !== ""))
+                        executable.exec(": PW_UNCOMBINE; " + unj
+                                        + (nullM ? restoreDef : "") + "true");
                     // A duplicate enable's failure (sink name already taken)
                     // must not clobber the LIVE instance's state — the box
                     // would read unchecked with the sink still running and
@@ -3511,11 +3577,14 @@ PlasmoidItem {
                 if (!root._combineWantActive) {
                     // Turned off while loading — honor the user's last word.
                     var unw = root._combineUnloadCmd();
-                    if (unw !== "") executable.exec(": PW_UNCOMBINE; " + unw + "true");
+                    if (unw !== "" || restoreDef !== "")
+                        executable.exec(": PW_UNCOMBINE; " + unw + restoreDef + "true");
                     root._combinePrevOutput = "";
                     return;
                 }
                 root._combineActive = true;
+                root._combinePrevDefault = prevDef;
+                Plasmoid.configuration.combinePrevDefault = prevDef;
                 root._combinePendingRoute = true;
                 root._combineTryRoute();
                 return;
