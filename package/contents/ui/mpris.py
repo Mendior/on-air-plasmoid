@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Egon Greenberg
 # SPDX-License-Identifier: LGPL-2.0-or-later
-"""MPRIS2 DBus bridge for Advanced Radio Player plasmoid.
+"""MPRIS2 DBus bridge for the On Air plasmoid.
 
 The plasmoid spawns this script as a background daemon.
 Communication is bidirectional via files:
@@ -26,7 +26,10 @@ import dbus.service
 import dbus.mainloop.glib
 from gi.repository import GLib
 
-BUS_NAME = "org.mpris.MediaPlayer2.advancedradio"
+# The public MPRIS name: what `playerctl -l` and media controls list.
+# Renamed from the inherited "advancedradio" to match the published id —
+# scripts that matched the old substring need the new one.
+BUS_NAME = "org.mpris.MediaPlayer2.onair"
 # The command file must not grow unbounded — QML reads the whole file on every event.
 CMD_FILE_MAX_BYTES = 8192
 OBJ_PATH = "/org/mpris/MediaPlayer2"
@@ -217,7 +220,10 @@ class MPRISBridge(dbus.service.Object):
             "CanRaise": dbus.Boolean(False, variant_level=1),
             "HasTrackList": dbus.Boolean(False, variant_level=1),
             "Identity": dbus.String("On Air", variant_level=1),
-            "DesktopEntry": dbus.String("plasma-applet-org.kde.plasma.advancedradio", variant_level=1),
+            # Icon lookup hint for media controls. Plasma 6 generates no
+            # .desktop file for plasmoids, so this is a soft reference either
+            # way — kept aligned with the published package id.
+            "DesktopEntry": dbus.String("plasma-applet-io.github.mendior.onair", variant_level=1),
             "SupportedUriSchemes": dbus.Array([], signature="s", variant_level=1),
             "SupportedMimeTypes": dbus.Array([], signature="s", variant_level=1),
         }, signature="sv")
