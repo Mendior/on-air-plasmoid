@@ -1315,7 +1315,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.17");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -2785,7 +2785,7 @@ PlasmoidItem {
         var guard = null;
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.17");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -2937,7 +2937,7 @@ PlasmoidItem {
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                     + encodeURIComponent(name) + "&limit=30");
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.17");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -3003,7 +3003,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/url/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.17");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -3025,7 +3025,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/vote/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.17");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);

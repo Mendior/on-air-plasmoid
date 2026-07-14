@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026.17
 
 Wake up to the radio — and the sync engine's last rough edges, sanded.
 
