@@ -25,6 +25,7 @@ Always exits 0 — a failure is a sentinel, not a crash.
 """
 import math
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -97,6 +98,27 @@ def peak_of(path):
     return (start + best_i) / rate, best
 
 
+def recorder_args(mic, rec):
+    """The microphone capture command line.
+
+    pw-record where PipeWire is native; parecord on plain PulseAudio — it
+    ships in the same package as the paplay already used for the clicks, so
+    the fallback costs no new dependency. Both finalize the WAV header on
+    SIGTERM. parecord gets the sample format pinned because its default
+    follows the device, and peak_of only reads 16-bit.
+    """
+    if shutil.which("pw-record"):
+        args = ["pw-record", "--rate", str(RATE), "--channels", "1"]
+        if mic:
+            args += ["--target", mic]
+        return args + [rec]
+    args = ["parecord", "--rate=%d" % RATE, "--channels=1",
+            "--format=s16le", "--file-format=wav"]
+    if mic:
+        args += ["--device=" + mic]
+    return args + [rec]
+
+
 def measure_once(sink, click, mic):
     """One click through `sink`, recorded from `mic`.
 
@@ -105,19 +127,23 @@ def measure_once(sink, click, mic):
     """
     rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
-        args = ["pw-record", "--rate", str(RATE), "--channels", "1"]
-        if mic:
-            args += ["--target", mic]
-        args.append(rec)
-        rp = subprocess.Popen(args, stdout=subprocess.DEVNULL,
+        rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
         try:
             time.sleep(PLAY_DELAY)
             t_play = time.monotonic()
-            subprocess.run(["paplay", "--device", sink,
-                            "--volume", "65536", click],
-                           timeout=5, stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
+            try:
+                subprocess.run(["paplay", "--device", sink,
+                                "--volume", "65536", click],
+                               timeout=5, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+            except subprocess.TimeoutExpired:
+                # A dying sink can hold paplay past its timeout. That is one
+                # FAILED measurement of one sink ("nothing click-like heard"),
+                # not a reason to abort the run — letting this escape used to
+                # throw away an already-successful timing verdict because one
+                # extra, level-only speaker wedged.
+                pass
             time.sleep(max(0.0, RECORD_SECONDS - (time.monotonic() - t_play)))
         finally:
             rp.terminate()

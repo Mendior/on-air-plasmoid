@@ -7,7 +7,9 @@ config, so both directions are pinned here."""
 import ast
 import math
 import pathlib
+import shutil
 import struct
+import types
 import wave
 
 import pytest
@@ -24,7 +26,7 @@ def calib():
     wanted = [n for n in tree.body
               if isinstance(n, (ast.FunctionDef, ast.Assign, ast.AnnAssign))]
     # Keep constants (RATE, thresholds) and functions; drop the main() CALL
-    ns = {"math": math, "struct": struct, "wave": wave}
+    ns = {"math": math, "shutil": shutil, "struct": struct, "wave": wave}
     body = [n for n in wanted
             if not (isinstance(n, ast.FunctionDef) and n.name == "main")]
     exec(compile(ast.Module(body=body, type_ignores=[]), str(UI_DIR / "calibrate.py"), "exec"), ns)
@@ -117,3 +119,31 @@ def test_peak_of_rejects_too_short_recording(calib, tmp_path):
 def test_median_takes_the_middle(calib):
     assert calib["median"]([3.0, 1.0, 2.0]) == 2.0
     assert calib["median"]([5.0, 1.0]) == 5.0  # upper-middle on even counts
+
+
+def test_recorder_prefers_pw_record(calib, monkeypatch):
+    monkeypatch.setitem(calib, "shutil",
+                        types.SimpleNamespace(which=lambda n: "/usr/bin/" + n))
+    args = calib["recorder_args"]("mic1", "/tmp/rec.wav")
+    assert args[0] == "pw-record"
+    assert args[args.index("--target") + 1] == "mic1"
+    assert args[-1] == "/tmp/rec.wav"
+
+
+def test_recorder_falls_back_to_parecord(calib, monkeypatch):
+    # Plain PulseAudio has no pw-record; parecord ships with paplay, and the
+    # sample format must be pinned there because peak_of only reads 16-bit.
+    monkeypatch.setitem(calib, "shutil",
+                        types.SimpleNamespace(which=lambda n: None))
+    args = calib["recorder_args"]("", "/tmp/rec.wav")
+    assert args[0] == "parecord"
+    assert "--file-format=wav" in args
+    assert "--format=s16le" in args
+    assert not any(a.startswith("--device=") for a in args)  # no mic given
+    assert args[-1] == "/tmp/rec.wav"
+
+
+def test_recorder_parecord_takes_the_mic(calib, monkeypatch):
+    monkeypatch.setitem(calib, "shutil",
+                        types.SimpleNamespace(which=lambda n: None))
+    assert "--device=alsa_input.usb" in calib["recorder_args"]("alsa_input.usb", "/x.wav")
