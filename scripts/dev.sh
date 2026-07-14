@@ -35,7 +35,19 @@ EOF
 case "${1:-}" in
   install)
     rsync "${RSYNC_OPTS[@]}" "$PKG/contents/" "$INSTALL_DIR/contents/"
-    echo "OK: package/contents -> $INSTALL_DIR/contents (metadata.json and locale untouched)"
+    # The install keeps its own metadata.json (old plugin id — replacing it
+    # would orphan the user's stations/favorites), but the VERSION field must
+    # follow the repo or the About page keeps showing a long-gone release.
+    python3 - "$PKG/metadata.json" "$INSTALL_DIR/metadata.json" <<'PYEOF'
+import json, sys
+repo = json.load(open(sys.argv[1]))
+inst = json.load(open(sys.argv[2]))
+if inst["KPlugin"]["Version"] != repo["KPlugin"]["Version"]:
+    inst["KPlugin"]["Version"] = repo["KPlugin"]["Version"]
+    json.dump(inst, open(sys.argv[2], "w"), indent=4)
+    print("  install version -> " + repo["KPlugin"]["Version"] + " (id untouched)")
+PYEOF
+    echo "OK: package/contents -> $INSTALL_DIR/contents (metadata id and locale untouched)"
     echo "To reload the QML: scripts/dev.sh restart"
     ;;
   pull)
