@@ -69,6 +69,19 @@ def _out(line):
         print(line, flush=True)
 
 
+def _dbg(context, exc):
+    """Trace for failure branches that are handled by design.
+
+    stderr ONLY: stdout is the sentinel channel the QML side parses, and one
+    stray line there corrupts a command's result. Never raises — a trace must
+    not introduce a failure mode of its own (stderr can be a closed pipe).
+    """
+    try:
+        print("cast.py %s: %r" % (context, exc), file=sys.stderr)
+    except Exception:
+        pass
+
+
 def _import():
     """Import pychromecast lazily so `probe` can report absence cleanly."""
     import pychromecast  # noqa: F401
@@ -86,8 +99,8 @@ def _stop_browser(browser):
         return
     try:
         browser.stop_discovery()
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg("stop-browser", exc)
 
 
 def _connect_host(pychromecast, host, port, uuid, model):
@@ -106,15 +119,16 @@ def _disconnect(cast):
         return
     try:
         cast.disconnect(timeout=2)
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg("disconnect", exc)
 
 
 def _discover_cast(seconds):
     found = {}
     try:
         pychromecast = _import()
-    except Exception:
+    except Exception as exc:
+        _dbg("discover(cast) import", exc)
         return
     browser = None
     try:
@@ -132,7 +146,7 @@ def _discover_cast(seconds):
             }
             _disconnect(cast)
     except Exception as exc:
-        print("cast.py discover(cast): %r" % (exc,), file=sys.stderr)
+        _dbg("discover(cast)", exc)
     finally:
         _stop_browser(browser)
     # Fresh mDNS results are proven alive — print them NOW, before the cache
@@ -158,8 +172,9 @@ def _discover_cast(seconds):
                 found[uuid] = dev
             _out("DEV\tcast\t%s\t%s\t%s\t%s\t%s\t" % (
                 uuid, dev["name"], dev["host"], dev["port"], dev["model"]))
-        except Exception:
-            pass
+        except Exception as exc:
+            # Expected for a cached device that is offline right now.
+            _dbg("verify-cache %s" % uuid, exc)
         finally:
             _disconnect(cast)
 
@@ -222,7 +237,7 @@ def cmd_stop(host, port, uuid, model):
         cast.quit_app()
         _out(DONE)
     except Exception as exc:
-        print("cast.py stop: %r" % (exc,), file=sys.stderr)
+        _dbg("stop", exc)
         _out(DONE)
     finally:
         _disconnect(cast)
@@ -282,7 +297,8 @@ def _msearch(st, wait, target=None):
     locations = set()
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    except OSError:
+    except OSError as exc:
+        _dbg("msearch socket", exc)
         return locations
     try:
         s.settimeout(wait)
@@ -311,10 +327,10 @@ def _msearch(st, wait, target=None):
             for line in data.decode("utf-8", "replace").split("\r\n"):
                 if line.lower().startswith("location:"):
                     locations.add(line.split(":", 1)[1].strip())
-    except OSError:
+    except OSError as exc:
         # A send failure (unreachable network, buffer pressure) just means no
         # results from this round — but the socket must not leak with it.
-        pass
+        _dbg("msearch %s" % (target or "multicast"), exc)
     finally:
         s.close()
     return locations
@@ -330,7 +346,11 @@ def _describe_renderer(location):
     """Fetch+parse a device description; None unless it is a MediaRenderer."""
     try:
         root = ET.fromstring(_http_get(location))
-    except Exception:
+    except Exception as exc:
+        # The direct-probe fallback hits many dead ports by design — most of
+        # these lines are the expected mass, but they are exactly what shows
+        # WHICH addresses were tried when a renderer fails to appear.
+        _dbg("describe %s" % location, exc)
         return None
     # URLBase is deprecated but still used by older stacks (e.g. Frontier
     # Silicon); without it relative control URLs resolve against the location.
@@ -401,11 +421,13 @@ def _mdns_candidates():
         )
         try:
             out, _ = proc.communicate(timeout=3.5)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
+            _dbg("avahi-browse timeout (partial output kept)", exc)
             proc.kill()
             out, _ = proc.communicate()
-    except Exception:
-        pass
+    except Exception as exc:
+        # Typically FileNotFoundError: avahi-browse is an optional helper.
+        _dbg("avahi-browse", exc)
     return _parse_avahi(out or "")
 
 
@@ -428,7 +450,10 @@ def _cache_load():
         with open(CACHE_PATH) as fh:
             data = json.load(fh)
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except FileNotFoundError:
+        return {}  # first run — nothing cached yet, not worth a trace
+    except Exception as exc:
+        _dbg("cache-load", exc)
         return {}
 
 
@@ -449,8 +474,8 @@ def _cache_save(devices):
             with open(tmp, "w") as fh:
                 json.dump(cache, fh)
             os.replace(tmp, CACHE_PATH)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg("cache-save", exc)
 
 
 def _discover_dlna(seconds):
@@ -494,8 +519,8 @@ def _discover_dlna(seconds):
                     with lock:
                         locations.add(url)
                     return
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg("probe %s" % url, exc)
 
     for ip, extra_paths in candidates.items():
         threads.append(threading.Thread(target=probe_known, args=(ip, extra_paths)))
@@ -648,8 +673,8 @@ def cmd_dlna_play(location, url, ctype, title):
         # Stop first and ignore the result (stopped/idle devices error here).
         try:
             _soap(avt, AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>", timeout=3.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg("dlna-play pre-stop (expected on idle devices)", exc)
         didl = _didl_metadata(title, ctype, url)
         # CDATA first: Frontier Silicon renderers (Ruark, Roberts…) silently
         # DISCARD an escaped-metadata URI and then fail Play with 705
@@ -658,7 +683,8 @@ def cmd_dlna_play(location, url, ctype, title):
         # on the retry.
         try:
             _dlna_set_uri_and_play(avt, url, didl, cdata=True)
-        except Exception:
+        except Exception as exc:
+            _dbg("dlna-play cdata form, retrying escaped", exc)
             _dlna_set_uri_and_play(avt, url, didl, cdata=False)
         _out(OK)
     except Exception as exc:
@@ -668,8 +694,8 @@ def cmd_dlna_play(location, url, ctype, title):
         try:
             _soap(dev["avtransport"], AVT_SERVICE, "Stop",
                   "<InstanceID>0</InstanceID>", timeout=3.0)
-        except Exception:
-            pass
+        except Exception as exc2:
+            _dbg("dlna-play cleanup-stop", exc2)
         _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
 
 
@@ -679,7 +705,7 @@ def cmd_dlna_stop(location):
         if dev:
             _soap(dev["avtransport"], AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>")
     except Exception as exc:
-        print("cast.py dlna-stop: %r" % (exc,), file=sys.stderr)
+        _dbg("dlna-stop", exc)
     _out(DONE)
 
 
@@ -777,8 +803,8 @@ def main():
         if args:
             try:
                 seconds = max(1.0, min(15.0, float(args[0])))
-            except ValueError:
-                pass
+            except ValueError as exc:
+                _dbg("discover seconds arg", exc)
         cmd_discover(seconds)
     elif command == "play" and len(args) >= 6:
         host, port, uuid, model, url, ctype = args[0:6]

@@ -111,3 +111,24 @@ def test_no_argv_prints_usage_sentinel(cast, monkeypatch, capsys):
     assert run_main(cast, monkeypatch, []) == []
     out = sentinel_lines(capsys)
     assert len(out) == 1 and out[0].startswith(cast.FAIL)
+
+
+def test_dbg_writes_stderr_never_stdout(cast, capsys):
+    # stdout is the sentinel channel the QML side parses — the debug trace
+    # must never leak a single byte into it.
+    cast._dbg("unit-test", ValueError("boom"))
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "unit-test" in captured.err and "boom" in captured.err
+
+
+def test_dbg_survives_a_dead_stderr(cast, monkeypatch):
+    class Broken:
+        def write(self, *_a):
+            raise OSError("closed pipe")
+
+        def flush(self):
+            raise OSError("closed pipe")
+
+    monkeypatch.setattr(cast.sys, "stderr", Broken())
+    cast._dbg("x", RuntimeError("y"))  # a trace must never add a crash
