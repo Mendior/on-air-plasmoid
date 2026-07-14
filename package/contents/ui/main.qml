@@ -1505,192 +1505,12 @@ PlasmoidItem {
         return -1;
     }
 
-    // ── Group volume: one master, per-device balance ─────────────────────────
-    // The volume slider stays the MASTER for everything at once; each device
-    // additionally carries a balance factor (0.05–1.0) so a boomy soundbar
-    // and quiet desk speakers can hold their relative levels while one
-    // slider drives the room: effective = master × balance.
-    //
-    // WHERE the balance is applied decides whether the sync survives:
-    //   • the master stays ON THE STREAM (playMusicOutput.volume) — upstream
-    //     of the combined sink, so a master move is baked into the samples
-    //     and arrives at every local speaker delayed exactly like the music
-    //     itself. Moving the master can never smear the sync.
-    //   • a local balance goes on OUR loopback's sink-input — never on the
-    //     sink, which belongs to the user (and, on Bluetooth, to the
-    //     speaker's own AVRCP buttons); other applications are not touched.
-    //   • a network device gets master × balance pushed as its device
-    //     volume — wall-clock only; its buffer sits seconds away by nature.
-    // Keyed by the most stable id each device has: Cast/DLNA uuid, Bluetooth
-    // MAC, plain sink name for wired outputs. Kept across restarts.
-    property var _deviceTrims: ({})
-    // UI rebind tick — bindings can't observe key writes inside a JS object.
-    property int _trimRev: 0
-
-    function _loadDeviceTrims() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.deviceTrims || "{}");
-            _deviceTrims = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _deviceTrims = {};
-        }
-        _trimRev++;
-    }
-
-    function trimOf(id) {
-        var t = _deviceTrims[id];
-        return (typeof t === "number" && t >= 0.05 && t <= 1) ? t : 1.0;
-    }
-
-    // Balance key for a local sink: the Bluetooth MAC when there is one (the
-    // sink NAME can change between connects, the MAC never), the sink name
-    // for wired outputs.
-    function _trimKeyForSink(sink) {
-        return _btMacOfSink(sink) || String(sink);
-    }
-
-    // ── Stereo pairs (per-speaker channel in the combined output) ───────────
-    // A speaker in the group can play the full stereo (default), only the
-    // LEFT or only the RIGHT channel — two speakers set L and R become a
-    // true stereo pair — or a MONO mix of both for a speaker that stands
-    // alone in another room. Implemented as the loopback's own channel map;
-    // measured on PipeWire: channels=1 with an explicit position takes
-    // exactly that source channel (full level, zero bleed) and
-    // channel_map=mono is an equal L+R downmix. Duplicate-position maps
-    // (front-left,front-left) are NOT used — pactl half-drops them.
-    // Keyed like the balances: Bluetooth MAC, sink name for wired.
-    property var _deviceChannels: ({})
-    property int _chanRev: 0
-
-    function _loadDeviceChannels() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.deviceChannels || "{}");
-            _deviceChannels = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _deviceChannels = {};
-        }
-        _chanRev++;
-    }
-
-    // "S" stereo (the default — no entry), "L", "R", "M" mono mix.
-    function channelOf(id) {
-        var c = _deviceChannels[id];
-        return (c === "L" || c === "R" || c === "M") ? c : "S";
-    }
-
-    function setDeviceChannel(id, mode) {
-        var m = {};
-        for (var k in _deviceChannels) m[k] = _deviceChannels[k];
-        if (mode === "L" || mode === "R" || mode === "M") m[id] = mode;
-        else delete m[id];
-        _deviceChannels = m;
-        _chanRev++;
-        Plasmoid.configuration.deviceChannels = JSON.stringify(m);
-        // The map is baked into the loopback itself — swap them live.
-        if (_combineActive) syncOffsetDebounce.restart();
-    }
-
-    // One click walks the modes — a row of four buttons per speaker would
-    // bury the sync section.
-    function cycleDeviceChannel(id) {
-        var order = ["S", "L", "R", "M"];
-        setDeviceChannel(id, order[(order.indexOf(channelOf(id)) + 1) % 4]);
-    }
-
-    function setDeviceTrim(id, factor) {
-        var f = Math.max(0.05, Math.min(1, factor));
-        var m = {};
-        for (var k in _deviceTrims) m[k] = _deviceTrims[k];
-        if (f >= 0.995) delete m[id]; // full level = no entry, the default
-        else m[id] = Math.round(f * 100) / 100;
-        _deviceTrims = m;
-        _trimRev++;
-        trimsPersistTimer.restart();
-        // Live targets follow the slider immediately (debounced): the
-        // matching loopback's sink-input locally, the device volume for a
-        // casting network target. Idle devices just keep the stored value.
-        if (_combineActive) {
-            var mod = _combineModuleForKey(id);
-            if (mod !== "") {
-                _trimPendingLocal[mod] = Math.round(trimOf(id) * 100);
-                trimApplyTimer.restart();
-            }
-        }
-        if (_casting && castTargetIndex(id) >= 0) {
-            _trimPendingCast[id] = true;
-            trimApplyTimer.restart();
-        }
-    }
-
-    Timer {
-        id: trimsPersistTimer
-        interval: 1000
-        repeat: false
-        onTriggered: Plasmoid.configuration.deviceTrims = JSON.stringify(root._deviceTrims)
-    }
-
-    // One debounce for both directions — a slider drag lands as a single
-    // pactl call / volume command per device, not one per pixel.
-    property var _trimPendingLocal: ({})  // loopback module id → percent
-    property var _trimPendingCast: ({})   // device uuid → true
-
-    Timer {
-        id: trimApplyTimer
-        interval: 250
-        repeat: false
-        onTriggered: {
-            var cmd = "";
-            for (var mod in root._trimPendingLocal)
-                cmd += root._sinkInputVolCmd(mod, root._trimPendingLocal[mod]);
-            root._trimPendingLocal = {};
-            if (cmd !== "") executable.exec(": PW_TRIM; " + cmd + "true # " + (++root._execSeq));
-            var master = root.targetVolume();
-            for (var uuid in root._trimPendingCast) {
-                var ti = root.castTargetIndex(uuid);
-                if (ti < 0) continue;
-                var dev = root._castTargets[ti];
-                var eff = Math.min(1, master * root.trimOf(uuid)).toFixed(3);
-                if (dev.kind === "dlna") {
-                    root._castExec("CAST_VOL", ["dlna-volume", dev.location, eff]);
-                } else {
-                    root._castExec("CAST_VOL", ["volume", dev.host, dev.port, dev.uuid,
-                                                dev.deviceModel, eff]);
-                }
-            }
-            root._trimPendingCast = {};
-        }
-    }
-
-    // Set OUR loopback's sink-input to a percentage — resolved by owner
-    // module id at apply time, because load-module does not print the
-    // sink-input id. Only ever touches inputs owned by modules we loaded.
-    // moduleId is either digits (parsed from a pactl echo) or the literal
-    // "$id" when baked into the same shell round that loaded the module.
-    function _sinkInputVolCmd(moduleId, pct) {
-        var mod = String(moduleId) === "$id"
-                  ? "\"$id\"" : String(moduleId).replace(/\D/g, "");
-        var p = Math.max(5, Math.min(100, Math.round(pct)));
-        if (mod === "") return "";
-        return "si=$(pactl list sink-inputs 2>/dev/null | awk -v m=" + mod
-             + " '/^Sink Input #/{si=substr($3,2)} $1==\"Owner\" && $2==\"Module:\" && $3==m {print si; exit}');"
-             + " [ -n \"$si\" ] && pactl set-sink-input-volume \"$si\" " + p + "% 2>/dev/null; ";
-    }
-
-    // Which loopback module serves the sink behind a balance key ("" = none).
-    property var _combineLoopbackSinkByModule: ({})
-
-    function _combineModuleForKey(key) {
-        for (var mod in _combineLoopbackSinkByModule)
-            if (_trimKeyForSink(_combineLoopbackSinkByModule[mod]) === key) return mod;
-        return "";
-    }
-
     // A network device joining the group ADOPTS the loudness it already has:
     // its current level / master becomes its balance, so the first master
     // move scales it from where it stands instead of yanking it to the
     // master level. Only when the user has not set a balance by hand.
     function _castAdoptTrim(dev) {
-        if (!dev || !dev.uuid || _deviceTrims[dev.uuid] !== undefined) return;
+        if (!dev || !dev.uuid || sync.hasTrim(dev.uuid)) return;
         if (dev.kind === "dlna") {
             _castExec("CAST_ADOPT " + dev.uuid, ["dlna-get-volume", dev.location]);
         } else {
@@ -1699,590 +1519,50 @@ PlasmoidItem {
         }
     }
 
-    // Description of a local output for the balance rows (falls back to the
-    // raw sink name — better than an empty label if the device just left).
-    function outputDescription(sinkId) {
-        var outs = mediaDevices.audioOutputs;
-        for (var i = 0; i < outs.length; i++)
-            if (String(outs[i].id) === String(sinkId)) return outs[i].description;
-        return String(sinkId);
+    // ── Whole-room sync engine ───────────────────────────────────────────────
+    // Everything combined-output lives in SyncEngine.qml: loopbacks and
+    // their delays, balances, channel modes, exclusions, the microphone
+    // calibration, the join watchdog and the default-sink etiquette. The
+    // engine touches the system only through the facade members below and
+    // reads settings through `cfg` — which is what makes it unit-testable
+    // (tests hand it a mock app and a plain object as cfg).
+    readonly property var sync: syncEngine
+
+    readonly property var mediaDevs: mediaDevices
+    readonly property var playerOutput: playMusicOutput
+    readonly property string instanceId: _mprisId
+
+    function exec(cmd) { executable.exec(cmd); }
+    function nextSeq() { return ++_execSeq; }
+
+    function notify(title, text, icon) {
+        dlNotification.title = title;
+        dlNotification.text = text;
+        dlNotification.iconName = icon;
+        dlNotification.sendEvent();
     }
 
-    // ── Combined local output (every speaker in sync) ────────────────────────
-    // PipeWire's module-combine-sink plays one stream on several sinks at
-    // once with latency compensation: the faster (wired) outputs are delayed
-    // to match the slowest (typically Bluetooth, 100–250 ms), so all local
-    // speakers play together instead of echoing. Session-scoped by design —
-    // the module is unloaded on disable and orphans are swept at startup.
-    // Network devices (Cast/DLNA) can NOT join this: they pull the stream
-    // themselves and expose no latency control; Cast-to-Cast sync is what
-    // Google Home speaker groups are for.
-    property bool _combineAvailable: false   // pactl (pipewire-pulse) present?
-    // Intent vs acknowledgement: _combineWantActive flips synchronously with
-    // the user's toggle; _combineActive only once pactl has confirmed the
-    // module. Gating on the ack alone dropped a disable clicked during the
-    // load round-trip — the module then landed anyway, routed itself and
-    // stayed on against an unchecked box.
-    property bool _combineWantActive: false
-    property bool _combineActive: false
-    property string _combineNullId: ""
-    property var _combineLoopbackIds: []
-    property string _combineSinksSnapshot: ""
-    property bool _combinePendingRoute: false
-    // The specific output that was selected before combining, so switching
-    // the sync mode off restores it instead of dumping to the default.
-    property string _combinePrevOutput: ""
-    // The sink that was the system default before the sync took it over —
-    // restored on disable, and from config after a crash.
-    property string _combinePrevDefault: ""
-    // Per-instance suffix (the stable applet id, same as MPRIS uses): the
-    // startup sweep may only reclaim THIS instance's orphans — a second
-    // widget or a plasmoidviewer run must not tear down a live combine.
-    readonly property string _combineSinkName: "onair_combined_" + _mprisId
+    // The cast half of a balance change: the engine owns the store, the
+    // cast session lives here.
+    function castTrimActive(id) { return _casting && castTargetIndex(id) >= 0; }
 
-    // Only real hardware ends. Virtual sinks (an equalizer's effect input,
-    // other apps' null sinks) either double the audio through their own
-    // output path — audible phasing no delay can ever fix — or lead nowhere.
-    // This is the FULL candidate list; the group itself (_combineRealSinks)
-    // additionally honors the user's per-speaker in/out choice. The UI lists
-    // from here so an excluded speaker keeps its row — otherwise there would
-    // be no way to bring it back.
-    function _combineAllSinks() {
-        var outs = mediaDevices.audioOutputs;
-        var res = [];
-        for (var i = 0; i < outs.length; i++) {
-            var oid = String(outs[i].id);
-            // bluez_output = PipeWire, bluez_sink = plain PulseAudio — the
-            // combine must take Bluetooth along on both stacks.
-            if (/^(alsa_output|bluez_output|bluez_sink)/.test(oid)
-                && oid.indexOf("onair_combined") === -1)
-                res.push(oid);
-        }
-        return res;
-    }
-
-    function _combineRealSinks() {
-        var all = _combineAllSinks();
-        var res = [];
-        for (var i = 0; i < all.length; i++)
-            if (syncDeviceIncluded(_trimKeyForSink(all[i]))) res.push(all[i]);
-        return res;
-    }
-
-    // What the loopback set is BUILT from: the group's sinks and each one's
-    // channel mode. Anything that changes this signature obsoletes the live
-    // loopbacks — compared after device changes AND when an enable's ack
-    // lands, because the user can untick a speaker or flip a channel inside
-    // the load round-trip and the ack would otherwise adopt a stale build
-    // that nothing ever revisits.
-    function _combineGroupSignature() {
-        var sinks = _combineRealSinks();
-        var sig = [];
-        for (var i = 0; i < sinks.length; i++)
-            sig.push(sinks[i] + ":" + channelOf(_trimKeyForSink(sinks[i])));
-        return sig.join("|");
-    }
-
-    // ── Per-speaker in/out of the group ─────────────────────────────────────
-    // "Everything except the bedroom" is a real evening — a speaker can sit
-    // out of the group without disconnecting it. Stored as an EXCLUSION set:
-    // absent means in, so a brand-new speaker always joins by default.
-    property var _syncExcluded: ({})
-    property int _exclRev: 0
-
-    function _loadSyncExcluded() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.syncExcluded || "{}");
-            _syncExcluded = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _syncExcluded = {};
-        }
-        _exclRev++;
-    }
-
-    function syncDeviceIncluded(id) {
-        return _syncExcluded[id] !== true;
-    }
-
-    function setSyncDeviceIncluded(id, on) {
-        var m = {};
-        for (var k in _syncExcluded) m[k] = _syncExcluded[k];
-        if (on) delete m[id];
-        else m[id] = true;
-        _syncExcluded = m;
-        _exclRev++;
-        Plasmoid.configuration.syncExcluded = JSON.stringify(m);
-        if (_combineActive) syncOffsetDebounce.restart();
-    }
-
-    function _btMacOfSink(sinkId) {
-        var m = String(sinkId).match(/^bluez_(?:output|sink)\.([0-9A-Fa-f_]{17})/);
-        return m ? m[1].replace(/_/g, ":").toUpperCase() : "";
-    }
-
-    // The measured/tuned lag of one Bluetooth sink: its own calibration if
-    // the device has been calibrated (keyed by MAC — a JBL and AirPods lag
-    // differently), the global slider value otherwise.
-    function _lagForSink(sinkId) {
-        var mac = _btMacOfSink(sinkId);
-        if (mac !== "") {
-            try {
-                var map = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
-                if (map[mac] !== undefined)
-                    return Math.max(0, Math.min(900, parseInt(map[mac], 10) || 0));
-            } catch (e) {}
-        }
-        return Math.max(0, Math.min(900, Plasmoid.configuration.syncOffsetMs || 0));
-    }
-
-    // One loopback per hardware sink, each with a REAL buffer delay
-    // (latency_msec) — deterministic, unlike latency compensation that
-    // trusts what a Bluetooth box claims about itself. Every sink is held
-    // back to the SLOWEST device's schedule: wired outputs wait the full
-    // worst lag, a faster Bluetooth device waits the difference. Stereo is
-    // pinned.
-    function _combineLoopbackCmds(sinks) {
-        var maxLag = 0;
-        var lags = {};
-        for (var j = 0; j < sinks.length; j++) {
-            if (sinks[j].indexOf("bluez_") === 0) {
-                lags[sinks[j]] = _lagForSink(sinks[j]);
-                if (lags[sinks[j]] > maxLag) maxLag = lags[sinks[j]];
-            }
-        }
-        var cmds = "";
-        for (var i = 0; i < sinks.length; i++) {
-            var s = sinks[i].replace(/'/g, "'\\''");
-            var d = 60 + (sinks[i].indexOf("bluez_") === 0
-                          ? (maxLag - lags[sinks[i]]) : maxLag);
-            // The sink rides along in the echo so the handler can pair module
-            // ids with sinks for the balance — /LB (\d+)/ readers are
-            // unaffected. The balance itself is baked in right here, in the
-            // same shell round, so every (re)build restores it atomically.
-            // EXISTENCE GATE, learned the hard way: loading a loopback whose
-            // sink is not registered yet (a Bluetooth speaker mid-connect)
-            // does NOT fail — pactl attaches it to the DEFAULT sink, which is
-            // now the combined sink itself: a silent feedback loop, and the
-            // speaker plays nothing. Skip it, report LBMISS, and the retry
-            // pass picks it up once the sink is really there.
-            // The speaker's channel mode lives in the loopback's own map:
-            // a single explicit position takes exactly that source channel,
-            // mono is the equal downmix, stereo the plain 2ch pass.
-            var chMode = channelOf(_trimKeyForSink(sinks[i]));
-            var chSpec = chMode === "L" ? "channels=1 channel_map=front-left"
-                       : chMode === "R" ? "channels=1 channel_map=front-right"
-                       : chMode === "M" ? "channels=1 channel_map=mono"
-                       : "channels=2";
-            cmds += "if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
-                 + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
-                 + " sink='" + s + "' latency_msec=" + d + " " + chSpec + ") && echo \"LB $id " + s + "\"";
-            var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
-            if (pct < 100) cmds += " && { " + _sinkInputVolCmd("$id", pct) + "}";
-            cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
-        }
-        return cmds;
-    }
-
-    // Whether the calibration has both of its reference speakers IN the
-    // group — the button grays out instead of silently doing nothing when
-    // the only Bluetooth (or only wired) speaker was ticked out.
-    function calibPairReady() {
-        void _exclRev;
-        var sinks = _combineRealSinks();
-        var wired = false, bt = false;
-        for (var i = 0; i < sinks.length; i++) {
-            if (sinks[i].indexOf("bluez_") === 0) bt = true;
-            else wired = true;
-        }
-        return wired && bt;
-    }
-
-    // ── Microphone auto-calibration ──────────────────────────────────────────
-    // calibrate.py plays clicks through the wired reference and the Bluetooth
-    // speaker and times, with the microphone, when each actually arrives —
-    // the difference IS the lag, no ears needed. Volumes are raised for the
-    // clicks (a too-quiet speaker measures as silence) and restored after.
-    property bool _calibrating: false
-    // Stream volume to put back after calibration (-1 = nothing to restore).
-    property real _calibVolumeBefore: -1
-
-    function calibrateSync() {
-        if (_calibrating || !_combineActive) return;
-        var sinks = _combineRealSinks();
-        var wired = "", bt = "";
-        for (var i = 0; i < sinks.length; i++) {
-            if (sinks[i].indexOf("bluez_") === 0) { if (bt === "") bt = sinks[i]; }
-            else if (wired === "") wired = sinks[i];
-        }
-        if (wired === "" || bt === "") return;
-        _calibrating = true;
-        // The natural moment to calibrate is WHILE listening — but program
-        // audio through the live loopbacks either drowns the clicks (every
-        // measurement fails) or a drum hit beats them in the peak search and
-        // a plausible-but-wrong lag gets persisted for the device. Silence
-        // the stream at its source for the measurement; the clicks are
-        // played straight at the sinks and don't pass through it.
-        _calibVolumeBefore = playMusicOutput.volume;
-        playMusicOutput.volume = 0;
-        var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
-        // The timing pair goes first; EVERY other speaker in the group rides
-        // along for the loudness measurement, all parked at the same 55% so
-        // the click amplitudes compare speaker against speaker, nothing else.
-        // Capped to what calibrate.py will measure (2 + MAX_EXTRA_SINKS) —
-        // parking the volume of a sink nobody clicks would be a pointless
-        // save/restore cycle.
-        var calSinks = [wired, bt];
-        for (var e = 0; e < sinks.length; e++)
-            if (sinks[e] !== wired && sinks[e] !== bt) calSinks.push(sinks[e]);
-        calSinks = calSinks.slice(0, 8);
-        // The guard must outlast the WORST run, not the typical one: every
-        // extra speaker adds two clicks, and a dying sink holds each click
-        // for paplay's full 5 s timeout — a fixed 60 s fired mid-run with a
-        // full group, unmuting the radio INTO the tail measurements and
-        // persisting music-contaminated levels.
-        calibGuardTimer.interval = 60000 + (calSinks.length - 2) * 15000;
-        calibGuardTimer.restart();
-        // A balance-trimmed loopback would mute the clicks on that speaker
-        // and the measurement would read as silence — raise OUR sink-inputs
-        // to full for the clicks and put the balance back right after.
-        var pre = "", post = "";
-        for (var ci = 0; ci < calSinks.length; ci++) {
-            var mod = _combineModuleForKey(_trimKeyForSink(calSinks[ci]));
-            var pct = Math.round(trimOf(_trimKeyForSink(calSinks[ci])) * 100);
-            if (mod !== "" && pct < 100) {
-                pre += _sinkInputVolCmd(mod, 100);
-                post += _sinkInputVolCmd(mod, pct);
-            }
-        }
-        var setup = "", restore = "", argv = "";
-        for (var si = 0; si < calSinks.length; si++) {
-            var esc = calSinks[si].replace(/'/g, "'\\''");
-            setup += " s" + si + "='" + esc + "';"
-                  + " v" + si + "=$(pactl get-sink-volume \"$s" + si + "\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
-                  // The restored volume rides along for the loudness math:
-                  // the clicks are measured at the parked 55%, but playback
-                  // happens at THIS level — the handler folds it back in.
-                  + " echo \"CALIBVOL $s" + si + " ${v" + si + ":-55%}\";"
-                  + " pactl set-sink-volume \"$s" + si + "\" 55%;";
-            // Unquoted on purpose: $vN holds one %-value PER CHANNEL and
-            // word-splitting hands pactl each as its own argument, so a
-            // left/right balance survives the round-trip. An unreadable
-            // volume falls back to the 55% the calibration itself used.
-            restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-55%};";
-            argv += " \"$s" + si + "\"";
-            if (si === 1) argv += " ''"; // the mic placeholder sits between
-                                         // the timing pair and the extras
-        }
-        // The timeout must beat the guard timer: only the SHELL knows the
-        // saved sink levels ($vN) and the balance percentages to put back —
-        // if a hung pw-record lived past the guard, the sinks would stay
-        // parked at 55% and the loopbacks at full, and QML could not restore
-        // either. Killing the python inside the guard window keeps the
-        // restore lines on the path no matter how the measurement dies.
-        var calBudget = Math.round(calibGuardTimer.interval / 1000) - 10;
-        executable.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
-            + setup
-            + " " + pre
-            + " timeout " + calBudget + " python3 '" + script + "'" + argv + ";"
-            + restore
-            + " " + post
-            + " true # " + (++_execSeq));
-    }
-
-    // Every load carries this generation: PipeWire happily loads a SECOND
-    // null sink under the same name, so a stale in-flight load landing after
-    // an enable→disable→enable would otherwise be adopted next to the live
-    // set — every speaker gets two differently-delayed loopbacks (phasing)
-    // and the first set leaks until the next session's sweep.
-    property int _combineLoadSeq: 0
-
-    function combineOutputsEnable() {
-        if (!_combineAvailable || _combineWantActive) return;
-        // Two pieces of hardware make a sync; how many of them PLAY is the
-        // user's per-speaker choice (one alone is a valid evening).
-        if (_combineAllSinks().length < 2) return;
-        var sinks = _combineRealSinks();
-        if (sinks.length === 0) {
-            // The big switch says "play", but the remembered exclusions
-            // leave nothing to play on — the explicit action of right now
-            // wins over the leftovers of some earlier evening. Only the
-            // speakers standing here return: an absent device (a headset
-            // excluded for good) keeps its choice for when it comes back.
-            var m = {};
-            for (var xk in _syncExcluded) m[xk] = _syncExcluded[xk];
-            var all = _combineAllSinks();
-            for (var xi = 0; xi < all.length; xi++)
-                delete m[_trimKeyForSink(all[xi])];
-            _syncExcluded = m;
-            _exclRev++;
-            Plasmoid.configuration.syncExcluded = JSON.stringify(m);
-            sinks = _combineRealSinks();
-        }
-        if (sinks.length === 0) return;
-        _combineWantActive = true;
-        _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
-        Plasmoid.configuration.combinePrevOutput = _combinePrevOutput;
-        _combineSinksSnapshot = _combineGroupSignature();
-        // Sync switched on while a speaker is still connecting: its sink is
-        // not in the snapshot yet, so the join watchdog walks it in.
-        if (_btConnectingMac !== "")
-            _btJoinWatchArm(_btConnectingMac, _btPendingSinkName);
-        // Human name for the sink — this is what the output picker (ours and
-        // the system volume applet) shows instead of the raw node name.
-        var desc = i18n("All local outputs (On Air)").replace(/"/g, "").replace(/'/g, "'\\''");
-        // The combined output also becomes the system DEFAULT sink while the
-        // sync is on: the volume keys and the panel applet act on the default
-        // sink, and pointing them anywhere else meant "volume up" reached the
-        // wired speakers but never the Bluetooth ones. The null sink's volume
-        // provably scales its monitor, so one keypress now moves the whole
-        // room. The previous default's level is copied over first — becoming
-        // the default must not jump the loudness.
-        executable.exec(": PW_COMBINE " + (++_combineLoadSeq) + ";"
-                        + " d=$(pactl get-default-sink); echo \"PREVDEF $d\";"
-                        + " m=$(pactl load-module module-null-sink"
-                        + " sink_name=" + _combineSinkName + " channels=2"
-                        + " sink_properties='device.description=\"" + desc + "\"')"
-                        // Master starts at 100% = acoustic passthrough: every
-                        // hardware sink keeps its own level, so enabling never
-                        // jumps the loudness (copying one device's level here
-                        // would double-apply it to that device). The default
-                        // switch is best-effort — `true` keeps the group's
-                        // exit status from gating the loopbacks, which are
-                        // the actual feature.
-                        + " && { echo \"NULL $m\";"
-                        + " pactl set-sink-volume " + _combineSinkName + " 100% 2>/dev/null;"
-                        + " pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true; }"
-                        + " && " + _combineLoopbackCmds(sinks) + "true"
-                        + " # " + (++_execSeq));
-    }
-
-    function _combineUnloadCmd() {
-        var ids = _combineLoopbackIds.slice();
-        if (_combineNullId !== "") ids.push(_combineNullId);
-        var cmd = "";
-        for (var i = 0; i < ids.length; i++)
-            cmd += "pactl unload-module " + ids[i] + " 2>/dev/null; ";
-        _combineLoopbackIds = [];
-        _combineLoopbackSinkByModule = {};
-        _combineNullId = "";
-        return cmd;
-    }
-
-    function combineOutputsDisable() {
-        if (!_combineWantActive) return;
-        _combineWantActive = false;
-        if (!_combineActive && _combineNullId === "") {
-            // The load is still in flight — the PW_COMBINE handler sees the
-            // intent withdrawn and unloads everything the moment it lands.
-            return;
-        }
-        _combineActive = false;
-        _combinePendingRoute = false;
-        _combineLbRetries = 0;
-        combineLbRetry.stop();
-        // Generation boundary: an in-flight rebuild's ack is stale from here
-        // on and deliberately keeps its hands off these flags — a leftover
-        // busy would deadlock every rebuild of the next enable.
-        _combineReloopBusy = false;
-        _combineReloopPending = false;
-        _btJoinWatchStop();
-        // Route away FIRST — with the choice already off the combined sink,
-        // its removal is not a "device vanished" event worth a notification.
-        setAudioOutputDevice(_combinePrevOutput);
-        _combinePrevOutput = "";
-        Plasmoid.configuration.combinePrevOutput = "";
-        var unMods = _combineUnloadCmd();
-        var un = "";
-        if (unMods !== "" || _combinePrevDefault !== "") {
-            // The default is read BEFORE the unloads: destroying the combined
-            // sink makes WirePlumber re-point the default on its own, and a
-            // check made after that could no longer tell our sink was holding it.
-            un = "d=$(pactl get-default-sink 2>/dev/null); " + unMods;
-        }
-        // Hand the system default back to whoever held it before the sync —
-        // but only if it is still OURS to hand back: a default the user moved
-        // elsewhere mid-session is their word, not a leftover to revert.
-        if (_combinePrevDefault !== "") {
-            un += "[ \"$d\" = \"" + _combineSinkName + "\" ] && pactl set-default-sink '"
-                  + _combinePrevDefault.replace(/'/g, "'\\''") + "' 2>/dev/null; ";
-            _combinePrevDefault = "";
-        }
-        // The persisted key is cleared by the DONE ack below, not here: this
-        // exec is asynchronous, and a teardown that kills it before it runs
-        // (disable is called from Component.onDestruction) must leave the key
-        // for the next session's conditional startup restore.
-        if (un !== "") executable.exec(": PW_UNCOMBINE_DONE; " + un + "true # " + (++_execSeq));
-        else Plasmoid.configuration.combinePrevDefault = "";
-    }
-
-    // Swap the loopbacks under a live null sink: the player keeps feeding
-    // onair_combined uninterrupted while the delays change (slider move,
-    // Bluetooth sink came or went).
-    // Serialized: a second rebuild while one is in flight would read the
-    // id list as empty, skip the unloads, and leave every sink with two
-    // live loopbacks — audible phasing, the exact artifact this feature
-    // exists to prevent.
-    property bool _combineReloopBusy: false
-    property bool _combineReloopPending: false
-
-    function _combineRebuildLoopbacks() {
-        if (!_combineActive) return;
-        if (_combineReloopBusy) { _combineReloopPending = true; return; }
-        _combineReloopBusy = true;
-        var sinks = _combineRealSinks();
-        _combineSinksSnapshot = _combineGroupSignature();
-        var un = "";
-        for (var i = 0; i < _combineLoopbackIds.length; i++)
-            un += "pactl unload-module " + _combineLoopbackIds[i] + " 2>/dev/null; ";
-        _combineLoopbackIds = [];
-        // Re-assert the default while we're here: WirePlumber's
-        // switch-on-connect policy hands the default to a freshly-connected
-        // sink (the very Bluetooth speaker that just joined the group), and
-        // the volume keys would silently start moving one device, not the room.
-        // Conditionally, though — rebuilds run on every slider move, and an
-        // unconditional grab kept overriding a default the user had pointed
-        // elsewhere on purpose. Reclaim only when the current default is ours
-        // already or a member of the group (the switch-on-connect steal);
-        // anything outside the group is the user's word and stands.
-        var reclaim = " d=$(pactl get-default-sink 2>/dev/null); ok=0;"
-                    + " [ -z \"$d\" ] && ok=1; [ \"$d\" = \"" + _combineSinkName + "\" ] && ok=1;";
-        for (var rc = 0; rc < sinks.length; rc++)
-            reclaim += " [ \"$d\" = '" + sinks[rc].replace(/'/g, "'\\''") + "' ] && ok=1;";
-        reclaim += " [ \"$ok\" = 1 ] && pactl set-default-sink " + _combineSinkName + " 2>/dev/null;";
-        // The rebuild carries its enable-generation: a wedged rebuild whose
-        // ack lands after a disable→re-enable would otherwise be adopted
-        // into the NEW generation next to its own fresh build — every
-        // speaker with two differently-delayed loopbacks, audible phasing.
-        executable.exec(": PW_RELOOP " + _combineLoadSeq + "; " + un + _combineLoopbackCmds(sinks)
-                        + reclaim + " true"
-                        + " # " + (++_execSeq));
-    }
-
-    function setSyncOffset(ms) {
-        Plasmoid.configuration.syncOffsetMs = Math.round(ms);
-        // The slider speaks for the CONNECTED device(s) — remember the value
-        // per MAC so each speaker keeps its own lag across sessions.
-        try {
-            var map = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
-            var sinks = _combineRealSinks();
-            var touched = false;
-            for (var i = 0; i < sinks.length; i++) {
-                var mac = _btMacOfSink(sinks[i]);
-                if (mac !== "") { map[mac] = Math.round(ms); touched = true; }
-            }
-            if (touched) Plasmoid.configuration.syncOffsetMap = JSON.stringify(map);
-        } catch (e) {}
-        syncOffsetDebounce.restart();
-    }
-
-    Timer {
-        id: syncOffsetDebounce
-        interval: 300
-        repeat: false
-        onTriggered: root._combineRebuildLoopbacks()
-    }
-
-    // Restore the stream volume muted for the calibration clicks. Skipped if
-    // the user moved the slider themselves meanwhile — their word wins.
-    function _calibRestoreVolume() {
-        if (_calibVolumeBefore >= 0 && playMusicOutput.volume === 0)
-            playMusicOutput.volume = _calibVolumeBefore;
-        _calibVolumeBefore = -1;
-    }
-
-    Timer {
-        id: calibGuardTimer
-        // Interval is set per run by calibrateSync (it grows with the group's
-        // size, sized to calibrate.py's worst case) — the guard only exists
-        // so a lost result can't leave the stream muted forever.
-        interval: 60000
-        repeat: false
-        onTriggered: {
-            root._calibrating = false;
-            root._calibRestoreVolume();
+    function applyCastTrim(uuid) {
+        var ti = castTargetIndex(uuid);
+        if (ti < 0) return;
+        var dev = _castTargets[ti];
+        var eff = Math.min(1, targetVolume() * sync.trimOf(uuid)).toFixed(3);
+        if (dev.kind === "dlna") {
+            _castExec("CAST_VOL", ["dlna-volume", dev.location, eff]);
+        } else {
+            _castExec("CAST_VOL", ["volume", dev.host, dev.port, dev.uuid,
+                                   dev.deviceModel, eff]);
         }
     }
 
-    // The rebind bounce below is momentarily audible — pick the least
-    // surprising stop for it: the device the user was playing on before the
-    // sync, then a wired sink still IN the group, then any wired sink, and a
-    // Bluetooth device only when nothing else exists. A speaker ticked out
-    // of the group usually means "not in this room" — never blip it first.
-    function _combineBounceTarget(outs) {
-        var prev = null, wiredIn = null, wired = null, any = null;
-        for (var b = 0; b < outs.length; b++) {
-            var oid = String(outs[b].id);
-            if (oid.indexOf(_combineSinkName) !== -1) continue;
-            if (any === null) any = outs[b];
-            if (prev === null && _combinePrevOutput !== "" && oid === _combinePrevOutput)
-                prev = outs[b];
-            if (oid.indexOf("bluez_") !== 0) {
-                if (wired === null) wired = outs[b];
-                if (wiredIn === null && syncDeviceIncluded(_trimKeyForSink(oid)))
-                    wiredIn = outs[b];
-            }
-        }
-        return prev || wiredIn || wired || any;
-    }
-
-    function _combineTryRoute() {
-        if (!_combinePendingRoute) return;
-        var outs = mediaDevices.audioOutputs;
-        for (var i = 0; i < outs.length; i++) {
-            if (String(outs[i].id).indexOf(_combineSinkName) !== -1) {
-                _combinePendingRoute = false;
-                // Bounce through another device first while playing: a
-                // re-enable recreates the combined sink under the SAME name,
-                // and Qt treats the same-id assignment as a no-op — the live
-                // stream stays bound to the DEAD node, silent while claiming
-                // to play. Seen live: four orphaned streams on one session.
-                if (isPlaying()) {
-                    var bounce = _combineBounceTarget(outs);
-                    if (bounce !== null) playMusicOutput.device = bounce;
-                }
-                setAudioOutputDevice(String(outs[i].id));
-                return;
-            }
-        }
-    }
-
-    // A loopback skipped mid-build because its sink was still registering —
-    // bounded retries; the outputs-changed rebuild covers anything later.
-    property int _combineLbRetries: 0
-
-    Timer {
-        id: combineLbRetry
-        interval: 1500
-        repeat: false
-        onTriggered: root._combineRebuildLoopbacks()
-    }
-
-    // Which sinks the last build reported missing — a DIFFERENT miss set
-    // means a new speaker is registering and deserves its own full retry
-    // budget; the cap only ever exhausts against the same stuck sink(s).
-    property string _combineLbMissLast: ""
-
-    function _combineHandleMiss(out) {
-        var misses = [];
-        var missRe = /LBMISS (\S+)/g, missM;
-        while ((missM = missRe.exec(out || "")) !== null) misses.push(missM[1]);
-        if (misses.length === 0) {
-            _combineLbRetries = 0;
-            _combineLbMissLast = "";
-            return;
-        }
-        var missKey = misses.sort().join("|");
-        if (missKey !== _combineLbMissLast) {
-            _combineLbMissLast = missKey;
-            _combineLbRetries = 0;
-        }
-        // 8 × 1.5 s: a Bluetooth speaker's sink registers up to ~6 s after
-        // the connect (measured on a JBL Xtreme 3) — the old 3-try window
-        // closed before the sink existed and the speaker never joined.
-        if (_combineActive && _combineLbRetries < 8) {
-            _combineLbRetries++;
-            combineLbRetry.restart();
-        }
+    SyncEngine {
+        id: syncEngine
+        app: root
+        cfg: Plasmoid.configuration
     }
 
     // ── Bluetooth (paired speakers/headphones in the cast menu) ─────────────
@@ -2446,10 +1726,10 @@ PlasmoidItem {
         }
         // The user sent this device away — the watchdog must not fight them
         // by reconnecting it.
-        if (_btJoinWatchMac === mac) _btJoinWatchStop();
+        if (sync._btJoinWatchMac === mac) sync._btJoinWatchStop();
         // A kick already in flight for it will reconnect it in a few seconds
         // regardless — flag it so the kick's landing undoes that.
-        if (_btKickMac === mac) _btKickAbort = true;
+        if (sync._btKickMac === mac) sync._btKickAbort = true;
         executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect " + mac + "; true");
     }
 
@@ -2465,118 +1745,6 @@ PlasmoidItem {
         onTriggered: {
             root._btPendingSinkName = "";
             root._btPendingSinkMac = "";
-        }
-    }
-
-    // ── Sync join watchdog ───────────────────────────────────────────────────
-    // bluetoothctl saying "Connected: yes" does not mean audio: some speakers
-    // (JBLs, notoriously) come up without their A2DP profile on the first
-    // page, so no sink ever appears — the fix a human eventually finds is
-    // "connect it again". This watchdog does exactly that, once, on its own:
-    // after a connect that should JOIN the sync it checks every 2 s that the
-    // speaker's sink and its loopback actually materialized, nudges a rebuild
-    // if only the loopback is missing, and cycles the Bluetooth connection if
-    // the sink itself never showed up. Bounded; gives up with a note.
-    property string _btJoinWatchMac: ""
-    property string _btJoinWatchName: ""
-    property int _btJoinWatchTicks: 0
-    property bool _btJoinKicked: false
-    // The kick shell lives for up to ~21 s and its reconnect phase cannot be
-    // recalled — if the user clicks Disconnect inside that window, their
-    // choice would be silently reverted. Tracked so the kick's handler can
-    // undo its own reconnect the moment it lands.
-    property string _btKickMac: ""
-    property bool _btKickAbort: false
-    // The kick's own round-trip (up to ~21 s) plus the sink registration
-    // after it (~6 s) together outrun the 15-tick give-up — the watch used
-    // to declare "did not join" while the cure was still being applied.
-    // Ticks hold while the kick is in flight and restart from zero when it
-    // lands, so the reconnected speaker gets the full window again.
-    property bool _btKickInFlight: false
-
-    function _btJoinWatchArm(mac, name) {
-        if (!(_combineWantActive || _combineActive) || !_btValidMac(mac)) return;
-        _btJoinWatchMac = mac;
-        _btJoinWatchName = name || "";
-        _btJoinWatchTicks = 0;
-        _btJoinKicked = false;
-        btJoinWatch.restart();
-    }
-
-    function _btJoinWatchStop() {
-        btJoinWatch.stop();
-        _btJoinWatchMac = "";
-        _btJoinWatchName = "";
-    }
-
-    Timer {
-        id: btJoinWatch
-        interval: 2000
-        repeat: true
-        onTriggered: root._btJoinWatchTick()
-    }
-
-    function _btJoinWatchTick() {
-        if (!(_combineActive || _combineWantActive) || _btJoinWatchMac === "") {
-            _btJoinWatchStop();
-            return;
-        }
-        // The connect/pair attempt itself is still in flight — its retry path
-        // pages a sleeping speaker for up to ~36 s, and a kick's disconnect
-        // here would sabotage the very attempt being guarded. Hold the count
-        // until bluez has given its verdict (the handler re-arms on success
-        // and stops the watch on failure). Same hold during our own kick.
-        if (_btConnectingMac !== "" || _btPairingMac !== "" || _btKickInFlight) return;
-        // The user sat this speaker out of the group mid-watch — there is
-        // nothing to walk in anymore, and a kick would drag it back.
-        if (!syncDeviceIncluded(_btJoinWatchMac.toUpperCase())) {
-            _btJoinWatchStop();
-            return;
-        }
-        _btJoinWatchTicks++;
-        var token = _btJoinWatchMac.toLowerCase().replace(/:/g, "_");
-        var outs = mediaDevices.audioOutputs;
-        var sinkUp = false;
-        for (var i = 0; i < outs.length; i++)
-            if (String(outs[i].id).toLowerCase().indexOf(token) !== -1) { sinkUp = true; break; }
-        if (sinkUp) {
-            for (var mod in _combineLoopbackSinkByModule) {
-                if (String(_combineLoopbackSinkByModule[mod]).toLowerCase().indexOf(token) !== -1) {
-                    _btJoinWatchStop(); // in the group — done, all is well
-                    return;
-                }
-            }
-            // Sink is up but no loopback feeds it — the outputs-changed
-            // signal was missed somehow; ask for a rebuild. Every OTHER tick,
-            // and only when no rebuild or retry is already scheduled: each
-            // rebuild swaps every loopback (a blink on all speakers), so the
-            // nudge must never turn into a drumbeat.
-            if (_btJoinWatchTicks % 2 === 1 && !_combineReloopBusy
-                && !syncOffsetDebounce.running && !combineLbRetry.running)
-                syncOffsetDebounce.restart();
-        } else if (_btJoinWatchTicks >= 4 && !_btJoinKicked) {
-            // ~8 s connected with no sink: the audio profile did not come up.
-            // Cycle the connection once — re-paging renegotiates A2DP.
-            _btJoinKicked = true;
-            _btKickMac = _btJoinWatchMac;
-            _btKickAbort = false;
-            _btKickInFlight = true;
-            executable.exec(": BT_KICK; timeout 5 bluetoothctl disconnect " + _btJoinWatchMac
-                + " >/dev/null 2>&1; sleep 1;"
-                + " timeout 15 bluetoothctl connect " + _btJoinWatchMac + " >/dev/null 2>&1; true"
-                + " # " + (++_execSeq));
-        }
-        if (_btJoinWatchTicks >= 15) {
-            // ~30 s is past every observed good case — stop, and say why the
-            // speaker is absent instead of leaving a silently missing device.
-            var gaveUpName = _btJoinWatchName || _btJoinWatchMac;
-            _btJoinWatchStop();
-            dlNotification.title = i18n("%1 did not join the sync", gaveUpName);
-            dlNotification.text = sinkUp
-                ? i18n("The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it.")
-                : i18n("The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again.");
-            dlNotification.iconName = "network-bluetooth";
-            dlNotification.sendEvent();
         }
     }
 
@@ -2721,7 +1889,7 @@ PlasmoidItem {
                 // Master × balance: the one slider drives every room while
                 // each device keeps its own relative level.
                 var level = Math.min(1, (root._pendingCastVolumePct / 100)
-                                        * root.trimOf(dev.uuid)).toFixed(3);
+                                        * root.sync.trimOf(dev.uuid)).toFixed(3);
                 if (dev.kind === "dlna") {
                     _castExec("CAST_VOL", ["dlna-volume", dev.location, level]);
                 } else {
@@ -3743,49 +2911,14 @@ PlasmoidItem {
         // kill-and-rearm cycle also cleans up after a crashed session.
         _loadAlarms();
         _alarmArmInhibit();
-        // Seed the steal-watch snapshot (sync is never active this early, so
-        // this only records the current sink set — no suspects, no action).
-        _combineDefaultStealWatch();
-        _loadDeviceTrims();
-        _loadDeviceChannels();
-        _loadSyncExcluded();
         syncFavicons();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
         castProbe();
         btProbe();
-        executable.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
-        // A crashed session can orphan the combined-output module — PipeWire
-        // keeps it loaded forever. Sweep THIS instance's modules at startup
-        // (per-instance sink name; a second widget's live combine survives),
-        // plus the suffix-less name pre-2026.14 versions used.
-        //
-        // The persisted restore keys are consumed HERE, unconditionally: they
-        // are only meaningful for the session that wrote them. An aborted
-        // enable used to leave combinePrevOutput set forever, and the old
-        // fallback then re-pointed the system default at every single login.
-        var prevOutCfg = Plasmoid.configuration.combinePrevOutput || "";
-        if ((Plasmoid.configuration.audioOutputDevice || "").indexOf("onair_combined") !== -1)
-            Plasmoid.configuration.audioOutputDevice = prevOutCfg;
-        Plasmoid.configuration.combinePrevOutput = "";
-        var prevDefCfg = Plasmoid.configuration.combinePrevDefault || "";
-        // A crash inside the load window never persisted PREVDEF — the user's
-        // chosen output is a strictly better guess than WirePlumber's pick.
-        if (prevDefCfg === "" && prevOutCfg !== "") prevDefCfg = prevOutCfg;
-        Plasmoid.configuration.combinePrevDefault = "";
-        // Sweep and default-restore share ONE shell: the default must be read
-        // BEFORE the sweep destroys the combined sink (WirePlumber re-points
-        // it the moment the sink dies), and the restore runs only when the
-        // default was still ours — a default the user holds elsewhere is not
-        // touched at startup.
-        var restoreDefCmd = "";
-        if (prevDefCfg !== "")
-            restoreDefCmd = " case \"$d\" in onair_combined*) pactl set-default-sink '"
-                            + prevDefCfg.replace(/'/g, "'\\''") + "' 2>/dev/null;; esac;";
-        executable.exec(": PW_COMBINE_CLEAN; d=$(pactl get-default-sink 2>/dev/null);"
-                        + " for m in $(pactl list short modules 2>/dev/null"
-                        + " | awk '/" + _combineSinkName + "([^0-9]|$)|onair_combined([^_0-9]|$)/ {print $1}'); do"
-                        + " pactl unload-module \"$m\"; done;" + restoreDefCmd + " true");
+        // Combined-output availability probe, crash sweep, restore-key
+        // consumption and the steal-watch seed all live in the engine.
+        syncEngine.startup();
         _ensureMusicDir();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
@@ -3803,7 +2936,7 @@ PlasmoidItem {
         _mprisStop();
         // Best effort — if the exec doesn't get out before teardown, the
         // startup sweep above reclaims the module on the next session.
-        combineOutputsDisable();
+        syncEngine.combineOutputsDisable();
     }
 
     StationsModel {
@@ -3842,13 +2975,13 @@ PlasmoidItem {
         function onDeviceTrimsChanged() {
             // Written back by our own persist timer too — reloading is cheap
             // and keeps a second widget instance's balances in step.
-            _loadDeviceTrims();
+            sync._loadDeviceTrims();
         }
         function onDeviceChannelsChanged() {
-            _loadDeviceChannels();
+            sync._loadDeviceChannels();
         }
         function onSyncExcludedChanged() {
-            _loadSyncExcluded();
+            sync._loadSyncExcluded();
         }
         target: Plasmoid.configuration
     }
@@ -3891,6 +3024,9 @@ PlasmoidItem {
                 }
                 return;
             }
+            // Whole-room sync: every PW_*/BT_KICK round-trip belongs to
+            // the engine, which answers true when the command was its own.
+            if (syncEngine.handleExec(cmd, stdout, stderr)) return;
             // Music-library folder created (or already existed) → safe to load
             if (cmd.indexOf(": MUSICDIR;") === 0) {
                 root._musicDirEnsured = true;
@@ -3990,24 +3126,13 @@ PlasmoidItem {
             if (cmd.indexOf(": CAST_ADOPT ") === 0) {
                 var adM = cmd.match(/^: CAST_ADOPT (\S+);/);
                 var adVol = (stdout || "").match(/__CAST_VOL__ ([0-9.]+)/);
-                if (adM && adVol && root._deviceTrims[adM[1]] === undefined) {
+                if (adM && adVol) {
                     var ratio = parseFloat(adVol[1]) / Math.max(0.05, root.targetVolume());
-                    if (isFinite(ratio)) {
-                        var adF = Math.max(0.05, Math.min(1, Math.round(ratio * 100) / 100));
-                        if (adF < 0.995) {
-                            var adTrims = {};
-                            for (var adK in root._deviceTrims) adTrims[adK] = root._deviceTrims[adK];
-                            adTrims[adM[1]] = adF;
-                            root._deviceTrims = adTrims;
-                            root._trimRev++;
-                            trimsPersistTimer.restart();
-                        }
-                    }
+                    if (isFinite(ratio)) sync.adoptTrim(adM[1], ratio);
                 }
                 return;
             }
-            if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0
-                || cmd.indexOf(": PW_TRIM;") === 0) {
+            if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0) {
                 return; // fire-and-forget
             }
             // Bluetooth: bluetoothctl availability + controller probe
@@ -4055,8 +3180,8 @@ PlasmoidItem {
                     // guard — left ticking it would kick a device the user
                     // was just told did not connect, then contradict this
                     // message with a second one.
-                    if (connMac !== "" && root._btJoinWatchMac === connMac)
-                        root._btJoinWatchStop();
+                    if (connMac !== "" && root.sync._btJoinWatchMac === connMac)
+                        root.sync._btJoinWatchStop();
                     dlNotification.title = i18n("Could not connect to %1",
                         root._btPendingSinkName || i18n("the Bluetooth device"));
                     dlNotification.text = i18n("Make sure the speaker is switched on and in range.");
@@ -4076,32 +3201,12 @@ PlasmoidItem {
                     root._btTryRoutePending();
                     // With the sync on, "connected" is only half the story —
                     // the watchdog sees the speaker all the way into the group.
-                    root._btJoinWatchArm(connMac, connName);
+                    root.sync._btJoinWatchArm(connMac, connName);
                 }
                 btList();
                 return;
             }
             if (cmd.indexOf(": BT_DISCONNECT;") === 0) {
-                btList();
-                return;
-            }
-            // Watchdog's one-shot connection cycle finished — the sink's
-            // appearance (or not) flows back through the normal watch ticks;
-            // only the menu's Connected states need refreshing here. Unless
-            // the user clicked Disconnect while the cycle was mid-flight:
-            // its reconnect phase just reverted their choice — undo that.
-            if (cmd.indexOf(": BT_KICK;") === 0) {
-                root._btKickInFlight = false;
-                if (root._btKickAbort && root._btValidMac(root._btKickMac))
-                    // Uniquified: an identical disconnect for the same MAC may
-                    // already be in flight from the user's own click, and the
-                    // exec dedup would silently swallow this one.
-                    executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect "
-                                    + root._btKickMac + "; true # " + (++root._execSeq));
-                else if (root._btJoinWatchMac !== "" && root._btJoinWatchMac === root._btKickMac)
-                    root._btJoinWatchTicks = 0; // fresh window for the reconnect
-                root._btKickMac = "";
-                root._btKickAbort = false;
                 btList();
                 return;
             }
@@ -4139,7 +3244,7 @@ PlasmoidItem {
                         btRouteTimeout.restart();
                         // Armed before the route pass — that pass clears the
                         // pending name the watchdog wants for its messages.
-                        root._btJoinWatchArm(pairedMac, root._btPendingSinkName);
+                        root.sync._btJoinWatchArm(pairedMac, root._btPendingSinkName);
                         // The sink may already be up — route now, not never.
                         root._btTryRoutePending();
                     } else {
@@ -4162,250 +3267,8 @@ PlasmoidItem {
                 btList();
                 return;
             }
-            // Combined local output: pactl availability probe
-            if (cmd.indexOf(": PW_PROBE;") === 0) {
-                root._combineAvailable = (stdout || "").indexOf("__PACTL_YES__") !== -1;
-                return;
-            }
-            // Combined local output created — route onto it when its sink
-            // shows up in mediaDevices (usually instantly).
-            if (/^: PW_COMBINE \d+;/.test(cmd)) {
-                var pwOut = stdout || "";
-                var nullM = pwOut.match(/NULL (\d+)/);
-                // What was the default before this load switched it? ANY
-                // combined name — this instance's, another's, a superseded
-                // enable's from a fast toggle, a pre-2026.14 leftover — means
-                // there is nothing real to restore: persisting it would point
-                // the default at a dead node on the next disable.
-                var prevDefM = pwOut.match(/PREVDEF (\S+)/);
-                var prevDef = (prevDefM && prevDefM[1].indexOf("onair_combined") !== 0)
-                              ? prevDefM[1] : "";
-                var restoreDef = prevDef !== ""
-                    ? "pactl set-default-sink '" + prevDef.replace(/'/g, "'\\''") + "' 2>/dev/null; " : "";
-                var lbIds = [];
-                var lbPairs = {};
-                var lbRe = /LB (\d+)(?: (\S+))?/g, lbM;
-                while ((lbM = lbRe.exec(pwOut)) !== null) {
-                    lbIds.push(lbM[1]);
-                    if (lbM[2]) lbPairs[lbM[1]] = lbM[2];
-                }
-                // A load from a superseded enable (enable→disable→enable
-                // while it was in flight): its modules are strays next to
-                // the current generation's — unload them, touch no state.
-                var seqM = cmd.match(/^: PW_COMBINE (\d+);/);
-                if (!seqM || parseInt(seqM[1], 10) !== root._combineLoadSeq
-                    || root._combineActive) {
-                    var stale = lbIds.slice();
-                    if (nullM) stale.push(nullM[1]);
-                    var uns = "";
-                    for (var sui = 0; sui < stale.length; sui++)
-                        uns += "pactl unload-module " + stale[sui] + " 2>/dev/null; ";
-                    // A live OR WANTED instance keeps the default it owns —
-                    // a pending re-enable (wanted, not yet acked) must not
-                    // have its default stolen back by the superseded load.
-                    if (uns !== "") executable.exec(": PW_UNCOMBINE; " + uns
-                        + ((root._combineActive || root._combineWantActive) ? "" : restoreDef) + "true");
-                    return;
-                }
-                // Fatal only when the null sink itself failed, or when no
-                // loopback loaded AND none was even skipped: an all-LBMISS
-                // build (every sink still registering — a Bluetooth-only
-                // group right after connect) is a healthy build waiting for
-                // its sinks, and the retry pass below walks them in.
-                if (!nullM || (lbIds.length === 0 && pwOut.indexOf("LBMISS") === -1)) {
-                    // Nothing usable came up — take down whatever half did.
-                    var junk = lbIds.slice();
-                    if (nullM) junk.push(nullM[1]);
-                    var unj = "";
-                    for (var ji = 0; ji < junk.length; ji++)
-                        unj += "pactl unload-module " + junk[ji] + " 2>/dev/null; ";
-                    if (unj !== "" || (nullM && restoreDef !== ""))
-                        executable.exec(": PW_UNCOMBINE; " + unj
-                                        + (nullM ? restoreDef : "") + "true");
-                    // A duplicate enable's failure (sink name already taken)
-                    // must not clobber the LIVE instance's state — the box
-                    // would read unchecked with the sink still running and
-                    // disable early-returning on the cleared intent.
-                    if (root._combineActive) return;
-                    root._combineWantActive = false;
-                    root._combinePrevOutput = "";
-                    // The persisted copy too — a stale key here used to make
-                    // the startup restore fire on every later login.
-                    Plasmoid.configuration.combinePrevOutput = "";
-                    dlNotification.title = i18n("Could not combine the outputs");
-                    dlNotification.text = ((stderr || "").split("\n")[0] || i18n("pactl refused to create the combined output.")).substring(0, 120);
-                    dlNotification.iconName = "dialog-warning";
-                    dlNotification.sendEvent();
-                    return;
-                }
-                root._combineNullId = nullM[1];
-                root._combineLoopbackIds = lbIds;
-                root._combineLoopbackSinkByModule = lbPairs;
-                if (!root._combineWantActive) {
-                    // Turned off while loading — honor the user's last word.
-                    var unw = root._combineUnloadCmd();
-                    if (unw !== "" || restoreDef !== "")
-                        executable.exec(": PW_UNCOMBINE; " + unw + restoreDef + "true");
-                    root._combinePrevOutput = "";
-                    // The persisted copy too, or the startup restore would
-                    // re-point the system default on every later login.
-                    Plasmoid.configuration.combinePrevOutput = "";
-                    return;
-                }
-                root._combineActive = true;
-                root._combinePrevDefault = prevDef;
-                Plasmoid.configuration.combinePrevDefault = prevDef;
-                root._combinePendingRoute = true;
-                root._combineTryRoute();
-                root._combineHandleMiss(pwOut);
-                // The rows are clickable from the moment the switch flips,
-                // which is BEFORE this ack lands — an untick or a channel
-                // flip made inside the load round-trip is not in the build
-                // that just arrived, and nothing else would ever revisit it.
-                if (root._combineGroupSignature() !== root._combineSinksSnapshot)
-                    syncOffsetDebounce.restart();
-                return;
-            }
-            // Loopbacks swapped under the live null sink (slider / sink set
-            // changed) — adopt the fresh module ids.
-            if (cmd.indexOf(": PW_RELOOP") === 0) {
-                var rlIds = [];
-                var rlPairs = {};
-                var rlRe = /LB (\d+)(?: (\S+))?/g, rlM;
-                while ((rlM = rlRe.exec(stdout || "")) !== null) {
-                    rlIds.push(rlM[1]);
-                    if (rlM[2]) rlPairs[rlM[1]] = rlM[2];
-                }
-                // A rebuild from a superseded enable-generation (its ack
-                // outlived a disable→re-enable): its modules are strays, and
-                // the CURRENT generation's serialization state is not its to
-                // touch — clearing the busy flag here would let two rebuilds
-                // of the live generation overlap.
-                var rlSeqM = cmd.match(/^: PW_RELOOP (\d+);/);
-                if (!rlSeqM || parseInt(rlSeqM[1], 10) !== root._combineLoadSeq) {
-                    var unrl = "";
-                    for (var rsi = 0; rsi < rlIds.length; rsi++)
-                        unrl += "pactl unload-module " + rlIds[rsi] + " 2>/dev/null; ";
-                    if (unrl !== "") executable.exec(": PW_UNCOMBINE; " + unrl + "true");
-                    return;
-                }
-                root._combineReloopBusy = false;
-                // Disabled-while-rebuilding must win over a queued rebuild:
-                // the pending branch used to run first, adopt the fresh ids
-                // into a rebuild that early-returns on !_combineActive, and
-                // strand the modules for the whole session.
-                if (!root._combineActive) {
-                    root._combineReloopPending = false;
-                    var unr = "";
-                    for (var ri = 0; ri < rlIds.length; ri++)
-                        unr += "pactl unload-module " + rlIds[ri] + " 2>/dev/null; ";
-                    if (unr !== "") executable.exec(": PW_UNCOMBINE; " + unr + "true");
-                    return;
-                }
-                if (root._combineReloopPending) {
-                    root._combineReloopPending = false;
-                    root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
-                    root._combineRebuildLoopbacks();
-                    return;
-                }
-                root._combineLoopbackIds = root._combineLoopbackIds.concat(rlIds);
-                root._combineLoopbackSinkByModule = rlPairs;
-                root._combineHandleMiss(stdout || "");
-                return;
-            }
-            if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0
-                || cmd.indexOf(": ALARM_INHIBIT;") === 0) {
+            if (cmd.indexOf(": ALARM_INHIBIT;") === 0) {
                 return; // fire-and-forget
-            }
-            // Disable's teardown ran to completion — only now is the persisted
-            // default-restore key spent. Guarded: an enable inside the ack's
-            // round-trip owns the key again and must keep it.
-            if (cmd.indexOf(": PW_UNCOMBINE_DONE;") === 0) {
-                if (!root._combineActive && !root._combineWantActive)
-                    Plasmoid.configuration.combinePrevDefault = "";
-                return;
-            }
-            // Microphone calibration finished — apply and remember the lag.
-            if (cmd.indexOf(": PW_CALIB") === 0) {
-                root._calibrating = false;
-                calibGuardTimer.stop();
-                root._calibRestoreVolume();
-                var okM = (stdout || "").match(/CALIB_OK (\d+)/);
-                var macM = cmd.match(/^: PW_CALIB ([0-9A-F:]{17}) /);
-                if (okM) {
-                    // Same ceiling as calibrate.py's own sanity window — a
-                    // 600 ms television is a real measurement, not an error,
-                    // and clamping it to 500 would report a made-up number.
-                    var calMs = Math.max(0, Math.min(900, parseInt(okM[1], 10)));
-                    Plasmoid.configuration.syncOffsetMs = calMs;
-                    if (macM) {
-                        try {
-                            var calMap = JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}");
-                            calMap[macM[1]] = calMs;
-                            Plasmoid.configuration.syncOffsetMap = JSON.stringify(calMap);
-                        } catch (e) {}
-                    }
-                    // Loudness matching, from the same run: each level line is
-                    // one speaker's click peak at the microphone, all taken at
-                    // the same sink volume. The QUIETEST speaker becomes the
-                    // reference (nothing is ever boosted — no headroom games)
-                    // and louder ones are trimmed down to it. Software volumes
-                    // are cubic in PulseAudio/PipeWire, so a linear amplitude
-                    // ratio lands as its cube root.
-                    // Each sink's REAL (restored) volume, echoed by the same
-                    // run before it parked everything at 55%.
-                    var volBySink = {};
-                    var cvRe = /CALIBVOL (\S+) (\d+)%/g, cvM;
-                    while ((cvM = cvRe.exec(stdout || "")) !== null)
-                        volBySink[cvM[1]] = Math.max(1, parseInt(cvM[2], 10));
-                    var lvls = [], lvlRe = /CALIB_LVL (\S+) (\d+)/g, lvlM;
-                    while ((lvlM = lvlRe.exec(stdout || "")) !== null) {
-                        var lvlAmp = parseInt(lvlM[2], 10);
-                        if (lvlAmp <= 0) continue;
-                        // The clicks compared the speakers at an equal 55% —
-                        // pure sensitivity. Playback runs at each sink's own
-                        // restored level, so that level is folded back in
-                        // (software volumes are cubic) or the trims would
-                        // equalize a room the user never actually hears.
-                        var calVol = volBySink[lvlM[1]] !== undefined ? volBySink[lvlM[1]] : 55;
-                        lvls.push({ sink: lvlM[1],
-                                    amp: lvlAmp * Math.pow(calVol / 55, 3) });
-                    }
-                    var leveled = false;
-                    var trimsReplaced = false;
-                    if (lvls.length >= 2) {
-                        var refAmp = lvls[0].amp;
-                        for (var li = 1; li < lvls.length; li++)
-                            if (lvls[li].amp < refAmp) refAmp = lvls[li].amp;
-                        for (var lj = 0; lj < lvls.length; lj++) {
-                            var trimKey = _trimKeyForSink(lvls[lj].sink);
-                            var newTrim = Math.pow(refAmp / lvls[lj].amp, 1 / 3);
-                            // The measurement wins — that is what the button
-                            // promises — but replacing a balance somebody set
-                            // by hand must never happen without a word.
-                            if (_deviceTrims[trimKey] !== undefined
-                                && Math.abs(trimOf(trimKey)
-                                            - Math.max(0.05, Math.min(1, newTrim))) > 0.05)
-                                trimsReplaced = true;
-                            setDeviceTrim(trimKey, newTrim);
-                        }
-                        leveled = true;
-                    }
-                    root._combineRebuildLoopbacks();
-                    dlNotification.title = i18n("Speakers calibrated");
-                    dlNotification.text = leveled
-                        ? i18n("The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered.", calMs)
-                        : i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
-                    if (trimsReplaced)
-                        dlNotification.text += " " + i18n("Balance levels set earlier were replaced by the measured ones.");
-                    dlNotification.iconName = "audio-input-microphone";
-                } else {
-                    dlNotification.title = i18n("Calibration did not succeed");
-                    dlNotification.text = i18n("Make sure the microphone is not covered and both speakers can be heard, then try again.");
-                    dlNotification.iconName = "dialog-warning";
-                }
-                dlNotification.sendEvent();
-                return;
             }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {
@@ -4790,7 +3653,7 @@ PlasmoidItem {
         // rebuild. Stealing the stream onto the speaker alone would leave
         // the combined sink feeding silence to every other output — with
         // the sync checkbox still reading on.
-        if (_combineWantActive || _combineActive) {
+        if (sync._combineWantActive || sync._combineActive) {
             _btPendingSinkMac = "";
             _btPendingSinkName = "";
             btRouteTimeout.stop();
@@ -4826,66 +3689,10 @@ PlasmoidItem {
         target: mediaDevices
         // Keeps the routing correct when a Bluetooth speaker (dis)connects.
         function onAudioOutputsChanged() {
-            root._combineDefaultStealWatch();
-            root._combineTryRoute();
-            // A hardware sink came or went while the combined output is live
-            // (Bluetooth reconnect, HDMI plug) — rebuild the loopbacks for
-            // the CURRENT set. Snapshot-compared, or the null sink's own
-            // appearance would trigger a rebuild and double every loopback.
-            if (root._combineActive
-                && root._combineGroupSignature() !== root._combineSinksSnapshot)
-                syncOffsetDebounce.restart();
+            syncEngine.onOutputsChanged();
             if (root._btTryRoutePending())
                 return; // setAudioOutputDevice re-applies the routing
             root._applyAudioOutputDevice()
-        }
-    }
-
-    // Switch-on-connect steal watch. The RELOOP reclaim only takes the
-    // default back from GROUP members — a device excluded from the sync
-    // never triggers a rebuild when it reconnects (the group signature is
-    // unchanged), so WirePlumber handing it the default would stand and the
-    // volume keys would silently move a speaker that plays nothing. The
-    // precise tell: a steal lands on a sink that APPEARED just now — a sink
-    // the user cannot have picked by hand in the same instant. Only such
-    // just-appeared sinks are ever taken back here; a default moved to any
-    // pre-existing device remains the user's word.
-    property var _outputIdsSnapshot: []
-    property var _defaultStealSuspects: []
-
-    function _combineDefaultStealWatch() {
-        var outs = mediaDevices.audioOutputs;
-        var ids = [];
-        for (var i = 0; i < outs.length; i++) ids.push(String(outs[i].id));
-        var prev = _outputIdsSnapshot;
-        _outputIdsSnapshot = ids;
-        if (!(_combineActive || _combineWantActive)) return;
-        var suspects = _defaultStealSuspects.slice();
-        for (var n = 0; n < ids.length; n++) {
-            if (prev.indexOf(ids[n]) !== -1) continue;
-            if (ids[n].indexOf(_combineSinkName) !== -1) continue; // our own sink
-            if (suspects.indexOf(ids[n]) === -1) suspects.push(ids[n]);
-        }
-        if (suspects.length === 0) return;
-        _defaultStealSuspects = suspects;
-        // Delayed: WirePlumber applies its policy at about the same moment
-        // the sink appears — checking instantly would race it and miss.
-        defaultStealCheck.restart();
-    }
-
-    Timer {
-        id: defaultStealCheck
-        interval: 1200
-        repeat: false
-        onTriggered: {
-            var suspects = root._defaultStealSuspects;
-            root._defaultStealSuspects = [];
-            if (!(root._combineActive || root._combineWantActive) || suspects.length === 0) return;
-            var cmd = ": PW_STEALBACK; d=$(pactl get-default-sink 2>/dev/null); ";
-            for (var i = 0; i < suspects.length; i++)
-                cmd += "[ \"$d\" = '" + suspects[i].replace(/'/g, "'\\''") + "' ] && "
-                     + "pactl set-default-sink " + root._combineSinkName + " 2>/dev/null; ";
-            executable.exec(cmd + "true # " + (++root._execSeq));
         }
     }
 

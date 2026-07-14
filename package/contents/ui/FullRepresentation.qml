@@ -2631,18 +2631,18 @@ PlasmaExtras.Representation {
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             text: i18n("All local outputs, in sync")
                             icon.name: "speaker"
-                            visible: root._combineAvailable
-                                     && (root._combineWantActive || mediaDevices.audioOutputs.length >= 2)
+                            visible: root.sync._combineAvailable
+                                     && (root.sync._combineWantActive || mediaDevices.audioOutputs.length >= 2)
                             // Bound to the INTENT flag (flips with the click),
                             // not the async pactl ack — and re-bound after
                             // every toggle, because the click itself severs a
                             // declarative binding. A failed load resets the
                             // intent and the box unchecks itself.
-                            checked: root._combineWantActive
+                            checked: root.sync._combineWantActive
                             onToggled: {
-                                if (checked) root.combineOutputsEnable()
-                                else root.combineOutputsDisable()
-                                checked = Qt.binding(function() { return root._combineWantActive })
+                                if (checked) root.sync.combineOutputsEnable()
+                                else root.sync.combineOutputsDisable()
+                                checked = Qt.binding(function() { return root.sync._combineWantActive })
                             }
 
                             PlasmaComponents3.ToolTip {
@@ -2657,7 +2657,7 @@ PlasmaExtras.Representation {
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             Layout.rightMargin: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
-                            visible: root._combineWantActive
+                            visible: root.sync._combineWantActive
 
                             PlasmaComponents3.Label {
                                 text: i18n("Sync fine-tune")
@@ -2673,7 +2673,7 @@ PlasmaExtras.Representation {
                                 to: 900
                                 stepSize: 10
                                 value: Plasmoid.configuration.syncOffsetMs || 0
-                                onMoved: root.setSyncOffset(value)
+                                onMoved: root.sync.setSyncOffset(value)
 
                                 PlasmaComponents3.ToolTip {
                                     text: i18n("If the Bluetooth speaker still trails the wired ones, raise this until they play together.")
@@ -2692,11 +2692,11 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.ItemDelegate {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
-                            visible: root._combineWantActive && !root._calibrating
-                            enabled: root.calibPairReady()
+                            visible: root.sync._combineWantActive && !root.sync._calibrating
+                            enabled: root.sync.calibPairReady()
                             text: i18n("Calibrate with the microphone")
                             icon.name: "audio-input-microphone"
-                            onClicked: root.calibrateSync()
+                            onClicked: root.sync.calibrateSync()
 
                             PlasmaComponents3.ToolTip {
                                 text: i18n("Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically.")
@@ -2708,7 +2708,7 @@ PlasmaExtras.Representation {
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             Layout.margins: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
-                            visible: root._calibrating
+                            visible: root.sync._calibrating
                             PlasmaComponents3.BusyIndicator {
                                 implicitWidth: Kirigami.Units.iconSizes.small
                                 implicitHeight: implicitWidth
@@ -2730,12 +2730,12 @@ PlasmaExtras.Representation {
                             // The FULL sink list, not the group: an excluded
                             // speaker must keep its row or there would be no
                             // way to bring it back in.
-                            model: root._combineWantActive ? root._combineAllSinks() : []
+                            model: root.sync._combineWantActive ? root.sync._combineAllSinks() : []
                             delegate: RowLayout {
                                 id: balanceRow
                                 required property string modelData
-                                readonly property string trimKey: root._trimKeyForSink(modelData)
-                                readonly property bool inGroup: { void root._exclRev; return root.syncDeviceIncluded(trimKey) }
+                                readonly property string trimKey: root.sync._trimKeyForSink(modelData)
+                                readonly property bool inGroup: { void root.sync._exclRev; return root.sync.syncDeviceIncluded(trimKey) }
                                 Layout.fillWidth: true
                                 Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                                 Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -2747,7 +2747,7 @@ PlasmaExtras.Representation {
                                 PlasmaComponents3.CheckBox {
                                     checked: balanceRow.inGroup
                                     onToggled: {
-                                        root.setSyncDeviceIncluded(balanceRow.trimKey, checked)
+                                        root.sync.setSyncDeviceIncluded(balanceRow.trimKey, checked)
                                         // The click broke the declarative
                                         // binding — put it back so an
                                         // enable-time exclusion reset (or a
@@ -2762,7 +2762,7 @@ PlasmaExtras.Representation {
                                 }
                                 PlasmaComponents3.Label {
                                     Layout.preferredWidth: Kirigami.Units.gridUnit * 6
-                                    text: root.outputDescription(balanceRow.modelData)
+                                    text: root.sync.outputDescription(balanceRow.modelData)
                                     font: Kirigami.Theme.smallFont
                                     opacity: balanceRow.inGroup ? 0.7 : 0.35
                                     elide: Text.ElideRight
@@ -2774,8 +2774,8 @@ PlasmaExtras.Representation {
                                     to: 100
                                     stepSize: 1
                                     enabled: balanceRow.inGroup
-                                    value: { void root._trimRev; return Math.round(root.trimOf(balanceRow.trimKey) * 100) }
-                                    onMoved: root.setDeviceTrim(balanceRow.trimKey, value / 100)
+                                    value: { void root.sync._trimRev; return Math.round(root.sync.trimOf(balanceRow.trimKey) * 100) }
+                                    onMoved: root.sync.setDeviceTrim(balanceRow.trimKey, value / 100)
 
                                     PlasmaComponents3.ToolTip {
                                         text: i18n("This speaker's share of the volume — the balance follows every master move and is remembered for the device.")
@@ -2792,7 +2792,7 @@ PlasmaExtras.Representation {
                                 // standing alone in another room.
                                 PlasmaComponents3.ToolButton {
                                     id: channelButton
-                                    readonly property string chMode: { void root._chanRev; return root.channelOf(balanceRow.trimKey) }
+                                    readonly property string chMode: { void root.sync._chanRev; return root.sync.channelOf(balanceRow.trimKey) }
                                     enabled: balanceRow.inGroup
                                     Layout.preferredWidth: Kirigami.Units.gridUnit * 2
                                     text: chMode === "L" ? i18nc("compact: speaker plays the left channel", "L")
@@ -2800,7 +2800,7 @@ PlasmaExtras.Representation {
                                         : chMode === "M" ? i18nc("compact: speaker plays a mono mix", "M")
                                         : i18nc("compact: speaker plays plain stereo", "ST")
                                     font.bold: chMode !== "S"
-                                    onClicked: root.cycleDeviceChannel(balanceRow.trimKey)
+                                    onClicked: root.sync.cycleDeviceChannel(balanceRow.trimKey)
 
                                     PlasmaComponents3.ToolTip {
                                         text: i18n("Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device.")
@@ -3010,8 +3010,8 @@ PlasmaExtras.Representation {
                                         from: 5
                                         to: 100
                                         stepSize: 1
-                                        value: { void root._trimRev; return Math.round(root.trimOf(castRow.uuid) * 100) }
-                                        onMoved: root.setDeviceTrim(castRow.uuid, value / 100)
+                                        value: { void root.sync._trimRev; return Math.round(root.sync.trimOf(castRow.uuid) * 100) }
+                                        onMoved: root.sync.setDeviceTrim(castRow.uuid, value / 100)
 
                                         PlasmaComponents3.ToolTip {
                                             text: i18n("This device's share of the volume — the balance follows every master move and is remembered for the device.")
