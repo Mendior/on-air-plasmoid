@@ -1150,7 +1150,7 @@ PlasmoidItem {
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(stationName)
                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1384,6 +1384,54 @@ PlasmoidItem {
         return _btMacOfSink(sink) || String(sink);
     }
 
+    // ── Stereo pairs (per-speaker channel in the combined output) ───────────
+    // A speaker in the group can play the full stereo (default), only the
+    // LEFT or only the RIGHT channel — two speakers set L and R become a
+    // true stereo pair — or a MONO mix of both for a speaker that stands
+    // alone in another room. Implemented as the loopback's own channel map;
+    // measured on PipeWire: channels=1 with an explicit position takes
+    // exactly that source channel (full level, zero bleed) and
+    // channel_map=mono is an equal L+R downmix. Duplicate-position maps
+    // (front-left,front-left) are NOT used — pactl half-drops them.
+    // Keyed like the balances: Bluetooth MAC, sink name for wired.
+    property var _deviceChannels: ({})
+    property int _chanRev: 0
+
+    function _loadDeviceChannels() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.deviceChannels || "{}");
+            _deviceChannels = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _deviceChannels = {};
+        }
+        _chanRev++;
+    }
+
+    // "S" stereo (the default — no entry), "L", "R", "M" mono mix.
+    function channelOf(id) {
+        var c = _deviceChannels[id];
+        return (c === "L" || c === "R" || c === "M") ? c : "S";
+    }
+
+    function setDeviceChannel(id, mode) {
+        var m = {};
+        for (var k in _deviceChannels) m[k] = _deviceChannels[k];
+        if (mode === "L" || mode === "R" || mode === "M") m[id] = mode;
+        else delete m[id];
+        _deviceChannels = m;
+        _chanRev++;
+        Plasmoid.configuration.deviceChannels = JSON.stringify(m);
+        // The map is baked into the loopback itself — swap them live.
+        if (_combineActive) syncOffsetDebounce.restart();
+    }
+
+    // One click walks the modes — a row of four buttons per speaker would
+    // bury the sync section.
+    function cycleDeviceChannel(id) {
+        var order = ["S", "L", "R", "M"];
+        setDeviceChannel(id, order[(order.indexOf(channelOf(id)) + 1) % 4]);
+    }
+
     function setDeviceTrim(id, factor) {
         var f = Math.max(0.05, Math.min(1, factor));
         var m = {};
@@ -1530,7 +1578,11 @@ PlasmoidItem {
     // Only real hardware ends. Virtual sinks (an equalizer's effect input,
     // other apps' null sinks) either double the audio through their own
     // output path — audible phasing no delay can ever fix — or lead nowhere.
-    function _combineRealSinks() {
+    // This is the FULL candidate list; the group itself (_combineRealSinks)
+    // additionally honors the user's per-speaker in/out choice. The UI lists
+    // from here so an excluded speaker keeps its row — otherwise there would
+    // be no way to bring it back.
+    function _combineAllSinks() {
         var outs = mediaDevices.audioOutputs;
         var res = [];
         for (var i = 0; i < outs.length; i++) {
@@ -1542,6 +1594,60 @@ PlasmoidItem {
                 res.push(oid);
         }
         return res;
+    }
+
+    function _combineRealSinks() {
+        var all = _combineAllSinks();
+        var res = [];
+        for (var i = 0; i < all.length; i++)
+            if (syncDeviceIncluded(_trimKeyForSink(all[i]))) res.push(all[i]);
+        return res;
+    }
+
+    // What the loopback set is BUILT from: the group's sinks and each one's
+    // channel mode. Anything that changes this signature obsoletes the live
+    // loopbacks — compared after device changes AND when an enable's ack
+    // lands, because the user can untick a speaker or flip a channel inside
+    // the load round-trip and the ack would otherwise adopt a stale build
+    // that nothing ever revisits.
+    function _combineGroupSignature() {
+        var sinks = _combineRealSinks();
+        var sig = [];
+        for (var i = 0; i < sinks.length; i++)
+            sig.push(sinks[i] + ":" + channelOf(_trimKeyForSink(sinks[i])));
+        return sig.join("|");
+    }
+
+    // ── Per-speaker in/out of the group ─────────────────────────────────────
+    // "Everything except the bedroom" is a real evening — a speaker can sit
+    // out of the group without disconnecting it. Stored as an EXCLUSION set:
+    // absent means in, so a brand-new speaker always joins by default.
+    property var _syncExcluded: ({})
+    property int _exclRev: 0
+
+    function _loadSyncExcluded() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.syncExcluded || "{}");
+            _syncExcluded = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _syncExcluded = {};
+        }
+        _exclRev++;
+    }
+
+    function syncDeviceIncluded(id) {
+        return _syncExcluded[id] !== true;
+    }
+
+    function setSyncDeviceIncluded(id, on) {
+        var m = {};
+        for (var k in _syncExcluded) m[k] = _syncExcluded[k];
+        if (on) delete m[id];
+        else m[id] = true;
+        _syncExcluded = m;
+        _exclRev++;
+        Plasmoid.configuration.syncExcluded = JSON.stringify(m);
+        if (_combineActive) syncOffsetDebounce.restart();
     }
 
     function _btMacOfSink(sinkId) {
@@ -1594,14 +1700,36 @@ PlasmoidItem {
             // now the combined sink itself: a silent feedback loop, and the
             // speaker plays nothing. Skip it, report LBMISS, and the retry
             // pass picks it up once the sink is really there.
+            // The speaker's channel mode lives in the loopback's own map:
+            // a single explicit position takes exactly that source channel,
+            // mono is the equal downmix, stereo the plain 2ch pass.
+            var chMode = channelOf(_trimKeyForSink(sinks[i]));
+            var chSpec = chMode === "L" ? "channels=1 channel_map=front-left"
+                       : chMode === "R" ? "channels=1 channel_map=front-right"
+                       : chMode === "M" ? "channels=1 channel_map=mono"
+                       : "channels=2";
             cmds += "if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
                  + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
-                 + " sink='" + s + "' latency_msec=" + d + " channels=2) && echo \"LB $id " + s + "\"";
+                 + " sink='" + s + "' latency_msec=" + d + " " + chSpec + ") && echo \"LB $id " + s + "\"";
             var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
             if (pct < 100) cmds += " && { " + _sinkInputVolCmd("$id", pct) + "}";
             cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
         }
         return cmds;
+    }
+
+    // Whether the calibration has both of its reference speakers IN the
+    // group — the button grays out instead of silently doing nothing when
+    // the only Bluetooth (or only wired) speaker was ticked out.
+    function calibPairReady() {
+        void _exclRev;
+        var sinks = _combineRealSinks();
+        var wired = false, bt = false;
+        for (var i = 0; i < sinks.length; i++) {
+            if (sinks[i].indexOf("bluez_") === 0) bt = true;
+            else wired = true;
+        }
+        return wired && bt;
     }
 
     // ── Microphone auto-calibration ──────────────────────────────────────────
@@ -1694,12 +1822,31 @@ PlasmoidItem {
 
     function combineOutputsEnable() {
         if (!_combineAvailable || _combineWantActive) return;
+        // Two pieces of hardware make a sync; how many of them PLAY is the
+        // user's per-speaker choice (one alone is a valid evening).
+        if (_combineAllSinks().length < 2) return;
         var sinks = _combineRealSinks();
-        if (sinks.length < 2) return;
+        if (sinks.length === 0) {
+            // The big switch says "play", but the remembered exclusions
+            // leave nothing to play on — the explicit action of right now
+            // wins over the leftovers of some earlier evening. Only the
+            // speakers standing here return: an absent device (a headset
+            // excluded for good) keeps its choice for when it comes back.
+            var m = {};
+            for (var xk in _syncExcluded) m[xk] = _syncExcluded[xk];
+            var all = _combineAllSinks();
+            for (var xi = 0; xi < all.length; xi++)
+                delete m[_trimKeyForSink(all[xi])];
+            _syncExcluded = m;
+            _exclRev++;
+            Plasmoid.configuration.syncExcluded = JSON.stringify(m);
+            sinks = _combineRealSinks();
+        }
+        if (sinks.length === 0) return;
         _combineWantActive = true;
         _combinePrevOutput = Plasmoid.configuration.audioOutputDevice || "";
         Plasmoid.configuration.combinePrevOutput = _combinePrevOutput;
-        _combineSinksSnapshot = sinks.join("|");
+        _combineSinksSnapshot = _combineGroupSignature();
         // Sync switched on while a speaker is still connecting: its sink is
         // not in the snapshot yet, so the join watchdog walks it in.
         if (_btConnectingMac !== "")
@@ -1789,7 +1936,7 @@ PlasmoidItem {
         if (_combineReloopBusy) { _combineReloopPending = true; return; }
         _combineReloopBusy = true;
         var sinks = _combineRealSinks();
-        _combineSinksSnapshot = sinks.join("|");
+        _combineSinksSnapshot = _combineGroupSignature();
         var un = "";
         for (var i = 0; i < _combineLoopbackIds.length; i++)
             un += "pactl unload-module " + _combineLoopbackIds[i] + " 2>/dev/null; ";
@@ -2134,6 +2281,12 @@ PlasmoidItem {
         // until bluez has given its verdict (the handler re-arms on success
         // and stops the watch on failure).
         if (_btConnectingMac !== "" || _btPairingMac !== "") return;
+        // The user sat this speaker out of the group mid-watch — there is
+        // nothing to walk in anymore, and a kick would drag it back.
+        if (!syncDeviceIncluded(_btJoinWatchMac.toUpperCase())) {
+            _btJoinWatchStop();
+            return;
+        }
         _btJoinWatchTicks++;
         var token = _btJoinWatchMac.toLowerCase().replace(/:/g, "_");
         var outs = mediaDevices.audioOutputs;
@@ -2385,7 +2538,7 @@ PlasmoidItem {
         var guard = null;
         xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                 + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -2537,7 +2690,7 @@ PlasmoidItem {
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
                     + encodeURIComponent(name) + "&limit=30");
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -2603,7 +2756,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/url/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -2625,7 +2778,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/vote/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.15");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.16");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
@@ -3333,6 +3486,8 @@ PlasmoidItem {
         _loadLiked();
         _loadRecSchedules();
         _loadDeviceTrims();
+        _loadDeviceChannels();
+        _loadSyncExcluded();
         syncFavicons();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
@@ -3430,6 +3585,12 @@ PlasmoidItem {
             // Written back by our own persist timer too — reloading is cheap
             // and keeps a second widget instance's balances in step.
             _loadDeviceTrims();
+        }
+        function onDeviceChannelsChanged() {
+            _loadDeviceChannels();
+        }
+        function onSyncExcludedChanged() {
+            _loadSyncExcluded();
         }
         target: Plasmoid.configuration
     }
@@ -3819,6 +3980,12 @@ PlasmoidItem {
                 root._combinePendingRoute = true;
                 root._combineTryRoute();
                 root._combineHandleMiss(pwOut);
+                // The rows are clickable from the moment the switch flips,
+                // which is BEFORE this ack lands — an untick or a channel
+                // flip made inside the load round-trip is not in the build
+                // that just arrived, and nothing else would ever revisit it.
+                if (root._combineGroupSignature() !== root._combineSinksSnapshot)
+                    syncOffsetDebounce.restart();
                 return;
             }
             // Loopbacks swapped under the live null sink (slider / sink set
@@ -4339,7 +4506,7 @@ PlasmoidItem {
             // the CURRENT set. Snapshot-compared, or the null sink's own
             // appearance would trigger a rebuild and double every loopback.
             if (root._combineActive
-                && root._combineRealSinks().join("|") !== root._combineSinksSnapshot)
+                && root._combineGroupSignature() !== root._combineSinksSnapshot)
                 syncOffsetDebounce.restart();
             if (root._btTryRoutePending())
                 return; // setAudioOutputDevice re-applies the routing

@@ -83,6 +83,14 @@
             <label>Per-device volume balance, 0.05-1.0 of the master level (JSON: device id to factor)</label>
             <default>{}</default>
         </entry>
+        <entry name="deviceChannels" type="String">
+            <label>Per-speaker channel in the combined output: L, R or M (mono mix); absent means stereo (JSON: device id to mode)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="syncExcluded" type="String">
+            <label>Speakers sitting out of the combined output; absent means included (JSON: device id to true)</label>
+            <default>{}</default>
+        </entry>
         <entry name="syncOffsetMs" type="Int">
             <label>Extra latency reported for Bluetooth sinks while the combined output is active (ms)</label>
             <default>0</default>

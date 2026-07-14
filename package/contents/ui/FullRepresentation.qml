@@ -126,7 +126,7 @@ PlasmaExtras.Representation {
         var guard = null
         xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
                  + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.15")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.16")
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return
             root._clearXhrTimeout(guard)
@@ -2461,6 +2461,7 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             visible: root._combineWantActive && !root._calibrating
+                            enabled: root.calibPairReady()
                             text: i18n("Calibrate with the microphone")
                             icon.name: "audio-input-microphone"
                             onClicked: root.calibrateSync()
@@ -2494,21 +2495,44 @@ PlasmaExtras.Representation {
                         // own loopback only — other applications' audio and
                         // the speaker's own buttons are left alone.
                         Repeater {
-                            model: root._combineWantActive ? root._combineRealSinks() : []
+                            // The FULL sink list, not the group: an excluded
+                            // speaker must keep its row or there would be no
+                            // way to bring it back in.
+                            model: root._combineWantActive ? root._combineAllSinks() : []
                             delegate: RowLayout {
                                 id: balanceRow
                                 required property string modelData
                                 readonly property string trimKey: root._trimKeyForSink(modelData)
+                                readonly property bool inGroup: { void root._exclRev; return root.syncDeviceIncluded(trimKey) }
                                 Layout.fillWidth: true
                                 Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                                 Layout.rightMargin: Kirigami.Units.smallSpacing
                                 spacing: Kirigami.Units.smallSpacing
 
+                                // A speaker can sit an evening out without
+                                // being disconnected — "everything except
+                                // the bedroom" is one click.
+                                PlasmaComponents3.CheckBox {
+                                    checked: balanceRow.inGroup
+                                    onToggled: {
+                                        root.setSyncDeviceIncluded(balanceRow.trimKey, checked)
+                                        // The click broke the declarative
+                                        // binding — put it back so an
+                                        // enable-time exclusion reset (or a
+                                        // second widget instance) still
+                                        // reaches this box.
+                                        checked = Qt.binding(function() { return balanceRow.inGroup })
+                                    }
+
+                                    PlasmaComponents3.ToolTip {
+                                        text: i18n("Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device.")
+                                    }
+                                }
                                 PlasmaComponents3.Label {
                                     Layout.preferredWidth: Kirigami.Units.gridUnit * 6
                                     text: root.outputDescription(balanceRow.modelData)
                                     font: Kirigami.Theme.smallFont
-                                    opacity: 0.7
+                                    opacity: balanceRow.inGroup ? 0.7 : 0.35
                                     elide: Text.ElideRight
                                 }
                                 PlasmaComponents3.Slider {
@@ -2517,6 +2541,7 @@ PlasmaExtras.Representation {
                                     from: 5
                                     to: 100
                                     stepSize: 1
+                                    enabled: balanceRow.inGroup
                                     value: { void root._trimRev; return Math.round(root.trimOf(balanceRow.trimKey) * 100) }
                                     onMoved: root.setDeviceTrim(balanceRow.trimKey, value / 100)
 
@@ -2528,6 +2553,26 @@ PlasmaExtras.Representation {
                                     text: Math.round(balanceSlider.value) + "%"
                                     font: Kirigami.Theme.smallFont
                                     opacity: 0.7
+                                }
+                                // Stereo pair, one click at a time: ST → L →
+                                // R → M. Two speakers set to L and R make a
+                                // true pair; M is the mono mix for a speaker
+                                // standing alone in another room.
+                                PlasmaComponents3.ToolButton {
+                                    id: channelButton
+                                    readonly property string chMode: { void root._chanRev; return root.channelOf(balanceRow.trimKey) }
+                                    enabled: balanceRow.inGroup
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                                    text: chMode === "L" ? i18nc("compact: speaker plays the left channel", "L")
+                                        : chMode === "R" ? i18nc("compact: speaker plays the right channel", "R")
+                                        : chMode === "M" ? i18nc("compact: speaker plays a mono mix", "M")
+                                        : i18nc("compact: speaker plays plain stereo", "ST")
+                                    font.bold: chMode !== "S"
+                                    onClicked: root.cycleDeviceChannel(balanceRow.trimKey)
+
+                                    PlasmaComponents3.ToolTip {
+                                        text: i18n("Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device.")
+                                    }
                                 }
                             }
                         }

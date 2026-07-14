@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.16
+
+Stereo pairs, and the group finally takes requests.
+
+- **Stereo pairs.** Every speaker in the sync group got a channel button next to its balance: stereo (the default), left only, right only, or a mono mix of both. Two speakers set to L and R become a true stereo pair with the room between them; the mono mix suits a lone speaker in the kitchen that would otherwise miss half the song. Implemented as the loopback's own channel map and measured before shipping (on PipeWire — plain PulseAudio takes the same pactl commands, but the pair modes were not bench-tested there): a single explicit position takes exactly that source channel — full level, zero bleed — while duplicate-position maps turned out half-broken in pactl and were left alone. Remembered per device, like everything else here.
+- **A speaker can sit an evening out.** Each speaker row now carries a tick — untick the bedroom and the group plays on without it, no disconnecting, no re-pairing. The choice is remembered; a speaker excluded into absurdity is self-correcting: if the remembered exclusions would leave the group empty, flipping the sync on clears them, because the explicit action of right now outranks the leftovers of some earlier evening. The join watchdog respects the choice too — it will not drag an excluded speaker back in.
+
 ## 2026.15
 
 The sync looks after itself now: speakers walk themselves into the group, and the calibration levels the room's loudness while it is at it.
