@@ -2,9 +2,9 @@
 #   core — fast, Qt-free: Python compile + unit tests, translations,
 #          metadata.json, shell syntax, regression grep rules.
 #   qml  — the real thing on an Arch container (same package set as a
-#          rolling Plasma 6 desktop): Qt6 qmllint plus the offscreen
-#          plasmoidviewer smoke test that catches engine-level load errors
-#          qmllint cannot see.
+#          rolling Plasma 6 desktop): Qt6 qmllint, the qmltestrunner logic
+#          tests (tests/qml), and the offscreen plasmoidviewer smoke test
+#          that catches engine-level load errors qmllint cannot see.
 name: checks
 
 on:

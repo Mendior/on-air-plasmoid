@@ -8,6 +8,8 @@ INSTALL_DIR="$HOME/.local/share/plasma/plasmoids/org.kde.plasma.advancedradio"
 # NB: /usr/bin/qmllint may be the Qt5 version, which reports NOTHING — the Qt6
 # binary is required for real checks.
 QMLLINT="${QMLLINT:-/usr/lib/qt6/bin/qmllint}"
+# Qt6 qmltestrunner (qt6-declarative) — runs the QML logic tests in tests/qml.
+QMLTESTRUNNER="${QMLTESTRUNNER:-/usr/lib/qt6/bin/qmltestrunner}"
 # locale/ is excluded from both sync directions: a local install (old plugin
 # id) keeps its old-domain translations; the published package is English-only
 # and ships no locale.
@@ -99,6 +101,18 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
         (cd "$REPO_DIR" && uv run --with pytest python -m pytest tests/ -q) || { echo "lint FAILED: unit tests"; exit 1; }
       else
         echo "NB: pytest unavailable (no system pytest, no uv) — unit tests skipped here, CI runs them"
+      fi
+    fi
+    # QML logic tests (alarm/recording scheduling math). qmltestrunner ships
+    # with qt6-declarative; where it is absent this only notes the skip — the
+    # CI qml job always runs it. QMLTESTRUNNER=none skips explicitly.
+    if [ -d "$REPO_DIR/tests/qml" ] && [ "$QMLTESTRUNNER" != "none" ]; then
+      if [ -x "$QMLTESTRUNNER" ]; then
+        (cd "$REPO_DIR" && QT_QPA_PLATFORM=offscreen "$QMLTESTRUNNER" -silent -input tests/qml) \
+          || { echo "lint FAILED: qml tests"; exit 1; }
+        echo "qml tests OK"
+      else
+        echo "NB: qmltestrunner unavailable ($QMLTESTRUNNER) — QML tests skipped here, CI runs them"
       fi
     fi
     if [ "$fail" -eq 0 ]; then echo "lint OK"; else echo "lint FAILED"; fi
