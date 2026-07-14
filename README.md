@@ -14,6 +14,7 @@
 - 📚 **My Music** — built-in offline library page for your downloaded tracks and recordings
 - 🕐 **Recently played history** — the last 30 tracks with timestamps; download a song you missed half an hour ago
 - ⏰ **Sleep timer** with progress ring and gentle 30-second fade-out
+- ⏰ **Wake-up alarms** — wake to a station of your choice, once, daily or weekly, at your volume; a built-in chime takes over if the station can't start, and the widget can keep the computer awake until it's time
 - 🎹 **MPRIS integration** — media keys and the Plasma media controls just work
 - 📺 **Cast to TVs, soundbars & network speakers** — Chromecast/Nest and any DLNA renderer (Samsung/LG/Sony TVs, Bose/Sonos soundbars, WiFi speakers). The stream goes straight to the device, which does the decoding, so your PC stays quiet and cool (a real help on older machines). Volume and station switching stay in the widget. DLNA needs no extra packages at all. Google Home speaker groups appear as one device and play in perfect sync
 - 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up
