@@ -32,7 +32,12 @@ KCM.ScrollViewKCM {
     property var _activeLogoXhr: null
 
     function fileUtils(fileUrl, text, mode) {
-        var file = fileUrl.toString().replace("file:///", "/").replace(/'/g, "'\\''");
+        // toString() percent-encodes the path ("minu jaamad.arp" becomes
+        // minu%20jaamad.arp) and the shell then reads a file that does not
+        // exist — decode first. Malformed sequences stay literal.
+        var raw = fileUrl.toString();
+        try { raw = decodeURIComponent(raw); } catch (e) {}
+        var file = raw.replace("file:///", "/").replace(/'/g, "'\\''");
         if (mode === 1) {
             var escapedText = text.replace(/'/g, "'\\''");
             // printf %s, NOT echo: a dash/busybox /bin/sh echo interprets the
@@ -42,6 +47,11 @@ KCM.ScrollViewKCM {
         } else {
             executable.exec("cat '" + file + "'");
         }
+    }
+
+    function _webUrlOrEmpty(v) {
+        const s = v && v !== "null" ? String(v).trim() : "";
+        return /^https?:\/\//i.test(s) ? s : "";
     }
 
     function showMessage(positive, text) {
@@ -184,8 +194,14 @@ KCM.ScrollViewKCM {
                         let firstHome = "";
                         for (const r of results) {
                             const rn = (r.name || "").replace(/\s+/g, " ").trim().toLowerCase();
-                            const fav = r.favicon && r.favicon !== "null" ? r.favicon : "";
-                            const home = r.homepage && r.homepage !== "null" ? r.homepage : "";
+                            // Catalogue data is untrusted: only plain web
+                            // URLs may become favicon sources or homepage
+                            // scrape targets (same rule the popup search
+                            // applies to stream URLs) — a file:// or data:
+                            // entry from the publicly writable directory
+                            // must never reach an Image or an XHR.
+                            const fav = _webUrlOrEmpty(r.favicon);
+                            const home = _webUrlOrEmpty(r.homepage);
                             if (firstHome === "" && home !== "")
                                 firstHome = home;
                             if (firstWithIcon === "" && fav !== "")
@@ -846,8 +862,12 @@ KCM.ScrollViewKCM {
         fileMode: Labs.FileDialog.SaveFile
         onVisibleChanged: {
             if (visible) {
-                const home = Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation);
-                currentFile = "file:///" + home + "/stations.arp";
+                // writableLocation returns a URL (file:///home/…), not a
+                // bare path — prefixing another file:/// used to produce
+                // file:///file:///home/… and a dialog with a broken default.
+                const home = Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation).toString();
+                currentFile = (home.indexOf("file://") === 0 ? home : "file://" + home)
+                              + "/stations.arp";
             }
         }
         onAccepted: fileUtils(currentFile, cfg_servers, 1)
