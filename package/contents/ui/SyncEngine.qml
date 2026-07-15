@@ -188,6 +188,10 @@ Item {
             _combinePendingRoute = true;
             _combineTryRoute();
             _combineHandleMiss(pwOut);
+            // Balances moved during the load round-trip were stored but not
+            // audible — the build baked the values from enable time. Bring
+            // the room to the STORED state now that the modules are known.
+            _trimReconcile(lbPairs);
             // The rows are clickable from the moment the switch flips,
             // which is BEFORE this ack lands — an untick or a channel
             // flip made inside the load round-trip is not in the build
@@ -241,6 +245,10 @@ Item {
             _combineLoopbackIds = _combineLoopbackIds.concat(rlIds);
             _combineLoopbackSinkByModule = rlPairs;
             _combineHandleMiss(stdout || "");
+            // Same reconciliation as the enable ack: a slider moved during
+            // the rebuild flight resolved against module ids that were
+            // being unloaded — the fresh modules now get the stored value.
+            _trimReconcile(rlPairs);
             return true;
         }
         // Disable's teardown ran to completion — only now is the persisted
@@ -563,6 +571,24 @@ Item {
 
     // Which loopback module serves the sink behind a balance key ("" = none).
     property var _combineLoopbackSinkByModule: ({})
+
+    // Bring every freshly-adopted loopback to the STORED balance. The build
+    // bakes balances as of the moment its shell leaves; a slider moved
+    // during the round-trip is persisted but lands on module ids that are
+    // dying — this runs on the ack, when the live ids are finally known.
+    // Only trimmed speakers are queued (full level is the loopback's own
+    // default), so the quiet path stays quiet.
+    function _trimReconcile(pairs) {
+        var queued = false;
+        for (var mod in pairs) {
+            var pct = Math.round(trimOf(_trimKeyForSink(pairs[mod])) * 100);
+            if (pct < 100) {
+                _trimPendingLocal[mod] = pct;
+                queued = true;
+            }
+        }
+        if (queued) trimApplyTimer.restart();
+    }
 
     function _combineModuleForKey(key) {
         for (var mod in _combineLoopbackSinkByModule)
@@ -1036,6 +1062,11 @@ Item {
         for (var i = 0; i < _combineLoopbackIds.length; i++)
             un += "pactl unload-module " + _combineLoopbackIds[i] + " 2>/dev/null; ";
         _combineLoopbackIds = [];
+        // The module→sink map dies with the modules: a slider moved during
+        // the flight used to resolve against these very ids and volume a
+        // corpse. Empty map = no live apply; the value is persisted and the
+        // ack's reconcile pass brings the fresh modules to it.
+        _combineLoopbackSinkByModule = {};
         // Re-assert the default while we're here: WirePlumber's
         // switch-on-connect policy hands the default to a freshly-connected
         // sink (the very Bluetooth speaker that just joined the group), and
@@ -1242,8 +1273,19 @@ Item {
     // lands, so the reconnected speaker gets the full window again.
     property bool _btKickInFlight: false
 
+    // A second speaker connecting while one is already being walked in
+    // waits its turn here — the single slot used to be overwritten, which
+    // silently orphaned the FIRST speaker's watch. {mac, name} entries.
+    property var _btJoinWatchQueue: []
+
     function _btJoinWatchArm(mac, name) {
         if (!(_combineWantActive || _combineActive) || !app._btValidMac(mac)) return;
+        if (_btJoinWatchMac !== "" && _btJoinWatchMac !== mac) {
+            for (var q = 0; q < _btJoinWatchQueue.length; q++)
+                if (_btJoinWatchQueue[q].mac === mac) return;
+            _btJoinWatchQueue = _btJoinWatchQueue.concat([{ mac: mac, name: name || "" }]);
+            return;
+        }
         _btJoinWatchMac = mac;
         _btJoinWatchName = name || "";
         _btJoinWatchTicks = 0;
@@ -1255,6 +1297,21 @@ Item {
         btJoinWatch.stop();
         _btJoinWatchMac = "";
         _btJoinWatchName = "";
+        // A kick whose ack never lands must not paralyze every FUTURE
+        // watch's tick hold — the stopped watch takes its flag with it.
+        // (A kick that DOES land later clears it again, harmlessly.)
+        _btKickInFlight = false;
+        if (!(_combineWantActive || _combineActive)) {
+            // Sync went off — nobody left to walk in.
+            _btJoinWatchQueue = [];
+            return;
+        }
+        // The freed slot goes to the next speaker waiting its turn.
+        if (_btJoinWatchQueue.length > 0) {
+            var nxt = _btJoinWatchQueue[0];
+            _btJoinWatchQueue = _btJoinWatchQueue.slice(1);
+            _btJoinWatchArm(nxt.mac, nxt.name);
+        }
     }
 
     Timer {

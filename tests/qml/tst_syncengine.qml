@@ -391,6 +391,64 @@ Item {
             verify(!r.e._verifyPending);
         }
 
+        function test_trim_moved_during_rebuild_lands_on_the_fresh_modules() {
+            // The rebuild kills the module→sink map with the modules; a
+            // slider moved mid-flight used to volume a corpse. The ack's
+            // reconcile pass must bring the FRESH module to the stored value.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._combineRebuildLoopbacks();
+            compare(r.e._combineModuleForKey(wired), "");   // map died with the flight
+            r.e.setDeviceTrim(wired, 0.5);                  // dragged mid-rebuild
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + ";",
+                           "LB 201 " + wired + "\nLB 202 " + btSink + "\n", "");
+            wait(400);                                      // the 250 ms apply debounce
+            var last = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(last.indexOf(": PW_TRIM;") === 0);
+            verify(last.indexOf("m=201") !== -1);           // the fresh module id
+            verify(last.indexOf("50%") !== -1);             // the stored balance
+        }
+
+        function test_trim_moved_during_enable_lands_on_the_adopted_modules() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            r.e.setDeviceTrim(wired, 0.6);                  // dragged mid-load
+            r.e.handleExec(": PW_COMBINE " + r.e._combineLoadSeq + ";",
+                           "PREVDEF usb_dac\nNULL 77\nLB 101 " + wired
+                           + "\nLB 102 " + btSink + "\n", "");
+            wait(400);
+            var last = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(last.indexOf(": PW_TRIM;") === 0);
+            verify(last.indexOf("m=101") !== -1);
+            verify(last.indexOf("60%") !== -1);
+        }
+
+        function test_watchdog_queues_a_second_speaker() {
+            // Two speakers connecting back to back: the single slot used to
+            // be overwritten and the first speaker's watch silently died.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._btJoinWatchArm(btMac, "JBL");
+            r.e._btJoinWatchArm("11:22:33:44:55:66", "Sony");
+            compare(r.e._btJoinWatchMac, btMac);            // first keeps the slot
+            compare(r.e._btJoinWatchQueue.length, 1);
+            r.e._btJoinWatchStop();                         // first resolved
+            compare(r.e._btJoinWatchMac, "11:22:33:44:55:66");
+            compare(r.e._btJoinWatchQueue.length, 0);
+        }
+
+        function test_watchdog_stop_clears_a_stranded_kick_flag() {
+            // A kick whose ack never lands used to leave _btKickInFlight
+            // stuck true — every later watch's tick hold froze forever.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._btJoinWatchArm(btMac, "JBL");
+            r.e._btKickInFlight = true;
+            r.e._btJoinWatchStop();
+            verify(!r.e._btKickInFlight);
+        }
+
         // ── balance adoption (cast devices joining the group) ────────────
 
         function test_adopt_trim_keeps_a_remembered_choice() {
