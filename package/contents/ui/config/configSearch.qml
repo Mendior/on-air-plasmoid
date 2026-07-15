@@ -42,8 +42,17 @@ KCM.ScrollViewKCM {
         id: stationsModel
     }
 
+    property int _serverIdx: -1
+
+    // The first pick lands on a random mirror (the directory asks clients
+    // to spread load); every retry then WALKS the list instead of drawing
+    // again — the same dead mirror could be drawn twice in a row and eat
+    // two of the three retries.
     function getServer() {
-        server = items[Math.floor(Math.random() * items.length)]
+        _serverIdx = _serverIdx < 0
+            ? Math.floor(Math.random() * items.length)
+            : (_serverIdx + 1) % items.length
+        server = items[_serverIdx]
     }
 
     // QML XHR's xhr.timeout/ontimeout are silently ignored by Qt — every
@@ -227,7 +236,11 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest
         var guard = null
         const baseUrl = currentUrl.split("?")[0]
-        const url = `${baseUrl}?hidebroken=true&limit=${limit}&offset=${offset}`
+        // The cursor advances only on a successfully parsed page — the old
+        // scroll-time increment skipped a failed page forever: one timeout
+        // and rows 500-999 simply never existed for that session.
+        const nextOffset = offset + limit
+        const url = `${baseUrl}?hidebroken=true&limit=${limit}&offset=${nextOffset}`
         xhr.open("GET", url)
         setHeaders(xhr)
         _activeLoadMoreXhr = xhr
@@ -241,8 +254,10 @@ KCM.ScrollViewKCM {
             if (xhr.status === 200) {
                 try {
                     const servers = JSON.parse(xhr.responseText)
-                    // Update currentUrl only after a successful parse.
+                    // Update currentUrl and the cursor only after a
+                    // successful parse.
                     currentUrl = url
+                    offset = nextOffset
                     if (servers.length > 0) {
                         for (const srv of servers) {
                             srv.name = srv.name.replace(/\n/g, ' ').trim()
@@ -555,7 +570,6 @@ KCM.ScrollViewKCM {
         }
         onContentYChanged: {
             if (contentY > contentHeight - height * 2 && root.stat == 1) {
-                root.offset = root.offset + 500
                 loadMore()
             }
         }
@@ -638,6 +652,10 @@ KCM.ScrollViewKCM {
                 icon.name: "edit-clear-all"
                 enabled: search.text !== ""
                 onClicked: {
+                    // The row being auditioned is about to vanish from the
+                    // list — a preview nobody can see (or stop) must not
+                    // keep playing.
+                    testPlay.stop()
                     // Reload the default list DIRECTLY — routing through
                     // search.accepted() is a no-op when no search had been run
                     // (isNoSearch still true) and left the page blank forever.
