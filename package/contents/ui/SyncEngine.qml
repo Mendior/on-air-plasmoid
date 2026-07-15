@@ -373,6 +373,17 @@ Item {
             _calibRestoreVolume();
             var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
             cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
+            // A speaker the presence phase could not hear: the room is NOT
+            // confirmed, and saying so honestly beats a soothing verdict
+            // computed from the survivors — the calibration itself stands.
+            var pM = (stdout || "").match(/VERIFY_PARTIAL (\S+)/);
+            if (pM) {
+                app.notify(i18n("Sync check"),
+                           i18n("Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept.",
+                                outputDescription(pM[1])),
+                           "dialog-warning");
+                return true;
+            }
             if (vM) {
                 var vSpread = parseInt(vM[1], 10);
                 if (vSpread <= 30)
@@ -1148,9 +1159,17 @@ Item {
         onTriggered: {
             if (!_verifyPending) return;
             var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
-            var n = Math.max(2, _combineRealSinks().length);
-            app.exec(": PW_VERIFY; timeout 25 python3 '" + script + "' verify '"
-                     + _combineSinkName + "' '' " + n + "; true # " + app.nextSeq());
+            // The group members ride along for the presence phase: the
+            // verify must be able to say WHICH speaker it could not hear,
+            // and the combined pass alone cannot (in-sync arrivals fuse).
+            var sinks = _combineRealSinks();
+            var argv = "";
+            for (var vi = 0; vi < sinks.length && vi < 8; vi++)
+                argv += " '" + sinks[vi].replace(/'/g, "'\\''") + "'";
+            // One presence click per speaker plus the three spread clicks.
+            var vBudget = 15 + Math.min(8, sinks.length) * 8;
+            app.exec(": PW_VERIFY; timeout " + vBudget + " python3 '" + script + "' verify '"
+                     + _combineSinkName + "' ''" + argv + "; true # " + app.nextSeq());
         }
     }
 

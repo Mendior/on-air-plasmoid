@@ -169,6 +169,21 @@ def test_find_arrivals_separates_and_fuses(calib, tmp_path):
     assert len(calib["find_arrivals"](samples, tpl, 4)) == 1
 
 
+def test_find_arrivals_fixed_window_resists_anchor_creep(calib, tmp_path):
+    # A rising chain of arrivals used to drag the running merge anchor
+    # along and fuse everything into one peak. With the fixed ±8 ms
+    # neighbourhood, arrivals 12 ms apart with a dip between them stay
+    # two arrivals and the spread is honest.
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, 0.9, 16000)
+    inject_click(samples, rate, 0.912, 20000)   # louder one LATER: the creep case
+    arr = calib["find_arrivals"](samples, tpl, 4)
+    assert len(arr) == 2
+    assert abs((arr[1] - arr[0]) - 0.012) < 0.002
+
+
 def test_peak_of_amplitudes_keep_their_ratio(calib, tmp_path):
     # The loudness matching stands on this: a speaker heard at half the
     # amplitude must MEASURE at half the amplitude.

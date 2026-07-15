@@ -377,6 +377,23 @@ Item {
             verify(!r.e._verifyPending);
         }
 
+        function test_verify_partial_names_the_unheard_speaker() {
+            // A dead or muted speaker must fail the verify LOUDLY — a small
+            // spread computed from the survivors is the same optimistic-
+            // signal disease the wake tone was cured of.
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._calibVolumeBefore = 0.5;
+            r.mock.playerOutput.volume = 0;
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + btSink + "\n", "");
+            compare(r.cfg.syncVerifiedMs, -1);            // NOT confirmed
+            compare(r.mock.playerOutput.volume, 0.5);     // volume still returns
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            compare(note.icon, "dialog-warning");
+            verify(note.text.indexOf("Could not hear") !== -1);
+            verify(!r.e._verifyPending);
+        }
+
         function test_verify_failure_unmutes_without_extra_noise() {
             // The calibration verdict was already reported; a verify that
             // heard nothing must hand the volume back and stay quiet.

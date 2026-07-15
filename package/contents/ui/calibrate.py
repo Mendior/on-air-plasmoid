@@ -85,10 +85,10 @@ def read_mono(path):
     return samples, rate
 
 
-def _xcorr_refine(window, coarse_i, tpl):
+def _xcorr_refine(window, coarse_i, tpl, half_s=0.015):
     """Sub-sample click arrival via a matched filter around the coarse peak.
 
-    Correlates the recording with the KNOWN burst shape in a ±15 ms
+    Correlates the recording with the KNOWN burst shape in a ±half_s
     neighbourhood of the amplitude peak and takes the correlation maximum,
     plus a parabolic fit between neighbouring lags for the sub-sample
     fraction. The magnitude is used so a polarity-inverting mic/speaker
@@ -98,7 +98,7 @@ def _xcorr_refine(window, coarse_i, tpl):
     Returns a float sample index in `window`'s frame, aligned to the burst
     peak so the number means what the old detector's did.
     """
-    half = int(0.015 * RATE)
+    half = int(half_s * RATE)
     tn = len(tpl)
     lo = max(0, coarse_i - tn - half)
     hi = min(len(window) - tn, coarse_i + half)
@@ -246,11 +246,15 @@ def median(values):
 def find_arrivals(window, tpl, max_peaks):
     """Distinct click arrivals in one recording, seconds within `window`.
 
-    A 1 ms envelope pass finds candidate bursts (≥25 % of the loudest,
-    ≥8 ms apart — arrivals closer than that fuse into one correlation
-    peak, which for a sync check reads as 'together', the good news);
-    the matched filter then refines each candidate. Used by the verify
-    pass, where every speaker's click lands in the SAME recording.
+    A 1 ms envelope pass finds candidate bursts (≥25 % of the loudest);
+    a candidate must be the maximum of its FIXED ±8 ms neighbourhood —
+    the old running-reference merge let a rising chain of small steps
+    drag the anchor along and fuse spread-out arrivals into one, under-
+    reporting the spread. The matched filter then refines each candidate
+    and near-duplicates within 8 ms collapse. Arrivals closer than ~8 ms
+    still fuse (bounded by the 10 ms burst), which for a sync check reads
+    as 'together' — that is exactly why counting peaks can never prove
+    every speaker played, and the verify pass checks presence separately.
     """
     block = int(RATE * 0.001)
     if len(window) < block * 2:
@@ -268,50 +272,71 @@ def find_arrivals(window, tpl, max_peaks):
         return []
     thresh = max(1200, top * 0.25)
     cands = []
+    n = len(env)
     for i, v in enumerate(env):
         if v < thresh:
             continue
-        if cands and i - cands[-1][0] < 8:
-            if v > cands[-1][1]:
-                cands[-1] = (i, v)
+        lo = max(0, i - 8)
+        hi = min(n, i + 9)
+        if v < max(env[lo:hi]):
             continue
-        cands.append((i, v))
-    cands = sorted(cands, key=lambda c: -c[1])[:max_peaks]
+        cands.append(i)
+    cands = sorted(sorted(cands, key=lambda i: -env[i])[:max_peaks])
     out = []
-    for i, _v in sorted(cands):
+    for i in cands:
         coarse = i * block
-        lo = max(0, coarse - block)
-        hi = min(len(window), coarse + 2 * block)
-        ci = max(range(lo, hi), key=lambda k: abs(window[k]))
-        out.append(_xcorr_refine(window, ci, tpl) / RATE)
-    return sorted(out)
+        lo2 = max(0, coarse - block)
+        hi2 = min(len(window), coarse + 2 * block)
+        ci = max(range(lo2, hi2), key=lambda k: abs(window[k]))
+        # Tight refine window: the candidate is already sample-accurate,
+        # and the default ±15 ms would reach a LOUDER neighbouring burst —
+        # both candidates then refine onto the same arrival and the spread
+        # collapses to zero.
+        out.append(_xcorr_refine(window, ci, tpl, 0.003) / RATE)
+    out.sort()
+    dedup = []
+    for t in out:
+        if dedup and (t - dedup[-1]) < 0.008:
+            continue
+        dedup.append(t)
+    return dedup
 
 
 def cmd_verify(argv):
-    """calibrate.py verify <sink> <mic> <speaker_count> — the check-measure.
+    """calibrate.py verify <combined_sink> <mic> <sink…> — the check-measure.
 
-    Clicks through the LIVE combined sink, so every speaker's arrival rides
-    its real deployed delay; the spread between the earliest and the latest
-    arrival at the microphone is the sync's actual residual error. Speakers
-    within ~8 ms fuse into one peak and read as spread 0 — resolution is
-    bounded by the 10 ms burst, which is exactly the region the ear stops
-    caring about too.
+    Phase one, PRESENCE: one click directly through every real sink. A
+    dead, muted or disconnected speaker must fail the verify loudly, not
+    hide inside a small spread of the survivors — and the combined pass
+    cannot count it out, because in-sync arrivals fuse into one peak
+    (three perfect speakers and one lone survivor both read as a single
+    peak). Presence is the only honest way to know everyone played.
 
-    Prints VERIFY_OK <spread_ms> or VERIFY_FAIL <reason>; always returns.
+    Phase two, SPREAD: clicks through the LIVE combined sink ride every
+    deployed delay; the spread between the earliest and the latest arrival
+    at the microphone is the sync's actual residual error. Speakers within
+    ~8 ms fuse and read as spread 0 — resolution is bounded by the 10 ms
+    burst, which is exactly the region the ear stops caring about too.
+
+    Prints VERIFY_OK <spread_ms>, VERIFY_PARTIAL <sink> (first speaker
+    that was not heard — the room is NOT confirmed), or
+    VERIFY_FAIL <reason>; always returns.
     """
     try:
         if len(argv) < 3:
             print("VERIFY_FAIL usage")
             return
         sink, mic = argv[0], argv[1]
-        try:
-            count = max(1, min(8, int(argv[2])))
-        except ValueError:
-            count = 2
+        sinks = argv[2:2 + 8]
+        count = max(1, min(8, len(sinks)))
         click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
         try:
             make_click(click)
             tpl = click_template()
+            for member in sinks:
+                if measure_once(member, click, mic, tpl) is None:
+                    print("VERIFY_PARTIAL %s" % member)
+                    return
             spreads = []
             for _ in range(3):
                 rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name

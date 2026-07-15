@@ -134,10 +134,13 @@ def test_extras_get_their_own_lag_line(fast_calibrate):
 
 
 def test_verify_reports_the_room_spread(fast_calibrate):
-    # One stub click in the recording = every speaker arrived together —
-    # the verify pass must call that a spread of (near) zero.
-    proc = run_calibrate(fast_calibrate, ["verify", "combined_sink", "", "2"])
+    # Presence clicks hear every member (the stub always records a click),
+    # then one fused arrival in the combined pass = everyone together —
+    # the verify must call that a spread of (near) zero.
+    proc = run_calibrate(fast_calibrate,
+                         ["verify", "combined_sink", "", "wired_sink", "bt_sink"])
     assert proc.returncode == 0
+    assert "VERIFY_PARTIAL" not in proc.stdout
     ok = [ln for ln in proc.stdout.splitlines() if ln.startswith("VERIFY_OK ")]
     assert len(ok) == 1
     assert int(ok[0].split()[1]) <= 10
