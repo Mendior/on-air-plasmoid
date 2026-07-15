@@ -48,6 +48,12 @@ MIN_SANE_MS = -100.0       # BT ahead of wired by >100 ms means a bad measure
 MAX_SANE_MS = 900.0
 CLIP_LEVEL = 32000         # |sample| at the int16 rail: the mic is saturating
 CLIP_COUNT = 4             # one grazed rail can be honest; a run of them lies
+LEADER_SECONDS = 0.35      # quiet hum before the burst: wakes a sleeping
+LEADER_HZ = 180.0          # Bluetooth link and opens the speaker's own noise
+LEADER_AMP = 900           # gate BEFORE the moment being measured — a JBL
+                           # measured cold swallowed clicks whole or shifted
+                           # them by hundreds of ms while the link spun up
+LEADER_GAP_SECONDS = 0.05
 
 
 def click_template():
@@ -61,12 +67,22 @@ def click_template():
 
 
 def make_click(path):
-    """10 ms raised-cosine burst at 2.2 kHz — sharp but speaker-safe."""
+    """The measurement stimulus: a third of a second of quiet 180 Hz hum, a
+    beat of silence, then the 10 ms raised-cosine burst at 2.2 kHz — sharp
+    but speaker-safe. Only the burst is measured; the hum is far too quiet
+    (and the wrong shape) to move the matched filter or the peak gate, it
+    exists so the sound PATH is already awake when the burst rides it."""
     with wave.open(path, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(RATE)
         frames = bytearray()
+        ramp = RATE * 0.05  # soft ramp-in, no pop of its own
+        for i in range(int(RATE * LEADER_SECONDS)):
+            env = min(1.0, i / ramp)
+            frames += struct.pack("<h", int(LEADER_AMP * env
+                                            * math.sin(2.0 * math.pi * LEADER_HZ * i / RATE)))
+        frames += b"\x00\x00" * int(RATE * LEADER_GAP_SECONDS)
         for v in click_template():
             frames += struct.pack("<h", int(24000 * v))
         w.writeframes(bytes(frames))
@@ -150,19 +166,37 @@ def peak_of(path, tpl=None):
         return None
     window = samples[start:]
     best, best_i = 0, -1
-    total = 0
     clipped = 0
     for i, s in enumerate(window):
         a = abs(s)
-        total += a
         if a >= CLIP_LEVEL:
             clipped += 1
         if a > best:
             best, best_i = a, i
-    mean_abs = total / max(1, len(window))
-    # A click is impulsive: it must stand far above the window's own noise
-    # floor AND be loud in absolute terms, or we heard nothing click-like.
-    if best_i < 0 or best < 1200 or best < 6 * mean_abs:
+    # A click is impulsive: it must stand far above the noise floor. The
+    # floor is the MEDIAN |sample| of the window's opening stretch — before
+    # the stimulus arrives — because webcam AGC scales the noise and the
+    # click together: a mean over the whole window drifted with the leader
+    # hum and an absolute-only threshold silently dropped every click from
+    # the quieter speaker after a loud one had ducked the mic's gain.
+    if best_i < 0:
+        return None
+    # The noise floor is measured strictly BEFORE the stimulus began — the
+    # burst position minus the leader hum and a margin — so neither the hum
+    # nor the burst can inflate it. A recorder that started late (cold
+    # spawn) can push the stimulus to the window's edge and leave no
+    # pre-roll at all; the floor then falls back to the clamp.
+    pre_end = best_i - int((LEADER_SECONDS + LEADER_GAP_SECONDS + 0.05) * rate)
+    head = sorted(abs(s) for s in window[:pre_end]) if pre_end >= int(0.05 * rate) else []
+    floor = head[len(head) // 2] if head else 60
+    med_all = sorted(abs(s) for s in window)[len(window) // 2]
+    # Measured on real hardware: after a loud speaker's series, webcam AGC
+    # ducks the gain ~10x and the next speaker's clicks land around 800 —
+    # 37x above their concurrent floor, unmistakably clicks. The absolute
+    # bar only needs to reject quiet garbage in true silence; the ratios
+    # carry the discrimination (the whole-window median guards against
+    # steady noise when the pre-roll is missing).
+    if best < 600 or best < 8 * max(floor, 60) or best < 4 * max(med_all, 1):
         return None
     pos = _xcorr_refine(window, best_i, tpl) if tpl else float(best_i)
     return (start + pos) / rate, best, clipped >= CLIP_COUNT
@@ -333,6 +367,10 @@ def cmd_verify(argv):
         try:
             make_click(click)
             tpl = click_template()
+            # Same throwaway as the calibration: the session's first
+            # recorder spawn starts capturing late and would push the first
+            # presence click against the window's edge.
+            measure_once(sinks[0], click, mic, tpl)
             for member in sinks:
                 if measure_once(member, click, mic, tpl) is None:
                     print("VERIFY_PARTIAL %s" % member)
@@ -404,8 +442,17 @@ def main():
             else:
                 amps.setdefault(sink, []).append(amp)
 
+        # One throwaway click before anything counts: the session's very
+        # first recorder spawn starts capturing late (half a second observed
+        # on real hardware) and would shift one measurement's clock against
+        # every other. Then each sink is measured as a BURST — all its
+        # clicks back to back — so a Bluetooth link stays in one power state
+        # across the repeats instead of drifting through sniff-mode between
+        # interleaved turns.
+        measure_once(wired, click, mic, tpl)
         for _ in range(CLICK_REPEATS):
             note(wired, measure_once(wired, click, mic, tpl), wired_times)
+        for _ in range(CLICK_REPEATS):
             note(bt, measure_once(bt, click, mic, tpl), bt_times)
         if len(wired_times) < 2:
             print("CALIB_FAIL no click heard from the wired speaker")

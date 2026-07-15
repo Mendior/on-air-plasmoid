@@ -41,17 +41,24 @@ def write_wav(path, samples, rate):
         w.writeframes(b"".join(struct.pack("<h", s) for s in samples))
 
 
-def test_make_click_is_short_and_bounded(calib, tmp_path):
+def test_make_click_is_leader_then_burst(calib, tmp_path):
     p = tmp_path / "click.wav"
     calib["make_click"](str(p))
+    rate = calib["RATE"]
     with wave.open(str(p), "rb") as w:
-        assert w.getframerate() == calib["RATE"]
+        assert w.getframerate() == rate
         assert w.getnchannels() == 1
         n = w.getnframes()
         raw = w.readframes(n)
-    assert n == int(calib["RATE"] * 0.010)
-    peak = max(abs(struct.unpack_from("<h", raw, i * 2)[0]) for i in range(n))
-    assert 10000 < peak <= 24000  # audible but never clipping
+    total = int(rate * (calib["LEADER_SECONDS"] + calib["LEADER_GAP_SECONDS"] + 0.010))
+    assert n == total
+    samples = [struct.unpack_from("<h", raw, i * 2)[0] for i in range(n)]
+    # The wake-up hum stays far below the burst and below the peak gate —
+    # it must never be mistaken for the moment being measured.
+    leader_peak = max(abs(s) for s in samples[:int(rate * calib["LEADER_SECONDS"])])
+    assert leader_peak <= calib["LEADER_AMP"]
+    burst_peak = max(abs(s) for s in samples[-int(rate * 0.010):])
+    assert 10000 < burst_peak <= 24000  # audible but never clipping
 
 
 def inject_click(samples, rate, at, amp):
@@ -215,6 +222,28 @@ def test_peak_of_rejects_steady_noise(calib, tmp_path):
     p = tmp_path / "noise.wav"
     write_wav(p, samples, rate)
     assert calib["peak_of"](str(p)) is None
+
+
+def test_peak_of_gate_is_relative_to_the_pre_click_floor(calib, tmp_path):
+    # Webcam AGC ducks the gain after a loud speaker: the next speaker's
+    # click AND the noise floor shrink together. The gate must compare the
+    # click against the concurrent floor, not an absolute bar — an AGC-
+    # quieted click at 1500 over a floor of ~100 is a real click.
+    rate = calib["RATE"]
+    samples = [(100 if i % 3 else -100) for i in range(int(rate * 1.5))]
+    inject_click(samples, rate, 0.9, 1500)
+    p = tmp_path / "ducked.wav"
+    write_wav(p, samples, rate)
+    got = calib["peak_of"](str(p))
+    assert got is not None
+    assert abs(got[0] - 0.9) < 0.01
+    # ...but the same click drowning in steady noise of its own size is
+    # nothing click-like.
+    samples = [(1000 if i % 2 else -1000) for i in range(int(rate * 1.5))]
+    inject_click(samples, rate, 0.9, 1500)
+    p2 = tmp_path / "buried.wav"
+    write_wav(p2, samples, rate)
+    assert calib["peak_of"](str(p2)) is None
 
 
 def test_peak_of_rejects_too_short_recording(calib, tmp_path):
