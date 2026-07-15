@@ -8,7 +8,15 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="$REPO_DIR/package"
-INSTALL_DIR="$HOME/.local/share/plasma/plasmoids/org.kde.plasma.advancedradio"
+# The local install may live under the current plugin id or the pre-rename
+# one, depending on when this machine first installed the widget — sync into
+# whichever actually exists (preferring the current id when both do).
+INSTALL_BASE="$HOME/.local/share/plasma/plasmoids"
+if [ -d "$INSTALL_BASE/io.github.mendior.onair" ]; then
+  INSTALL_DIR="$INSTALL_BASE/io.github.mendior.onair"
+else
+  INSTALL_DIR="$INSTALL_BASE/org.kde.plasma.advancedradio"
+fi
 # NB: /usr/bin/qmllint may be the Qt5 version, which reports NOTHING — the Qt6
 # binary is required for real checks.
 QMLLINT="${QMLLINT:-/usr/lib/qt6/bin/qmllint}"
