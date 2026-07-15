@@ -255,7 +255,6 @@ Item {
         if (cmd.indexOf(": PW_CALIB") === 0) {
             _calibrating = false;
             calibGuardTimer.stop();
-            _calibRestoreVolume();
             var okM = (stdout || "").match(/CALIB_OK (\d+)/);
             var macM = cmd.match(/^: PW_CALIB ([0-9A-F:]{17}) /);
             if (okM) {
@@ -264,13 +263,19 @@ Item {
                 // and clamping it to 500 would report a made-up number.
                 var calMs = Math.max(0, Math.min(900, parseInt(okM[1], 10)));
                 cfg.syncOffsetMs = calMs;
-                if (macM) {
-                    try {
-                        var calMap = JSON.parse(cfg.syncOffsetMap || "{}");
-                        calMap[macM[1]] = calMs;
-                        cfg.syncOffsetMap = JSON.stringify(calMap);
-                    } catch (e) {}
-                }
+                try {
+                    var calMap = JSON.parse(cfg.syncOffsetMap || "{}");
+                    if (macM) calMap[macM[1]] = calMs;
+                    // Wired/extra sinks measured in the same run: CALIB_XLAG
+                    // is each one's real lag against the wired reference — a
+                    // USB DAC or an HDMI TV stops being assumed zero. Same
+                    // map, keyed by sink name (names cannot collide with
+                    // MACs); negative = faster than the reference.
+                    var xRe = /CALIB_XLAG (\S+) (-?\d+)/g, xM;
+                    while ((xM = xRe.exec(stdout || "")) !== null)
+                        calMap[xM[1]] = Math.max(-100, Math.min(900, parseInt(xM[2], 10)));
+                    cfg.syncOffsetMap = JSON.stringify(calMap);
+                } catch (e) {}
                 // Loudness matching, from the same run: each level line is
                 // one speaker's click peak at the microphone, all taken at
                 // the same sink volume. The QUIETEST speaker becomes the
@@ -323,11 +328,53 @@ Item {
                     : i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
                 if (trimsReplaced)
                     calText += " " + i18n("Balance levels set earlier were replaced by the measured ones.");
+                // A saturated mic cannot measure loudness honestly — those
+                // speakers kept their old balance, and the user should know
+                // why (and how to fix it) instead of wondering.
+                var clipped = [];
+                var clRe = /CALIB_CLIP (\S+)/g, clM;
+                while ((clM = clRe.exec(stdout || "")) !== null) clipped.push(clM[1]);
+                if (clipped.length > 0)
+                    calText += " " + i18n("The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again.", clipped.join(", "));
                 app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");
+                // The check-measure: with the rebuilt loopbacks live, click
+                // through the combined sink and hear the room's ACTUAL
+                // residual spread — a bad calibration gets caught here, not
+                // at 7 AM. The stream stays muted until the verdict, for the
+                // same reason the calibration muted it: program audio drowns
+                // the clicks.
+                _verifyPending = true;
+                verifySettleTimer.restart();
+                verifyGuardTimer.restart();
             } else {
+                _calibRestoreVolume();
                 app.notify(i18n("Calibration did not succeed"),
                            i18n("Make sure the microphone is not covered and both speakers can be heard, then try again."),
                            "dialog-warning");
+            }
+            return true;
+        }
+        // The verify pass came back — the room's measured residual. Anything
+        // under ~30 ms fuses to the ear (and arrivals under ~8 ms fuse in
+        // the measurement itself); above that the calibration deserves
+        // another run.
+        if (cmd.indexOf(": PW_VERIFY;") === 0) {
+            verifyGuardTimer.stop();
+            if (!_verifyPending) return true;
+            _verifyPending = false;
+            _calibRestoreVolume();
+            var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
+            cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
+            if (vM) {
+                var vSpread = parseInt(vM[1], 10);
+                if (vSpread <= 30)
+                    app.notify(i18n("Sync verified"),
+                               i18n("Every speaker arrives within %1 ms at the microphone — in step to the ear.", vSpread),
+                               "audio-input-microphone");
+                else
+                    app.notify(i18n("Sync check"),
+                               i18n("The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider.", vSpread),
+                               "dialog-warning");
             }
             return true;
         }
@@ -666,19 +713,25 @@ Item {
         return m ? m[1].replace(/_/g, ":").toUpperCase() : "";
     }
 
-    // The measured/tuned lag of one Bluetooth sink: its own calibration if
-    // the device has been calibrated (keyed by MAC — a JBL and AirPods lag
-    // differently), the global slider value otherwise.
+    // The measured/tuned lag of one sink. Bluetooth: its own calibration if
+    // the device has one (keyed by MAC — a JBL and AirPods lag differently),
+    // the global slider value otherwise. Wired: its own CALIB_XLAG if the
+    // calibration heard it (keyed by sink name; may be negative when the
+    // sink runs AHEAD of the reference), zero otherwise — the pre-XLAG
+    // behaviour.
     function _lagForSink(sinkId) {
         var mac = _btMacOfSink(sinkId);
-        if (mac !== "") {
-            try {
-                var map = JSON.parse(cfg.syncOffsetMap || "{}");
+        try {
+            var map = JSON.parse(cfg.syncOffsetMap || "{}");
+            if (mac !== "") {
                 if (map[mac] !== undefined)
                     return Math.max(0, Math.min(900, parseInt(map[mac], 10) || 0));
-            } catch (e) {}
-        }
-        return Math.max(0, Math.min(900, cfg.syncOffsetMs || 0));
+            } else if (map[sinkId] !== undefined) {
+                var w = parseInt(map[sinkId], 10);
+                if (isFinite(w)) return Math.max(-100, Math.min(900, w));
+            }
+        } catch (e) {}
+        return mac !== "" ? Math.max(0, Math.min(900, cfg.syncOffsetMs || 0)) : 0;
     }
 
     // One loopback per hardware sink, each with a REAL buffer delay
@@ -688,19 +741,21 @@ Item {
     // worst lag, a faster Bluetooth device waits the difference. Stereo is
     // pinned.
     function _combineLoopbackCmds(sinks) {
+        // EVERY sink carries its measured lag now — Bluetooth from its MAC
+        // calibration (or the slider), wired from its CALIB_XLAG (or the
+        // assumed zero it always had). The slowest device sets the schedule
+        // and everyone else waits the difference; a negative wired lag (the
+        // sink runs ahead) simply earns it more delay.
         var maxLag = 0;
         var lags = {};
         for (var j = 0; j < sinks.length; j++) {
-            if (sinks[j].indexOf("bluez_") === 0) {
-                lags[sinks[j]] = _lagForSink(sinks[j]);
-                if (lags[sinks[j]] > maxLag) maxLag = lags[sinks[j]];
-            }
+            lags[sinks[j]] = _lagForSink(sinks[j]);
+            if (lags[sinks[j]] > maxLag) maxLag = lags[sinks[j]];
         }
         var cmds = "";
         for (var i = 0; i < sinks.length; i++) {
             var s = sinks[i].replace(/'/g, "'\\''");
-            var d = 60 + (sinks[i].indexOf("bluez_") === 0
-                          ? (maxLag - lags[sinks[i]]) : maxLag);
+            var d = 60 + (maxLag - lags[sinks[i]]);
             // The sink rides along in the echo so the handler can pair module
             // ids with sinks for the balance — /LB (\d+)/ readers are
             // unaffected. The balance itself is baked in right here, in the
@@ -753,7 +808,7 @@ Item {
     property real _calibVolumeBefore: -1
 
     function calibrateSync() {
-        if (_calibrating || !_combineActive) return;
+        if (_calibrating || _verifyPending || !_combineActive) return;
         var sinks = _combineRealSinks();
         var wired = "", bt = "";
         for (var i = 0; i < sinks.length; i++) {
@@ -1045,6 +1100,36 @@ Item {
         repeat: false
         onTriggered: {
             _calibrating = false;
+            _calibRestoreVolume();
+        }
+    }
+
+    // The verify pass (check-measure) in flight: a calibration succeeded,
+    // the loopbacks were rebuilt with the new delays, and the room is being
+    // listened back to.
+    property bool _verifyPending: false
+
+    Timer {
+        id: verifySettleTimer
+        // The rebuilt loopbacks need a beat before the clicks ride them.
+        interval: 2500
+        repeat: false
+        onTriggered: {
+            if (!_verifyPending) return;
+            var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
+            var n = Math.max(2, _combineRealSinks().length);
+            app.exec(": PW_VERIFY; timeout 25 python3 '" + script + "' verify '"
+                     + _combineSinkName + "' '' " + n + "; true # " + app.nextSeq());
+        }
+    }
+
+    Timer {
+        id: verifyGuardTimer
+        // A lost verify must not leave the stream muted forever.
+        interval: 35000
+        repeat: false
+        onTriggered: {
+            _verifyPending = false;
             _calibRestoreVolume();
         }
     }

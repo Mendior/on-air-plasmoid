@@ -66,6 +66,7 @@ Item {
         id: mockCfgComp
         QtObject {
             property int syncOffsetMs: 0
+            property int syncVerifiedMs: -1
             property string syncOffsetMap: "{}"
             property string deviceTrims: "{}"
             property string deviceChannels: "{}"
@@ -322,6 +323,72 @@ Item {
             r.e.handleExec(": PW_CALIB " + btMac + " ;", "CALIB_FAIL no click heard\n", "");
             compare(r.mock.notes.length, 1);
             compare(r.mock.notes[0].icon, "dialog-warning");
+        }
+
+        function test_calibration_stores_wired_lags_and_arms_the_verify() {
+            // CALIB_XLAG: the extras' clicks are timed too — a USB DAC in
+            // the group gets its measured lag instead of an assumed zero,
+            // in the same map the MACs live in.
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            var out = "CALIB_LVL " + wired + " 20000\n"
+                    + "CALIB_XLAG " + wired2 + " 34\n"
+                    + "CALIB_OK 150\n";
+            r.e.handleExec(": PW_CALIB " + btMac + " ;", out, "");
+            var map = JSON.parse(r.cfg.syncOffsetMap);
+            compare(map[btMac], 150);
+            compare(map[wired2], 34);
+            verify(r.e._verifyPending);        // the check-measure is armed
+        }
+
+        function test_a_clipped_mic_is_reported_not_silently_swallowed() {
+            var r = rig([dev(wired), dev(btSink)]);
+            var out = "CALIB_LVL " + wired + " 20000\n"
+                    + "CALIB_CLIP " + btSink + "\n"
+                    + "CALIB_OK 150\n";
+            r.e.handleExec(": PW_CALIB " + btMac + " ;", out, "");
+            verify(r.mock.notes[0].text.indexOf("clipped") !== -1);
+        }
+
+        function test_wired_lag_feeds_the_loopback_schedule() {
+            var m = {};
+            m[wired2] = 40;
+            var r = rig([dev(wired), dev(wired2), dev(btSink)],
+                        { syncOffsetMs: 200, syncOffsetMap: JSON.stringify(m) });
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            var cmd = r.mock.execLog[0];
+            // Slowest is the bt sink at 200: the unmeasured wired waits the
+            // full 200, the measured dock (40 ahead of nothing — it LAGS 40)
+            // waits the 160 difference, the bt itself waits nothing extra.
+            verify(cmd.indexOf("sink='" + wired + "' latency_msec=260") !== -1);
+            verify(cmd.indexOf("sink='" + wired2 + "' latency_msec=220") !== -1);
+            verify(cmd.indexOf("sink='" + btSink + "' latency_msec=60") !== -1);
+        }
+
+        function test_verify_verdict_reports_and_unmutes() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._calibVolumeBefore = 0.5;
+            r.mock.playerOutput.volume = 0;    // as the calibration left it
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 12\n", "");
+            compare(r.cfg.syncVerifiedMs, 12);
+            compare(r.mock.playerOutput.volume, 0.5);
+            compare(r.mock.notes[r.mock.notes.length - 1].title, "Sync verified");
+            verify(!r.e._verifyPending);
+        }
+
+        function test_verify_failure_unmutes_without_extra_noise() {
+            // The calibration verdict was already reported; a verify that
+            // heard nothing must hand the volume back and stay quiet.
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._calibVolumeBefore = 0.5;
+            r.mock.playerOutput.volume = 0;
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_FAIL nothing heard\n", "");
+            compare(r.cfg.syncVerifiedMs, -1);
+            compare(r.mock.playerOutput.volume, 0.5);
+            compare(r.mock.notes.length, 0);
+            verify(!r.e._verifyPending);
         }
 
         // ── balance adoption (cast devices joining the group) ────────────

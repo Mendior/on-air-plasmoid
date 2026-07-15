@@ -82,8 +82,12 @@
             <default>true</default>
         </entry>
         <entry name="syncOffsetMap" type="String">
-            <label>Per-device Bluetooth lag in ms, keyed by MAC (JSON)</label>
+            <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
             <default>{}</default>
+        </entry>
+        <entry name="syncVerifiedMs" type="Int">
+            <label>Residual speaker spread measured by the last verify pass (ms); -1 means never verified</label>
+            <default>-1</default>
         </entry>
         <entry name="deviceTrims" type="String">
             <label>Per-device volume balance, 0.05-1.0 of the master level (JSON: device id to factor)</label>
