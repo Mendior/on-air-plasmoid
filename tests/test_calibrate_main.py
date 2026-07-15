@@ -10,12 +10,10 @@ execute the shipped main() verbatim; only the timing constants (repeat
 counts, record/playback windows) are shrunk on a copy so the suite stays
 fast — they don't participate in any decision being tested.
 """
-import math
 import os
 import pathlib
 import re
 import stat
-import struct
 import subprocess
 import sys
 
@@ -93,9 +91,9 @@ def test_happy_path_reports_lag_and_all_levels(fast_calibrate):
     proc = run_calibrate(fast_calibrate, ["wired_sink", "bt_sink", "", "extra_sink"])
     assert proc.returncode == 0
     lines = proc.stdout.strip().splitlines()
-    lvl_sinks = [l.split()[1] for l in lines if l.startswith("CALIB_LVL ")]
+    lvl_sinks = [ln.split()[1] for ln in lines if ln.startswith("CALIB_LVL ")]
     assert sorted(lvl_sinks) == ["bt_sink", "extra_sink", "wired_sink"]
-    ok = [l for l in lines if l.startswith("CALIB_OK ")]
+    ok = [ln for ln in lines if ln.startswith("CALIB_OK ")]
     assert len(ok) == 1
     # Identical stub arrivals on both sinks: the measured lag must be ~0.
     assert int(ok[0].split()[1]) <= 50
@@ -114,7 +112,7 @@ def test_wedged_extra_sink_cannot_abort_the_run(fast_calibrate):
 def test_extras_repeating_the_timing_pair_are_measured_once(fast_calibrate):
     proc = run_calibrate(fast_calibrate, ["wired_sink", "bt_sink", "", "wired_sink"])
     lines = proc.stdout.strip().splitlines()
-    wired_lvls = [l for l in lines if l.startswith("CALIB_LVL wired_sink ")]
+    wired_lvls = [ln for ln in lines if ln.startswith("CALIB_LVL wired_sink ")]
     assert len(wired_lvls) == 1
 
 
@@ -122,3 +120,30 @@ def test_missing_argv_is_a_sentinel_not_a_crash(fast_calibrate):
     proc = run_calibrate(fast_calibrate, ["only_one"])
     assert proc.returncode == 0
     assert proc.stdout.strip() == "CALIB_FAIL usage"
+
+
+def test_extras_get_their_own_lag_line(fast_calibrate):
+    # The clicks that measure an extra sink's loudness are timed anyway —
+    # a USB DAC or HDMI TV in the group reports its real lag against the
+    # wired reference (CALIB_XLAG) instead of an assumed zero.
+    proc = run_calibrate(fast_calibrate, ["wired_sink", "bt_sink", "", "extra_sink"])
+    xlag = [ln for ln in proc.stdout.splitlines() if ln.startswith("CALIB_XLAG extra_sink ")]
+    assert len(xlag) == 1
+    # Identical stub arrivals everywhere: the extra's lag must be ~0.
+    assert abs(int(xlag[0].split()[2])) <= 50
+
+
+def test_verify_reports_the_room_spread(fast_calibrate):
+    # One stub click in the recording = every speaker arrived together —
+    # the verify pass must call that a spread of (near) zero.
+    proc = run_calibrate(fast_calibrate, ["verify", "combined_sink", "", "2"])
+    assert proc.returncode == 0
+    ok = [ln for ln in proc.stdout.splitlines() if ln.startswith("VERIFY_OK ")]
+    assert len(ok) == 1
+    assert int(ok[0].split()[1]) <= 10
+
+
+def test_verify_usage_is_a_sentinel(fast_calibrate):
+    proc = run_calibrate(fast_calibrate, ["verify"])
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == "VERIFY_FAIL usage"

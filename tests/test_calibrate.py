@@ -71,10 +71,102 @@ def test_peak_of_finds_a_click_where_it_is(calib, tmp_path):
     write_wav(p, samples, rate)
     got = calib["peak_of"](str(p))
     assert got is not None
-    t, amp = got
+    t, amp, clipped = got
     assert abs(t - at) < 0.01
     assert t > skip  # the AGC-pop window must never win
     assert 18000 < amp <= 20000  # the peak's own height rides along
+    assert clipped is False
+
+
+def lcg_noise(n, sd, seed=12345):
+    """Deterministic pseudo-noise — the matched-filter tests must not flake."""
+    x = seed
+    out = []
+    for _ in range(n):
+        x = (1103515245 * x + 12345) % (1 << 31)
+        out.append(int((x % (4 * sd + 1)) - 2 * sd))
+    return out
+
+
+def test_matched_filter_holds_still_in_noise(calib, tmp_path):
+    # The bare amplitude argmax wandered by whole samples between runs in
+    # room noise; the matched filter integrates over the full burst and
+    # must pin the arrival to well under a millisecond.
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    at = 0.9
+    # The detector reports the burst PEAK (like the old argmax did), not the
+    # burst start — the truth reference carries the template's own peak.
+    truth = at + max(range(len(tpl)), key=lambda i: abs(tpl[i])) / rate
+    for k, seed in enumerate((1, 99)):
+        samples = lcg_noise(int(rate * 1.5), 1000, seed)
+        inject_click(samples, rate, at, 20000)
+        p = tmp_path / ("noisy%d.wav" % k)
+        write_wav(p, samples, rate)
+        got = calib["peak_of"](str(p), tpl)
+        assert got is not None
+        assert abs(got[0] - truth) < 0.0005  # < half a millisecond off truth
+
+
+def test_matched_filter_survives_inverted_polarity(calib, tmp_path):
+    # A mic/speaker chain that flips the waveform's sign must not move the
+    # measured arrival — the filter correlates on magnitude.
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    times = []
+    for k, amp in enumerate((20000, -20000)):
+        samples = [0] * int(rate * 1.5)
+        inject_click(samples, rate, 0.9, amp)
+        p = tmp_path / ("pol%d.wav" % k)
+        write_wav(p, samples, rate)
+        got = calib["peak_of"](str(p), tpl)
+        assert got is not None
+        times.append(got[0])
+    assert abs(times[0] - times[1]) < 0.0005
+
+
+def test_peak_of_flags_mic_saturation(calib, tmp_path):
+    # A burst flattened against the int16 rail still times fine, but its
+    # amplitude is the microphone's ceiling, not the speaker's loudness —
+    # the flag keeps it out of the level matching.
+    rate = calib["RATE"]
+    samples = [0] * int(rate * 1.5)
+    n = int(rate * 0.01)
+    at = int(0.9 * rate)
+    for i in range(n):
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / n))
+        v = int(80000 * env * math.sin(2.0 * math.pi * 2200.0 * i / rate))
+        samples[at + i] = max(-32768, min(32767, v))
+    p = tmp_path / "clip.wav"
+    write_wav(p, samples, rate)
+    got = calib["peak_of"](str(p))
+    assert got is not None
+    assert got[2] is True
+
+
+def test_peak_of_survives_a_truncated_recording(calib, tmp_path):
+    # A recorder killed mid-header used to escape as wave.Error and abort
+    # the WHOLE run — it must read as one failed measurement instead.
+    p = tmp_path / "trunc.wav"
+    p.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_find_arrivals_separates_and_fuses(calib, tmp_path):
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    # Two speakers 50 ms apart: two arrivals, spread ≈ 50 ms.
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, 0.9, 20000)
+    inject_click(samples, rate, 0.95, 15000)
+    arr = calib["find_arrivals"](samples, tpl, 4)
+    assert len(arr) == 2
+    assert abs((arr[1] - arr[0]) - 0.05) < 0.002
+    # Two speakers 3 ms apart fuse into one peak — reads as "together".
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, 0.9, 20000)
+    inject_click(samples, rate, 0.903, 15000)
+    assert len(calib["find_arrivals"](samples, tpl, 4)) == 1
 
 
 def test_peak_of_amplitudes_keep_their_ratio(calib, tmp_path):

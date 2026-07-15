@@ -34,8 +34,10 @@ import time
 import wave
 
 RATE = 48000
+CLICK_HZ = 2200.0
+CLICK_SECONDS = 0.010
 CLICK_REPEATS = 4          # median over several clicks rejects room noise
-LEVEL_REPEATS = 2          # extra sinks are heard for loudness only — quicker
+LEVEL_REPEATS = 2          # extra sinks get two clicks — level AND timing
 MAX_EXTRA_SINKS = 6        # keeps the whole run inside the widget's guard
 RECORD_SECONDS = 1.9
 PLAY_DELAY = 0.6           # recording warm-up before the click is played
@@ -44,20 +46,29 @@ ANALYSIS_SKIP = 0.4        # recording start carries a loud mic/AGC pop —
                            # otherwise wins the peak search every time
 MIN_SANE_MS = -100.0       # BT ahead of wired by >100 ms means a bad measure
 MAX_SANE_MS = 900.0
+CLIP_LEVEL = 32000         # |sample| at the int16 rail: the mic is saturating
+CLIP_COUNT = 4             # one grazed rail can be honest; a run of them lies
+
+
+def click_template():
+    """The burst's unit-amplitude shape, shared by the WAV writer and the
+    matched filter — the filter must correlate against exactly what was
+    played, or its sub-sample precision is fiction."""
+    n = int(RATE * CLICK_SECONDS)
+    return [0.5 * (1.0 - math.cos(2.0 * math.pi * i / n))
+            * math.sin(2.0 * math.pi * CLICK_HZ * i / RATE)
+            for i in range(n)]
 
 
 def make_click(path):
     """10 ms raised-cosine burst at 2.2 kHz — sharp but speaker-safe."""
-    n = int(RATE * 0.010)
     with wave.open(path, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(RATE)
         frames = bytearray()
-        for i in range(n):
-            env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / n))
-            val = int(24000 * env * math.sin(2.0 * math.pi * 2200.0 * i / RATE))
-            frames += struct.pack("<h", val)
+        for v in click_template():
+            frames += struct.pack("<h", int(24000 * v))
         w.writeframes(bytes(frames))
 
 
@@ -74,9 +85,64 @@ def read_mono(path):
     return samples, rate
 
 
-def peak_of(path):
-    """(seconds from recording start, peak amplitude) of the click's arrival."""
-    samples, rate = read_mono(path)
+def _xcorr_refine(window, coarse_i, tpl):
+    """Sub-sample click arrival via a matched filter around the coarse peak.
+
+    Correlates the recording with the KNOWN burst shape in a ±15 ms
+    neighbourhood of the amplitude peak and takes the correlation maximum,
+    plus a parabolic fit between neighbouring lags for the sub-sample
+    fraction. The magnitude is used so a polarity-inverting mic/speaker
+    chain cannot flip the answer. The bare amplitude argmax used to wander
+    by whole samples between runs in room noise; the filter integrates over
+    all 480 template samples (~22x processing gain) and holds still.
+    Returns a float sample index in `window`'s frame, aligned to the burst
+    peak so the number means what the old detector's did.
+    """
+    half = int(0.015 * RATE)
+    tn = len(tpl)
+    lo = max(0, coarse_i - tn - half)
+    hi = min(len(window) - tn, coarse_i + half)
+    if hi <= lo:
+        return float(coarse_i)
+    corr = [0.0] * (hi - lo + 1)
+    best_l, best_c = lo, -1.0
+    for lag in range(lo, hi + 1):
+        acc = 0.0
+        for k in range(tn):
+            acc += window[lag + k] * tpl[k]
+        c = abs(acc)
+        corr[lag - lo] = c
+        if c > best_c:
+            best_c, best_l = c, lag
+    if best_c <= 0.0:
+        return float(coarse_i)
+    ci = best_l - lo
+    cm = corr[ci - 1] if ci > 0 else 0.0
+    cp = corr[ci + 1] if ci + 1 < len(corr) else 0.0
+    denom = cm - 2.0 * best_c + cp
+    frac = 0.0 if denom == 0.0 else max(-1.0, min(1.0, 0.5 * (cm - cp) / denom))
+    tpl_peak = max(range(tn), key=lambda i: abs(tpl[i]))
+    return best_l + frac + tpl_peak
+
+
+def peak_of(path, tpl=None):
+    """(seconds from start, peak amplitude, clipped?) of the click's arrival.
+
+    Returns None when nothing click-like was heard — including when the
+    recording itself is truncated or unreadable: one bad capture is one
+    failed measurement, never a reason to abort the whole run (an escaped
+    wave.Error used to do exactly that from an extra, level-only sink).
+
+    The impulsiveness gate is unchanged from the shipped detector; when a
+    template is given, the matched filter then refines WHERE the click sits
+    to sub-sample precision. `clipped` reports mic saturation: a rail-flat
+    burst still times fine, but its amplitude is a lie and must not feed
+    the loudness matching.
+    """
+    try:
+        samples, rate = read_mono(path)
+    except Exception:
+        return None
     if not samples:
         return None
     start = int(ANALYSIS_SKIP * rate)
@@ -85,9 +151,12 @@ def peak_of(path):
     window = samples[start:]
     best, best_i = 0, -1
     total = 0
+    clipped = 0
     for i, s in enumerate(window):
         a = abs(s)
         total += a
+        if a >= CLIP_LEVEL:
+            clipped += 1
         if a > best:
             best, best_i = a, i
     mean_abs = total / max(1, len(window))
@@ -95,7 +164,8 @@ def peak_of(path):
     # floor AND be loud in absolute terms, or we heard nothing click-like.
     if best_i < 0 or best < 1200 or best < 6 * mean_abs:
         return None
-    return (start + best_i) / rate, best
+    pos = _xcorr_refine(window, best_i, tpl) if tpl else float(best_i)
+    return (start + pos) / rate, best, clipped >= CLIP_COUNT
 
 
 def recorder_args(mic, rec):
@@ -119,42 +189,48 @@ def recorder_args(mic, rec):
     return args + [rec]
 
 
-def measure_once(sink, click, mic):
+def _record_one(sink, click, mic, rec):
+    """One click through `sink` while the mic records into `rec` — the
+    shared plumbing under both the calibration and the verify pass."""
+    rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL)
+    try:
+        time.sleep(PLAY_DELAY)
+        t_play = time.monotonic()
+        try:
+            subprocess.run(["paplay", "--device", sink,
+                            "--volume", "65536", click],
+                           timeout=5, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            # A dying sink can hold paplay past its timeout. That is one
+            # FAILED measurement of one sink ("nothing click-like heard"),
+            # not a reason to abort the run — letting this escape used to
+            # throw away an already-successful timing verdict because one
+            # extra, level-only speaker wedged.
+            pass
+        time.sleep(max(0.0, RECORD_SECONDS - (time.monotonic() - t_play)))
+    finally:
+        rp.terminate()
+        try:
+            rp.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            rp.kill()
+
+
+def measure_once(sink, click, mic, tpl=None):
     """One click through `sink`, recorded from `mic`.
 
-    Returns (arrival_seconds, peak_amplitude) or None when nothing
+    Returns (arrival_seconds, peak_amplitude, clipped) or None when nothing
     click-like was heard.
     """
     rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
-        rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL)
-        try:
-            time.sleep(PLAY_DELAY)
-            t_play = time.monotonic()
-            try:
-                subprocess.run(["paplay", "--device", sink,
-                                "--volume", "65536", click],
-                               timeout=5, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
-            except subprocess.TimeoutExpired:
-                # A dying sink can hold paplay past its timeout. That is one
-                # FAILED measurement of one sink ("nothing click-like heard"),
-                # not a reason to abort the run — letting this escape used to
-                # throw away an already-successful timing verdict because one
-                # extra, level-only speaker wedged.
-                pass
-            time.sleep(max(0.0, RECORD_SECONDS - (time.monotonic() - t_play)))
-        finally:
-            rp.terminate()
-            try:
-                rp.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                rp.kill()
+        _record_one(sink, click, mic, rec)
         # Seconds between "told the sink to play" and "mic heard it". The
         # recording started PLAY_DELAY earlier, which is part of the constant
         # that cancels between the two sinks.
-        return peak_of(rec)
+        return peak_of(rec, tpl)
     finally:
         try:
             os.unlink(rec)
@@ -167,7 +243,114 @@ def median(values):
     return s[len(s) // 2]
 
 
+def find_arrivals(window, tpl, max_peaks):
+    """Distinct click arrivals in one recording, seconds within `window`.
+
+    A 1 ms envelope pass finds candidate bursts (≥25 % of the loudest,
+    ≥8 ms apart — arrivals closer than that fuse into one correlation
+    peak, which for a sync check reads as 'together', the good news);
+    the matched filter then refines each candidate. Used by the verify
+    pass, where every speaker's click lands in the SAME recording.
+    """
+    block = int(RATE * 0.001)
+    if len(window) < block * 2:
+        return []
+    env = []
+    for b in range(0, len(window) - block, block):
+        m = 0
+        for i in range(b, b + block):
+            a = abs(window[i])
+            if a > m:
+                m = a
+        env.append(m)
+    top = max(env)
+    if top < 1200:
+        return []
+    thresh = max(1200, top * 0.25)
+    cands = []
+    for i, v in enumerate(env):
+        if v < thresh:
+            continue
+        if cands and i - cands[-1][0] < 8:
+            if v > cands[-1][1]:
+                cands[-1] = (i, v)
+            continue
+        cands.append((i, v))
+    cands = sorted(cands, key=lambda c: -c[1])[:max_peaks]
+    out = []
+    for i, _v in sorted(cands):
+        coarse = i * block
+        lo = max(0, coarse - block)
+        hi = min(len(window), coarse + 2 * block)
+        ci = max(range(lo, hi), key=lambda k: abs(window[k]))
+        out.append(_xcorr_refine(window, ci, tpl) / RATE)
+    return sorted(out)
+
+
+def cmd_verify(argv):
+    """calibrate.py verify <sink> <mic> <speaker_count> — the check-measure.
+
+    Clicks through the LIVE combined sink, so every speaker's arrival rides
+    its real deployed delay; the spread between the earliest and the latest
+    arrival at the microphone is the sync's actual residual error. Speakers
+    within ~8 ms fuse into one peak and read as spread 0 — resolution is
+    bounded by the 10 ms burst, which is exactly the region the ear stops
+    caring about too.
+
+    Prints VERIFY_OK <spread_ms> or VERIFY_FAIL <reason>; always returns.
+    """
+    try:
+        if len(argv) < 3:
+            print("VERIFY_FAIL usage")
+            return
+        sink, mic = argv[0], argv[1]
+        try:
+            count = max(1, min(8, int(argv[2])))
+        except ValueError:
+            count = 2
+        click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+        try:
+            make_click(click)
+            tpl = click_template()
+            spreads = []
+            for _ in range(3):
+                rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+                try:
+                    _record_one(sink, click, mic, rec)
+                    try:
+                        samples, rate = read_mono(rec)
+                    except Exception:
+                        continue
+                    if not samples:
+                        continue
+                    start = int(ANALYSIS_SKIP * rate)
+                    if start >= len(samples):
+                        continue
+                    arr = find_arrivals(samples[start:], tpl, count)
+                    if arr:
+                        spreads.append((arr[-1] - arr[0]) * 1000.0)
+                finally:
+                    try:
+                        os.unlink(rec)
+                    except OSError:
+                        pass
+            if not spreads:
+                print("VERIFY_FAIL nothing heard")
+                return
+            print("VERIFY_OK %d" % max(0, round(median(spreads))))
+        finally:
+            try:
+                os.unlink(click)
+            except OSError:
+                pass
+    except Exception as exc:  # a failure must be a sentinel, never a crash
+        print("VERIFY_FAIL %s" % str(exc)[:120])
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "verify":
+        cmd_verify(sys.argv[2:])
+        return
     if len(sys.argv) < 3:
         print("CALIB_FAIL usage")
         return
@@ -177,17 +360,28 @@ def main():
     click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
         make_click(click)
+        tpl = click_template()
         wired_times, bt_times = [], []
         amps = {wired: [], bt: []}
+        clipped_sinks = {}
+
+        def note(sink, m, times):
+            if m is None:
+                return
+            t, amp, clipped = m
+            if times is not None:
+                times.append(t)
+            # A saturated burst still times fine, but its amplitude is the
+            # microphone's rail, not the speaker's loudness — it must never
+            # feed the level matching.
+            if clipped:
+                clipped_sinks[sink] = True
+            else:
+                amps.setdefault(sink, []).append(amp)
+
         for _ in range(CLICK_REPEATS):
-            m = measure_once(wired, click, mic)
-            if m is not None:
-                wired_times.append(m[0])
-                amps[wired].append(m[1])
-            m = measure_once(bt, click, mic)
-            if m is not None:
-                bt_times.append(m[0])
-                amps[bt].append(m[1])
+            note(wired, measure_once(wired, click, mic, tpl), wired_times)
+            note(bt, measure_once(bt, click, mic, tpl), bt_times)
         if len(wired_times) < 2:
             print("CALIB_FAIL no click heard from the wired speaker")
             return
@@ -198,20 +392,37 @@ def main():
         if not (MIN_SANE_MS < lag_ms < MAX_SANE_MS):
             print("CALIB_FAIL implausible result %.0f ms" % lag_ms)
             return
-        # Extra speakers join for their loudness only — a couple of clicks
-        # each. One that stays silent simply gets no level line; the timing
-        # verdict above is already in the bag either way.
+        # Extra speakers get a couple of clicks each — and since every click
+        # is timed anyway, their lag against the wired reference rides along
+        # as CALIB_XLAG: a USB DAC or an HDMI TV in the group is off by its
+        # own real amount, not by an assumed zero. One that stays silent
+        # simply gets no lines; the timing verdict above is already in the
+        # bag either way.
+        wired_ref = median(wired_times)
+        extra_times = {}
         for sink in extras:
-            if sink in amps:
+            if sink in amps or sink in extra_times:
                 continue
-            amps[sink] = []
+            extra_times[sink] = []
             for _ in range(LEVEL_REPEATS):
-                m = measure_once(sink, click, mic)
-                if m is not None:
-                    amps[sink].append(m[1])
+                note(sink, measure_once(sink, click, mic, tpl), extra_times[sink])
         for sink, vals in amps.items():
             if vals:
                 print("CALIB_LVL %s %d" % (sink, median(vals)))
+        for sink in clipped_sinks:
+            if not amps.get(sink):
+                # Every burst from this sink saturated the mic — no honest
+                # level was measured. The widget keeps the old balance and
+                # can tell the user to back the volume off.
+                print("CALIB_CLIP %s" % sink)
+        for sink, ts in extra_times.items():
+            if len(ts) < LEVEL_REPEATS:
+                continue
+            # Two samples: the plain mean is the fair middle (median of an
+            # even count picks the upper value).
+            x_ms = (sum(ts) / len(ts) - wired_ref) * 1000.0
+            if MIN_SANE_MS < x_ms < MAX_SANE_MS:
+                print("CALIB_XLAG %s %d" % (sink, round(x_ms)))
         print("CALIB_OK %d" % max(0, round(lag_ms)))
     except FileNotFoundError as exc:
         print("CALIB_FAIL missing tool: %s" % exc)
