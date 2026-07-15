@@ -1011,6 +1011,11 @@ PlasmoidItem {
     // every _alarmFire, so yesterday's proof cannot vouch for today's alarm.
     property bool _alarmCastConfirmed: false
 
+    // The bundled chime's identity, resolved once — compared wherever the
+    // tone needs special-casing (the infinite loop in startWithFade; file://
+    // already keeps it off the cast branch).
+    readonly property url _alarmToneUrl: Qt.resolvedUrl("../sounds/alarm-fallback.ogg")
+
     Timer {
         id: alarmFallbackTimer
         interval: 25000
@@ -1033,7 +1038,7 @@ PlasmoidItem {
             // file:// skips the cast branch in startWithFade — the tone
             // plays locally, which is exactly where the sleeper is.
             startWithFade({ "name": i18n("Wake-up alarm"),
-                            "hostname": Qt.resolvedUrl("../sounds/alarm-fallback.ogg"),
+                            "hostname": root._alarmToneUrl,
                             "favicon": "", "active": true });
         }
     }
@@ -2437,6 +2442,13 @@ PlasmoidItem {
             playMusicOutput.volume = targetVolume();
         }
         playMusic.source = station.hostname;
+        // The wake tone must repeat until someone explicitly says "I'm up" —
+        // the bundled chime is 32 s long and the default single pass would
+        // end in exactly the silence the tone exists to prevent. Streams are
+        // endless anyway and a My Music track should finish once, so only
+        // the chime loops.
+        playMusic.loops = (station.hostname && station.hostname.toString() === root._alarmToneUrl.toString())
+                          ? MediaPlayer.Infinite : 1;
         playMusic.play();
         if (Plasmoid.configuration.fadeEnabled) {
             fadeInAnimation.from = 0;
