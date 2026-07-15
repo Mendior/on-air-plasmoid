@@ -134,6 +134,34 @@ TestCase {
         compare(out[0].keepAwake, true)
     }
 
+    // ── castSilencesWakeTone ──────────────────────────────────────────────
+    // The 2026.18 audit's worst finding: the wake tone trusted the
+    // optimistic _casting flag, so a speaker unplugged overnight silenced
+    // the alarm entirely. The gate must demand an actual acknowledgement.
+
+    function test_unconfirmed_cast_never_silences_the_tone() {
+        compare(AL.castSilencesWakeTone(true, false, false), false)
+    }
+
+    function test_confirmed_cast_only_stands_down_without_local_play() {
+        compare(AL.castSilencesWakeTone(true, true, false), true)
+        // Multi-room: the local side must still pass the audibility check.
+        compare(AL.castSilencesWakeTone(true, true, true), false)
+    }
+
+    function test_not_casting_never_silences_the_tone() {
+        compare(AL.castSilencesWakeTone(false, true, false), false)
+        compare(AL.castSilencesWakeTone(false, false, false), false)
+    }
+
+    function test_gate_rejects_truthy_junk() {
+        // Only strict booleans count — an undefined property mid-startup or
+        // a stale string must fail closed (tone plays).
+        compare(AL.castSilencesWakeTone(undefined, true, false), false)
+        compare(AL.castSilencesWakeTone(true, undefined, false), false)
+        compare(AL.castSilencesWakeTone(1, 1, 0), false)
+    }
+
     // ── earliestKeepAwake ─────────────────────────────────────────────────
 
     function test_earliest_keep_awake() {

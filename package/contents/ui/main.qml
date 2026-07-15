@@ -976,6 +976,13 @@ PlasmoidItem {
         // If cast devices are checked, startWithFade routes the alarm to
         // them — waking up to the same bedroom speaker the evening ended on
         // is correct, and the fallback below knows local silence is fine.
+        // But cast delivery starts UNPROVEN: only a fresh __CAST_OK__ from a
+        // device upgrades it to confirmed, and the wake-tone gate trusts
+        // nothing less. Clearing the last-pushed URL forces the re-push (and
+        // with it the fresh acknowledgement) even when the bedtime stream is
+        // the same one — that is exactly the route that dies overnight.
+        _alarmCastConfirmed = false;
+        _castCurrentUrl = "";
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
         _alarmFallbackArmed = true;
@@ -999,6 +1006,11 @@ PlasmoidItem {
     // explicit stop or a manual station pick — either one means "I'm up".
     property bool _alarmFallbackArmed: false
 
+    // Set by the CAST_PLAY dispatcher on a device's __CAST_OK__ — the only
+    // evidence that "casting" is more than an optimistic flag. Reset by
+    // every _alarmFire, so yesterday's proof cannot vouch for today's alarm.
+    property bool _alarmCastConfirmed: false
+
     Timer {
         id: alarmFallbackTimer
         interval: 25000
@@ -1006,9 +1018,13 @@ PlasmoidItem {
         onTriggered: {
             if (!root._alarmFallbackArmed) return;
             root._alarmFallbackArmed = false;
-            // Casting-only is a healthy route: the play command went to the
-            // device, and the muted local side is by design.
-            if (root._casting && !root._castLocalPlay) return;
+            // Casting-only is a healthy route ONLY once a device actually
+            // acknowledged the play command. The optimistic _casting flag
+            // alone would let a speaker unplugged overnight silence the
+            // alarm entirely — the one failure this tone exists to catch.
+            if (AlarmLogic.castSilencesWakeTone(root._casting,
+                                                root._alarmCastConfirmed,
+                                                root._castLocalPlay)) return;
             if (isPlaying() && playMusic.mediaStatus === MediaPlayer.BufferedMedia) return;
             dlNotification.title = i18n("Wake-up alarm");
             dlNotification.text = i18n("The station could not start — playing the built-in tone instead.");
@@ -3098,6 +3114,10 @@ PlasmoidItem {
                     dlNotification.iconName = "dialog-error";
                     dlNotification.sendEvent();
                 } else {
+                    // A device really took the stream — the wake-tone gate
+                    // may now trust the casting route (multi-device: any one
+                    // confirmed speaker is enough to wake the room).
+                    root._alarmCastConfirmed = true;
                     // Playing — a device without a stored balance adopts the
                     // loudness it is at right now (see _castAdoptTrim). The
                     // uuid is read back from the argv this very command

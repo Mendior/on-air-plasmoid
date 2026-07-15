@@ -88,6 +88,16 @@ function advance(alarm, nowMs) {
     return nextOccurrence(alarm.hh, alarm.mm, alarm.repeat, alarm.weekday, nowMs);
 }
 
+// Whether the casting route is proven well enough for the wake tone to
+// stand down. `casting` alone is an optimistic flag set the moment the play
+// command LEAVES — a speaker unplugged overnight still looks "casting".
+// Only a device's actual CAST_PLAY acknowledgement (`confirmed`) counts,
+// and a multi-room setup (localPlay) must still pass the local audibility
+// check regardless.
+function castSilencesWakeTone(casting, confirmed, localPlay) {
+    return casting === true && confirmed === true && localPlay !== true;
+}
+
 // The soonest keep-awake deadline, or 0 when no alarm wants the machine
 // held awake — the QML side turns this into one systemd-inhibit holder.
 function earliestKeepAwake(alarms) {
