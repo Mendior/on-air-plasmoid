@@ -394,6 +394,46 @@ Item {
             verify(!r.e._verifyPending);
         }
 
+        function test_verify_residual_feeds_back_and_reverifies_once() {
+            // The closed loop: a measured through-path residual lands in the
+            // speaker's stored lag, the loopbacks rebuild, and ONE more
+            // verify runs — volume stays muted until the second verdict.
+            var m = {}; m[btMac] = 213;
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: JSON.stringify(m) });
+            activate(r);
+            r.e._calibVolumeBefore = 0.5;
+            r.mock.playerOutput.volume = 0;
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY;",
+                           "VERIFY_LAG " + wired + " 0\nVERIFY_LAG " + btSink + " 149\nVERIFY_OK 149\n", "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 362);  // 213 + 149
+            verify(r.e._verifyCorrected);
+            verify(r.e._verifyPending);                 // round two armed
+            compare(r.mock.playerOutput.volume, 0);     // still muted for it
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 3\n", "");
+            compare(r.cfg.syncVerifiedMs, 3);
+            compare(r.mock.playerOutput.volume, 0.5);   // and now released
+            verify(!r.e._verifyPending);
+        }
+
+        function test_verify_pathology_flushes_the_bluetooth_route() {
+            // Past ~900 ms the number is not a lag but a stuck buffer —
+            // more delay never cures it; a suspend/resume bounce does.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY;",
+                           "VERIFY_LAG " + wired + " 0\nVERIFY_LAG " + btSink + " 2320\nVERIFY_OK 2320\n", "");
+            var flushed = false;
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_FLUSH;") === 0
+                    && r.mock.execLog[i].indexOf("suspend-sink '" + btSink + "'") !== -1)
+                    flushed = true;
+            verify(flushed);
+            verify(r.e._verifyPending);                 // round two armed
+        }
+
         function test_verify_failure_unmutes_without_extra_noise() {
             // The calibration verdict was already reported; a verify that
             // heard nothing must hand the volume back and stay quiet.

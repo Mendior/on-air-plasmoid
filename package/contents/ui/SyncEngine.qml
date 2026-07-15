@@ -370,9 +370,63 @@ Item {
             verifyGuardTimer.stop();
             if (!_verifyPending) return true;
             _verifyPending = false;
-            _calibRestoreVolume();
             var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
             cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
+            // THE CLOSED LOOP. A Bluetooth path's buffering is re-rolled on
+            // every stream lifecycle (measured live: the same speaker sat
+            // 213 ms one session, 2.3 s the next after a codec switch, and
+            // 149 ms EARLY after a flush) — so a stored number is only an
+            // opening bid. The verify measured every speaker through the
+            // deployed path; feed each one's residual back into its stored
+            // lag, rebuild, and verify ONCE more. Small residuals converge
+            // in one pass; a residual past 900 ms is not a lag but a stuck
+            // buffer, cured by bouncing the sink, not by waiting longer.
+            if (vM && !_verifyCorrected && parseInt(vM[1], 10) > 25) {
+                var vSpreadNow = parseInt(vM[1], 10);
+                var lagRe = /VERIFY_LAG (\S+) (\d+)/g, lagM;
+                var residuals = {};
+                while ((lagM = lagRe.exec(stdout || "")) !== null)
+                    residuals[lagM[1]] = parseInt(lagM[2], 10);
+                _verifyCorrected = true;
+                if (vSpreadNow <= 900) {
+                    try {
+                        var vMap = JSON.parse(cfg.syncOffsetMap || "{}");
+                        for (var vs in residuals) {
+                            if (residuals[vs] === 0) continue;
+                            var vKey = _btMacOfSink(vs) || vs;
+                            var vOld = parseInt(vMap[vKey], 10);
+                            if (!isFinite(vOld)) vOld = 0;
+                            vMap[vKey] = Math.max(-100, Math.min(2000, vOld + residuals[vs]));
+                        }
+                        cfg.syncOffsetMap = JSON.stringify(vMap);
+                    } catch (e) {}
+                    app.notify(i18n("Sync check"),
+                               i18n("The speakers were %1 ms apart — adjusted from the measurement, checking once more.", vSpreadNow),
+                               "audio-input-microphone");
+                } else {
+                    // Bounce the Bluetooth members: suspend/resume flushes a
+                    // wedged buffer where more delay never could.
+                    var bounce = "";
+                    var vSinks = _combineRealSinks();
+                    for (var vb = 0; vb < vSinks.length; vb++)
+                        if (vSinks[vb].indexOf("bluez_") === 0) {
+                            var vEsc = vSinks[vb].replace(/'/g, "'\\''");
+                            bounce += "pactl suspend-sink '" + vEsc + "' 1; "
+                                    + "pactl suspend-sink '" + vEsc + "' 0; ";
+                        }
+                    if (bounce !== "")
+                        app.exec(": PW_FLUSH; " + bounce + "true # " + app.nextSeq());
+                    app.notify(i18n("Sync check"),
+                               i18n("A speaker's route was stuck %1 ms behind — flushed it, checking once more.", vSpreadNow),
+                               "dialog-warning");
+                }
+                _combineRebuildLoopbacks();
+                _verifyPending = true;
+                verifySettleTimer.restart();
+                verifyGuardTimer.restart();
+                return true;
+            }
+            _calibRestoreVolume();
             // Other audio (a browser video, another player) reads as extra
             // arrivals and would make the verdict a dice roll — the script
             // discards polluted recordings and says why.
@@ -771,10 +825,13 @@ Item {
             var map = JSON.parse(cfg.syncOffsetMap || "{}");
             if (mac !== "") {
                 if (map[mac] !== undefined)
-                    return Math.max(0, Math.min(900, parseInt(map[mac], 10) || 0));
+                    return Math.max(0, Math.min(2000, parseInt(map[mac], 10) || 0));
             } else if (map[sinkId] !== undefined) {
                 var w = parseInt(map[sinkId], 10);
-                if (isFinite(w)) return Math.max(-100, Math.min(900, w));
+                // The verify loop's corrections may push past the direct
+                // calibration's own 900 ms sanity window — a through-path
+                // lag includes loopback buffering the direct click never saw.
+                if (isFinite(w)) return Math.max(-100, Math.min(2000, w));
             }
         } catch (e) {}
         return mac !== "" ? Math.max(0, Math.min(900, cfg.syncOffsetMs || 0)) : 0;
@@ -863,6 +920,7 @@ Item {
         }
         if (wired === "" || bt === "") return;
         _calibrating = true;
+        _verifyCorrected = false;
         // The natural moment to calibrate is WHILE listening — but program
         // audio through the live loopbacks either drowns the clicks (every
         // measurement fails) or a drum hit beats them in the peak search and
@@ -1159,11 +1217,16 @@ Item {
     // the loopbacks were rebuilt with the new delays, and the room is being
     // listened back to.
     property bool _verifyPending: false
+    // One correction round per calibration: the loop must converge, not
+    // chase its own tail. Reset when a new calibration starts.
+    property bool _verifyCorrected: false
 
     Timer {
         id: verifySettleTimer
-        // The rebuilt loopbacks need a beat before the clicks ride them.
-        interval: 2500
+        // The rebuilt loopbacks need real time before the clicks ride them:
+        // a fresh loopback's first second reported arrivals over a second
+        // off while its buffer settled (measured live).
+        interval: 6000
         repeat: false
         onTriggered: {
             if (!_verifyPending) return;
