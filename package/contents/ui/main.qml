@@ -1401,19 +1401,12 @@ PlasmoidItem {
             onPicked(origUrl);
             return;
         }
-        const servers = ["de1", "de2", "nl1", "at1", "fi1"];
-        const srv = servers[Math.floor(Math.random() * servers.length)];
-        const xhr = new XMLHttpRequest();
-        var guard = null;
-        xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
-                + encodeURIComponent(stationName)
-                + "&hidebroken=true&order=bitrate&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            _clearXhrTimeout(guard);
+        _rbFetch("/json/stations/search?name="
+                 + encodeURIComponent(stationName)
+                 + "&hidebroken=true&order=bitrate&reverse=true&limit=30",
+                 4000, function(xhr) {
             let pickedUrl = origUrl;
-            if (xhr.status === 200) {
+            if (xhr && xhr.status === 200) {
                 try {
                     const results = JSON.parse(xhr.responseText) || [];
                     const nameLower = stationName.toLowerCase();
@@ -1481,11 +1474,7 @@ PlasmoidItem {
                 console.log("[ARP] auto-bitrate upgrade: " + stationName + " => " + pickedUrl);
             }
             onPicked(pickedUrl);
-        };
-        // NB: QML XHR's xhr.timeout is a no-op — the real timeout runs via an abort
-        // timer, whose abort() drives readyState to DONE (status 0) → the fallback path above.
-        guard = _armXhrTimeout(xhr, 4000);
-        xhr.send();
+        });
     }
 
     // --- A working timeout for QML XHR (xhr.timeout/ontimeout do nothing in Qt) ---
@@ -1509,6 +1498,43 @@ PlasmoidItem {
     function _clearXhrTimeout(timer) {
         if (!timer) return;
         try { timer.stop(); timer.destroy(); } catch (e) {}
+    }
+
+    // ── radio-browser transport ──────────────────────────────────────────────
+    // Every radio-browser call in this file goes through one GET with
+    // sequential mirror failover — the convention _rbResolveUuid proved out.
+    // A single random pick from the hard-coded five used to hit a mirror
+    // whose DNS no longer resolves well over half the time, with no second
+    // attempt: the bitrate upgrade, the heal lookup, clicks and votes all
+    // became a lottery. Live mirrors lead the list, so the dead tail only
+    // ever costs a timeout when everything ahead of it failed.
+    readonly property var _rbMirrors: ["de1", "de2", "nl1", "at1", "fi1"]
+
+    // onDone(xhr) fires once with the first mirror that gave a usable
+    // answer. Transport failures (dead DNS, refused, the abort-timer's
+    // status 0 — QML XHR's own xhr.timeout is a no-op) and server-side 5xx
+    // move on to the next mirror; anything else, including a 4xx that would
+    // be identical everywhere, belongs to the caller. Every mirror down →
+    // onDone(null), so callers can fall back instead of waiting forever.
+    function _rbFetch(path, timeoutMs, onDone) {
+        var attempt = 0;
+        function tryNext() {
+            if (attempt >= root._rbMirrors.length) { onDone(null); return; }
+            var srv = root._rbMirrors[attempt++];
+            var xhr = new XMLHttpRequest();
+            var guard = null;
+            xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== xhr.DONE) return;
+                _clearXhrTimeout(guard);
+                if (xhr.status === 0 || xhr.status >= 500) { tryNext(); return; }
+                onDone(xhr);
+            };
+            guard = _armXhrTimeout(xhr, timeoutMs);
+            xhr.send();
+        }
+        tryNext();
     }
 
     // ── Casting (Google Cast + DLNA/UPnP renderers) ──────────────────────────
@@ -2040,19 +2066,12 @@ PlasmoidItem {
         var norm = _healNormName(name);
         if (norm === "") return;
         var mySeq = ++_healSeq;
-        var servers = ["de1", "de2", "nl1", "at1", "fi1"];
-        var srv = servers[Math.floor(Math.random() * servers.length)];
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
-                + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            _clearXhrTimeout(guard);
+        _rbFetch("/json/stations/search?name="
+                 + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
+                 5000, function(xhr) {
             if (mySeq !== _healSeq) return;          // superseded by a newer heal
             if (isPlaying() || lastPlay < 0) return; // user moved on / recovered
-            if (xhr.status !== 200) return;
+            if (!xhr || xhr.status !== 200) return;
             var best = null, bestScore = -1;
             try {
                 var results = JSON.parse(xhr.responseText) || [];
@@ -2089,9 +2108,7 @@ PlasmoidItem {
             root._currentResolvedUrl = best;
             startWithFade({ "name": name, "hostname": best,
                             "favicon": st.favicon || "", "active": true });
-        };
-        guard = _armXhrTimeout(xhr, 5000);
-        xhr.send();
+        });
     }
 
     // The auditioned address buffered for real. Make it permanent ONLY when
@@ -2175,10 +2192,9 @@ PlasmoidItem {
 
     // radio-browser identity of the current station. Stored with the station
     // on first resolve; stations added from the search carry it from birth.
-    // Mirrors are tried IN ORDER (the same de1→nl1→… convention the search
-    // uses — a single random pick made it unreliable), and only a mirror
-    // that actually answered may negative-cache the station: one slow
-    // mirror used to silently disable clicks AND votes for 24 hours.
+    // Mirrors fail over in order via _rbFetch, and only a mirror that
+    // actually answered may negative-cache the station: one slow mirror
+    // used to silently disable clicks AND votes for 24 hours.
     function _rbResolveUuid(onUuid) {
         var entry = _stationEntry();
         if (!entry) return;
@@ -2188,44 +2204,28 @@ PlasmoidItem {
         if (_uuidFailed[orig] !== undefined && now - _uuidFailed[orig] < 86400000) return;
         var name = (entry.name || "").toString();
         if (name === "") return;
-        var mirrors = ["de1", "nl1", "de2", "at1", "fi1"];
-        var attempt = 0;
-
-        function tryNext() {
-            if (attempt >= mirrors.length) return; // all transient — retry next time
-            var srv = mirrors[attempt++];
-            var xhr = new XMLHttpRequest();
-            var guard = null;
-            xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/stations/search?name="
-                    + encodeURIComponent(name) + "&limit=30");
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState !== xhr.DONE) return;
-                _clearXhrTimeout(guard);
-                if (xhr.status !== 200) { tryNext(); return; }
-                var uuid = "";
-                try {
-                    var results = JSON.parse(xhr.responseText) || [];
-                    var origNoProto = orig.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
-                    for (var i = 0; i < results.length; i++) {
-                        var u = (results[i].url_resolved || results[i].url || "").toString()
-                                .replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
-                        if (u === origNoProto) { uuid = results[i].stationuuid || ""; break; }
-                    }
-                } catch (e) { tryNext(); return; }
-                if (uuid === "") {
-                    // A real answer with no match — the station is genuinely
-                    // not in the catalog; remembering that for a day is fair.
-                    _uuidFailed[orig] = Date.now();
-                    return;
+        _rbFetch("/json/stations/search?name=" + encodeURIComponent(name) + "&limit=30",
+                 5000, function(xhr) {
+            if (!xhr || xhr.status !== 200) return; // all transient — retry next time
+            var uuid = "";
+            try {
+                var results = JSON.parse(xhr.responseText) || [];
+                var origNoProto = orig.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
+                for (var i = 0; i < results.length; i++) {
+                    var u = (results[i].url_resolved || results[i].url || "").toString()
+                            .replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
+                    if (u === origNoProto) { uuid = results[i].stationuuid || ""; break; }
                 }
-                _rbStoreUuid(orig, uuid);
-                onUuid(uuid);
-            };
-            guard = _armXhrTimeout(xhr, 5000);
-            xhr.send();
-        }
-        tryNext();
+            } catch (e) { return; }
+            if (uuid === "") {
+                // A real answer with no match — the station is genuinely
+                // not in the catalog; remembering that for a day is fair.
+                _uuidFailed[orig] = Date.now();
+                return;
+            }
+            _rbStoreUuid(orig, uuid);
+            onUuid(uuid);
+        });
     }
 
     function _rbStoreUuid(orig, uuid) {
@@ -2259,18 +2259,9 @@ PlasmoidItem {
             && now - _clickSent[entry.hostname] < 14400000) return;
         _clickSent[entry.hostname] = now;
         _rbResolveUuid(function(uuid) {
-            var servers = ["de1", "de2", "nl1", "at1", "fi1"];
-            var srv = servers[Math.floor(Math.random() * servers.length)];
-            var xhr = new XMLHttpRequest();
-            var guard = null;
-            xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/url/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState !== xhr.DONE) return;
-                _clearXhrTimeout(guard);
-            };
-            guard = _armXhrTimeout(xhr, 4000);
-            xhr.send();
+            // Fire-and-forget, but with failover — a dead mirror used to
+            // swallow the ping while the 4 h lock was already taken.
+            _rbFetch("/json/url/" + uuid, 4000, function(xhr) {});
         });
     }
 
@@ -2281,26 +2272,16 @@ PlasmoidItem {
         _voteStatus = "busy";
         var votedUrl = entry.hostname;
         _rbResolveUuid(function(uuid) {
-            var servers = ["de1", "de2", "nl1", "at1", "fi1"];
-            var srv = servers[Math.floor(Math.random() * servers.length)];
-            var xhr = new XMLHttpRequest();
-            var guard = null;
-            xhr.open("GET", "https://" + srv + ".api.radio-browser.info/json/vote/" + uuid);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState !== xhr.DONE) return;
-                _clearXhrTimeout(guard);
+            _rbFetch("/json/vote/" + uuid, 5000, function(xhr) {
                 var ok = false;
-                try { ok = JSON.parse(xhr.responseText).ok === true; } catch (e) {}
+                try { ok = xhr && JSON.parse(xhr.responseText).ok === true; } catch (e) {}
                 if (ok) {
                     root._voteLockMap[votedUrl] = Date.now();
                     if (root._currentOrigUrl === votedUrl) root._voteStatus = "voted";
                 } else if (root._currentOrigUrl === votedUrl && root._voteStatus === "busy") {
                     root._voteStatus = "";
                 }
-            };
-            guard = _armXhrTimeout(xhr, 5000);
-            xhr.send();
+            });
         });
         // The resolve may fail silently — release the button after a beat.
         voteResetTimer.restart();
