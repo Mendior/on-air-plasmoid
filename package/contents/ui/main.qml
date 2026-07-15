@@ -958,6 +958,12 @@ PlasmoidItem {
             alarms = list;
             _saveAlarms();
             _alarmArmInhibit();
+        } else if (_alarmInhibitUntil > 0 && now > _alarmInhibitUntil - 120000
+                   && AlarmLogic.earliestKeepAwake(alarms) > 0) {
+            // The 12 h-capped holder is about to let go while a keep-awake
+            // alarm is still ahead — chain a fresh one so the coverage is
+            // continuous all the way to the fire moment.
+            _alarmArmInhibit();
         }
         if (toFire !== null) _alarmFire(toFire);
     }
@@ -1051,20 +1057,27 @@ PlasmoidItem {
     // belong to an innocent process by then.
     readonly property string _alarmInhibitPidFile: _mprisRunDir + "/arp-alarm-inhibit-" + _mprisId + ".pid"
 
+    // When the current inhibit holder lets go (epoch ms), 0 when none is
+    // held. The holder is capped at 12 h (AlarmLogic.INHIBIT_MAX_S) so a
+    // weekly alarm can't pin the machine awake for six days — _alarmTick
+    // re-arms a fresh one as this deadline approaches.
+    property double _alarmInhibitUntil: 0
+
     function _alarmArmInhibit() {
-        var until = AlarmLogic.earliestKeepAwake(alarms);
+        var now = Date.now();
+        var secs = AlarmLogic.inhibitSeconds(AlarmLogic.earliestKeepAwake(alarms), now);
         var pf = _alarmInhibitPidFile.replace(/'/g, "'\\''");
         var cmd = ": ALARM_INHIBIT; "
             + "if [ -f '" + pf + "' ]; then p=$(cat '" + pf + "' 2>/dev/null); "
             + "[ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'systemd-inhibit.*On Air' "
             + "&& kill -- -\"$p\" 2>/dev/null; rm -f '" + pf + "'; fi; ";
-        if (until > 0) {
-            var secs = Math.max(60, Math.round((until - Date.now()) / 1000) + 120);
+        if (secs > 0) {
             cmd += "command -v systemd-inhibit >/dev/null 2>&1 && { "
                 + "setsid systemd-inhibit --what=sleep --who='On Air' "
                 + "--why='Wake-up alarm' sleep " + secs + " >/dev/null 2>&1 & "
                 + "echo $! > '" + pf + "'; }; ";
         }
+        _alarmInhibitUntil = secs > 0 ? now + secs * 1000 : 0;
         executable.exec(cmd + "true # " + (++_execSeq));
     }
 

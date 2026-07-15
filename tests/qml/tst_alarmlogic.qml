@@ -162,6 +162,28 @@ TestCase {
         compare(AL.castSilencesWakeTone(1, 1, 0), false)
     }
 
+    // ── inhibitSeconds ────────────────────────────────────────────────────
+    // The keep-awake holder is capped: a weekly alarm six days out must not
+    // pin the machine awake for six days (audit finding 0.3).
+
+    function test_inhibit_normal_window_gets_the_two_minute_tail() {
+        compare(AL.inhibitSeconds(1000 * 1000 + 3600 * 1000, 1000 * 1000), 3720)
+    }
+
+    function test_inhibit_is_capped_at_twelve_hours() {
+        var sixDaysMs = 6 * 24 * 3600 * 1000
+        compare(AL.inhibitSeconds(sixDaysMs, 0), AL.INHIBIT_MAX_S)
+        compare(AL.INHIBIT_MAX_S, 12 * 3600)
+    }
+
+    function test_inhibit_floors_at_a_minute_and_zeroes_when_idle() {
+        compare(AL.inhibitSeconds(1000, 900), 120)     // due now: just the tail
+        compare(AL.inhibitSeconds(1000, 200000), 60)   // already past: the floor
+        compare(AL.inhibitSeconds(0, 5000), 0)         // nothing keep-awake
+        compare(AL.inhibitSeconds(-1, 5000), 0)
+        compare(AL.inhibitSeconds(undefined, 5000), 0)
+    }
+
     // ── earliestKeepAwake ─────────────────────────────────────────────────
 
     function test_earliest_keep_awake() {

@@ -98,6 +98,20 @@ function castSilencesWakeTone(casting, confirmed, localPlay) {
     return casting === true && confirmed === true && localPlay !== true;
 }
 
+// How long one systemd-inhibit holder should hold, in seconds — 0 when
+// nothing wants the machine awake. Capped at 12 hours: a weekly alarm must
+// not pin the machine awake for six days. The scheduler tick re-arms a
+// fresh holder as the current one nears expiry, so a due alarm is still
+// covered right up to firing; the +120 s tail keeps the fire moment itself
+// inside the hold.
+var INHIBIT_MAX_S = 12 * 3600;
+
+function inhibitSeconds(untilMs, nowMs) {
+    if (!(untilMs > 0)) return 0;
+    return Math.max(60, Math.min(INHIBIT_MAX_S,
+                                 Math.round((untilMs - nowMs) / 1000) + 120));
+}
+
 // The soonest keep-awake deadline, or 0 when no alarm wants the machine
 // held awake — the QML side turns this into one systemd-inhibit holder.
 function earliestKeepAwake(alarms) {
