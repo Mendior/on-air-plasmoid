@@ -49,7 +49,11 @@ function clampInt(v, lo, hi, dflt) {
 // versions and hand edits. Returns [] for anything that is not a
 // well-formed array; entries without a stream URL are dropped whole.
 // volumePct has a floor of 15: an alarm is never allowed to be silent.
-function sanitizeAlarms(raw) {
+// A missing or mangled nextRun is RECOMPUTED from the wall-clock fields
+// rather than zeroed: fireDecision treats 0 as "wait" forever, so a zeroed
+// entry would sit armed-looking in the UI and never ring.
+function sanitizeAlarms(raw, nowMs) {
+    var now = (nowMs === undefined) ? Date.now() : nowMs;
     var arr;
     try {
         arr = JSON.parse(raw || "[]");
@@ -64,18 +68,22 @@ function sanitizeAlarms(raw) {
         var url = (a.url || "").toString();
         if (url === "") continue;
         var repeat = (a.repeat === "daily" || a.repeat === "weekly") ? a.repeat : "once";
+        var hh = clampInt(a.hh, 0, 23, 7);
+        var mm = clampInt(a.mm, 0, 59, 0);
+        var weekday = clampInt(a.weekday, 0, 6, 0);
         out.push({
             station: (a.station || url).toString(),
             url: url,
             favicon: (a.favicon || "").toString(),
-            hh: clampInt(a.hh, 0, 23, 7),
-            mm: clampInt(a.mm, 0, 59, 0),
+            hh: hh,
+            mm: mm,
             repeat: repeat,
-            weekday: clampInt(a.weekday, 0, 6, 0),
+            weekday: weekday,
             volumePct: clampInt(a.volumePct, 15, 100, 40),
             keepAwake: a.keepAwake === true,
             nextRun: (typeof a.nextRun === "number" && isFinite(a.nextRun) && a.nextRun > 0)
-                     ? a.nextRun : 0
+                     ? a.nextRun
+                     : nextOccurrence(hh, mm, repeat, weekday, now)
         });
     }
     return out;

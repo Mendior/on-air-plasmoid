@@ -905,6 +905,10 @@ PlasmoidItem {
 
     function addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake) {
         if (!url) return;
+        // One defaulted weekday for BOTH the stored entry and the schedule
+        // math — feeding nextOccurrence the raw undefined made the computed
+        // nextRun disagree with the weekday the entry then carried.
+        var wd = weekday === undefined ? new Date().getDay() : weekday;
         var list = alarms.slice();
         list.push({
             "station": stationName || url,
@@ -912,10 +916,10 @@ PlasmoidItem {
             "favicon": favicon || "",
             "hh": hh, "mm": mm,
             "repeat": repeat || "once",
-            "weekday": weekday === undefined ? new Date().getDay() : weekday,
+            "weekday": wd,
             "volumePct": Math.max(15, Math.min(100, volumePct || 40)),
             "keepAwake": keepAwake === true,
-            "nextRun": AlarmLogic.nextOccurrence(hh, mm, repeat || "once", weekday, Date.now())
+            "nextRun": AlarmLogic.nextOccurrence(hh, mm, repeat || "once", wd, Date.now())
         });
         alarms = list;
         _saveAlarms();

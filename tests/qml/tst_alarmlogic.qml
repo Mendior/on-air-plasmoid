@@ -123,6 +123,22 @@ TestCase {
         compare(AL.sanitizeAlarms(JSON.stringify([{ station: "x" }, 42, null])).length, 0)
     }
 
+    function test_sanitize_revives_a_dead_nextrun() {
+        // fireDecision treats 0 as "wait" forever — a zeroed entry looked
+        // armed in the UI but could never ring (audit finding 0.7). Sanitize
+        // must recompute it from the wall-clock fields instead.
+        var now = ms(2026, 7, 14, 6, 0)
+        var out = AL.sanitizeAlarms(JSON.stringify([
+            { url: "http://x", hh: 7, mm: 30, repeat: "daily", nextRun: 0 },
+            { url: "http://y", hh: 7, mm: 30, repeat: "daily" },
+            { url: "http://z", hh: 7, mm: 30, repeat: "daily", nextRun: "junk" }
+        ]), now)
+        compare(out.length, 3)
+        compare(out[0].nextRun, ms(2026, 7, 14, 7, 30))
+        compare(out[1].nextRun, ms(2026, 7, 14, 7, 30))
+        compare(out[2].nextRun, ms(2026, 7, 14, 7, 30))
+    }
+
     function test_sanitize_keeps_a_good_entry_whole() {
         var out = AL.sanitizeAlarms(JSON.stringify([{
             station: "Radio", url: "http://r", favicon: "http://f", hh: 6, mm: 45,
