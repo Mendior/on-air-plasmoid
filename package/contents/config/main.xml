@@ -130,16 +130,16 @@
             <default>[]</default>
         </entry>
         <entry name="reportClicks" type="bool">
-            <label>Report an anonymous listening click to radio-browser.info when a station starts playing</label>
-            <default>true</default>
+            <label>Report an anonymous listening click to radio-browser.info when a station starts playing — opt-in: anything leaving the machine is the user's call</label>
+            <default>false</default>
         </entry>
         <entry name="downloadDir" type="String">
             <label>Download directory (empty = ~/Music/OnAir)</label>
             <default></default>
         </entry>
         <entry name="aiHelperEnabled" type="bool">
-            <label>Clean up track title with Claude CLI before searching/downloading</label>
-            <default>true</default>
+            <label>Clean up track title with Claude CLI before searching/downloading — opt-in: sends track names to an external service</label>
+            <default>false</default>
         </entry>
         <entry name="followSystemAccent" type="bool">
             <label>Use the system accent color instead of the built-in emerald theme</label>
