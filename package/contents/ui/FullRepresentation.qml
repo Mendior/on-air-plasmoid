@@ -604,7 +604,7 @@ PlasmaExtras.Representation {
                                                 text: {
                                                     var bits = []
                                                     if (webItem.model.country) bits.push(webItem.model.country)
-                                                    if (webItem.model.bitrate > 0) bits.push(webItem.model.bitrate + " kb/s")
+                                                    if (webItem.model.bitrate > 0) bits.push(i18n("%1 kb/s", webItem.model.bitrate))
                                                     if (webItem.model.codec) bits.push(webItem.model.codec)
                                                     return bits.join(" · ")
                                                 }
@@ -1002,7 +1002,7 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.Label {
                             id: brLabel
                             anchors.centerIn: parent
-                            text: fullRepresentation._nowBitrate + " kb/s"
+                            text: i18n("%1 kb/s", fullRepresentation._nowBitrate)
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: root.accentBright
                         }
@@ -1357,7 +1357,7 @@ PlasmaExtras.Representation {
                     }
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
-                        text: i18n("Downloading: ") + (root._dlCurrentQuery || "…")
+                        text: i18n("Downloading: %1", root._dlCurrentQuery || "…")
                         // Untrusted (derived from the ICY title) — never interpret as HTML
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
@@ -1716,10 +1716,11 @@ PlasmaExtras.Representation {
                                 text: {
                                     var s = schedItem.modelData
                                     var when = root._pad2(s.hh) + ":" + root._pad2(s.mm)
-                                    // Fixed English day names — the UI language is
-                                    // English by design, Qt.locale() would leak the
-                                    // system locale here.
-                                    var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                    // Day names via i18n, NOT Qt.locale(): the catalog
+                                    // keeps them in the widget's language, while the
+                                    // system locale may be something else entirely.
+                                    var days = [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
+                                                i18n("Thu"), i18n("Fri"), i18n("Sat")]
                                     var d = new Date(s.nextRun)
                                     var rep = s.repeat === "daily" ? i18n("Daily")
                                             : s.repeat === "weekly" ? i18n("Every %1", days[s.weekday])
@@ -1806,7 +1807,7 @@ PlasmaExtras.Representation {
                             from: 5; to: 600
                             stepSize: 5
                             value: 60
-                            textFromValue: function(v) { return v + " min" }
+                            textFromValue: function(v) { return i18n("%1 min", v) }
                             valueFromText: function(t) { return parseInt(t) || 60 }
                             Accessible.name: i18n("Duration in minutes")
                         }
@@ -1825,8 +1826,9 @@ PlasmaExtras.Representation {
                             QQC2.ComboBox {
                                 id: schedWeekday
                                 visible: schedRepeat.currentIndex === 2
-                                // Fixed English day names (UI language is English by design)
-                                model: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                // Day names via i18n — same language as the rest of the UI
+                                model: [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
+                                        i18n("Thu"), i18n("Fri"), i18n("Sat")]
                                 currentIndex: new Date().getDay()
                                 Accessible.name: i18n("Weekday")
                             }
@@ -1931,10 +1933,11 @@ PlasmaExtras.Representation {
                                 text: {
                                     var a = alarmItem.modelData
                                     var when = root._pad2(a.hh) + ":" + root._pad2(a.mm)
-                                    // Fixed English day names — the UI language is
-                                    // English by design, Qt.locale() would leak the
-                                    // system locale here.
-                                    var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                    // Day names via i18n, NOT Qt.locale(): the catalog
+                                    // keeps them in the widget's language, while the
+                                    // system locale may be something else entirely.
+                                    var days = [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
+                                                i18n("Thu"), i18n("Fri"), i18n("Sat")]
                                     var d = new Date(a.nextRun)
                                     var rep = a.repeat === "daily" ? i18n("Daily")
                                             : a.repeat === "weekly" ? i18n("Every %1", days[a.weekday])
@@ -2027,8 +2030,9 @@ PlasmaExtras.Representation {
                             QQC2.ComboBox {
                                 id: alarmWeekday
                                 visible: alarmRepeat.currentIndex === 2
-                                // Fixed English day names (UI language is English by design)
-                                model: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                                // Day names via i18n — same language as the rest of the UI
+                                model: [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
+                                        i18n("Thu"), i18n("Fri"), i18n("Sat")]
                                 currentIndex: new Date().getDay()
                                 Accessible.name: i18n("Weekday")
                             }
@@ -2419,7 +2423,7 @@ PlasmaExtras.Representation {
                 checkable: true
                 checked: root.sleepRemainingSec > 0
                 tooltipText: root.sleepRemainingSec > 0
-                             ? i18n("Sleep timer: ") + sleepFormatted()
+                             ? i18n("Sleep timer: %1", sleepFormatted())
                              : i18n("Sleep timer")
                 onClicked: sleepMenu.open()
 
@@ -2493,7 +2497,7 @@ PlasmaExtras.Representation {
                                + (root._recScheduled ? " · " + root._recStationName : "")
                     }
                     if (root.sleepRemainingSec > 0) {
-                        return i18n("Sleeping in ") + sleepFormatted()
+                        return i18n("Sleeping in %1", sleepFormatted())
                     }
                     if (root.downloading) {
                         return "⬇ " + i18n("Downloading…")
@@ -2504,10 +2508,10 @@ PlasmaExtras.Representation {
                     if (!isConnected)
                         return i18n("Check internet connection…")
                     else if (root.isError)
-                        return i18n("Error: ") + playMusic.errorString
+                        return i18n("Error: %1", playMusic.errorString)
                     else if (fullRepresentation._streamActive) {
                         if (fullRepresentation._nowBitrate > 0)
-                            return i18n("Bitrate: ") + fullRepresentation._nowBitrate + 'Kb/s'
+                            return i18n("Bitrate: %1 kb/s", fullRepresentation._nowBitrate)
                         else
                             return root.title !== Plasmoid.title ? "♪ " + i18n("Playing") : i18n("Connecting…")
                     } else if (playMusic.mediaStatus === MediaPlayer.LoadingMedia
@@ -3120,7 +3124,7 @@ PlasmaExtras.Representation {
                     return "audio-volume-high"
                 }
                 iconScale: 0.55
-                tooltipText: i18n("Volume: ") + Math.round(playMusicOutput.volume * 100) + "% " + i18n("(scroll to adjust)")
+                tooltipText: i18n("Volume: %1% (scroll to adjust)", Math.round(playMusicOutput.volume * 100))
                 onClicked: volumePopup.open()
 
                 // Scroll wheel over the button = volume

@@ -206,7 +206,10 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     echo "OK: reload with scripts/dev.sh restart (full effect after re-login)"
     ;;
   i18n)
-    find "$PKG/contents/ui" -name '*.qml' | sort > /tmp/onair-qml-files.txt
+    # ALL of contents/, not just ui/: config/config.qml lives one level up
+    # and its four i18n() category names were never extracted — the settings
+    # dialog's tabs stayed English in every translation.
+    find "$PKG/contents" -name '*.qml' | sort > /tmp/onair-qml-files.txt
     xgettext --from-code=UTF-8 -C -kde -ci18n -ki18n:1 -ki18nc:1c,2 -ki18np:1,2 -ki18ncp:1c,2,3 \
       --package-name='plasma_applet_io.github.mendior.onair' \
       --msgid-bugs-address='https://github.com/Mendior/on-air-plasmoid/issues' \
