@@ -89,6 +89,45 @@ function sanitizeAlarms(raw, nowMs) {
     return out;
 }
 
+// The recording scheduler's persisted list, same treatment as the alarms:
+// validated field by field, entries without a URL dropped whole, a missing
+// or mangled nextRun recomputed instead of zeroed (a zeroed entry sits in
+// the list looking armed and never records).
+function sanitizeRecSchedules(raw, nowMs) {
+    var now = (nowMs === undefined) ? Date.now() : nowMs;
+    var arr;
+    try {
+        arr = JSON.parse(raw || "[]");
+    } catch (e) {
+        return [];
+    }
+    if (!Array.isArray(arr)) return [];
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+        var s = arr[i];
+        if (!s || typeof s !== "object") continue;
+        var url = (s.url || "").toString();
+        if (url === "") continue;
+        var repeat = (s.repeat === "daily" || s.repeat === "weekly") ? s.repeat : "once";
+        var hh = clampInt(s.hh, 0, 23, 7);
+        var mm = clampInt(s.mm, 0, 59, 0);
+        var weekday = clampInt(s.weekday, 0, 6, 0);
+        out.push({
+            station: (s.station || url).toString(),
+            url: url,
+            hh: hh,
+            mm: mm,
+            durationMin: clampInt(s.durationMin, 1, 24 * 60, 60),
+            repeat: repeat,
+            weekday: weekday,
+            nextRun: (typeof s.nextRun === "number" && isFinite(s.nextRun) && s.nextRun > 0)
+                     ? s.nextRun
+                     : nextOccurrence(hh, mm, repeat, weekday, now)
+        });
+    }
+    return out;
+}
+
 // The alarm's life after one occurrence has been dealt with:
 // -1 = remove the entry (one-shots are spent), otherwise the new nextRun.
 function advance(alarm, nowMs) {

@@ -748,12 +748,10 @@ PlasmoidItem {
     // start moment was missed (machine asleep) — it records the REMAINDER.
 
     function _loadRecSchedules() {
-        try {
-            var arr = JSON.parse(Plasmoid.configuration.recSchedules || "[]");
-            recSchedules = Array.isArray(arr) ? arr : [];
-        } catch (e) {
-            recSchedules = [];
-        }
+        // Field-by-field validation lives in AlarmLogic (tested): a config
+        // entry with a mangled nextRun or a hand-edited hour used to sit in
+        // the list looking armed and never record anything.
+        recSchedules = AlarmLogic.sanitizeRecSchedules(Plasmoid.configuration.recSchedules);
     }
 
     function _saveRecSchedules() {
@@ -768,6 +766,10 @@ PlasmoidItem {
 
     function addRecSchedule(stationName, url, hh, mm, durationMin, repeat, weekday) {
         if (!url || !canRecordUrl(url)) return;
+        // One defaulted weekday for BOTH the stored entry and the schedule
+        // math — same fix as addAlarm; the raw undefined made a weekly
+        // schedule's first nextRun disagree with its stored weekday.
+        var wd = weekday === undefined ? new Date().getDay() : weekday;
         var list = recSchedules.slice();
         list.push({
             "station": stationName || url,
@@ -775,8 +777,8 @@ PlasmoidItem {
             "hh": hh, "mm": mm,
             "durationMin": Math.max(1, durationMin),
             "repeat": repeat || "once",
-            "weekday": weekday === undefined ? new Date().getDay() : weekday,
-            "nextRun": _nextOccurrence(hh, mm, repeat || "once", weekday, Date.now())
+            "weekday": wd,
+            "nextRun": _nextOccurrence(hh, mm, repeat || "once", wd, Date.now())
         });
         recSchedules = list;
         _saveRecSchedules();

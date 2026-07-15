@@ -76,6 +76,14 @@ PlasmaExtras.Representation {
     // is not "no matching stations", and the empty-state must say which of
     // the two it is telling the user about.
     property bool webSearchFailed: false
+
+    // Canvas gradients want CSS color strings — built from the live accent
+    // so the aurora and the vinyl glint follow the follow-system setting
+    // instead of the hard-coded default green.
+    function cssRgba(c, a) {
+        return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255)
+               + "," + Math.round(c.b * 255) + "," + a + ")"
+    }
     readonly property var _countryMap: ({
         "soome": "FI", "finland": "FI",
         "eesti": "EE", "estonia": "EE",
@@ -216,6 +224,8 @@ PlasmaExtras.Representation {
 
         Canvas {
             id: blobA
+            readonly property color tint: root.accent
+            onTintChanged: requestPaint()
             width: Kirigami.Units.gridUnit * 16
             height: width
             x: -width * 0.3
@@ -224,9 +234,9 @@ PlasmaExtras.Representation {
                 var ctx = getContext("2d")
                 ctx.reset()
                 var g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 2)
-                g.addColorStop(0, "rgba(111, 207, 151, 0.30)")
-                g.addColorStop(0.55, "rgba(111, 207, 151, 0.10)")
-                g.addColorStop(1, "rgba(111, 207, 151, 0)")
+                g.addColorStop(0, fullRepresentation.cssRgba(tint, 0.30))
+                g.addColorStop(0.55, fullRepresentation.cssRgba(tint, 0.10))
+                g.addColorStop(1, fullRepresentation.cssRgba(tint, 0))
                 ctx.fillStyle = g
                 ctx.fillRect(0, 0, width, height)
             }
@@ -247,6 +257,8 @@ PlasmaExtras.Representation {
 
         Canvas {
             id: blobB
+            readonly property color tint: root.accentTeal
+            onTintChanged: requestPaint()
             width: Kirigami.Units.gridUnit * 13
             height: width
             x: fullRepresentation.width - width * 0.4
@@ -255,9 +267,9 @@ PlasmaExtras.Representation {
                 var ctx = getContext("2d")
                 ctx.reset()
                 var g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 2)
-                g.addColorStop(0, "rgba(43, 179, 163, 0.26)")
-                g.addColorStop(0.55, "rgba(43, 179, 163, 0.09)")
-                g.addColorStop(1, "rgba(43, 179, 163, 0)")
+                g.addColorStop(0, fullRepresentation.cssRgba(tint, 0.26))
+                g.addColorStop(0.55, fullRepresentation.cssRgba(tint, 0.09))
+                g.addColorStop(1, fullRepresentation.cssRgba(tint, 0))
                 ctx.fillStyle = g
                 ctx.fillRect(0, 0, width, height)
             }
@@ -829,6 +841,10 @@ PlasmaExtras.Representation {
 
                             Canvas {
                                 anchors.fill: parent
+                                readonly property color tintA: root.accent
+                                readonly property color tintB: root.accentTeal
+                                onTintAChanged: requestPaint()
+                                onTintBChanged: requestPaint()
                                 onPaint: {
                                     var ctx = getContext("2d")
                                     ctx.reset()
@@ -848,9 +864,9 @@ PlasmaExtras.Representation {
                                     }
                                     // Light glint
                                     var g = ctx.createLinearGradient(0, 0, width, height)
-                                    g.addColorStop(0, "rgba(111,207,151,0.14)")
-                                    g.addColorStop(0.5, "rgba(111,207,151,0)")
-                                    g.addColorStop(1, "rgba(43,179,163,0.10)")
+                                    g.addColorStop(0, fullRepresentation.cssRgba(tintA, 0.14))
+                                    g.addColorStop(0.5, fullRepresentation.cssRgba(tintA, 0))
+                                    g.addColorStop(1, fullRepresentation.cssRgba(tintB, 0.10))
                                     ctx.beginPath()
                                     ctx.arc(c, c, c - 1, 0, Math.PI * 2)
                                     ctx.fillStyle = g

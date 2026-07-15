@@ -150,6 +150,31 @@ TestCase {
         compare(out[0].keepAwake, true)
     }
 
+    // ── sanitizeRecSchedules ──────────────────────────────────────────────
+
+    function test_rec_sanitize_mirrors_the_alarm_rules() {
+        var now = ms(2026, 7, 14, 6, 0)
+        var out = AL.sanitizeRecSchedules(JSON.stringify([
+            { url: "http://x", hh: 99, mm: -3, durationMin: 0, repeat: "hourly", weekday: 12 },
+            { url: "http://y", hh: 7, mm: 30, repeat: "daily", nextRun: 0 },
+            { station: "no-url" }, 42, null
+        ]), now)
+        compare(out.length, 2)
+        compare(out[0].hh, 23)
+        compare(out[0].mm, 0)
+        compare(out[0].durationMin, 1)      // the floor: never a 0-minute recording
+        compare(out[0].repeat, "once")
+        compare(out[0].weekday, 6)
+        verify(out[0].nextRun > now)        // revived, not left inert at 0
+        compare(out[1].nextRun, ms(2026, 7, 14, 7, 30))
+    }
+
+    function test_rec_sanitize_rejects_garbage_wholesale() {
+        compare(AL.sanitizeRecSchedules("not json").length, 0)
+        compare(AL.sanitizeRecSchedules(undefined).length, 0)
+        compare(AL.sanitizeRecSchedules("{\"a\":1}").length, 0)
+    }
+
     // ── castSilencesWakeTone ──────────────────────────────────────────────
     // The 2026.18 audit's worst finding: the wake tone trusted the
     // optimistic _casting flag, so a speaker unplugged overnight silenced
