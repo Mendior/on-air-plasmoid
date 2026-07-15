@@ -287,6 +287,40 @@ KNOWN_DESCRIPTOR_PATHS = (
 )
 
 
+def _local_ipv4_addrs():
+    """The IPv4 address of every up interface — Linux ioctl, no dependencies.
+
+    The kernel routes an un-pinned multicast send out ONE interface (the
+    default route); on a machine with, say, ethernet plus a hotspot the
+    speakers on the other network never hear the M-SEARCH. Best effort:
+    any failure just means the plain default-route send below stands alone.
+    """
+    addrs = []
+    probe = None
+    try:
+        import fcntl
+        import struct
+        # One throwaway socket serves every ioctl — it only exists to have
+        # a file descriptor for SIOCGIFADDR.
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        for _idx, name in socket.if_nameindex():
+            try:
+                packed = fcntl.ioctl(probe.fileno(), 0x8915,  # SIOCGIFADDR
+                                     struct.pack("256s", name.encode()[:15]))
+                addrs.append(socket.inet_ntoa(packed[20:24]))
+            except OSError:
+                continue  # no IPv4 on this interface (down, or v6-only)
+    except Exception as exc:
+        _dbg("iface enum", exc)
+    finally:
+        if probe is not None:
+            try:
+                probe.close()
+            except Exception:
+                pass
+    return [a for a in addrs if not a.startswith("127.")]
+
+
 def _msearch(st, wait, target=None):
     """One M-SEARCH round; returns a set of LOCATION URLs.
 
@@ -311,11 +345,22 @@ def _msearch(st, wait, target=None):
             "", "",
         ]).encode()
         dest = (target, 1900) if target else SSDP_ADDR
+        ifaddrs = []
         if not target:
             s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+            ifaddrs = _local_ipv4_addrs()
         # Some renderers (Bose, notably) miss the first datagram after idling;
         # a third send costs nothing and makes single-round discovery reliable.
+        # The group send goes out once per interface (IP_MULTICAST_IF), plus
+        # one un-pinned send for whatever the kernel would have picked anyway.
         for _ in range(3):
+            for addr in ifaddrs:
+                try:
+                    s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
+                                 socket.inet_aton(addr))
+                    s.sendto(msg, dest)
+                except OSError:
+                    pass  # interface went away mid-round — the others still go
             s.sendto(msg, dest)
             time.sleep(0.15)
         end = time.time() + wait
@@ -555,20 +600,30 @@ def _discover_dlna(seconds):
             "model": dev["model"],
             "location": loc,
         }
+        # A renderer without a UDN (bare-bones firmware) falls back to its
+        # descriptor URL as identity — the empty string used to collide
+        # every such device into one cache slot and one menu row.
+        key = dev["udn"] or loc
         with fresh_lock:
-            if dev["udn"] in fresh:
+            if key in fresh:
                 return
-            fresh[dev["udn"]] = entry
+            fresh[key] = entry
         _out("DEV\tdlna\t%s\t%s\t%s\t%s\t%s\t%s" % (
-            dev["udn"], dev["name"], entry["host"], 0, dev["model"], loc))
+            key, dev["name"], entry["host"], 0, dev["model"], loc))
 
     describers = [threading.Thread(target=describe_loc, args=(loc,))
                   for loc in found_locations]
     for t in describers:
         t.daemon = True
         t.start()
+    # The describe phase gets a floor of its own: the collectors above run
+    # right up to the shared deadline, and handing the leftovers to this
+    # join used to give it 0.1 s — every renderer the search DID find was
+    # then dropped undescribed. One descriptor fetch is bounded at 3 s, so
+    # 2.5 s covers the parallel batch without doubling the whole budget.
+    describe_by = max(deadline, time.time() + 2.5)
     for t in describers:
-        t.join(max(0.1, deadline - time.time()))
+        t.join(max(0.1, describe_by - time.time()))
     # Snapshot under the lock — a describer that outlived its join may still
     # be inserting while _cache_save iterates.
     with fresh_lock:

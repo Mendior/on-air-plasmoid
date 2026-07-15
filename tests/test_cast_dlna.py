@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: LGPL-2.0-or-later
 """DLNA plumbing in cast.py: descriptor parsing, DIDL metadata and the
 M-SEARCH socket lifecycle."""
-import socket
 
 
 RENDERER_XML = """<?xml version="1.0"?>
@@ -114,7 +113,10 @@ def test_msearch_closes_socket_on_send_error(cast, monkeypatch):
     _FakeSocket.instances = []
     monkeypatch.setattr(cast.socket, "socket", _FakeSocket)
     assert cast._msearch("ssdp:all", 0.1) == set()
-    assert len(_FakeSocket.instances) == 1
+    # The interface probe opens a socket of its own now — the invariant is
+    # "nothing leaks", not "exactly one socket".
+    assert len(_FakeSocket.instances) >= 1
+    assert all(inst.closed for inst in _FakeSocket.instances)
     assert _FakeSocket.instances[0].closed
 
 
