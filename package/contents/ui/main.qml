@@ -246,8 +246,17 @@ PlasmoidItem {
         }
     }
 
+    // A one-shot loudness override for the wake-up alarm. targetVolume()
+    // serves it instead of the persisted preference until the user takes
+    // over — a deliberate volume change, an explicit stop or a manual
+    // station pick all hand control back. The config value itself is never
+    // touched: an alarm must not rewrite what the user chose last night.
+    property int _volumeOverridePct: -1
+
     function targetVolume() {
-        return Math.max(0, Math.min(1, Plasmoid.configuration.defaultVolume / 100));
+        var pct = _volumeOverridePct >= 0
+                  ? _volumeOverridePct : Plasmoid.configuration.defaultVolume;
+        return Math.max(0, Math.min(1, pct / 100));
     }
 
     // Volume set deliberately by the user (wheel, slider, MPRIS) is persisted
@@ -279,6 +288,8 @@ PlasmoidItem {
             if (root._pendingUserVolumePct > 0)
                 Plasmoid.configuration.defaultVolume = root._pendingUserVolumePct;
             root._pendingUserVolumePct = -1;
+            // The user chose a level — the alarm's one-shot override retires.
+            root._volumeOverridePct = -1;
         }
     }
 
@@ -975,10 +986,11 @@ PlasmoidItem {
         // mid-flight would drag the volume right back down, and a pending
         // sleep timer would stop the just-started station minutes later.
         cancelSleepTimer();
-        // Volume floor, written straight into the config so startWithFade's
-        // fade-in target picks it up immediately — the debounced
-        // setUserVolume path would lose the race against the fade.
-        Plasmoid.configuration.defaultVolume = Math.max(15, Math.min(100, a.volumePct || 40));
+        // Volume floor as a one-shot override so startWithFade's fade-in
+        // target picks it up immediately — the debounced setUserVolume path
+        // would lose the race against the fade, and writing the config
+        // would permanently overwrite the level the user chose last night.
+        _volumeOverridePct = Math.max(15, Math.min(100, a.volumePct || 40));
         // If cast devices are checked, startWithFade routes the alarm to
         // them — waking up to the same bedroom speaker the evening ended on
         // is correct, and the fallback below knows local silence is fine.
@@ -991,6 +1003,12 @@ PlasmoidItem {
         _castCurrentUrl = "";
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
+        // The floor must reach the DEVICES too: while casting, the local
+        // output is muted and playMusicOutput's level is irrelevant — a
+        // bedroom speaker left whisper-quiet last night would wake nobody.
+        // Goes through the standard debounced path, so per-device balances
+        // still apply on top.
+        _castSetVolume(targetVolume());
         _alarmFallbackArmed = true;
         alarmFallbackTimer.restart();
         // Keep the station list's playing-row marker honest when the alarm
@@ -2317,9 +2335,11 @@ PlasmoidItem {
 
     function _playStation(station) {
         // A user-initiated play always outranks a heal audition in flight —
-        // and someone picking a station is awake: the wake tone stands down.
+        // and someone picking a station is awake: the wake tone stands down
+        // and the alarm's volume override hands control back.
         _alarmFallbackArmed = false;
         alarmFallbackTimer.stop();
+        _volumeOverridePct = -1;
         _healClearPending();
         _healSeq++;
         healTimer.stop();
@@ -2345,9 +2365,11 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         // A stop inside the wake-tone window is the person saying "I'm up" —
-        // the fallback chime must not blare over it half a minute later.
+        // the fallback chime must not blare over it half a minute later, and
+        // the alarm's volume override dies with the session it raised.
         _alarmFallbackArmed = false;
         alarmFallbackTimer.stop();
+        _volumeOverridePct = -1;
         root._previewUrl = "";
         // An explicit stop also cancels a heal audition in flight — "stop
         // must never start playback" applies to healing too.
