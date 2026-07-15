@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-15 14:47+0300\n"
+"POT-Creation-Date: 2026-07-15 15:54+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Estonian\n"
@@ -1320,40 +1320,45 @@ msgstr "Kalibratsioon ei õnnestunud"
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Veendu, et mikrofon pole kaetud ja mõlemat kõlarit on kuulda, siis proovi uuesti."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:381
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:394
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:380
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:390
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:403
 msgid "Sync check"
 msgstr "Sünki kontroll"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:382
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:381
+msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
+msgstr "Tuba ei olnud kontrolliks piisavalt vaikne — peata muu heli ja kalibreeri veel kord."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:391
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "Kontrolli ajal ei olnud %1 kuulda — kõlar võib olla vaigistatud või väljas. Kalibratsioon jäi alles."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:390
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:399
 msgid "Sync verified"
 msgstr "Sünk kinnitatud"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:391
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:400
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Iga kõlar jõuab mikrofonini %1 ms sees — kõrva jaoks ühes taktis."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:395
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:404
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Kõlarid saabuvad endiselt %1 ms vahega. Kalibreeri veel kord või nihuta viite liugurit."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:970
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:979
 msgid "All local outputs (On Air)"
 msgstr "Kõik kohalikud väljundid (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1398
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1407
 msgid "%1 did not join the sync"
 msgstr "%1 ei liitunud sünkrooniga"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1400
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1409
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Kõlar on ühendatud, aga teda ei õnnestunud gruppi tuua — lülita sünk korraks välja ja uuesti sisse."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1401
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1410
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Kõlar on ühendatud, aga selle heliväljundit ei tekkinud — lülita kõlar korraks välja ja sisse ning ühenda uuesti."
 

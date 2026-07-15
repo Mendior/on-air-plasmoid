@@ -373,6 +373,15 @@ Item {
             _calibRestoreVolume();
             var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
             cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
+            // Other audio (a browser video, another player) reads as extra
+            // arrivals and would make the verdict a dice roll — the script
+            // discards polluted recordings and says why.
+            if ((stdout || "").indexOf("VERIFY_FAIL room not quiet") !== -1) {
+                app.notify(i18n("Sync check"),
+                           i18n("The room was not quiet enough to verify — pause other audio and calibrate once more."),
+                           "dialog-warning");
+                return true;
+            }
             // A speaker the presence phase could not hear: the room is NOT
             // confirmed, and saying so honestly beats a soothing verdict
             // computed from the survivors — the calibration itself stands.

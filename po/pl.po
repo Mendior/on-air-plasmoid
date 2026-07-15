@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-15 14:47+0300\n"
+"POT-Creation-Date: 2026-07-15 15:54+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Polish\n"
@@ -1320,40 +1320,45 @@ msgstr "Kalibracja się nie powiodła"
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Upewnij się, że mikrofon nie jest zasłonięty i słychać oba głośniki, po czym spróbuj ponownie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:381
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:394
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:380
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:390
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:403
 msgid "Sync check"
 msgstr "Kontrola synchronizacji"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:382
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:381
+msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
+msgstr "W pomieszczeniu nie było wystarczająco cicho, by zweryfikować — wstrzymaj inne dźwięki i skalibruj ponownie."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:391
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "Podczas kontroli nie było słychać %1 — głośnik może być wyciszony lub wyłączony. Kalibrację zachowano."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:390
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:399
 msgid "Sync verified"
 msgstr "Synchronizacja potwierdzona"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:391
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:400
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Każdy głośnik dociera do mikrofonu w granicach %1 ms — dla ucha w pełnym rytmie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:395
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:404
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Głośniki wciąż docierają w odstępie %1 ms. Skalibruj ponownie albo przesuń suwak opóźnienia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:970
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:979
 msgid "All local outputs (On Air)"
 msgstr "Wszystkie lokalne wyjścia (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1398
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1407
 msgid "%1 did not join the sync"
 msgstr "%1 nie dołączył do synchronizacji"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1400
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1409
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Głośnik jest połączony, ale nie udało się go włączyć do grupy — wyłącz i włącz synchronizację."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1401
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1410
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Głośnik jest połączony, ale jego wyjście audio nigdy się nie pojawiło — wyłącz i włącz głośnik, a następnie połącz go ponownie."
 

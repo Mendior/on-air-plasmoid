@@ -26,7 +26,7 @@ import math, struct, sys, time, wave
 rate = 48000
 out = sys.argv[-1]
 n = int(rate * 1.2)
-click_at = int(rate * 0.5)   # past calibrate.py's ANALYSIS_SKIP window
+click_at = int(rate * 0.75)  # past ANALYSIS_SKIP and the impossible-early noise filter
 frames = bytearray()
 for i in range(n):
     v = 0

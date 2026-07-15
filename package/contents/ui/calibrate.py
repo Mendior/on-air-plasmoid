@@ -376,6 +376,7 @@ def cmd_verify(argv):
                     print("VERIFY_PARTIAL %s" % member)
                     return
             spreads = []
+            noisy = 0
             for _ in range(3):
                 rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
                 try:
@@ -389,7 +390,21 @@ def cmd_verify(argv):
                     start = int(ANALYSIS_SKIP * rate)
                     if start >= len(samples):
                         continue
-                    arr = find_arrivals(samples[start:], tpl, count)
+                    # Ask for a healthy surplus: the surplus IS the noise
+                    # detector, and a cap of one spare let a music bed slip
+                    # exactly under it.
+                    arr = find_arrivals(samples[start:], tpl, count + 3)
+                    # Nothing real arrives in the first quarter second — the
+                    # stimulus leaves at PLAY_DELAY — and a room cannot
+                    # produce more arrivals than it has speakers. Both are
+                    # the fingerprints of OTHER audio playing (a browser
+                    # video, another player): measured live, music beats
+                    # read as extra arrivals and made the spread a dice
+                    # roll. A polluted recording is discarded, not averaged.
+                    arr = [t for t in arr if t >= 0.25]
+                    if len(arr) > count:
+                        noisy += 1
+                        continue
                     if arr:
                         spreads.append((arr[-1] - arr[0]) * 1000.0)
                 finally:
@@ -398,7 +413,8 @@ def cmd_verify(argv):
                     except OSError:
                         pass
             if not spreads:
-                print("VERIFY_FAIL nothing heard")
+                print("VERIFY_FAIL room not quiet" if noisy >= 2
+                      else "VERIFY_FAIL nothing heard")
                 return
             print("VERIFY_OK %d" % max(0, round(median(spreads))))
         finally:
