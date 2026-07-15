@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+#
 # On Air development helper: repo<->install sync, lint, build, quick preview.
 set -euo pipefail
 
