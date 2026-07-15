@@ -1526,7 +1526,7 @@ PlasmoidItem {
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.18");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
