@@ -1547,6 +1547,10 @@ PlasmoidItem {
     property bool _castAvailable: false      // cast.py bridge usable (python3)?
     property bool _castDiscovering: false
     property bool _casting: false            // a stream is on ≥1 device now
+    // MPRIS mirrors the casting state (status/canPause read it) — without
+    // this nudge the desk's media applet showed "Stopped" until some other
+    // state change happened to write the file.
+    on_CastingChanged: _mprisQueueWrite()
     // Selected devices; the array is always REASSIGNED (never mutated in
     // place) so every binding on it re-evaluates. Entry: {kind, uuid, name,
     // host, port, deviceModel, location}.
@@ -1890,6 +1894,10 @@ PlasmoidItem {
                 var resume = _casting && !_castLocalPlay;
                 _casting = false;
                 _castCurrentUrl = "";
+                // Multi-room dies with the last device — a leftover true
+                // here made the NEXT session's first device start in
+                // multi-room mode nobody asked for.
+                _castLocalPlay = false;
                 if (resume) _castResumeLocally();
             }
             return;
@@ -2881,8 +2889,11 @@ PlasmoidItem {
 
     function _mprisWriteState() {
         if (!_mprisStarted) return;
+        // Casting counts as playing: the local player is idle by design
+        // while a device carries the stream, but to the desk's media keys
+        // the music is very much on.
         var state = {
-            status: isPlaying() ? "Playing" : "Stopped",
+            status: (isPlaying() || _casting) ? "Playing" : "Stopped",
             station: root.currentStation,
             artist: root.trackArtist,
             title: root.trackTitle,
@@ -2891,7 +2902,7 @@ PlasmoidItem {
             canGoNext: stationsModel.count > 1,
             canGoPrevious: stationsModel.count > 1,
             canPlay: stationsModel.count > 0,
-            canPause: isPlaying()
+            canPause: isPlaying() || _casting
         };
         var json = JSON.stringify(state).replace(/'/g, "'\\''");
         var safe = _mprisStateFile.replace(/'/g, "'\\''");
@@ -2902,10 +2913,12 @@ PlasmoidItem {
         if (!cmd) return;
         if (cmd === "Stop" || cmd === "Pause") {
             // Stop/Pause must NEVER start playback — only stop if playing.
-            if (isPlaying()) stopWithFade();
+            // Cast-only playback counts: the media key must reach the
+            // bedroom speaker too.
+            if (isPlaying() || _casting) stopWithFade();
         } else if (cmd === "PlayPause") {
             // PlayPause is the only toggle.
-            if (isPlaying()) {
+            if (isPlaying() || _casting) {
                 stopWithFade();
             } else if (stationsModel.count > 0) {
                 // Same fallback as the UI play button: if lastPlay is out of
@@ -2915,7 +2928,7 @@ PlasmoidItem {
                 refreshServer(idx);
             }
         } else if (cmd === "Play") {
-            if (!isPlaying() && stationsModel.count > 0) {
+            if (!isPlaying() && !_casting && stationsModel.count > 0) {
                 const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0;
                 lastPlay = idx;
                 refreshServer(idx);
@@ -3911,7 +3924,10 @@ PlasmoidItem {
                 sleepTimer.stop();
                 if (sleepFadeAnimation.running) sleepFadeAnimation.stop();
                 root._volumeBeforeSleepFade = -1;
-                if (isPlaying()) stopWithFade();
+                // Cast-only playback keeps isPlaying() false — the timer
+                // used to count to zero and leave the bedroom speaker
+                // playing all night. stopWithFade handles both sides.
+                if (isPlaying() || _casting) stopWithFade();
             } else {
                 sleepRemainingSec = remaining;
                 // Begin a 30-second linear fade so audio tapers off naturally
