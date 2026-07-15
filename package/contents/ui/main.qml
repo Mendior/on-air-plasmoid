@@ -3555,7 +3555,9 @@ PlasmoidItem {
 
         onErrorOccurred: {
             isError = true;
-            errorTimer.start();
+            // restart, not start: a second error inside the 5 s window used
+            // to inherit the first one's nearly-spent timer and blink away.
+            errorTimer.restart();
             infoTimer.stop();
             _mprisQueueWrite();
             // Auto-bitrate fallback: if the URL we're playing is an auto-upgrade

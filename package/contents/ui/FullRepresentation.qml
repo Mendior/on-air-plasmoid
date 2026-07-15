@@ -2323,7 +2323,9 @@ PlasmaExtras.Representation {
         // clear()+append() is the model's only mutation path (main.qml
         // reloadStationsModel), so count changes cover every reload; nothing
         // calls setProperty on it, so a dataChanged handler would be dead code.
-        function onCountChanged() { rebuildFilteredModel() }
+        // Qt.callLater coalesces the burst: a 200-station reload used to run
+        // the full rebuild once per append — O(n²) on every list load.
+        function onCountChanged() { Qt.callLater(rebuildFilteredModel) }
     }
 
     Connections {
@@ -2696,6 +2698,7 @@ PlasmaExtras.Representation {
                             PlasmaComponents3.Slider {
                                 id: syncSlider
                                 Layout.fillWidth: true
+                                Accessible.name: i18n("Sync fine-tune")
                                 from: 0
                                 // Matches the calibration's sanity ceiling —
                                 // slow televisions really sit past 500 ms.
@@ -2774,6 +2777,7 @@ PlasmaExtras.Representation {
                                 // being disconnected — "everything except
                                 // the bedroom" is one click.
                                 PlasmaComponents3.CheckBox {
+                                    Accessible.name: i18n("%1 plays in the group", root.sync.outputDescription(balanceRow.modelData))
                                     checked: balanceRow.inGroup
                                     onToggled: {
                                         root.sync.setSyncDeviceIncluded(balanceRow.trimKey, checked)
@@ -2799,6 +2803,7 @@ PlasmaExtras.Representation {
                                 PlasmaComponents3.Slider {
                                     id: balanceSlider
                                     Layout.fillWidth: true
+                                    Accessible.name: i18n("Balance of %1", root.sync.outputDescription(balanceRow.modelData))
                                     from: 5
                                     to: 100
                                     stepSize: 1

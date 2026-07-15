@@ -124,6 +124,10 @@ PlasmaComponents3.ItemDelegate {
                     id: faviconImage
                     anchors.fill: parent
                     anchors.margins: 1
+                    // Decode at display size: a station's 512-pixel logo
+                    // otherwise keeps a full-size texture per visible row.
+                    sourceSize.width: 64
+                    sourceSize.height: 64
                     // Disk-cached copy when available (instant, offline-proof)
                     source: root.faviconSrc(model.favicon)
                     fillMode: Image.PreserveAspectCrop

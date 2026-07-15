@@ -18,7 +18,6 @@ import re
 import signal
 import sys
 import threading
-import time
 from pathlib import Path
 
 import dbus
