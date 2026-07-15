@@ -943,11 +943,27 @@ PlasmoidItem {
         onTriggered: root._alarmTick()
     }
 
+    // Watches for the system time zone moving under the scheduler (travel,
+    // a VPN-driven tzdata change): stored nextRun instants belong to the
+    // OLD zone's wall clock, and an alarm's promise is the wall clock.
+    property int _alarmTzOffset: new Date().getTimezoneOffset()
+
     function _alarmTick() {
         var now = Date.now();
         var list = alarms.slice();
         var changed = false;
-        var toFire = null;
+        var due = [];
+        var tz = new Date(now).getTimezoneOffset();
+        if (tz !== _alarmTzOffset) {
+            _alarmTzOffset = tz;
+            // Recompute every schedule from its hh:mm fields — 07:00 must
+            // mean 07:00 where the machine now lives. Idempotent across DST
+            // flips (nextOccurrence already builds zone-correct instants).
+            for (var r = 0; r < list.length; r++)
+                list[r].nextRun = AlarmLogic.nextOccurrence(
+                    list[r].hh, list[r].mm, list[r].repeat, list[r].weekday, now);
+            changed = true;
+        }
         for (var i = list.length - 1; i >= 0; i--) {
             var a = list[i];
             var dec = AlarmLogic.fireDecision(a.nextRun, now, AlarmLogic.GRACE_MS);
@@ -959,7 +975,7 @@ PlasmoidItem {
                 dlNotification.iconName = "dialog-warning";
                 dlNotification.sendEvent();
             } else {
-                toFire = a;
+                due.push(a);
             }
             // The entry advances (or leaves) BEFORE any side effect — a fire
             // path that throws must never leave a due entry behind to re-fire
@@ -980,7 +996,22 @@ PlasmoidItem {
             // continuous all the way to the fire moment.
             _alarmArmInhibit();
         }
-        if (toFire !== null) _alarmFire(toFire);
+        if (due.length > 0) {
+            // One player, one stream: the first due entry (list order — the
+            // scan ran newest-index first) plays; the rest must not vanish
+            // in silence, so their owner at least learns what happened.
+            due.reverse();
+            _alarmFire(due[0]);
+            if (due.length > 1) {
+                var others = [];
+                for (var j = 1; j < due.length; j++) others.push(due[j].station);
+                dlNotification.title = i18n("Wake-up alarm");
+                dlNotification.text = i18n("%1 came due at the same time — playing %2 instead.",
+                                           others.join(", "), due[0].station);
+                dlNotification.iconName = "clock";
+                dlNotification.sendEvent();
+            }
+        }
     }
 
     // Fire = the reason this feature exists, so every step is belt and
@@ -1005,6 +1036,12 @@ PlasmoidItem {
         // the same one — that is exactly the route that dies overnight.
         _alarmCastConfirmed = false;
         _castCurrentUrl = "";
+        // startWithFade is called directly (no _playStation), so the
+        // origin/resolved pair would still describe LAST NIGHT's stream —
+        // and an error on the alarm stream would then heal the wrong
+        // station. Point both at the alarm's own URL.
+        _currentOrigUrl = a.url;
+        _currentResolvedUrl = a.url;
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
         // The floor must reach the DEVICES too: while casting, the local
