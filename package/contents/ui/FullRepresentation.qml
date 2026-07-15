@@ -72,6 +72,10 @@ PlasmaExtras.Representation {
     // any other text → search by name. Results appear at the end of the list.
     property bool webSearching: false
     property int _webSearchSeq: 0
+    // Every directory mirror failed on the last search — a network problem
+    // is not "no matching stations", and the empty-state must say which of
+    // the two it is telling the user about.
+    property bool webSearchFailed: false
     readonly property var _countryMap: ({
         "soome": "FI", "finland": "FI",
         "eesti": "EE", "estonia": "EE",
@@ -96,82 +100,97 @@ PlasmaExtras.Representation {
         "brasiilia": "BR", "türgi": "TR"
     })
 
+    // A prototype-safe country-map lookup: a plain `in` also matched
+    // Object.prototype keys, so searching "constructor" went to the
+    // country branch with an undefined code.
+    function _countryCodeOf(q) {
+        var key = q.toLowerCase()
+        return Object.prototype.hasOwnProperty.call(_countryMap, key)
+               ? _countryMap[key] : ""
+    }
+
     function runWebSearch(q) {
         q = (q || "").trim()
         webResultsModel.clear()
         const seq = ++fullRepresentation._webSearchSeq
+        fullRepresentation.webSearchFailed = false
         // Short queries are noise — EXCEPT exact country-map keys ("uk").
-        if (q.length < 3 && !(q.toLowerCase() in _countryMap)) {
+        const cc = _countryCodeOf(q)
+        if (q.length < 3 && cc === "") {
             fullRepresentation.webSearching = false
             return
         }
         fullRepresentation.webSearching = true
-        _webSearchAttempt(q, seq, 0)
-    }
-
-    // Try the API mirrors IN SEQUENCE — some mirrors are occasionally down, and
-    // a single random pick made the search unreliable ("works sometimes").
-    function _webSearchAttempt(q, seq, serverIdx) {
-        const apiServers = ["de1", "nl1", "de2", "at1", "fi1"]
-        if (serverIdx >= apiServers.length) {
-            if (seq === fullRepresentation._webSearchSeq)
-                fullRepresentation.webSearching = false
-            return
-        }
-        const cc = _countryMap[q.toLowerCase()] || ""
+        const tail = "&hidebroken=true&order=votes&reverse=true&limit=50"
         const qs = cc !== ""
-            ? "search?countrycode=" + cc
-            : "search?name=" + encodeURIComponent(q)
-        const xhr = new XMLHttpRequest()
-        var guard = null
-        xhr.open("GET", "https://" + apiServers[serverIdx] + ".api.radio-browser.info/json/stations/"
-                 + qs + "&hidebroken=true&order=votes&reverse=true&limit=50")
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.18")
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return
-            root._clearXhrTimeout(guard)
+            ? "/json/stations/search?countrycode=" + cc
+            : "/json/stations/search?name=" + encodeURIComponent(q)
+        // Mirror failover lives in main.qml's _rbFetch — the same chain every
+        // other radio-browser call uses.
+        root._rbFetch(qs + tail, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return // stale request
-            if (xhr.status !== 200) {
-                // This mirror is down → try the next one right away
-                _webSearchAttempt(q, seq, serverIdx + 1)
+            const gotAnswer = _webAppendResults(xhr)
+            // Genre pass: a one-word query is as likely a genre as a name —
+            // the search field literally suggests "jazz", yet the query only
+            // ever ran against station names. Tag matches fill in after the
+            // name matches, deduped, same 30-row cap.
+            if (gotAnswer && cc === "" && webResultsModel.count < 30
+                && /^\S+$/.test(q)) {
+                root._rbFetch("/json/stations/search?tag="
+                              + encodeURIComponent(q.toLowerCase()) + tail,
+                              4000, function(xhr2) {
+                    if (seq !== fullRepresentation._webSearchSeq) return
+                    _webAppendResults(xhr2)
+                    fullRepresentation.webSearching = false
+                })
                 return
             }
-            try {
-                const results = JSON.parse(xhr.responseText) || []
-                const existing = {}
-                for (var i = 0; i < stationsModel.count; i++)
-                    existing[stationsModel.get(i).hostname] = true
-                const seen = {}
-                for (const r of results) {
-                    const u = (r.url_resolved || r.url || "").toString()
-                    // http(s) only — catalogue data is untrusted and these URLs
-                    // reach playMusic.source, the config and ffmpeg (same rule
-                    // as _favUrls in main.qml).
-                    if (!u || !/^https?:\/\//i.test(u) || existing[u] || seen[u]) continue
-                    seen[u] = true
-                    var br = parseInt(r.bitrate) || 0
-                    if (br > 1000) br = Math.round(br / 1000)
-                    webResultsModel.append({
-                        "name": (r.name || "").replace(/\s+/g, " ").trim() || u,
-                        "url": u,
-                        "favicon": r.favicon || "",
-                        "country": r.country || "",
-                        "bitrate": br,
-                        "codec": (r.codec || "").toUpperCase(),
-                        "rbUuid": r.stationuuid || ""
-                    })
-                    if (webResultsModel.count >= 30) break
-                }
-                // Only now — a parse failure above keeps the "Searching…"
-                // indicator alive while the next mirror is tried.
-                fullRepresentation.webSearching = false
-            } catch (e) {
-                console.log("[ARP] webSearch parse: " + e)
-                _webSearchAttempt(q, seq, serverIdx + 1)
+            fullRepresentation.webSearchFailed = !gotAnswer
+            fullRepresentation.webSearching = false
+        })
+    }
+
+    // Appends one directory answer to the results model (deduped against the
+    // user's list AND rows already shown). Returns true when the answer was
+    // usable — null/non-200 means the whole mirror chain failed.
+    function _webAppendResults(xhr) {
+        if (!xhr || xhr.status !== 200) return false
+        try {
+            const results = JSON.parse(xhr.responseText) || []
+            const existing = {}
+            for (var i = 0; i < stationsModel.count; i++)
+                existing[stationsModel.get(i).hostname] = true
+            const seen = {}
+            for (var j = 0; j < webResultsModel.count; j++)
+                seen[webResultsModel.get(j).url] = true
+            for (const r of results) {
+                if (webResultsModel.count >= 30) break
+                const u = (r.url_resolved || r.url || "").toString()
+                // http(s) only — catalogue data is untrusted and these URLs
+                // reach playMusic.source, the config and ffmpeg (same rule
+                // as _favUrls in main.qml).
+                if (!u || !/^https?:\/\//i.test(u) || existing[u] || seen[u]) continue
+                seen[u] = true
+                var br = parseInt(r.bitrate) || 0
+                // kbps is the directory's unit; only clearly-bps values are
+                // scaled down. The old >1000 cutoff mangled honest high-rate
+                // streams (1411 kbps lossless became "1 kb/s").
+                if (br >= 8000) br = Math.round(br / 1000)
+                webResultsModel.append({
+                    "name": (r.name || "").replace(/\s+/g, " ").trim() || u,
+                    "url": u,
+                    "favicon": r.favicon || "",
+                    "country": r.country || "",
+                    "bitrate": br,
+                    "codec": (r.codec || "").toUpperCase(),
+                    "rbUuid": r.stationuuid || ""
+                })
             }
+            return true
+        } catch (e) {
+            console.log("[ARP] webSearch parse: " + e)
+            return false
         }
-        guard = root._armXhrTimeout(xhr, 4000)
-        xhr.send()
     }
 
     Timer {
@@ -663,7 +682,9 @@ PlasmaExtras.Representation {
 
                         Kirigami.Icon {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            source: root.favoritesOnly ? "favorite" : "search"
+                            source: root.favoritesOnly
+                                    ? "favorite"
+                                    : (fullRepresentation.webSearchFailed ? "network-disconnect" : "search")
                             width: Kirigami.Units.iconSizes.huge
                             height: width
                             opacity: 0.4
@@ -673,7 +694,9 @@ PlasmaExtras.Representation {
                             horizontalAlignment: Text.AlignHCenter
                             text: root.favoritesOnly
                                   ? i18n("No favorite stations yet")
-                                  : (root.searchFilter !== "" ? i18n("No matching stations") : i18n("No stations"))
+                                  : (fullRepresentation.webSearchFailed
+                                     ? i18n("The station directory is not reachable")
+                                     : (root.searchFilter !== "" ? i18n("No matching stations") : i18n("No stations")))
                             font.weight: Font.DemiBold
                             opacity: 0.7
                         }
@@ -687,7 +710,9 @@ PlasmaExtras.Representation {
                             visible: text !== ""
                             text: root.favoritesOnly
                                   ? i18n("Tap the heart on a station to add it here")
-                                  : (root.searchFilter !== "" ? i18n("Try a different search term") : "")
+                                  : (fullRepresentation.webSearchFailed
+                                     ? i18n("Check the connection and type to search again")
+                                     : (root.searchFilter !== "" ? i18n("Try a different search term") : ""))
                         }
                     }
                 }

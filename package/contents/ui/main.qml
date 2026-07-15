@@ -1426,7 +1426,7 @@ PlasmoidItem {
                         const uNoProto = u.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
                         if (uNoProto !== origUrlNoProto) continue;
                         let br = parseInt(r.bitrate) || 0;
-                        if (br > 1000) br = Math.round(br / 1000);
+                        if (br >= 8000) br = Math.round(br / 1000);
                         origBr = br;
                         foundOrig = true;
                         break;
@@ -1457,7 +1457,7 @@ PlasmoidItem {
                         if (origFmt !== "unknown" && urlFmt !== "unknown"
                             && origFmt !== urlFmt) continue;
                         let br = parseInt(r.bitrate) || 0;
-                        if (br > 1000) br = Math.round(br / 1000);
+                        if (br >= 8000) br = Math.round(br / 1000);
                         if (br <= 0 || br > 2000) continue;
                         if (br > bestBr) {
                             bestBr = br;
