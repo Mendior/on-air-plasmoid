@@ -321,6 +321,7 @@ PlasmoidItem {
             // (lastPlay === -1) and the toggle-stop check above needs the match.
             lastPlay = index;
             root._previewUrl = "";
+        root._previewUuid = "";
             root.currentStationFavicon = station.favicon || "";
             _playStation(station);
         }
@@ -329,16 +330,59 @@ PlasmoidItem {
     // The URL being played as a PREVIEW (an internet-search result that the
     // user has not added to their list). Empty = normal playback.
     property string _previewUrl: ""
+    // The directory identity of the preview — one error-time retry asks the
+    // directory for the station's CURRENT address by uuid instead of giving
+    // up on a rotted one.
+    property string _previewUuid: ""
+
+    // .pls/.m3u wrappers hide the real stream one fetch away — the player
+    // backend reports them as "Could not open file". Unwrap before playing;
+    // .m3u8 (HLS) is a real format the backend speaks itself.
+    function _unwrapPlaylist(url, cb) {
+        var low = url.toLowerCase().split("?")[0];
+        if (!/^https?:\/\//i.test(url)
+            || !(low.indexOf(".pls", low.length - 4) !== -1
+                 || low.indexOf(".m3u", low.length - 4) !== -1)) {
+            cb(url);
+            return;
+        }
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        xhr.open("GET", url);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== xhr.DONE) return;
+            _clearXhrTimeout(guard);
+            var out = url;
+            var txt = xhr.responseText || "";
+            var m = txt.match(/^File\d+\s*=\s*(\S+)/mi);
+            if (m && /^https?:\/\//i.test(m[1])) {
+                out = m[1];
+            } else {
+                var lines = txt.split("\n");
+                for (var i = 0; i < lines.length; i++) {
+                    var ln = lines[i].trim();
+                    if (ln !== "" && ln.indexOf("#") !== 0 && /^https?:\/\//i.test(ln)) {
+                        out = ln;
+                        break;
+                    }
+                }
+            }
+            cb(out);
+        };
+        guard = _armXhrTimeout(xhr, 4000);
+        xhr.send();
+    }
 
     // LISTEN to an internet-search result (preview) — does NOT add it to the list.
     // A second click on the same result stops playback.
-    function previewStation(name, url, favicon) {
+    function previewStation(name, url, favicon, rbUuid) {
         if (!url) return;
         if (isPlaying() && root._previewUrl === url) {
             stopWithFade();
             return;
         }
         root._previewUrl = url;
+        root._previewUuid = rbUuid || "";
         root.lastPlay = -1;
         root.currentStationFavicon = favicon || "";
         _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "", "active": true });
@@ -1155,6 +1199,7 @@ PlasmoidItem {
         _healSeq++;
         healTimer.stop();
         root._previewUrl = "";
+        root._previewUuid = "";
         root.lastPlay = -1;
         root.currentStationFavicon = "";
         // A local file is not a station: clear the station-tracking state so
@@ -1338,6 +1383,7 @@ PlasmoidItem {
                     const h = stationsModel.get(k).hostname;
                     if (keepPlaying && h === url) {
                         root._previewUrl = "";
+        root._previewUuid = "";
                         lastPlay = k;
                         refreshServer(k);
                         return;
@@ -2384,7 +2430,13 @@ PlasmoidItem {
         bitrateFallbackTimer.stop();
         bitrateFallbackTimer.fallbackUrl = "";
         const mySeq = ++_resolveCallSeq;
-        _autoSelectBitrate(station, function(resolvedUrl) {
+        // Unwrap a .pls/.m3u first: everything downstream (bitrate resolve,
+        // the player itself) wants the stream, not its wrapper.
+        _unwrapPlaylist((station.hostname || "").toString(), function(playUrl) {
+            if (mySeq !== _resolveCallSeq) return;
+            var st = { "name": station.name, "hostname": playUrl,
+                       "favicon": station.favicon, "active": station.active };
+        _autoSelectBitrate(st, function(resolvedUrl) {
             // Bail out if the user clicked another station while we were
             // waiting for the radio-browser response.
             if (mySeq !== _resolveCallSeq) return;
@@ -2398,6 +2450,7 @@ PlasmoidItem {
             };
             startWithFade(effective);
         });
+        });
     }
 
     function stopWithFade() {
@@ -2409,6 +2462,7 @@ PlasmoidItem {
         alarmFallbackTimer.stop();
         _volumeOverridePct = -1;
         root._previewUrl = "";
+        root._previewUuid = "";
         // An explicit stop also cancels a heal audition in flight — "stop
         // must never start playback" applies to healing too.
         _healClearPending();
@@ -3590,6 +3644,27 @@ PlasmoidItem {
                 // URL won't re-enter this branch.
                 root._currentResolvedUrl = root._currentOrigUrl;
                 bitrateFallbackTimer.restart();
+            } else if (root._previewUrl !== "" && root._previewUuid !== "") {
+                // A preview from the directory died — the directory itself
+                // knows the station's CURRENT address by identity. One
+                // retry, then honesty.
+                var pvUuid = root._previewUuid;
+                root._previewUuid = "";
+                var pvName = root.currentStation;
+                var pvIcon = root.currentStationFavicon;
+                _rbFetch("/json/url/" + pvUuid, 4000, function(xhr) {
+                    if (root._previewUrl === "") return; // user stopped it
+                    var fresh = "";
+                    try { fresh = (xhr && JSON.parse(xhr.responseText).url) || ""; } catch (e) {}
+                    if (fresh !== "" && /^https?:\/\//i.test(fresh)
+                        && fresh !== root._previewUrl) {
+                        root._previewUrl = fresh;
+                        _unwrapPlaylist(fresh, function(playUrl) {
+                            startWithFade({ "name": pvName, "hostname": playUrl,
+                                            "favicon": pvIcon, "active": true });
+                        });
+                    }
+                });
             } else if (playMusic.source.toString() !== ""
                        && playMusic.source.toString().indexOf("file://") !== 0
                        && root._previewUrl === "") {

@@ -675,10 +675,10 @@ PlasmaExtras.Representation {
                                 Accessible.name: webItem.isPreviewing
                                                  ? i18n("Stop preview: %1", model.name)
                                                  : i18n("Preview: %1", model.name)
-                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon)
+                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid)
                                 Keys.onPressed: (event) => {
                                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon)
+                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid)
                                         event.accepted = true
                                     }
                                 }
@@ -809,7 +809,7 @@ PlasmaExtras.Representation {
 
                                 HoverHandler { id: webHover }
                                 TapHandler {
-                                    onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon)
+                                    onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid)
                                 }
 
                                 PlasmaCore.ToolTipArea {
