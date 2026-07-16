@@ -882,6 +882,15 @@ Item {
                  + " sink='" + s + "' latency_msec=" + d + " " + chSpec + ") && echo \"LB $id " + s + "\"";
             var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
             if (pct < 100) cmds += " && { " + _sinkInputVolCmd("$id", pct) + "}";
+            // Flush at birth, Bluetooth only: a loopback attached to a sink
+            // that is still settling (a speaker that just connected, a codec
+            // switch recreating the node) starts with a backlog it can NEVER
+            // drain — measured live at 2.3 seconds of permanent echo. One
+            // suspend/resume cycle right after the attach empties it before
+            // anyone hears anything.
+            if (sinks[i].indexOf("bluez_") === 0)
+                cmds += " && pactl suspend-sink '" + s + "' 1"
+                     + " && pactl suspend-sink '" + s + "' 0";
             cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
         }
         return cmds;
