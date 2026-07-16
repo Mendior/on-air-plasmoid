@@ -112,9 +112,9 @@ def _xcorr_refine(window, coarse_i, tpl, half_s=0.015):
     by whole samples between runs in room noise; the filter integrates over
     all 480 template samples (~22x processing gain) and holds still.
     Returns (float sample index in `window`'s frame — aligned to the burst
-    peak so the number means what the old detector's did — and the
-    correlation peak's ratio over the window's median correlation: a true
-    burst towers over it, a random thump does not).
+    peak so the number means what the old detector's did — and the raw
+    correlation peak, which the caller normalizes into a template-match
+    score: a true burst is SHAPED like the template, a thump is not).
     """
     half = int(half_s * RATE)
     tn = len(tpl)
@@ -140,9 +140,7 @@ def _xcorr_refine(window, coarse_i, tpl, half_s=0.015):
     denom = cm - 2.0 * best_c + cp
     frac = 0.0 if denom == 0.0 else max(-1.0, min(1.0, 0.5 * (cm - cp) / denom))
     tpl_peak = max(range(tn), key=lambda i: abs(tpl[i]))
-    corr_med = sorted(corr)[len(corr) // 2]
-    snr = best_c / corr_med if corr_med > 0 else 0.0
-    return best_l + frac + tpl_peak, snr
+    return best_l + frac + tpl_peak, best_c
 
 
 def peak_of(path, tpl=None):
@@ -185,9 +183,9 @@ def peak_of(path, tpl=None):
     # the quieter speaker after a loud one had ducked the mic's gain.
     if best_i < 0:
         return None
-    pos, snr = (float(best_i), 0.0)
+    pos, corr_peak = (float(best_i), 0.0)
     if tpl is not None:
-        pos, snr = _xcorr_refine(window, best_i, tpl)
+        pos, corr_peak = _xcorr_refine(window, best_i, tpl)
     # The noise floor is measured strictly BEFORE the stimulus began — the
     # burst position minus the leader hum and a margin — so neither the hum
     # nor the burst can inflate it. A recorder that started late (cold
@@ -203,12 +201,19 @@ def peak_of(path, tpl=None):
     # bar only needs to reject quiet garbage in true silence; the ratios
     # carry the discrimination (the whole-window median guards against
     # steady noise when the pre-roll is missing).
-    # A click through the DEPLOYED path is attenuated by the master volume
-    # and can land under the absolute bar while being unmistakable to the
-    # matched filter — a correlation peak towering over the window's median
-    # (measured live: a real burst scores 15+, a random thump 2-3) vouches
-    # for what raw amplitude cannot.
-    if best < 600 and snr < 6.0:
+    # The matched filter is the judge whenever a template is in hand:
+    # the correlation peak normalized by amplitude and template weight
+    # says whether the loudest thing is SHAPED like the burst. Measured
+    # on this room's real recordings: genuine clicks 0.59-0.61 (even
+    # AGC-ducked ones), music transients at most 0.24, keyboard 0.001.
+    # Amplitude alone let a daytime room paint "clicks" onto sinks with
+    # no speaker attached — their level lines then fed the trims.
+    if tpl is not None:
+        tpl_l1 = sum(abs(v) for v in tpl)
+        match = corr_peak / (best * tpl_l1) if best > 0 else 0.0
+        if match < 0.35 or best < 300:
+            return None
+    elif best < 600:
         return None
     if best < 8 * max(floor, 60) or best < 4 * max(med_all, 1):
         return None
@@ -353,6 +358,42 @@ def find_arrivals(window, tpl, max_peaks):
     return dedup
 
 
+def _raw_arrival(sink, click, mic):
+    """The loudest moment of one capture, seconds within the analysis
+    window — no shape gate, the verify's agreement check is the judge."""
+    rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        _record_one(sink, click, mic, rec, 3.2)
+        try:
+            samples, rate = read_mono(rec)
+        except Exception:
+            return None
+        if not samples:
+            return None
+        start = int(ANALYSIS_SKIP * rate)
+        if start >= len(samples):
+            return None
+        window = samples[start:]
+        best_i = max(range(len(window)), key=lambda i: abs(window[i]))
+        if abs(window[best_i]) < 200:
+            return None  # nothing rose above the mic's own hiss
+        return best_i / rate
+    finally:
+        try:
+            os.unlink(rec)
+        except OSError:
+            pass
+
+
+def _two_that_agree(times, tol=0.15):
+    """The mean of the first pair within `tol` of each other, else None."""
+    for i in range(len(times)):
+        for j in range(i + 1, len(times)):
+            if abs(times[i] - times[j]) <= tol:
+                return (times[i] + times[j]) / 2.0
+    return None
+
+
 def _set_mutes(sinks, muted):
     """Best-effort hardware mute for the verify's isolation — a missing
     pactl (test rig) just means the isolation is skipped."""
@@ -409,17 +450,30 @@ def cmd_verify(argv):
                 _set_mutes(others, True)
                 try:
                     time.sleep(0.3)  # let the mutes land before the click
+                    # A burst that rode a Bluetooth codec and a speaker DSP
+                    # arrives SMEARED — the template-match gate that guards
+                    # the direct clicks would call it noise (measured 0.02
+                    # against the direct clicks' 0.6). Through the deployed
+                    # path the discriminator is AGREEMENT instead: a real
+                    # buffered arrival repeats at the same offset click
+                    # after click (measured twice within 50 ms); room noise
+                    # does not repeat. Raw loudest-moment per capture, up
+                    # to three tries for two that agree.
                     times = []
-                    for _ in range(2):
-                        m = measure_once(sink, click, mic, tpl, seconds=3.2)
-                        if m is not None:
-                            times.append(m[0])
+                    for _ in range(3):
+                        t = _raw_arrival(sink, click, mic)
+                        if t is not None:
+                            times.append(t)
+                        agreed = _two_that_agree(times)
+                        if agreed is not None:
+                            break
                 finally:
                     _set_mutes(others, False)
-                if not times:
+                agreed = _two_that_agree(times)
+                if agreed is None:
                     print("VERIFY_PARTIAL %s" % member)
                     return
-                arrivals[member] = sum(times) / len(times)
+                arrivals[member] = agreed
             base = min(arrivals.values())
             for member in sinks:
                 print("VERIFY_LAG %s %d" % (member,
