@@ -85,6 +85,10 @@
             <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
             <default>{}</default>
         </entry>
+        <entry name="searchHistory" type="String">
+            <label>Recent successful web searches, newest first (JSON array)</label>
+            <default>[]</default>
+        </entry>
         <entry name="syncVerifiedMs" type="Int">
             <label>Residual speaker spread measured by the last verify pass (ms); -1 means never verified</label>
             <default>-1</default>

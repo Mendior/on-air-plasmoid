@@ -77,6 +77,20 @@ PlasmaExtras.Representation {
     // the two it is telling the user about.
     property bool webSearchFailed: false
 
+    // ── Search 2.0 state ──────────────────────────────────────────────────
+    // What the query MEANS: matched against names, genre tags, countries or
+    // languages — the directory indexes all four, the field is one.
+    property string webSearchMode: "all"
+    // votes = the directory's quality signal, clicktrend = what the world
+    // plays right now, bitrate = audiophile ordering.
+    property string webSearchOrder: "votes"
+    // Rows the list will show — "Show more" raises it page by page.
+    property int webResultCap: 30
+    // The last query string sent, offset-free — "Show more" re-issues it.
+    property string _webLastQs: ""
+    // Recent successful searches, newest first, persisted in the config.
+    property var webHistory: []
+
     // Canvas gradients want CSS color strings — built from the live accent
     // so the aurora and the vinyl glint follow the follow-system setting
     // instead of the hard-coded default green.
@@ -129,10 +143,21 @@ PlasmaExtras.Representation {
             return
         }
         fullRepresentation.webSearching = true
-        const tail = "&hidebroken=true&order=votes&reverse=true&limit=50"
-        const qs = cc !== ""
-            ? "/json/stations/search?countrycode=" + cc
-            : "/json/stations/search?name=" + encodeURIComponent(q)
+        fullRepresentation.webResultCap = 30
+        const tail = "&hidebroken=true&order=" + fullRepresentation.webSearchOrder
+                     + "&reverse=true&limit=50"
+        const mode = fullRepresentation.webSearchMode
+        var qs
+        if (mode === "genre")
+            qs = "/json/stations/search?tag=" + encodeURIComponent(q.toLowerCase())
+        else if (mode === "language")
+            qs = "/json/stations/search?language=" + encodeURIComponent(q.toLowerCase())
+        else if (mode === "country" || cc !== "")
+            qs = cc !== "" ? "/json/stations/search?countrycode=" + cc
+                           : "/json/stations/search?country=" + encodeURIComponent(q)
+        else
+            qs = "/json/stations/search?name=" + encodeURIComponent(q)
+        fullRepresentation._webLastQs = qs + tail
         // Mirror failover lives in main.qml's _rbFetch — the same chain every
         // other radio-browser call uses.
         root._rbFetch(qs + tail, 4000, function(xhr) {
@@ -142,7 +167,10 @@ PlasmaExtras.Representation {
             // the search field literally suggests "jazz", yet the query only
             // ever ran against station names. Tag matches fill in after the
             // name matches, deduped, same 30-row cap.
-            if (gotAnswer && cc === "" && webResultsModel.count < 30
+            if (gotAnswer && webResultsModel.count > 0)
+                _webRememberQuery(q)
+            if (gotAnswer && mode === "all" && cc === ""
+                && webResultsModel.count < fullRepresentation.webResultCap
                 && /^\S+$/.test(q)) {
                 root._rbFetch("/json/stations/search?tag="
                               + encodeURIComponent(q.toLowerCase()) + tail,
@@ -156,6 +184,47 @@ PlasmaExtras.Representation {
             fullRepresentation.webSearchFailed = !gotAnswer
             fullRepresentation.webSearching = false
         })
+    }
+
+    // Trending: what the world tunes into right now — a discovery rail for
+    // the empty query, one tap away.
+    function runWebTrending() {
+        webResultsModel.clear()
+        const seq = ++fullRepresentation._webSearchSeq
+        fullRepresentation.webSearchFailed = false
+        fullRepresentation.webResultCap = 30
+        fullRepresentation.webSearching = true
+        const qs = "/json/stations/search?hidebroken=true&order=clicktrend&reverse=true&limit=50"
+        fullRepresentation._webLastQs = qs
+        root._rbFetch(qs, 4000, function(xhr) {
+            if (seq !== fullRepresentation._webSearchSeq) return
+            fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
+            fullRepresentation.webSearching = false
+        })
+    }
+
+    // The next page of whatever is showing — same query, same generation.
+    function loadMoreWeb() {
+        if (fullRepresentation._webLastQs === "" || fullRepresentation.webSearching) return
+        const seq = fullRepresentation._webSearchSeq
+        fullRepresentation.webResultCap += 30
+        fullRepresentation.webSearching = true
+        root._rbFetch(fullRepresentation._webLastQs + "&offset=" + webResultsModel.count,
+                      4000, function(xhr) {
+            if (seq !== fullRepresentation._webSearchSeq) return
+            _webAppendResults(xhr)
+            fullRepresentation.webSearching = false
+        })
+    }
+
+    function _webRememberQuery(q) {
+        if (q.length < 3) return
+        var h = fullRepresentation.webHistory.filter(function(e) {
+            return e.toLowerCase() !== q.toLowerCase()
+        })
+        h.unshift(q)
+        fullRepresentation.webHistory = h.slice(0, 8)
+        Plasmoid.configuration.searchHistory = JSON.stringify(fullRepresentation.webHistory)
     }
 
     // Appends one directory answer to the results model (deduped against the
@@ -172,7 +241,7 @@ PlasmaExtras.Representation {
             for (var j = 0; j < webResultsModel.count; j++)
                 seen[webResultsModel.get(j).url] = true
             for (const r of results) {
-                if (webResultsModel.count >= 30) break
+                if (webResultsModel.count >= fullRepresentation.webResultCap) break
                 const u = (r.url_resolved || r.url || "").toString()
                 // http(s) only — catalogue data is untrusted and these URLs
                 // reach playMusic.source, the config and ffmpeg (same rule
@@ -374,6 +443,75 @@ PlasmaExtras.Representation {
                     checked: root.favoritesOnly
                     tooltipText: root.favoritesOnly ? i18n("Show all stations") : i18n("Show only favorites")
                     onClicked: root.favoritesOnly = !root.favoritesOnly
+                }
+            }
+
+            // ── Search 2.0 rail ──────────────────────────────────────────
+            // While typing: what the query MEANS (name/genre/country/language)
+            // and how to rank it. While idle: the recent searches and a
+            // trending shortcut — discovery one tap away.
+            Flow {
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+                visible: root.searchFilter !== ""
+                         || fullRepresentation.webHistory.length > 0
+
+                Repeater {
+                    model: root.searchFilter !== "" ? [
+                        { "key": "all",      "label": i18n("All") },
+                        { "key": "genre",    "label": i18n("Genre") },
+                        { "key": "country",  "label": i18n("Country") },
+                        { "key": "language", "label": i18n("Language") }
+                    ] : []
+                    delegate: PlasmaComponents3.ToolButton {
+                        required property var modelData
+                        text: modelData.label
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        checkable: true
+                        checked: fullRepresentation.webSearchMode === modelData.key
+                        onClicked: {
+                            fullRepresentation.webSearchMode = modelData.key
+                            runWebSearch(root.searchFilter)
+                        }
+                    }
+                }
+                Repeater {
+                    model: root.searchFilter !== "" ? [
+                        { "key": "votes",      "label": i18n("Top voted"),  "icon": "starred-symbolic" },
+                        { "key": "clicktrend", "label": i18n("Trending"),   "icon": "office-chart-line" },
+                        { "key": "bitrate",    "label": i18n("Bitrate"),    "icon": "audio-volume-high" }
+                    ] : []
+                    delegate: PlasmaComponents3.ToolButton {
+                        required property var modelData
+                        text: modelData.label
+                        icon.name: modelData.icon
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        checkable: true
+                        checked: fullRepresentation.webSearchOrder === modelData.key
+                        onClicked: {
+                            fullRepresentation.webSearchOrder = modelData.key
+                            runWebSearch(root.searchFilter)
+                        }
+                    }
+                }
+                PlasmaComponents3.ToolButton {
+                    visible: root.searchFilter === ""
+                    text: i18n("Trending now")
+                    icon.name: "office-chart-line"
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    onClicked: runWebTrending()
+                }
+                Repeater {
+                    model: root.searchFilter === "" ? fullRepresentation.webHistory : []
+                    delegate: PlasmaComponents3.ToolButton {
+                        required property string modelData
+                        text: modelData
+                        icon.name: "view-history"
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        onClicked: filterField.text = modelData
+                    }
                 }
             }
 
@@ -681,6 +819,15 @@ PlasmaExtras.Representation {
                                               : i18n("Click = preview · ⭐ = add to my stations")
                                 }
                             }
+                        }
+
+                        PlasmaComponents3.ToolButton {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            visible: webResultsModel.count >= fullRepresentation.webResultCap
+                                     && !fullRepresentation.webSearching
+                            text: i18n("Show more results")
+                            icon.name: "arrow-down"
+                            onClicked: loadMoreWeb()
                         }
 
                         Item { width: 1; height: Kirigami.Units.smallSpacing }
@@ -2354,7 +2501,14 @@ PlasmaExtras.Representation {
         function onFavoriteNamesChanged() { rebuildFilteredModel() }
     }
 
-    Component.onCompleted: rebuildFilteredModel()
+    Component.onCompleted: {
+        try {
+            var h = JSON.parse(Plasmoid.configuration.searchHistory || "[]")
+            if (Array.isArray(h))
+                webHistory = h.filter(function(e) { return typeof e === "string" }).slice(0, 8)
+        } catch (e) {}
+        rebuildFilteredModel()
+    }
 
     // True when any text/form input (search field, scheduler SpinBoxes /
     // ComboBoxes, volume slider) owns keyboard focus — the global Space/M
