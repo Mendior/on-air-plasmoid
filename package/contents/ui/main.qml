@@ -1830,9 +1830,15 @@ PlasmoidItem {
         // from the device's actual Connected state, never from parsing the
         // client's output, and a failed first attempt gets one retry before
         // anyone is told anything.
-        executable.exec(": BT_CONNECT; timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
+        // The inquiry scan first: a sleeping speaker's radio ignores the
+        // page itself (br-connection-page-timeout, "click it again and it
+        // works") but wakes for the inquiry — measured live on a JBL that
+        // refused every direct connect and answered right after one scan.
+        executable.exec(": BT_CONNECT; timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
+            + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
             + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
-            + " || timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
+            + " || { timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
+            + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1; };"
             + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
             + " && echo __BT_CONN_OK__ || echo __BT_CONN_FAIL__; true"
             + " # " + (++_execSeq));

@@ -1447,7 +1447,15 @@ Item {
         if (sinkUp) {
             for (var mod in _combineLoopbackSinkByModule) {
                 if (String(_combineLoopbackSinkByModule[mod]).toLowerCase().indexOf(token) !== -1) {
-                    _btJoinWatchStop(); // in the group — done, all is well
+                    // In the group — but "sink up + loopback attached" can
+                    // still be silence: a transport that came back under a
+                    // LIVE loopback plays into a dead pipe (measured live —
+                    // signal flowing, nothing in the air). One flush as the
+                    // watchdog signs off clears it; harmless when healthy.
+                    var okSink = String(_combineLoopbackSinkByModule[mod]).replace(/'/g, "'\\''");
+                    app.exec(": PW_FLUSH; pactl suspend-sink '" + okSink + "' 1;"
+                             + " pactl suspend-sink '" + okSink + "' 0; true # " + app.nextSeq());
+                    _btJoinWatchStop();
                     return;
                 }
             }
@@ -1468,6 +1476,9 @@ Item {
             _btKickInFlight = true;
             app.exec(": BT_KICK; timeout 5 bluetoothctl disconnect " + _btJoinWatchMac
                 + " >/dev/null 2>&1; sleep 1;"
+                // Wake the speaker's radio with an inquiry before re-paging —
+                // the page itself is what sleeping speakers ignore.
+                + " timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
                 + " timeout 15 bluetoothctl connect " + _btJoinWatchMac + " >/dev/null 2>&1; true"
                 + " # " + app.nextSeq());
         }
