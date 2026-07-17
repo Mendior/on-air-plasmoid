@@ -308,6 +308,18 @@ Item {
             }
             _combineActive = true;
             _resurrectTries = 0;
+            // The sighting is recorded HERE too: the sink usually registers
+            // before this ack (the same shell created it), so the death
+            // check's "seen alive" precondition would otherwise wait for a
+            // later device event that may never mention the sink at all —
+            // measured live: a hand-killed null sink was never resurrected
+            // because no event after activation had carried its birth.
+            var bcOuts = app.mediaDevs.audioOutputs;
+            for (var bc = 0; bc < bcOuts.length; bc++)
+                if (String(bcOuts[bc].id).indexOf(_combineSinkName) !== -1) {
+                    _combineSinkSeen = true;
+                    break;
+                }
             // If our own PREVDEF read back as a combined name (empty after
             // the filter) — a superseded load had already switched the
             // default before this generation looked — adopt the real default
