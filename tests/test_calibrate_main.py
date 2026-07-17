@@ -22,9 +22,22 @@ import pytest
 UI_DIR = pathlib.Path(__file__).resolve().parent.parent / "package" / "contents" / "ui"
 
 PW_RECORD_STUB = """#!/usr/bin/env python3
-import math, struct, sys, time, wave
+import math, os, struct, sys, time, wave
 rate = 48000
 out = sys.argv[-1]
+target = ""
+if "--target" in sys.argv:
+    target = sys.argv[sys.argv.index("--target") + 1]
+dead = [d for d in os.environ.get("ONAIR_TEST_DEAD", "").split(",") if d]
+is_dead = ("DEFAULT" in dead and target == "") or (target in dead)
+if is_dead:
+    with wave.open(out, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"\\x00\\x00" * int(rate * 1.2))
+    time.sleep(60)
+    sys.exit(0)
 n = int(rate * 1.2)
 click_at = int(rate * 0.75)  # past ANALYSIS_SKIP and the impossible-early noise filter
 frames = bytearray()
@@ -50,6 +63,24 @@ if any("wedge" in a for a in sys.argv):
 """
 
 
+
+PACTL_STUB = """#!/usr/bin/env python3
+import sys
+args = sys.argv[1:]
+if args[:1] == ["get-default-source"]:
+    print("stub_mic")
+elif args[:2] == ["list", "sources"]:
+    print("Source #0")
+    print("\\tName: sink_x.monitor")
+    print("\\tDescription: Monitor of Sink X")
+    print("Source #1")
+    print("\\tName: stub_mic")
+    print("\\tDescription: Stub Desk Microphone")
+    print("Source #2")
+    print("\\tName: cam_mic")
+    print("\\tDescription: Stub Webcam Microphone")
+"""
+
 @pytest.fixture(scope="module")
 def fast_calibrate(tmp_path_factory):
     """A copy of the shipped calibrate.py with only timing constants shrunk,
@@ -71,17 +102,20 @@ def fast_calibrate(tmp_path_factory):
     script.write_text(src)
     bindir = root / "bin"
     bindir.mkdir()
-    for name, body in (("pw-record", PW_RECORD_STUB), ("paplay", PAPLAY_STUB)):
+    for name, body in (("pw-record", PW_RECORD_STUB), ("paplay", PAPLAY_STUB),
+                       ("pactl", PACTL_STUB)):
         p = bindir / name
         p.write_text(body)
         p.chmod(p.stat().st_mode | stat.S_IXUSR)
     return script, bindir
 
 
-def run_calibrate(fast_calibrate, argv):
+def run_calibrate(fast_calibrate, argv, extra_env=None):
     script, bindir = fast_calibrate
     env = dict(os.environ)
     env["PATH"] = str(bindir) + os.pathsep + env.get("PATH", "")
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run([sys.executable, str(script)] + argv,
                           capture_output=True, text=True, timeout=120, env=env)
     return proc
@@ -150,3 +184,31 @@ def test_verify_usage_is_a_sentinel(fast_calibrate):
     proc = run_calibrate(fast_calibrate, ["verify"])
     assert proc.returncode == 0
     assert proc.stdout.strip() == "VERIFY_FAIL usage"
+
+
+def test_dead_default_mic_hands_over_to_a_live_one(fast_calibrate):
+    # The Yeti disease, measured live: the mic's own touch-mute delivers
+    # exact zeros while every software flag says "not muted". The run must
+    # notice before spending forty seconds of clicks, skip the monitor in
+    # the source list, and hand the measurement to the webcam next to it.
+    proc = run_calibrate(fast_calibrate, ["wired_sink", "bt_sink", ""],
+                         extra_env={"ONAIR_TEST_DEAD": "DEFAULT,stub_mic"})
+    assert proc.returncode == 0
+    assert "CALIB_MIC Stub Webcam Microphone" in proc.stdout
+    assert "Monitor of Sink X" not in proc.stdout
+    assert "CALIB_OK" in proc.stdout
+    assert "no click heard" not in proc.stdout
+
+
+def test_every_mic_dead_fails_fast_and_specifically(fast_calibrate):
+    proc = run_calibrate(fast_calibrate, ["wired_sink", "bt_sink", ""],
+                         extra_env={"ONAIR_TEST_DEAD": "DEFAULT,stub_mic,cam_mic"})
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == "CALIB_FAIL microphone silent"
+
+
+def test_verify_with_dead_mics_says_so(fast_calibrate):
+    proc = run_calibrate(fast_calibrate, ["verify", "combined", "", "wired_sink"],
+                         extra_env={"ONAIR_TEST_DEAD": "DEFAULT,stub_mic,cam_mic"})
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == "VERIFY_FAIL microphone silent"

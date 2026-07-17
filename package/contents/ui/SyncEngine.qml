@@ -566,8 +566,26 @@ Item {
                 while ((clM = clRe.exec(stdout || "")) !== null) clipped.push(clM[1]);
                 if (clipped.length > 0)
                     calText += " " + i18n("The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again.", clipped.join(", "));
+                // The default mic delivered exact zeros (a hardware mute the
+                // system cannot see) and another one stepped in — say which,
+                // or the user wonders why their good mic was "ignored".
+                var micM = (stdout || "").match(/CALIB_MIC (.+)/);
+                if (micM)
+                    calText += " " + i18n("Measured with %1 — the default microphone stayed silent.", micM[1].trim());
                 app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");
             } else {
+                // Every microphone in the room delivered exact zeros — a
+                // hardware mute (the touch button on the mic itself) that no
+                // software flag reports. Louder clicks cannot fix a deaf
+                // ear, so this failure never escalates the park.
+                if ((stdout || "").indexOf("microphone silent") !== -1) {
+                    _calibRestoreVolume();
+                    if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
+                    app.notify(i18n("Calibration did not succeed"),
+                               i18n("Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."),
+                               "dialog-warning");
+                    return true;
+                }
                 // Inaudible clicks at the polite park are a ROOM property,
                 // not a verdict: fans plus a sensitive microphone bury a 55%
                 // click that an 85% one clears with room to spare (measured
@@ -703,6 +721,15 @@ Item {
             if ((stdout || "").indexOf("VERIFY_FAIL room not quiet") !== -1) {
                 app.notify(i18n("Sync check"),
                            i18n("The room was not quiet enough to verify — pause other audio and calibrate once more."),
+                           "dialog-warning");
+                return true;
+            }
+            // The mic went hardware-mute between the rounds (its own touch
+            // button — no software flag reports it): the calibration stands,
+            // the check just could not listen.
+            if ((stdout || "").indexOf("VERIFY_FAIL microphone silent") !== -1) {
+                app.notify(i18n("Sync check"),
+                           i18n("Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."),
                            "dialog-warning");
                 return true;
             }

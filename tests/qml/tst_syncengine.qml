@@ -424,6 +424,49 @@ Item {
             verify(cmd.indexOf(" timeout 50 python3 '") !== -1);
         }
 
+        function test_a_dead_microphone_never_escalates_the_park() {
+            // Every mic delivered exact zeros (a hardware touch-mute no
+            // software flag reports): louder clicks cannot fix a deaf ear.
+            // No 85% retry, a specific verdict, and the stream comes back.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            var before = r.mock.execLog.length;
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " P55 ;",
+                           "CALIB_FAIL microphone silent\n", "");
+            verify(!r.e._calibrating);
+            compare(r.mock.execLog.length, before);   // no louder retry launched
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            verify(note.text.indexOf("pure silence") !== -1);
+            fuzzyCompare(r.mock.playerOutput.volume, 0.5, 0.001);
+        }
+
+        function test_a_stand_in_microphone_is_credited() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " P55 ;",
+                           "CALIB_MIC Stub Webcam Microphone\n"
+                           + "CALIB_LVL " + wired + " 10000\n"
+                           + "CALIB_LVL " + btSink + " 10000\n"
+                           + "CALIB_OK 200\n", "");
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            compare(note.title, "Speakers calibrated");
+            verify(note.text.indexOf("Measured with Stub Webcam Microphone") !== -1);
+        }
+
+        function test_verify_with_dead_mics_reports_honestly() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";",
+                           "VERIFY_FAIL microphone silent\n", "");
+            verify(!r.e._verifyPending);
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            compare(note.title, "Sync check");
+            verify(note.text.indexOf("pure silence") !== -1);
+        }
+
         function test_inaudible_clicks_escalate_the_park_once() {
             // A noisy room buries the 55% clicks (measured here: 1976 over a
             // floor of ~570). The failure handler retries ONCE at 85% —

@@ -314,6 +314,95 @@ def median(values):
     return s[len(s) // 2]
 
 
+def _is_dead_capture(samples):
+    """A hardware-muted microphone delivers EXACT zeros forever — a Yeti's
+    own touch-mute is pure DSP inside the mic and invisible to PulseAudio's
+    mute flag (measured live: 'Mute: no' over five seconds of flat zero). A
+    live capture never sits this low: even a silent room leaves a few LSBs
+    of noise and dither on a real ADC."""
+    if not samples:
+        return True
+    return max(abs(s) for s in samples) <= 3
+
+
+def _usable_mic_name(name):
+    """Monitors are not microphones: a monitor 'hears' a click electrically
+    the instant it is queued — zero acoustic path, every lag reads ~0 — and
+    a calibration against one writes confident nonsense into the lags."""
+    return bool(name) and not name.endswith(".monitor")
+
+
+def _capture_alive(mic, seconds=0.7):
+    """Whether a short capture from `mic` carries any signal at all."""
+    rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+        time.sleep(seconds)
+        rp.terminate()
+        try:
+            rp.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            rp.kill()
+        try:
+            samples, _rate = read_mono(rec)
+        except Exception:
+            return False
+        return not _is_dead_capture(samples)
+    finally:
+        try:
+            os.unlink(rec)
+        except OSError:
+            pass
+
+
+def _default_source_name():
+    try:
+        return subprocess.run(["pactl", "get-default-source"],
+                              capture_output=True, text=True,
+                              timeout=3).stdout.strip()
+    except Exception:
+        return ""
+
+
+def _alternative_mics(skip):
+    """(name, description) of candidate microphones, monitors excluded."""
+    try:
+        out = subprocess.run(["pactl", "list", "sources"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception:
+        return []
+    mics = []
+    name = ""
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("Name: "):
+            name = line[6:].strip()
+        elif line.startswith("Description: "):
+            if _usable_mic_name(name) and name != skip:
+                mics.append((name, line[13:].strip()))
+            name = ""
+    return mics
+
+
+def _resolve_mic(mic):
+    """The microphone this run will actually use.
+
+    '' means the system default. A default that is a monitor, or that
+    delivers exact zeros (hardware-muted), is swapped for the first
+    alternative source that provably hears the room — a muted desk mic must
+    not turn the whole feature off while a healthy webcam sits next to it.
+    Returns (mic, description-or-None); (None, None) means nothing usable.
+    """
+    resolved = mic or _default_source_name()
+    if _usable_mic_name(resolved) and _capture_alive(mic):
+        return mic, None
+    for name, desc in _alternative_mics(resolved):
+        if _capture_alive(name):
+            return name, desc
+    return None, None
+
+
 def find_arrivals(window, tpl, max_peaks):
     """Distinct click arrivals in one recording, seconds within `window`.
 
@@ -466,6 +555,13 @@ def cmd_verify(argv):
         signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
         sink, mic = argv[0], argv[1]
         sinks = argv[2:2 + 8]
+        # Same mic discipline as the calibration: a hardware-muted default
+        # (or a monitor) must fail fast and honestly — or hand over to a
+        # microphone that actually hears the room.
+        mic, _vdesc = _resolve_mic(mic)
+        if mic is None:
+            print("VERIFY_FAIL microphone silent")
+            return
         click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
         try:
             make_click(click)
@@ -537,6 +633,15 @@ def main():
     signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
     click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
+        # The microphone must provably hear ANYTHING before forty seconds of
+        # clicks are spent against it — and a dead default must not end the
+        # story while another mic in the room works.
+        mic, mic_desc = _resolve_mic(mic)
+        if mic is None:
+            print("CALIB_FAIL microphone silent")
+            return
+        if mic_desc:
+            print("CALIB_MIC %s" % mic_desc)
         make_click(click)
         tpl = click_template()
         wired_times, bt_times = [], []

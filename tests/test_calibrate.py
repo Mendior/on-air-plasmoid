@@ -331,3 +331,20 @@ def test_agreement_window_matches_the_measured_repeatability(calib):
     assert calib["_two_that_agree"]([1.00, 1.05]) is not None
     assert calib["_two_that_agree"]([1.00, 1.10]) is None
     assert calib["_two_that_agree"]([1.00, 1.30, 1.34]) is not None
+
+
+def test_dead_capture_is_exact_zero_not_quiet(calib):
+    # A hardware-muted mic (the Yeti's own touch button) delivers EXACT
+    # zeros; a live ADC in a silent room still shows a few LSBs. The line
+    # between them is what turns "forty seconds of futile clicks" into an
+    # instant, specific verdict.
+    assert calib["_is_dead_capture"]([])
+    assert calib["_is_dead_capture"]([0] * 48000)
+    assert calib["_is_dead_capture"]([0, 2, -3, 1])
+    assert not calib["_is_dead_capture"]([0, 0, 5, 0])
+
+
+def test_monitors_are_not_microphones(calib):
+    assert not calib["_usable_mic_name"]("")
+    assert not calib["_usable_mic_name"]("alsa_output.usb-X.analog-stereo.monitor")
+    assert calib["_usable_mic_name"]("alsa_input.usb-Blue_Yeti.analog-stereo")
