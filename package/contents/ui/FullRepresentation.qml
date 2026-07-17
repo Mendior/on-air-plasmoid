@@ -17,6 +17,8 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
+import "SearchLogic.js" as SearchLogic
+
 PlasmaExtras.Representation {
     id: fullRepresentation
 
@@ -54,6 +56,13 @@ PlasmaExtras.Representation {
     Connections {
         target: root
         function onCurrentStationChanged() { fullRepresentation._brokenArtUrls = {} }
+        // The preview ladder's honest give-up doubles as a probe verdict:
+        // the row the listener just heard fail gets its offline tag, so
+        // the list learns what the ear already knows.
+        function on_FriendlyErrorChanged() {
+            if (root._friendlyError !== "" && root._previewUrl !== "")
+                fullRepresentation._webSetAlive(root._previewUrl, 0)
+        }
     }
 
     readonly property bool _streamActive: root._casting
@@ -93,6 +102,84 @@ PlasmaExtras.Representation {
     property string _webLastQs: ""
     // Recent successful searches, newest first, persisted in the config.
     property var webHistory: []
+
+    // ── Result liveness probes ────────────────────────────────────────────
+    // hidebroken=true only filters what the directory's checker KNOWS is
+    // broken — and that knowledge can be months stale (Bauer Media Finland
+    // moved hosts in January; in July every dead mount still read
+    // lastcheckok=1). Each shown row gets one real GET, aborted at the
+    // response headers: 2xx marks it alive, 4xx/5xx tags it "not
+    // answering" and dims the row. Timeouts and transport errors stay
+    // unknown — a slow server is not a dead station.
+    property var _probeSpent: ({})
+    property int _probeActive: 0
+
+    function _probeKick(seq) {
+        if (seq !== fullRepresentation._webSearchSeq) return
+        for (var i = 0; i < webResultsModel.count
+             && fullRepresentation._probeActive < 6; i++) {
+            var row = webResultsModel.get(i)
+            if (row.alive !== -1 || fullRepresentation._probeSpent[row.url]) continue
+            fullRepresentation._probeSpent[row.url] = true
+            fullRepresentation._probeActive++
+            _probeOne(row.url, seq)
+        }
+    }
+
+    function _probeOne(url, seq) {
+        var xhr = new XMLHttpRequest()
+        var guard = null
+        var settled = false
+        var done = function(verdict) {
+            if (settled) return
+            settled = true
+            root._clearXhrTimeout(guard)
+            fullRepresentation._probeActive = Math.max(0, fullRepresentation._probeActive - 1)
+            if (seq === fullRepresentation._webSearchSeq && verdict !== -1)
+                _webSetAlive(url, verdict)
+            _probeKick(seq)
+        }
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === xhr.HEADERS_RECEIVED) {
+                // The verdict is in the status line — abort before the
+                // endless stream body starts costing anyone bandwidth.
+                var v = SearchLogic.probeVerdict(xhr.status)
+                try { xhr.abort() } catch (e) {}
+                done(v)
+            } else if (xhr.readyState === xhr.DONE) {
+                done(SearchLogic.probeVerdict(xhr.status))
+            }
+        }
+        xhr.open("GET", url)
+        guard = root._armXhrTimeout(xhr, 6000)
+        xhr.send()
+    }
+
+    // The verdict lands by URL, not by index — probes race against
+    // relevance moves, "Show more" pages and the ⭐ remove.
+    function _webSetAlive(url, verdict) {
+        for (var i = 0; i < webResultsModel.count; i++)
+            if (webResultsModel.get(i).url === url) {
+                webResultsModel.setProperty(i, "alive", verdict)
+                return
+            }
+    }
+
+    // Stable two-pass float: exact (fold-blind) name matches keep their
+    // vote order among themselves and rise first, then prefix matches —
+    // the directory only ranks by fame, and fame buries the exact station
+    // the user just typed out in full.
+    function _webBoostRelevance(q) {
+        var target = 0
+        for (var cls = 0; cls <= 1; cls++)
+            for (var i = target; i < webResultsModel.count; i++) {
+                if (SearchLogic.relevance(webResultsModel.get(i).name, q) !== cls)
+                    continue
+                if (i > target)
+                    webResultsModel.move(i, target, 1)
+                target++
+            }
+    }
 
     // Canvas gradients want CSS color strings — built from the live accent
     // so the aurora and the vinyl glint follow the follow-system setting
@@ -140,6 +227,7 @@ PlasmaExtras.Representation {
         // typing would fire the same query a beat later as a duplicate.
         webSearchDebounce.stop()
         webResultsModel.clear()
+        fullRepresentation._probeSpent = ({})
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
         // Short queries are noise — EXCEPT exact country-map keys ("uk").
@@ -169,12 +257,15 @@ PlasmaExtras.Representation {
         root._rbFetch(qs + tail, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return // stale request
             const gotAnswer = _webAppendResults(xhr)
+            if (gotAnswer && webResultsModel.count > 0)
+                _webRememberQuery(q)
+            if (gotAnswer && mode === "all" && cc === "")
+                _webBoostRelevance(q)
+            _probeKick(seq)
             // Genre pass: a one-word query is as likely a genre as a name —
             // the search field literally suggests "jazz", yet the query only
             // ever ran against station names. Tag matches fill in after the
             // name matches, deduped, same 30-row cap.
-            if (gotAnswer && webResultsModel.count > 0)
-                _webRememberQuery(q)
             if (gotAnswer && mode === "all" && cc === ""
                 && webResultsModel.count < fullRepresentation.webResultCap
                 && /^\S+$/.test(q)) {
@@ -188,6 +279,29 @@ PlasmaExtras.Representation {
                     // query, and history exists for successful queries.
                     if (webResultsModel.count > 0)
                         _webRememberQuery(q)
+                    _probeKick(seq)
+                    fullRepresentation.webSearching = false
+                })
+                return
+            }
+            // Word pass: the directory only ever matches SUBSTRINGS —
+            // "nova radio" never finds "Radio Nova". Ask it for the longest
+            // word alone and keep the rows containing every word, any
+            // order, fold-blind ("jarvi" finds "Järviradio").
+            if (gotAnswer && mode === "all" && cc === ""
+                && webResultsModel.count < fullRepresentation.webResultCap
+                && SearchLogic.words(q).length >= 2) {
+                const ws = SearchLogic.words(q)
+                root._rbFetch("/json/stations/search?name="
+                              + encodeURIComponent(SearchLogic.longestWord(q)) + tail,
+                              4000, function(xhr2) {
+                    if (seq !== fullRepresentation._webSearchSeq) return
+                    _webAppendResults(xhr2, function(r) {
+                        return SearchLogic.matchesAllWords((r.name || "").toString(), ws)
+                    })
+                    if (webResultsModel.count > 0)
+                        _webRememberQuery(q)
+                    _probeKick(seq)
                     fullRepresentation.webSearching = false
                 })
                 return
@@ -201,6 +315,7 @@ PlasmaExtras.Representation {
     // the empty query, one tap away.
     function runWebTrending() {
         webResultsModel.clear()
+        fullRepresentation._probeSpent = ({})
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
         fullRepresentation.webResultCap = 30
@@ -210,6 +325,7 @@ PlasmaExtras.Representation {
         root._rbFetch(qs, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
+            _probeKick(seq)
             fullRepresentation.webSearching = false
         })
     }
@@ -229,6 +345,7 @@ PlasmaExtras.Representation {
             // one bad mirror moment.
             if (!_webAppendResults(xhr))
                 fullRepresentation.webResultCap = Math.max(30, fullRepresentation.webResultCap - 30)
+            _probeKick(seq)
             fullRepresentation.webSearching = false
         })
     }
@@ -262,8 +379,10 @@ PlasmaExtras.Representation {
 
     // Appends one directory answer to the results model (deduped against the
     // user's list AND rows already shown). Returns true when the answer was
-    // usable — null/non-200 means the whole mirror chain failed.
-    function _webAppendResults(xhr) {
+    // usable — null/non-200 means the whole mirror chain failed. keepRow,
+    // when given, decides per directory row (the word pass keeps only names
+    // containing every query word).
+    function _webAppendResults(xhr, keepRow) {
         if (!xhr || xhr.status !== 200) return false
         try {
             const results = JSON.parse(xhr.responseText) || []
@@ -275,6 +394,7 @@ PlasmaExtras.Representation {
                 seen[webResultsModel.get(j).url] = true
             for (const r of results) {
                 if (webResultsModel.count >= fullRepresentation.webResultCap) break
+                if (keepRow && !keepRow(r)) continue
                 const u = (r.url_resolved || r.url || "").toString()
                 // http(s) only — catalogue data is untrusted and these URLs
                 // reach playMusic.source, the config and ffmpeg (same rule
@@ -301,7 +421,8 @@ PlasmaExtras.Representation {
                     "country": r.country || "",
                     "bitrate": br,
                     "codec": (r.codec || "").toUpperCase(),
-                    "rbUuid": r.stationuuid || ""
+                    "rbUuid": r.stationuuid || "",
+                    "alive": -1
                 })
             }
             return true
@@ -766,6 +887,10 @@ PlasmaExtras.Representation {
                                         anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
                                         anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5
                                         spacing: Kirigami.Units.smallSpacing * 1.5
+                                        // A probed-dead row steps back visually but
+                                        // stays clickable — the preview ladder's name
+                                        // rescue can still find the living twin.
+                                        opacity: webItem.model.alive === 0 ? 0.45 : 1.0
 
                                         Rectangle {
                                             anchors.verticalCenter: parent.verticalCenter
@@ -813,6 +938,7 @@ PlasmaExtras.Representation {
                                                 width: parent.width
                                                 text: {
                                                     var bits = []
+                                                    if (webItem.model.alive === 0) bits.push(i18n("not answering"))
                                                     if (webItem.model.country) bits.push(webItem.model.country)
                                                     if (webItem.model.bitrate > 0) bits.push(i18n("%1 kb/s", webItem.model.bitrate))
                                                     if (webItem.model.codec) bits.push(webItem.model.codec)
@@ -822,7 +948,10 @@ PlasmaExtras.Representation {
                                                 visible: text !== ""
                                                 elide: Text.ElideRight
                                                 maximumLineCount: 1
-                                                opacity: 0.55
+                                                color: webItem.model.alive === 0
+                                                       ? Kirigami.Theme.negativeTextColor
+                                                       : Kirigami.Theme.textColor
+                                                opacity: webItem.model.alive === 0 ? 0.9 : 0.55
                                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                             }
                                         }
