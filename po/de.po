@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-17 12:05+0300\n"
+"POT-Creation-Date: 2026-07-17 14:29+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: German\n"
@@ -40,13 +40,13 @@ msgid "%1 — playing %2"
 msgstr "%1 — spielt %2"
 
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:97
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:37
 msgid "Audio"
 msgstr "Audio"
 
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2275
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3455
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2286
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3497
 msgid "Volume"
 msgstr "Lautstärke"
 
@@ -54,311 +54,311 @@ msgstr "Lautstärke"
 msgid "Muted"
 msgstr "Stumm"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:102
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:42
 msgid "Default volume:"
 msgstr "Standardlautstärke:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:121
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:61
 msgid "Smooth fade:"
 msgstr "Weiche Überblendung:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:122
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:62
 msgid "Fade volume when changing stations"
 msgstr "Lautstärke beim Senderwechsel überblenden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:127
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:67
 msgid "Fade duration (ms):"
 msgstr "Überblenddauer (ms):"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:136
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:76
 msgid "Stream quality:"
 msgstr "Stream-Qualität:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:137
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:77
 msgid "Automatically switch to the highest-bitrate variant of a station"
 msgstr "Automatisch zur Variante des Senders mit der höchsten Bitrate wechseln"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:140
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:80
 msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
 msgstr "Sucht den Sender auf radio-browser.info und wählt die Stream-URL mit der besten Qualität"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:145
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:85
 msgid "Find a station's new address when its stream dies"
 msgstr "Neue Adresse eines Senders finden, wenn sein Stream stirbt"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:148
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:88
 msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
 msgstr "Sender wechseln die Server; schlägt die Wiedergabe fehl, wird der Sender auf radio-browser.info nachgeschlagen und die jetzt erreichbare Adresse in deiner Liste gespeichert"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:153
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:93
 msgid "Count my listening in the worldwide station catalog"
 msgstr "Mein Hören im weltweiten Senderkatalog zählen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:156
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:96
 msgid "When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone"
 msgstr "Wenn ein Sender zu spielen beginnt, wird ein anonymer Klick an radio-browser.info gemeldet (nur die Sender-ID, nichts über dich) — beliebte Sender sind für alle leichter zu finden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:164
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:104
 msgid "Visuals"
 msgstr "Erscheinungsbild"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:170
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:110
 msgid "Album art:"
 msgstr "Albumcover:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:171
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:111
 msgid "Look up cover art via iTunes"
 msgstr "Cover über iTunes suchen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:176
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:116
 msgid "Backdrop:"
 msgstr "Hintergrund:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:177
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:117
 msgid "Blurred album art behind now playing"
 msgstr "Unscharfes Albumcover hinter der Wiedergabeansicht"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:183
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:123
 msgid "Accent color:"
 msgstr "Akzentfarbe:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:184
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:124
 msgid "Follow the system accent color instead of the built-in emerald"
 msgstr "Akzentfarbe des Systems statt des eingebauten Smaragdgrüns verwenden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:192
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:132
 msgid "Integration"
 msgstr "Integration"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:198
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:138
 msgid "System integration:"
 msgstr "Systemintegration:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:199
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:139
 msgid "Allow control via media keys (MPRIS)"
 msgstr "Steuerung über Medientasten erlauben (MPRIS)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:207
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:147
 msgid "Downloads"
 msgstr "Downloads"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:213
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:100
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:153
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:27
 msgid "Format:"
 msgstr "Format:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:215
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:155
 msgid "Best quality (no re-encode)"
 msgstr "Beste Qualität (ohne Neukodierung)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:216
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:156
 msgid "MP3"
 msgstr "MP3"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:217
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:157
 msgid "Opus"
 msgstr "Opus"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:218
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:158
 msgid "MP4 (video)"
 msgstr "MP4 (Video)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:228
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:168
 msgid "Save to folder:"
 msgstr "In Ordner speichern:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:235
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:175
 msgid "Title cleanup:"
 msgstr "Titelbereinigung:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:236
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:176
 msgid "Use Claude CLI to clean up messy titles before download (optional)"
 msgstr "Claude CLI verwenden, um unsaubere Titel vor dem Download zu bereinigen (optional)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:244
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:184
 msgid "Behavior"
 msgstr "Verhalten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:249
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:189
 msgid "Marquee speed:"
 msgstr "Lauftext-Geschwindigkeit:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:267
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:207
 msgid "Slower"
 msgstr "Langsamer"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:269
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:209
 msgid "Faster"
 msgstr "Schneller"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:275
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:215
 msgid "Panel click:"
 msgstr "Leistenklick:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:276
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:216
 msgid "Middle click to toggle last station"
 msgstr "Mittelklick startet/stoppt den letzten Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:280
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:220
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "Mittelklick auf das Symbol spielt oder stoppt den letzten Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:209
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:135
 msgid "All stations already have a logo."
 msgstr "Alle Sender haben bereits ein Logo."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:223
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:149
 msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
 msgstr "Logo-Abruf abgeschlossen: %1 / %2 Sender aktualisiert. Zum Speichern auf „Anwenden“ klicken."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:225
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:151
 msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
 msgstr "Logo-Abruf abgeschlossen: %1 / %2 Sender aktualisiert (%3 konnten nicht automatisch gefunden werden). Zum Speichern auf „Anwenden“ klicken."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:621
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:547
 msgid "No stations to refresh."
 msgstr "Keine Sender zum Aktualisieren."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:706
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:632
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:714
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:640
 msgid "Hide"
 msgstr "Ausblenden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:714
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:640
 msgid "Show"
 msgstr "Anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:724
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:650
 msgid "Remove"
 msgstr "Entfernen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:843
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:572
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:770
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:502
 msgid "Add Station"
 msgstr "Sender hinzufügen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:843
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:770
 msgid "Edit station"
 msgstr "Sender bearbeiten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:890
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:753
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:817
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:683
 msgid "Name:"
 msgstr "Name:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:896
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:823
 msgid "URL:"
 msgstr "URL:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:903
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:830
 msgid "Logo URL:"
 msgstr "Logo-URL:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:904
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:831
 msgid "e.g. https://example.com/logo.png"
 msgstr "z. B. https://example.com/logo.png"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:912
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:839
 msgid "Active"
 msgstr "Aktiv"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:988
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:915
 msgid "Configuration has been loaded. Click 'Apply' to save changes."
 msgstr "Die Konfiguration wurde geladen. Klicken Sie auf „Anwenden“, um die Änderungen zu speichern."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:990
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:917
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "Fehler beim Laden der Konfiguration. Versuchen Sie eine andere Datei."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:994
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:921
 msgid "Your configuration was saved successfully."
 msgstr "Ihre Konfiguration wurde erfolgreich gespeichert."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:996
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:923
 msgid "Error, make sure the selected directory is writable!"
 msgstr "Fehler — stellen Sie sicher, dass der gewählte Ordner beschreibbar ist!"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:983
 msgid "Add…"
 msgstr "Hinzufügen…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1065
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:992
 msgid "Fetching… %1 / %2"
 msgstr "Wird geladen… %1 / %2"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1066
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:993
 msgid "Fetch missing logos"
 msgstr "Fehlende Logos laden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1075
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1002
 msgid "Re-fetch all"
 msgstr "Alle neu laden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1080
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1007
 msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
 msgstr "Neue Logos für alle Sender laden; vorhandene bleiben erhalten, wenn nichts Besseres gefunden wird"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1095
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1022
 msgid "Import…"
 msgstr "Importieren…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1101
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1028
 msgid "Export…"
 msgstr "Exportieren…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:94
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:21
 msgid "Stream recording"
 msgstr "Stream-Aufnahme"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:102
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:29
 msgid "Original stream (bit-exact copy, recommended)"
 msgstr "Original-Stream (bitgenaue Kopie, empfohlen)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:103
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:30
 msgid "MP3 (re-encode — max compatibility)"
 msgstr "MP3 (Neukodierung — beste Kompatibilität)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:104
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:31
 msgid "WAV (uncompressed — very large files)"
 msgstr "WAV (unkomprimiert — sehr große Dateien)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:113
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:40
 msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
 msgstr "Radiostreams sind bereits komprimiert — die bitgenaue Kopie IST die maximale Qualität. Neukodierung (MP3) oder Entpacken (WAV) kann nie Qualität hinzufügen; wählen Sie diese nur für Gerätekompatibilität oder Bearbeitung."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:122
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:49
 msgid "Max length:"
 msgstr "Maximale Länge:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:126
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2032
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:53
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2043
 msgid "%1 min"
 msgstr "%1 Min."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:131
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:58
 msgid "A hard safety cap for one recording — protects the disk if you forget to stop."
 msgstr "Feste Obergrenze für eine Aufnahme — schützt die Festplatte, falls Sie das Stoppen vergessen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:143
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1828
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1919
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:70
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1839
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1930
 msgid "Scheduled recordings"
 msgstr "Geplante Aufnahmen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:148
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:75
 msgid "Schedules are managed in the widget itself: open the popup, press the music-note button in the footer to open My Music, then press the stopwatch button next to \"My Music\". Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing."
 msgstr "Zeitpläne werden im Widget selbst verwaltet: Öffnen Sie das Popup, drücken Sie die Notentaste in der Fußzeile für „Meine Musik“ und dann die Stoppuhrtaste daneben. Wählen Sie Sender, Startzeit, Dauer und Wiederholung (einmal / täglich / wöchentlich) — das Widget nimmt im Hintergrund auf, auch wenn nichts abgespielt wird."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:155
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:82
 msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
 msgstr "Aufnahmen werden in Ihrem Musikordner gespeichert und sind nur für den persönlichen Gebrauch — geben Sie sie nicht weiter."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:210
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:268
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:669
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:136
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:194
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:599
 msgid ""
 "Get list of stations\n"
 "Please wait…"
@@ -366,7 +366,7 @@ msgstr ""
 "Senderliste wird geladen\n"
 "Bitte warten…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:267
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:193
 msgid ""
 "Nothing found\n"
 "Try changing your query"
@@ -374,379 +374,379 @@ msgstr ""
 "Nichts gefunden\n"
 "Versuchen Sie eine andere Suche"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:280
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:293
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:206
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:219
 msgid "Error: Could not connect to API servers"
 msgstr "Fehler: Verbindung zu den API-Servern nicht möglich"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:408
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:334
 msgid "Search Station"
 msgstr "Sender suchen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:414
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:340
 msgid "Search by"
 msgstr "Suchen nach"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:421
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:347
 msgid "name"
 msgstr "Name"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:422
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:348
 msgid "country"
 msgstr "Land"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:423
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:349
 msgid "language"
 msgstr "Sprache"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:424
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:350
 msgid "tags"
 msgstr "Schlagwörter"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:542
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:472
 msgid "%1 kBit/s"
 msgstr "%1 kBit/s"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:555
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:485
 msgid "Info"
 msgstr "Info"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:597
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:527
 msgid "Station is added. Click 'Apply' to save changes."
 msgstr "Sender wurde hinzugefügt. Klicken Sie auf „Anwenden“, um die Änderungen zu speichern."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:612
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1341
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:542
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1352
 msgid "Stop"
 msgstr "Stopp"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:612
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1341
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:542
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1352
 msgid "Play"
 msgstr "Wiedergabe"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:715
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:645
 msgid "Search…"
 msgstr "Suchen…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:725
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:655
 msgid "Clear Results"
 msgstr "Ergebnisse leeren"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:747
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:677
 msgid "Station Info"
 msgstr "Senderinfo"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:764
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:695
 msgid "Favicon:"
 msgstr "Logo:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:776
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:707
 msgid "Homepage:"
 msgstr "Webseite:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:786
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:717
 msgid "Stream URL:"
 msgstr "Stream-URL:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:800
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:731
 msgid "OK"
 msgstr "OK"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:802
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:733
 msgid "Error"
 msgstr "Fehler"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:809
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:740
 msgid "Server status:"
 msgstr "Serverstatus:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:820
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:751
 msgid "%1 (last check: %2)"
 msgstr "%1 (letzte Prüfung: %2)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:841
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:772
 msgid "Codec:"
 msgstr "Codec:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:852
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:783
 msgid "Bitrate:"
 msgstr "Bitrate:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:858
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:789
 msgid "kBit/s"
 msgstr "kBit/s"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:870
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:801
 msgid "Country:"
 msgstr "Land:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:878
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:810
 msgid "Language:"
 msgstr "Sprache:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:886
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:819
 msgid "Tags:"
 msgstr "Schlagwörter:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:917
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2752
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:851
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2763
 msgid "Error: %1"
 msgstr "Fehler: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:456
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:460
 msgid "Search station or country… (e.g. Finland, jazz)"
 msgstr "Sender oder Land suchen… (z. B. Finnland, Jazz)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:477
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:481
 msgid "Show all stations"
 msgstr "Alle Sender anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:477
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:481
 msgid "Show only favorites"
 msgstr "Nur Favoriten anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:496
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:500
 msgid "All"
 msgstr "Alle"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:497
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:501
 msgid "Genre"
 msgstr "Genre"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:498
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:502
 msgid "Country"
 msgstr "Land"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:499
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:503
 msgid "Language"
 msgstr "Sprache"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:515
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:519
 msgid "Top voted"
 msgstr "Bestbewertet"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:516
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:520
 msgid "Trending"
 msgstr "Im Trend"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:517
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:521
 msgid "Bitrate"
 msgstr "Bitrate"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:534
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:538
 msgid "Trending now"
 msgstr "Jetzt im Trend"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:550
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:554
 msgid "Search again — right-click removes this entry"
 msgstr "Erneut suchen — Rechtsklick entfernt den Eintrag"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:564
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:568
 msgid "Clear search history"
 msgstr "Suchverlauf leeren"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:694
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:698
 msgid "Searching the web…"
 msgstr "Websuche läuft…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:695
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:699
 msgid "From the web"
 msgstr "Aus dem Web"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:695
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1657
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1817
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:699
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1668
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1828
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:726
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:732
 msgid "Stop preview: %1"
 msgstr "Vorhören stoppen: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:727
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:733
 msgid "Preview: %1"
 msgstr "Vorhören: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:807
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1221
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:813
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1232
 msgid "%1 kb/s"
 msgstr "%1 kb/s"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:853
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1398
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:859
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1409
 msgid "Add to my stations + favorites"
 msgstr "Zu meinen Sendern + Favoriten hinzufügen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:868
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:874
 msgid "Click = stop preview"
 msgstr "Klick = Vorhören stoppen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:869
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:875
 msgid "Click = preview · ⭐ = add to my stations"
 msgstr "Klick = Vorhören · ⭐ = zu meinen Sendern hinzufügen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:878
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:884
 msgid "Show more results"
 msgstr "Mehr Ergebnisse anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:905
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:911
 msgid "No favorite stations yet"
 msgstr "Noch keine Favoriten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:907
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:913
 msgid "The station directory is not reachable"
 msgstr "Das Senderverzeichnis ist nicht erreichbar"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:908
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:914
 msgid "No matching stations"
 msgstr "Keine passenden Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:908
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:914
 msgid "No stations"
 msgstr "Keine Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:921
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:927
 msgid "Tap the heart on a station to add it here"
 msgstr "Tippen Sie auf das Herz eines Senders, um ihn hier hinzuzufügen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:923
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:929
 msgid "Check the connection and type to search again"
 msgstr "Verbindung prüfen und zum erneuten Suchen tippen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:924
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:930
 msgid "Try a different search term"
 msgstr "Versuchen Sie einen anderen Suchbegriff"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1200
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1211
 msgid "LIVE"
 msgstr "LIVE"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1306
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1317
 msgid "Nothing playing"
 msgstr "Nichts wird gespielt"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1323
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1334
 msgid "Previous station"
 msgstr "Vorheriger Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1361
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1372
 msgid "Next station"
 msgstr "Nächster Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1384
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1395
 msgid "Search this track on YouTube"
 msgstr "Diesen Titel auf YouTube suchen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1399
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1410
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:354
 msgid "Remove from favorites"
 msgstr "Aus Favoriten entfernen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1399
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1410
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:354
 msgid "Add to favorites"
 msgstr "Zu Favoriten hinzufügen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1426
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1785
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1437
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1796
 msgid "Remove from liked songs"
 msgstr "Aus den gemerkten Liedern entfernen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1427
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1438
 msgid "Like this song (saved to My Music)"
 msgstr "Dieses Lied merken (unter Meine Musik gespeichert)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1445
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1456
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Stimme gesendet — danke für die Unterstützung des Senders!"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1446
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1457
 msgid "Sending the vote…"
 msgstr "Stimme wird gesendet…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1447
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1458
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Für diesen Sender im weltweiten Katalog stimmen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1466
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2744
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1477
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2755
 msgid "Downloading…"
 msgstr "Wird heruntergeladen…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1467
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1478
 msgid "Download this track (for offline listening)"
 msgstr "Diesen Titel herunterladen (zum Offline-Hören)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1492
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1503
 msgid "A scheduled recording is running (%1)"
 msgstr "Eine geplante Aufnahme läuft (%1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1494
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1505
 msgid "Recording %1 — click to stop"
 msgstr "Aufnahme läuft: %1 — zum Stoppen klicken"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1496
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2079
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1507
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2090
 msgid "This source cannot be recorded"
 msgstr "Diese Quelle kann nicht aufgenommen werden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1497
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1508
 msgid "Record this station (personal use only)"
 msgstr "Diesen Sender aufnehmen (nur für den persönlichen Gebrauch)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1581
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1592
 msgid "Downloading: %1"
 msgstr "Wird heruntergeladen: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1634
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1645
 msgid "Stop recording"
 msgstr "Aufnahme stoppen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1658
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1669
 msgid "Liked songs"
 msgstr "Gemerkte Lieder"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1658
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1669
 msgid "Recently played"
 msgstr "Zuletzt gespielt"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1673
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1684
 msgid "Show play history"
 msgstr "Wiedergabeverlauf anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1674
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1685
 msgid "Show liked songs"
 msgstr "Gemerkte Lieder anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1684
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1695
 msgid "Clear history"
 msgstr "Verlauf leeren"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1715
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1726
 msgid "Search YouTube for %1"
 msgstr "Auf YouTube nach %1 suchen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1774
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1785
 msgid "Download this track"
 msgstr "Diesen Titel herunterladen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1798
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1809
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klick = auf YouTube suchen · ⬇ = herunterladen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1817
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1828
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:24
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1306
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1400
 msgid "My Music"
 msgstr "Meine Musik"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1858
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2136
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1869
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2147
 msgid "Wake-up alarms"
 msgstr "Weckalarme"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1886
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1897
 msgid "Open folder in file manager"
 msgstr "Ordner im Dateimanager öffnen"
 
@@ -758,418 +758,418 @@ msgstr "Ordner im Dateimanager öffnen"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1944
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2052
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2161
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2256
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Sun"
 msgstr "So"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1944
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2052
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2161
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2256
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Mon"
 msgstr "Mo"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1944
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2052
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2161
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2256
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Tue"
 msgstr "Di"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1944
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2052
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2161
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2256
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Wed"
 msgstr "Mi"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1945
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2053
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2162
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2257
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1956
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2064
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2173
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2268
 msgid "Thu"
 msgstr "Do"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1945
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2053
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2162
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2257
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1956
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2064
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2173
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2268
 msgid "Fri"
 msgstr "Fr"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1945
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2053
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2162
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2257
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1956
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2064
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2173
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2268
 msgid "Sat"
 msgstr "Sa"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1947
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2045
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2164
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2248
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1958
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2175
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
 msgid "Daily"
 msgstr "Täglich"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1948
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2165
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1959
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2176
 msgid "Every %1"
 msgstr "Jeden %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1963
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1974
 msgid "Remove this schedule"
 msgstr "Diesen Zeitplan entfernen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1971
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1982
 msgid "No scheduled recordings yet — add one below."
 msgstr "Noch keine geplanten Aufnahmen — fügen Sie unten eine hinzu."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1986
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2203
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1997
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2214
 msgid "Station:"
 msgstr "Sender:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1994
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2211
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2005
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2222
 msgid "Station"
 msgstr "Sender"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1998
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2215
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2009
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2226
 msgid "Start:"
 msgstr "Start:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2009
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2226
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2020
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2237
 msgid "Start hour"
 msgstr "Startstunde"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2019
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2236
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2030
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2247
 msgid "Start minute"
 msgstr "Startminute"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2024
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2035
 msgid "Duration:"
 msgstr "Dauer:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2034
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2045
 msgid "Duration in minutes"
 msgstr "Dauer in Minuten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2038
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2241
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2049
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2252
 msgid "Repeat:"
 msgstr "Wiederholung:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2045
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2248
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
 msgid "Once"
 msgstr "Einmal"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2045
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2248
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
 msgid "Weekly"
 msgstr "Wöchentlich"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2046
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2250
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2057
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2261
 msgid "Repeat"
 msgstr "Wiederholung"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2055
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2066
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2270
 msgid "Weekday"
 msgstr "Wochentag"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2066
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2077
 msgid "Recordings are for personal use only."
 msgstr "Aufnahmen sind nur für den persönlichen Gebrauch."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2091
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2292
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2102
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2303
 msgid "Add"
 msgstr "Hinzufügen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2180
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2191
 msgid "Remove this alarm"
 msgstr "Diesen Alarm entfernen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2188
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2199
 msgid "No alarms yet — add one below."
 msgstr "Noch keine Alarme — unten einen hinzufügen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2264
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2275
 msgid "Volume:"
 msgstr "Lautstärke:"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2286
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2297
 msgid "Keep the computer awake until the alarm"
 msgstr "Den Rechner bis zum Alarm wach halten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2347
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2358
 msgid "Stop: %1"
 msgstr "Stoppen: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2347
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2358
 msgid "Play: %1"
 msgstr "Abspielen: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2432
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2443
 msgid "Click again to confirm delete"
 msgstr "Zum Bestätigen des Löschens erneut klicken"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2432
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2443
 msgid "Delete file"
 msgstr "Datei löschen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2488
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2499
 msgid "Nothing here yet"
 msgstr "Hier ist noch nichts"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2499
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2510
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Wenn im Radio ein guter Titel läuft, drücken Sie ⬇ — er wird hier zum Offline-Hören gespeichert"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2653
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2664
 msgid "My Music (downloaded tracks)"
 msgstr "Meine Musik (heruntergeladene Titel)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2667
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2678
 msgid "Sleep timer: %1"
 msgstr "Einschlaf-Timer: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2668
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2679
 msgid "Sleep timer"
 msgstr "Einschlaf-Timer"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2700
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2711
 msgid "Sleep in 15 minutes"
 msgstr "Schlafmodus in 15 Minuten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2701
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2712
 msgid "Sleep in 30 minutes"
 msgstr "Schlafmodus in 30 Minuten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2702
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2713
 msgid "Sleep in 60 minutes"
 msgstr "Schlafmodus in 60 Minuten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2703
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
 msgid "Sleep in 90 minutes"
 msgstr "Schlafmodus in 90 Minuten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2706
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2717
 msgid "Cancel timer"
 msgstr "Timer abbrechen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2741
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2752
 msgid "Sleeping in %1"
 msgstr "Schlafen in %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2747
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2758
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:66
 msgid "Casting to %1"
 msgstr "Überträgt auf %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2750
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2761
 msgid "Check internet connection…"
 msgstr "Internetverbindung prüfen…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2755
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2766
 msgid "Bitrate: %1 kb/s"
 msgstr "Bitrate: %1 kb/s"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2760
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2771
 msgid "Playing"
 msgstr "Wiedergabe läuft"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2760
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2763
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2771
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2774
 msgid "Connecting…"
 msgstr "Verbinden…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2765
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2776
 msgid "Choose station and enjoy…"
 msgstr "Sender wählen und genießen…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2784
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2795
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Überträgt auf %1 — klicken zum Wählen oder Stoppen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2785
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2796
 msgid "Play on a device (Chromecast, TV, speaker)"
 msgstr "Auf einem Gerät abspielen (Chromecast, TV, Lautsprecher)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2854
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2868
 msgid "Play on"
 msgstr "Abspielen auf"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2867
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2881
 msgid "This computer"
 msgstr "Dieser Computer"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2883
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2905
 msgid "System default output"
 msgstr "Standard-Systemausgabe"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2910
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2932
 msgid "All local outputs, in sync"
 msgstr "Alle lokalen Ausgänge, synchron"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2927
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2949
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Spielt gleichzeitig auf jedem verbundenen Lautsprecher — kabelgebundene Ausgänge werden verzögert, um mit Bluetooth im Takt zu bleiben."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2941
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2948
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2963
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2970
 msgid "Sync fine-tune"
 msgstr "Sync-Feinabstimmung"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2958
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2980
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Hinkt der Bluetooth-Lautsprecher den kabelgebundenen noch hinterher, erhöhe dies, bis sie zusammen spielen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2970
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2992
 msgid "Sync delay in milliseconds"
 msgstr "Sync-Verzögerung in Millisekunden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2987
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3014
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Geben Sie eine genaue Verzögerung in Millisekunden ein — der Regler bewegt sich in Zehnerschritten."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2991
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3018
 msgid "ms"
 msgstr "ms"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3005
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3032
 msgid "Calibrate with the microphone"
 msgstr "Mit dem Mikrofon kalibrieren"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3010
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3037
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Spielt ein paar laute Klicks durch jeden Lautsprecher und misst mit dem Mikrofon, wie weit der Bluetooth-Lautsprecher hinterherhinkt — die Verzögerung wird automatisch gesetzt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3030
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3057
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Runde 1 von 2 — Klicks durch jeden Lautsprecher…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3031
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3058
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Runde 2 von 2 — still, Ergebnis wird geprüft…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3061
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3096
 msgid "%1 plays in the group"
 msgstr "%1 spielt in der Gruppe"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3074
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3109
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Ob dieser Lautsprecher in der Gruppe spielt — Haken entfernen, um ihn auszulassen, ohne die Verbindung zu trennen. Wird für das Gerät gemerkt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3080
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3118
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (nichts angeschlossen)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3090
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3132
 msgid "Balance of %1"
 msgstr "Balance von %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3099
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3141
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Der Anteil dieses Lautsprechers an der Lautstärke — die Balance folgt jeder Bewegung des Hauptreglers und wird für das Gerät gemerkt. Sie wirkt nur auf die Wiedergabe dieses Widgets; die gerätebezogene Lautstärke in den Systemeinstellungen ist eine eigene, unberührte Ebene — deshalb weichen deren Zahlen von diesen Reglern ab."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3116
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3158
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3117
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3159
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3118
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3160
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3119
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3161
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3124
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3166
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Welche Kanäle dieser Lautsprecher spielt: Stereo, nur links, nur rechts oder ein Mono-Mix aus beiden. Stellen Sie einen Lautsprecher auf L und einen anderen auf R für ein echtes Stereopaar — wird für das Gerät gemerkt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3154
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3196
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3169
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3211
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth ist ausgeschaltet oder kein Adapter verfügbar — prüfe die Systemeinstellungen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3180
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3222
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Keine gekoppelten Bluetooth-Audiogeräte — kopple den Lautsprecher einmal in den Systemeinstellungen, dann erscheint er hier."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3194
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3236
 msgid "%1 — connecting…"
 msgstr "%1 — Verbindung wird hergestellt …"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3212
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3254
 msgid "%1 — pairing…"
 msgstr "%1 — wird gekoppelt…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3213
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3255
 msgid "%1 — new, click to pair"
 msgstr "%1 — neu, zum Koppeln klicken"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3224
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3266
 msgid "Pair a new speaker…"
 msgstr "Neuen Lautsprecher koppeln…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3240
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3282
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Suche läuft — versetze den Lautsprecher in den Kopplungsmodus…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3261
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3303
 msgid "WiFi & network"
 msgstr "WLAN & Netzwerk"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3293
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3335
 msgid "%1 (speaker group)"
 msgstr "%1 (Lautsprechergruppe)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3321
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3363
 msgid "Balance"
 msgstr "Balance"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3335
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3377
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Der Anteil dieses Geräts an der Lautstärke — die Balance folgt jeder Bewegung des Hauptreglers und wird für das Gerät gemerkt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3357
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3399
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Jedes Gerät puffert den Stream für sich, daher können Räume einige Sekunden versetzt spielen. Für perfekt synchrone Lautsprecher gruppieren Sie sie in der Google-Home-App — die Gruppe erscheint hier als ein einzelnes Gerät."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3367
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3409
 msgid "Stop casting everywhere"
 msgstr "Wiedergabe auf allen Geräten stoppen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3385
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3427
 msgid "Searching for devices…"
 msgstr "Suche nach Geräten…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3394
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3436
 msgid "No devices found on your network"
 msgstr "Keine Geräte in Ihrem Netzwerk gefunden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3416
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3458
 msgid "Volume: %1% (scroll to adjust)"
 msgstr "Lautstärke: %1 % (zum Ändern scrollen)"
 
@@ -1181,179 +1181,179 @@ msgstr "Zurück zu den Sendern"
 msgid "Show now playing"
 msgstr "Wiedergabeansicht anzeigen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:852
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:893
 msgid "Scheduled recording started"
 msgstr "Geplante Aufnahme gestartet"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:957
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1009
 msgid "Scheduled recording missed"
 msgstr "Geplante Aufnahme verpasst"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:965
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1015
 msgid "Scheduled recording skipped"
 msgstr "Geplante Aufnahme übersprungen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:966
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1016
 msgid "%1 — another recording is already running."
 msgstr "%1 — eine andere Aufnahme läuft bereits."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1082
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1143
 msgid "Wake-up alarm missed"
 msgstr "Weckalarm verpasst"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1083
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1144
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 war für %2 gestellt — der Rechner war zu dem Zeitpunkt aus oder im Ruhezustand."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1117
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1174
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1212
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1215
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1178
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1243
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1296
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1299
 msgid "Wake-up alarm"
 msgstr "Weckalarm"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1118
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1179
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 war zur selben Zeit fällig — stattdessen spielt %2."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1216
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1300
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Der Sender konnte nicht starten — stattdessen spielt der eingebaute Weckton."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1707
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1814
 msgid "%1 devices"
 msgstr "%1 Geräte"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2342
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2463
 msgid "Station seems to be off the air"
 msgstr "Der Sender scheint nicht auf Sendung zu sein"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2343
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2464
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 antwortet unter keiner dem Verzeichnis bekannten Adresse. Der Sender bleibt in Ihrer Liste — es wird im Hintergrund weiter versucht."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2413
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2534
 msgid "Playing from a backup address"
 msgstr "Wiedergabe über eine Ausweichadresse"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2414
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2535
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Die gespeicherte Adresse des Senders antwortet nicht — vorerst spielt der nächstliegende Treffer aus dem Verzeichnis. Ihre gespeicherte Adresse blieb erhalten."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2443
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2564
 msgid "Station found at a new address"
 msgstr "Sender unter neuer Adresse gefunden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2444
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2565
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 ist umgezogen — die neue Adresse wurde in deiner Liste gespeichert."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3497
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3650
 msgid "Casting needs python-chromecast"
 msgstr "Übertragung benötigt python-chromecast"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3498
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3651
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Installieren Sie das Paket python-chromecast, um auf Ihre Geräte zu übertragen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3501
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3654
 msgid "the device"
 msgstr "das Gerät"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3501
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3654
 msgid "Could not cast to %1"
 msgstr "Übertragung auf %1 nicht möglich"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3502
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3655
 msgid "The device could not play this station."
 msgstr "Das Gerät konnte diesen Sender nicht abspielen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3594
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3667
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3747
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3820
 msgid "the Bluetooth device"
 msgstr "das Bluetooth-Gerät"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3593
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3746
 msgid "Could not connect to %1"
 msgstr "Verbindung mit %1 nicht möglich"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3595
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3748
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Stellen Sie sicher, dass der Lautsprecher eingeschaltet und in Reichweite ist."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3666
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3819
 msgid "Could not pair with %1"
 msgstr "Kopplung mit %1 fehlgeschlagen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3668
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3821
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Versetze den Lautsprecher in den Kopplungsmodus (Bluetooth-Taste gedrückt halten) und versuche es erneut."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3758
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3911
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg ist nicht installiert"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3759
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3912
 msgid "Install ffmpeg to record radio."
 msgstr "Installieren Sie ffmpeg, um Radio aufzunehmen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3762
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3915
 msgid "Recording saved ✓ (%1)"
 msgstr "Aufnahme gespeichert ✓ (%1)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3766
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3919
 msgid "Recording interrupted (%1 captured)"
 msgstr "Aufnahme unterbrochen (%1 aufgenommen)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3768
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3921
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — die Datei ist viel kleiner als erwartet."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3772
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3925
 msgid "Recording failed"
 msgstr "Aufnahme fehlgeschlagen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3773
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3926
 msgid "The stream could not be captured."
 msgstr "Der Stream konnte nicht aufgenommen werden."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3814
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4010
 msgid "Downloading again without the cover"
 msgstr "Erneuter Download ohne Cover"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3815
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4011
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Zum Einbetten der Metadaten wird das Paket python-mutagen benötigt — installieren Sie es, um Cover in den Dateien zu erhalten."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3823
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4019
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp ist nicht installiert"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3824
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4020
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installieren Sie yt-dlp (und ffmpeg), um Titel herunterzuladen."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3827
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4023
 msgid "Track downloaded ✓"
 msgstr "Titel heruntergeladen ✓"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3828
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4024
 msgid "Saved to: %1"
 msgstr "Gespeichert unter: %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3831
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4027
 msgid "Download failed"
 msgstr "Download fehlgeschlagen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3832
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4028
 msgid "Unknown error"
 msgstr "Unbekannter Fehler"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4125
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4335
 msgid "Audio output changed"
 msgstr "Audioausgang geändert"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4126
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4336
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Das gewählte Ausgabegerät ist verschwunden — stattdessen wird die Systemvorgabe verwendet."
 
@@ -1373,107 +1373,107 @@ msgstr "Zum Bestätigen des Entfernens erneut klicken"
 msgid "Remove station from list"
 msgstr "Sender aus der Liste entfernen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:189
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:197
 msgid "Could not combine the outputs"
 msgstr "Ausgänge konnten nicht kombiniert werden"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:190
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:198
 msgid "pactl refused to create the combined output."
 msgstr "pactl hat die Erstellung des kombinierten Ausgangs verweigert."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:381
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:412
 msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
 msgstr "Der Bluetooth-Lautsprecher hinkt %1 ms hinterher, und die Lautstärke aller Lautsprecher wurde am Mikrofon angeglichen — alles eingestellt und gemerkt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:382
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:413
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Der Bluetooth-Lautsprecher hinkt %1 ms hinterher — die Verzögerung ist gesetzt und wird für dieses Gerät gemerkt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:384
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:415
 msgid "Balance levels set earlier were replaced by the measured ones."
 msgstr "Zuvor eingestellte Balance-Pegel wurden durch die gemessenen ersetzt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:392
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:423
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
 msgstr "Das Mikrofon übersteuerte bei %1 — diese Balance blieb unverändert; Lautsprecher leiser stellen und neu kalibrieren."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:393
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:424
 msgid "Speakers calibrated"
 msgstr "Lautsprecher kalibriert"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:396
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:433
 msgid "Calibration did not succeed"
 msgstr "Kalibrierung fehlgeschlagen"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:397
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:434
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Stelle sicher, dass das Mikrofon frei ist und beide Lautsprecher zu hören sind, und versuche es erneut."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:447
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:483
 msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
 msgstr "Die Lautsprecher lagen %1 ms auseinander — nach der Messung nachjustiert, wird noch einmal geprüft."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:462
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:498
 msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
 msgstr "Der Weg eines Lautsprechers hing %1 ms fest — geleert, wird noch einmal geprüft."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:470
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:478
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:497
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:503
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:516
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:508
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:522
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:541
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:547
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:560
 msgid "Sync check"
 msgstr "Synchronprüfung"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:479
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:523
 msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
 msgstr "Der Raum war für die Prüfung nicht ruhig genug — anderes Audio pausieren und noch einmal kalibrieren."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:498
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:542
 msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
 msgstr "%1 blieb in beiden Runden stumm — es wurde aus der Gruppe herausgenommen. Ein Häkchen in der Lautsprecherliste holt es jederzeit zurück."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:504
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:548
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "%1 war bei der Prüfung nicht zu hören — der Lautsprecher ist womöglich stumm oder aus. Die Kalibrierung blieb erhalten."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:512
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:556
 msgid "Sync verified"
 msgstr "Synchronisierung bestätigt"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:513
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:557
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Jeder Lautsprecher trifft innerhalb von %1 ms am Mikrofon ein — fürs Ohr im Gleichschritt."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:517
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:561
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Die Lautsprecher treffen noch %1 ms auseinander ein. Noch einmal kalibrieren oder den Verzögerungsregler nachjustieren."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1097
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1161
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Zwei Klick-Runden mit einer stillen Prüfung dazwischen — insgesamt etwa zwei Minuten. Die Musik bleibt stumm, bis die Prüfung endet."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1099
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1163
 msgid "Skipped (empty jack): %1."
 msgstr "Übersprungen (leere Buchse): %1."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1100
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1164
 msgid "Calibration started"
 msgstr "Kalibrierung gestartet"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1143
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1214
 msgid "All local outputs (On Air)"
 msgstr "Alle lokalen Ausgänge (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1653
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1774
 msgid "%1 did not join the sync"
 msgstr "%1 ist der Synchronisation nicht beigetreten"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1655
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1776
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Der Lautsprecher ist verbunden, konnte aber nicht in die Gruppe geholt werden — schalten Sie die Synchronisation aus und wieder ein."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1656
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1777
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Der Lautsprecher ist verbunden, aber sein Audioausgang ist nie erschienen — schalten Sie den Lautsprecher aus und wieder ein und verbinden Sie ihn erneut."
 
