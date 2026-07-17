@@ -311,7 +311,7 @@ PlasmoidItem {
         }
     }
 
-    function refreshServer(index) {
+    function refreshServer(index, userInitiated) {
         if (index < 0 || index >= stationsModel.count) {
             return;
         }
@@ -347,7 +347,11 @@ PlasmoidItem {
             root._previewUuid = "";
             // The standing order: play, and keep playing until I say stop.
             root._wantsPlaying = true;
-            root._healRetryAttempts = 0;
+            // Only a genuine user pick resets the backoff ladder — an
+            // automated retry (healRetryTimer/netResumeTimer) that reset it
+            // here would pin the interval at 30 s forever and re-fire the
+            // give-up toast on every round.
+            if (userInitiated !== false) root._healRetryAttempts = 0;
             root.currentStationFavicon = station.favicon || "";
             _playStation(station);
         }
@@ -703,7 +707,7 @@ PlasmoidItem {
             if (!root._wantsPlaying || isPlaying() || root._casting) return;
             if (lastPlay < 0 || lastPlay >= stationsModel.count) return;
             console.log("[ARP] network is back — resuming the standing order");
-            refreshServer(lastPlay);
+            refreshServer(lastPlay, false);
         }
     }
 
@@ -1160,8 +1164,16 @@ PlasmoidItem {
         _currentUnwrappedUrl = a.url;
         _currentResolvedUrl = a.url;
         // An alarm IS a standing order — whatever it takes, keep trying.
+        // But the recovery roads replay lastPlay, which still points at last
+        // night's station until the callLater below finds this one: clear it
+        // and stop any retry armed by yesterday's outage, so a network edge
+        // during the alarm window can only ever restart the alarm's own url,
+        // never resurrect whatever played last evening.
         _wantsPlaying = true;
         _healRetryAttempts = 0;
+        lastPlay = -1;
+        healRetryTimer.stop();
+        netResumeTimer.stop();
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
         // The floor must reach the DEVICES too: while casting, the local
@@ -2262,11 +2274,20 @@ PlasmoidItem {
         // Only heal the station we actually failed on.
         if (orig === "" || orig.indexOf("file://") === 0 || orig !== root._currentOrigUrl) return;
         var now = Date.now();
-        if (_healTried[orig] !== undefined && now - _healTried[orig] < 600000) return;
+        // Every early return past this point still owes the standing order a
+        // heartbeat: the 10-minute lookup lock (a station simply offline),
+        // autoHeal off, or a nameless entry all skip the ladder — but the
+        // user asked for music, so the backoff must keep knocking until it
+        // comes back or they say stop. Without this the whole retry chain
+        // died silently after the first round.
+        if (_healTried[orig] !== undefined && now - _healTried[orig] < 600000) {
+            _healArmRetry();
+            return;
+        }
         _healTried[orig] = now;
         var name = (st.name || "").toString();
         var norm = _healNormName(name);
-        if (norm === "") return;
+        if (norm === "") { _healArmRetry(); return; }
         var mySeq = ++_healSeq;
         root._healRun = { seq: mySeq, orig: orig, name: name, norm: norm,
                           favicon: st.favicon || "",
@@ -2396,7 +2417,7 @@ PlasmoidItem {
             if (lastPlay < 0 || lastPlay >= stationsModel.count) return;
             console.log("[ARP] heal retry #" + root._healRetryAttempts
                         + ": replaying the saved address");
-            refreshServer(lastPlay);
+            refreshServer(lastPlay, false);
         }
     }
 
@@ -4087,10 +4108,24 @@ PlasmoidItem {
             // a local track that finished by itself must not keep its name in
             // the header as a stale "now playing".
             if (playMusic.mediaStatus === MediaPlayer.EndOfMedia) {
+                // An Icecast server that restarts closes the connection
+                // cleanly — the backend reports EndOfMedia, not an error, so
+                // none of the recovery roads (error/stall/watchdog) fire. A
+                // STREAM that ends while the standing order holds is an
+                // outage, not a finished track: send it down the heal road
+                // like any other death. A local file legitimately ends.
+                var endedSrc = playMusic.source.toString();
+                var wasStream = endedSrc !== "" && endedSrc.indexOf("file://") !== 0
+                                && endedSrc !== root._alarmToneUrl.toString();
                 playMusic.source = "";
                 root.title = Plasmoid.title;
                 root.currentStation = "";
                 root.currentStationFavicon = "";
+                if (wasStream && root._wantsPlaying && !root._casting) {
+                    isError = true;
+                    errorTimer.restart();
+                    healTimer.restart();
+                }
             }
         }
 
@@ -4353,6 +4388,10 @@ PlasmoidItem {
                 playMusic.stop();
                 playMusic.source = src;
                 playMusic.play();
+                // The retry restarts a stream — re-arm the connect deadline
+                // so a retry that hangs without data still reaches the heal.
+                if (src.toString().indexOf("file://") !== 0)
+                    connectWatchdog.restart();
             }
         }
     }
@@ -4420,6 +4459,10 @@ PlasmoidItem {
             playMusic.source = "";
             playMusic.source = fallbackUrl;
             playMusic.play();
+            // The fallback is a fresh stream with no watchdog — if it is the
+            // dead-but-polite kind (accepts the connect, sends nothing) it
+            // would show "Connecting…" forever. Re-arm the 15 s deadline.
+            connectWatchdog.restart();
             fallbackUrl = "";
         }
     }
