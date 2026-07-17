@@ -3309,6 +3309,9 @@ PlasmoidItem {
         // Load marker asserted by the dev.sh check smoke test — keep the text
         // in sync with LOAD_MARKER there.
         console.log("[ARP] widget loaded");
+        // Seed the Bluetooth-arrival watcher with the world as it already
+        // is — a speaker mid-song through a widget restart is not "new".
+        _btCapNewArrivals();
         reloadStationsModel();
         _loadHistory();
         _loadLiked();
@@ -4199,10 +4202,35 @@ PlasmoidItem {
         return true;
     }
 
+    // Bluetooth sinks known to be present — null until the first pass has
+    // recorded the world as it already is. The polite-hello volume cap must
+    // fire for sinks that APPEAR (any road in: our connect button, the
+    // speaker's own power button, the walk-in watchdog), and must NOT fire
+    // for a speaker that was simply already playing when plasmashell (and
+    // this widget with it) restarted.
+    property var _btSinksSeen: null
+
+    function _btCapNewArrivals() {
+        var outs = mediaDevices.audioOutputs;
+        var seeding = (_btSinksSeen === null);
+        var now = {};
+        for (var gi = 0; gi < outs.length; gi++) {
+            var gid = String(outs[gi].id);
+            if (gid.indexOf("bluez_") !== 0) continue;
+            now[gid] = true;
+            if (!seeding && !_btSinksSeen[gid]) {
+                var gm = gid.match(/([0-9A-Fa-f]{2}(?:_[0-9A-Fa-f]{2}){5})/);
+                if (gm) _btGentleVolume(gm[1].replace(/_/g, ":"));
+            }
+        }
+        _btSinksSeen = now;
+    }
+
     Connections {
         target: mediaDevices
         // Keeps the routing correct when a Bluetooth speaker (dis)connects.
         function onAudioOutputsChanged() {
+            root._btCapNewArrivals();
             syncEngine.onOutputsChanged();
             if (root._btTryRoutePending())
                 return; // setAudioOutputDevice re-applies the routing
