@@ -415,7 +415,10 @@ PlasmoidItem {
         xhr.onreadystatechange = function() {
             if ((xhr.readyState === xhr.LOADING || xhr.readyState === xhr.DONE)
                 && xhr.responseText && xhr.responseText.length > 256 * 1024) {
-                try { xhr.abort(); } catch (e) {}
+                // Deferred: abort() from inside this handler re-enters the
+                // dying reply and segfaults the shell (proven by the search
+                // probes). Next tick is safe and just as final.
+                Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
             }
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -1929,19 +1932,29 @@ PlasmoidItem {
             var srv = order[attempt++];
             var xhr = new XMLHttpRequest();
             var guard = null;
+            // One verdict per attempt: the deferred abort below re-fires
+            // DONE, and a second walk-on would skip a mirror unheard.
+            var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
             xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
             xhr.onreadystatechange = function() {
+                if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
                 // hostile one must not be able to stream an unbounded body
                 // into memory. A limit=30 search JSON is well under this.
+                // The abort is deferred a tick: abort() from inside this
+                // handler re-enters the dying reply and segfaults the shell
+                // (proven by the search probes).
                 if ((xhr.readyState === xhr.LOADING || xhr.readyState === xhr.DONE)
                     && xhr.responseText && xhr.responseText.length > 4 * 1024 * 1024) {
-                    try { xhr.abort(); } catch (e) {}
+                    walked = true;
+                    _clearXhrTimeout(guard);
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
                     tryNext();
                     return;
                 }
                 if (xhr.readyState !== xhr.DONE) return;
+                walked = true;
                 _clearXhrTimeout(guard);
                 // 429 joins the walk-on list: rate limits are PER MIRROR,
                 // and 'try again later' from one server is not the

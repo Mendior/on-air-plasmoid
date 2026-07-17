@@ -137,15 +137,21 @@ PlasmaExtras.Representation {
             fullRepresentation._probeActive = Math.max(0, fullRepresentation._probeActive - 1)
             if (seq === fullRepresentation._webSearchSeq && verdict !== -1)
                 _webSetAlive(url, verdict)
-            _probeKick(seq)
+            // The next probe starts on a fresh tick, never from inside a
+            // network signal handler.
+            Qt.callLater(function() { _probeKick(seq) })
         }
         xhr.onreadystatechange = function() {
+            if (settled) return
             if (xhr.readyState === xhr.HEADERS_RECEIVED) {
-                // The verdict is in the status line — abort before the
-                // endless stream body starts costing anyone bandwidth.
-                var v = SearchLogic.probeVerdict(xhr.status)
-                try { xhr.abort() } catch (e) {}
-                done(v)
+                // The verdict is in the status line — but abort() MUST NOT
+                // run inside this handler: it re-enters the dying reply and
+                // plasmashell segfaults in QIODevice::readAll (three cores
+                // measured live, reproduced standalone). One tick later is
+                // the same safe side the timeout guard's Timer aborts from,
+                // and still cuts the endless stream body off instantly.
+                done(SearchLogic.probeVerdict(xhr.status))
+                Qt.callLater(function() { try { xhr.abort() } catch (e) {} })
             } else if (xhr.readyState === xhr.DONE) {
                 done(SearchLogic.probeVerdict(xhr.status))
             }
