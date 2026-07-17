@@ -128,6 +128,11 @@ Item {
             verify(cmd.indexOf("module-null-sink") !== -1);
             verify(cmd.indexOf("sink_name=onair_combined_7") !== -1);
             verify(cmd.indexOf("pactl set-default-sink onair_combined_7") !== -1);
+            // Polite flip, then the ramp to acoustic passthrough — a master
+            // parked at 20% (−42 dB cubic) read as "the speakers don't play".
+            verify(cmd.indexOf("set-sink-volume onair_combined_7 20%") !== -1);
+            verify(cmd.indexOf("for rv in 35 50 65 80 90 100") !== -1);
+            verify(cmd.indexOf("set-sink-volume onair_combined_7 ${rv}%") !== -1);
             // The slowest device sets the schedule: wired waits the full lag,
             // the lagging Bluetooth sink itself waits nothing extra.
             verify(cmd.indexOf("sink='" + wired + "' latency_msec=260") !== -1);

@@ -1259,20 +1259,28 @@ Item {
                         + " m=$(pactl load-module module-null-sink"
                         + " sink_name=" + _combineSinkName + " channels=2"
                         + " sink_properties='device.description=\"" + desc + "\"')"
-                        // The group master starts POLITE, not at passthrough:
-                        // the default switches to a brand-new sink, so the
-                        // room's loudness after the flip is whatever this
-                        // line says times hardware levels nobody audited —
-                        // at 100% that was a blast on every enable. 20% is
-                        // deliberately on the quiet side; the volume keys sit
-                        // on this very sink and one press raises the whole
-                        // room together. The default switch is best-effort —
+                        // The group master starts POLITE and then RAMPS to
+                        // acoustic passthrough. The flip itself lands at 20%
+                        // (no blast through hardware levels nobody audited),
+                        // but it must not STAY there: 20% on the cubic curve
+                        // is −42 dB, and the widget's own slider rides the
+                        // stream — it cannot raise the master, so a room
+                        // parked polite read as "the speakers don't play"
+                        // (measured live: a connected JBL nobody could hear).
+                        // The soft ~0.7 s rise ends at 100% = passthrough,
+                        // where each sink's own level (and the polite caps a
+                        // joining speaker gets) decide the loudness; the
+                        // volume keys still sit on this very sink for the
+                        // whole-room trim. The default switch is best-effort —
                         // `true` keeps the group's exit status from gating
                         // the loopbacks, which are the actual feature.
                         + " && { echo \"NULL $m\";"
                         + " pactl set-sink-volume " + _combineSinkName + " 20% 2>/dev/null;"
                         + " pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true; }"
-                        + " && " + _combineLoopbackCmds(sinks) + "true"
+                        + " && " + _combineLoopbackCmds(sinks)
+                        + "for rv in 35 50 65 80 90 100; do"
+                        + " pactl set-sink-volume " + _combineSinkName + " ${rv}% 2>/dev/null;"
+                        + " sleep 0.12; done; true"
                         + " # " + app.nextSeq());
     }
 
