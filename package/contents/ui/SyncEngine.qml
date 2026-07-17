@@ -1153,15 +1153,18 @@ Item {
                         + " m=$(pactl load-module module-null-sink"
                         + " sink_name=" + _combineSinkName + " channels=2"
                         + " sink_properties='device.description=\"" + desc + "\"')"
-                        // Master starts at 100% = acoustic passthrough: every
-                        // hardware sink keeps its own level, so enabling never
-                        // jumps the loudness (copying one device's level here
-                        // would double-apply it to that device). The default
-                        // switch is best-effort — `true` keeps the group's
-                        // exit status from gating the loopbacks, which are
-                        // the actual feature.
+                        // The group master starts POLITE, not at passthrough:
+                        // the default switches to a brand-new sink, so the
+                        // room's loudness after the flip is whatever this
+                        // line says times hardware levels nobody audited —
+                        // at 100% that was a blast on every enable. 20% is
+                        // deliberately on the quiet side; the volume keys sit
+                        // on this very sink and one press raises the whole
+                        // room together. The default switch is best-effort —
+                        // `true` keeps the group's exit status from gating
+                        // the loopbacks, which are the actual feature.
                         + " && { echo \"NULL $m\";"
-                        + " pactl set-sink-volume " + _combineSinkName + " 100% 2>/dev/null;"
+                        + " pactl set-sink-volume " + _combineSinkName + " 20% 2>/dev/null;"
                         + " pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true; }"
                         + " && " + _combineLoopbackCmds(sinks) + "true"
                         + " # " + app.nextSeq());
