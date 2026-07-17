@@ -174,7 +174,17 @@ PlasmoidItem {
     // _resolveCallSeq prevents stale async callbacks from re-triggering an
     // older click if the user has already moved on.
     property var _bitrateCache: ({})
+    // The playing station's identity, three addresses deep. orig = the
+    // CONFIGURED url (what the user's list stores — possibly a .pls/.m3u
+    // wrapper); unwrapped = the stream the wrapper pointed at (equal to orig
+    // for plain stations); resolved = what actually plays after the
+    // auto-bitrate pass (equal to unwrapped when no upgrade was found).
+    // The error handler must fall back resolved→unwrapped, never →orig:
+    // handing the raw wrapper to the player is a guaranteed second error,
+    // and caching under the wrapper key poisons a cache the bitrate pass
+    // only ever reads by the unwrapped key.
     property string _currentOrigUrl: ""
+    property string _currentUnwrappedUrl: ""
     property string _currentResolvedUrl: ""
     property int _resolveCallSeq: 0
 
@@ -314,10 +324,15 @@ PlasmoidItem {
         const resolved = _bitrateCache[origHost] !== undefined ? _bitrateCache[origHost] : origHost;
         // While casting, playMusic is idle — compare against the origin URL of
         // what's on the device so a second click on the casting row stops it.
+        // Third comparison: a wrapper station plays its UNWRAPPED stream and
+        // a healed one plays a stopgap — neither matches origHost or the
+        // bitrate cache, and the "stop" click used to restart them instead.
         const stopping = _casting
                          ? (lastPlay === index && _currentOrigUrl === origHost)
                          : (isPlaying()
-                            && (playMusic.source == origHost || playMusic.source == resolved)
+                            && (playMusic.source == origHost || playMusic.source == resolved
+                                || (_currentOrigUrl === origHost
+                                    && playMusic.source.toString() === _currentResolvedUrl))
                             && lastPlay === index);
         if (stopping) {
             stopWithFade();
@@ -1084,6 +1099,7 @@ PlasmoidItem {
         // and an error on the alarm stream would then heal the wrong
         // station. Point both at the alarm's own URL.
         _currentOrigUrl = a.url;
+        _currentUnwrappedUrl = a.url;
         _currentResolvedUrl = a.url;
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
@@ -1201,6 +1217,7 @@ PlasmoidItem {
         // e.g. removeStation's "resume what was playing" can't restart a stale
         // radio URL over the local track.
         root._currentOrigUrl = "";
+        root._currentUnwrappedUrl = "";
         root._currentResolvedUrl = "";
         // Invalidate in-flight auto-bitrate resolves — otherwise a delayed
         // radio-browser callback would hijack the just-started local file
@@ -2155,6 +2172,7 @@ PlasmoidItem {
                     root._healPendingUrl = playUrl;
                     root._healByUuid = true;
                     root._currentOrigUrl = orig;
+                    root._currentUnwrappedUrl = playUrl;
                     root._currentResolvedUrl = playUrl;
                     startWithFade({ "name": name, "hostname": playUrl,
                                     "favicon": st.favicon || "", "active": true });
@@ -2204,6 +2222,7 @@ PlasmoidItem {
                 root._healPendingUrl = playUrl;
                 root._healByUuid = false;
                 root._currentOrigUrl = orig;
+                root._currentUnwrappedUrl = playUrl;
                 root._currentResolvedUrl = playUrl;
                 startWithFade({ "name": name, "hostname": playUrl,
                                 "favicon": st.favicon || "", "active": true });
@@ -2247,6 +2266,7 @@ PlasmoidItem {
                 // of the known-dead stream), block a second heal, and break
                 // removeStation's resume while a healed station plays.
                 root._currentOrigUrl = newUrl;
+                root._currentUnwrappedUrl = newUrl;
                 root._currentResolvedUrl = newUrl;
                 var stName = servers[i].name || "";
                 // A pure address swap — the reload must not stop playback.
@@ -2481,6 +2501,7 @@ PlasmoidItem {
             // waiting for the radio-browser response.
             if (mySeq !== _resolveCallSeq) return;
             root._currentOrigUrl = (station.hostname || "").toString();
+            root._currentUnwrappedUrl = playUrl;
             root._currentResolvedUrl = resolvedUrl;
             const effective = {
                 "name": station.name,
@@ -3670,17 +3691,23 @@ PlasmoidItem {
                 root._healClearPending();
                 return;
             }
-            if (root._currentOrigUrl !== ""
+            if (root._currentUnwrappedUrl !== ""
                 && root._currentResolvedUrl !== ""
-                && root._currentOrigUrl !== root._currentResolvedUrl
+                && root._currentUnwrappedUrl !== root._currentResolvedUrl
                 && playMusic.source.toString() === root._currentResolvedUrl) {
-                _bitrateCache[root._currentOrigUrl] = root._currentOrigUrl;
+                // Fall back to the UNWRAPPED stream, never to the configured
+                // url: for a .pls/.m3u station those differ even without an
+                // upgrade, and the old orig-comparison fired here on every
+                // wrapper station's death — handing the raw wrapper to the
+                // player (a guaranteed second error) and poisoning the
+                // bitrate cache under a key the resolver never reads.
+                _bitrateCache[root._currentUnwrappedUrl] = root._currentUnwrappedUrl;
                 console.log("[ARP] auto-bitrate fallback: " + root._currentResolvedUrl
-                            + " failed, retrying with " + root._currentOrigUrl);
-                bitrateFallbackTimer.fallbackUrl = root._currentOrigUrl;
+                            + " failed, retrying with " + root._currentUnwrappedUrl);
+                bitrateFallbackTimer.fallbackUrl = root._currentUnwrappedUrl;
                 // Mark as already-downgraded so a second error on the original
                 // URL won't re-enter this branch.
-                root._currentResolvedUrl = root._currentOrigUrl;
+                root._currentResolvedUrl = root._currentUnwrappedUrl;
                 bitrateFallbackTimer.restart();
             } else if (root._previewUrl !== "" && root._previewUuid !== "") {
                 // A preview from the directory died — the directory itself
@@ -3690,14 +3717,22 @@ PlasmoidItem {
                 root._previewUuid = "";
                 var pvName = root.currentStation;
                 var pvIcon = root.currentStationFavicon;
+                // _previewUrl KEEPS the original address: the result row's
+                // "is previewing" marker compares against it, and the fresh
+                // address plays under the row's identity. The guard checks
+                // identity, not emptiness — the directory can take many
+                // seconds across mirrors, and by then the user may be
+                // previewing the NEXT result; the old retry must not hijack
+                // that with yesterday's station.
+                var pvKey = root._previewUrl;
                 _rbFetch("/json/url/" + pvUuid, 4000, function(xhr) {
-                    if (root._previewUrl === "") return; // user stopped it
+                    if (root._previewUrl !== pvKey) return; // stopped or moved on
                     var fresh = "";
                     try { fresh = (xhr && JSON.parse(xhr.responseText).url) || ""; } catch (e) {}
                     if (fresh !== "" && /^https?:\/\//i.test(fresh)
-                        && fresh !== root._previewUrl) {
-                        root._previewUrl = fresh;
+                        && fresh !== pvKey) {
                         _unwrapPlaylist(fresh, function(playUrl) {
+                            if (root._previewUrl !== pvKey) return;
                             startWithFade({ "name": pvName, "hostname": playUrl,
                                             "favicon": pvIcon, "active": true });
                         });
