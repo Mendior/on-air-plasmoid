@@ -331,6 +331,16 @@ Item {
                     leveled = true;
                 }
                 _combineRebuildLoopbacks();
+                // The check-measure: with the rebuilt loopbacks live, click
+                // through the combined sink and hear the room's ACTUAL
+                // residual spread — a bad calibration gets caught here, not
+                // at 7 AM. The stream stays muted until the verdict, for the
+                // same reason the calibration muted it: program audio drowns
+                // the clicks. Armed BEFORE any notification: a toast that
+                // throws must never be what stands between the parked stream
+                // and the verify pass that restores it.
+                _verifyPending = true;
+                _verifyArmTimers();
                 var calText = leveled
                     ? i18n("The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered.", calMs)
                     : i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
@@ -345,14 +355,6 @@ Item {
                 if (clipped.length > 0)
                     calText += " " + i18n("The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again.", clipped.join(", "));
                 app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");
-                // The check-measure: with the rebuilt loopbacks live, click
-                // through the combined sink and hear the room's ACTUAL
-                // residual spread — a bad calibration gets caught here, not
-                // at 7 AM. The stream stays muted until the verdict, for the
-                // same reason the calibration muted it: program audio drowns
-                // the clicks.
-                _verifyPending = true;
-                _verifyArmTimers();
             } else {
                 _calibRestoreVolume();
                 app.notify(i18n("Calibration did not succeed"),
@@ -392,6 +394,7 @@ Item {
                 while ((lagM = lagRe.exec(stdout || "")) !== null)
                     residuals[lagM[1]] = parseInt(lagM[2], 10);
                 _verifyCorrected = true;
+                var vText, vIcon;
                 if (vSpreadNow <= 900) {
                     try {
                         var vMap = JSON.parse(cfg.syncOffsetMap || "{}");
@@ -405,9 +408,8 @@ Item {
                         }
                         cfg.syncOffsetMap = JSON.stringify(vMap);
                     } catch (e) {}
-                    app.notify(i18n("Sync check"),
-                               i18n("The speakers were %1 ms apart — adjusted from the measurement, checking once more.", vSpreadNow),
-                               "audio-input-microphone");
+                    vText = i18n("The speakers were %1 ms apart — adjusted from the measurement, checking once more.", vSpreadNow);
+                    vIcon = "audio-input-microphone";
                 } else {
                     // Bounce the Bluetooth members: suspend/resume flushes a
                     // wedged buffer where more delay never could.
@@ -421,13 +423,15 @@ Item {
                         }
                     if (bounce !== "")
                         app.exec(": PW_FLUSH; " + bounce + "true # " + app.nextSeq());
-                    app.notify(i18n("Sync check"),
-                               i18n("A speaker's route was stuck %1 ms behind — flushed it, checking once more.", vSpreadNow),
-                               "dialog-warning");
+                    vText = i18n("A speaker's route was stuck %1 ms behind — flushed it, checking once more.", vSpreadNow);
+                    vIcon = "dialog-warning";
                 }
+                // Re-armed before the toast, same rule as the calibration
+                // ack: the second pass must not depend on the messenger.
                 _combineRebuildLoopbacks();
                 _verifyPending = true;
                 _verifyArmTimers();
+                app.notify(i18n("Sync check"), vText, vIcon);
                 return true;
             }
             _calibRestoreVolume();

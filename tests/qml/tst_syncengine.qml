@@ -50,9 +50,16 @@ Item {
             property string _btConnectingMac: ""
             property string _btPairingMac: ""
             property string _btPendingSinkName: ""
+            // notifyThrows replays the 2026.18 disease: the autoDelete'd
+            // KNotification self-destructed after its first close and every
+            // later notify() threw mid-caller. The engine must survive it.
+            property bool notifyThrows: false
             function exec(cmd) { execLog.push(cmd); }
             function nextSeq() { return ++seqN; }
-            function notify(t, x, i) { notes.push({ title: t, text: x, icon: i }); }
+            function notify(t, x, i) {
+                if (notifyThrows) throw new Error("the messenger died mid-sentence");
+                notes.push({ title: t, text: x, icon: i });
+            }
             function isPlaying() { return playing; }
             function setAudioOutputDevice(id) { lastOutputDevice = id; }
             function btList() { btListed++; }
@@ -338,6 +345,37 @@ Item {
             compare(map[btMac], 150);
             compare(map[wired2], 34);
             verify(r.e._verifyPending);        // the check-measure is armed
+        }
+
+        function test_a_screaming_messenger_cannot_stop_the_show() {
+            // main.qml's notify() wraps the KNotification in a try/catch,
+            // but the engine must not lean on that belt: state lands BEFORE
+            // any toast. For a whole session the autoDelete'd notification
+            // object read null and every notify threw — and because the
+            // "Speakers calibrated" toast came before the verify arming,
+            // the stream stayed parked at volume 0 with nothing left to
+            // ever restore it. Music silent after every calibration.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._calibVolumeBefore = 0.5;
+            r.mock.playerOutput.volume = 0;    // parked for the clicks
+            r.mock.notifyThrows = true;
+            var threw = false;
+            try {
+                r.e.handleExec(": PW_CALIB " + btMac + " ;",
+                               "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
+            } catch (e) { threw = true; }
+            verify(threw);                     // the scream really happened
+            verify(r.e._verifyPending);        // and the verify is armed anyway
+            verify(r.e.verifySettleInterval() >= 8000);
+            var threw2 = false;
+            try {
+                r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 12\n", "");
+            } catch (e2) { threw2 = true; }
+            verify(threw2);
+            compare(r.mock.playerOutput.volume, 0.5);  // the stream came back
+            compare(r.cfg.syncVerifiedMs, 12);
+            verify(!r.e._verifyPending);
         }
 
         function test_a_clipped_mic_is_reported_not_silently_swallowed() {
