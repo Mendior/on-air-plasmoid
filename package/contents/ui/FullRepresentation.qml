@@ -3031,6 +3031,9 @@ PlasmaExtras.Representation {
                                       : i18n("Round 2 of 2 — quiet, checking the result…")
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 font.weight: Font.DemiBold
+                                // The full sentence must be readable, not
+                                // clipped at the popup's edge — it wraps.
+                                wrapMode: Text.WordWrap
                                 // Red on purpose: this is the one line that
                                 // must catch the eye before someone decides
                                 // the quiet gap means "done" and walks off
@@ -3080,7 +3083,10 @@ PlasmaExtras.Representation {
                                     }
                                 }
                                 PlasmaComponents3.Label {
-                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                    // Wide enough that "JBL Xtreme 3" and
+                                    // "USB Audio Front…" read whole, not as
+                                    // three dots after two words.
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                                     text: root.sync.portUnplugged(balanceRow.modelData)
                                           ? i18n("%1 (nothing plugged in)",
                                                  root.sync.outputDescription(balanceRow.modelData))

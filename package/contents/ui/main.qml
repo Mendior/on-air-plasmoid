@@ -4180,7 +4180,13 @@ PlasmoidItem {
         // the combined sink feeding silence to every other output — with
         // the sync checkbox still reading on.
         if (sync._combineWantActive || sync._combineActive) {
-            _btGentleVolume(_btPendingSinkMac);
+            // NO hardware cap on a speaker joining the sync group: the
+            // calibrated balance counts each member's hardware level into
+            // the room's equation, and a member capped to 25% next to
+            // siblings at 100% reads as "does not play at all" (measured
+            // acoustically: it was merely 12 dB down). The polite start
+            // for the GROUP lives on the group master, which enable
+            // already sets to 20%.
             _btPendingSinkMac = "";
             _btPendingSinkName = "";
             btRouteTimeout.stop();
@@ -4224,12 +4230,18 @@ PlasmoidItem {
     function _btCapNewArrivals() {
         var outs = mediaDevices.audioOutputs;
         var seeding = (_btSinksSeen === null);
+        // While the sync group is (becoming) live, arriving speakers JOIN
+        // a calibrated balance — their hardware level is part of the
+        // room's equation and capping it silences them next to their
+        // siblings. The group's politeness lives on the master (20% at
+        // enable), so the arrivals watcher only records, never caps.
+        var groupOwnsTheRoom = sync._combineWantActive || sync._combineActive;
         var now = {};
         for (var gi = 0; gi < outs.length; gi++) {
             var gid = String(outs[gi].id);
             if (gid.indexOf("bluez_") !== 0) continue;
             now[gid] = true;
-            if (!seeding && !_btSinksSeen[gid]) {
+            if (!seeding && !groupOwnsTheRoom && !_btSinksSeen[gid]) {
                 var gm = gid.match(/([0-9A-Fa-f]{2}(?:_[0-9A-Fa-f]{2}){5})/);
                 if (gm) _btGentleVolume(gm[1].replace(/_/g, ":"));
             }
