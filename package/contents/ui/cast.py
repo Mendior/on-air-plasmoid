@@ -92,6 +92,13 @@ def _clean(text):
     return (text or "").replace("\t", " ").replace("\n", " ")
 
 
+def _udn_safe(text):
+    """A device UDN reduced to the charset a real one uses. The value becomes
+    the device key and, QML-side, part of a shell sentinel — stripping it here
+    means a hostile renderer cannot smuggle shell metacharacters through it."""
+    return "".join(c for c in (text or "") if c.isalnum() or c in ":._-")
+
+
 # ── Google Cast ──────────────────────────────────────────────────────────────
 
 def _stop_browser(browser):
@@ -418,7 +425,12 @@ def _describe_renderer(location):
             return {
                 "name": _clean(dev.findtext(_DEVNS + "friendlyName")) or "DLNA device",
                 "model": _clean(dev.findtext(_DEVNS + "modelName")),
-                "udn": _clean(dev.findtext(_DEVNS + "UDN")),
+                # Defense in depth: the udn becomes the device key and, on the
+                # QML side, reaches a shell sentinel. Strip it to the same
+                # allowlist a real UDN already obeys so a hostile renderer
+                # cannot smuggle shell metacharacters through it. The QML
+                # boundary rejects anything that slips past this too.
+                "udn": _udn_safe(_clean(dev.findtext(_DEVNS + "UDN"))),
                 "avtransport": avt,
                 "rendering": rc,
             }
