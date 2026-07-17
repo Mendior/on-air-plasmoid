@@ -279,6 +279,7 @@ Item {
 
         function test_calibration_folds_the_real_sink_volume_back_in() {
             var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
             // wired parked from 110%: it plays (110/55)^3 = 8× louder than the
             // parked click measured; bt parked from its true 55%.
             var out = "CALIBVOL " + wired + " 110% 110%\n"
@@ -395,7 +396,7 @@ Item {
             r.e._verifyMembers = [wired, btSink];
             r.e._verifyLaunch();
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
-            verify(cmd.indexOf(": PW_VERIFY;") === 0);
+            verify(/^: PW_VERIFY \d+;/.test(cmd));
             verify(cmd.indexOf("pactl set-sink-volume onair_combined_7 100%") !== -1);
             verify(cmd.indexOf("pactl set-sink-volume onair_combined_7 ${cm:-100%}") !== -1);
             verify(cmd.indexOf("pactl set-sink-volume \"$w0\" 85%") !== -1);
@@ -430,6 +431,7 @@ Item {
             // the group gets its measured lag instead of an assumed zero,
             // in the same map the MACs live in.
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
             var out = "CALIB_LVL " + wired + " 20000\n"
                     + "CALIB_XLAG " + wired2 + " 34\n"
                     + "CALIB_OK 150\n";
@@ -463,7 +465,7 @@ Item {
             verify(r.e.verifySettleInterval() >= 8000);
             var threw2 = false;
             try {
-                r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 12\n", "");
+                r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 12\n", "");
             } catch (e2) { threw2 = true; }
             verify(threw2);
             compare(r.mock.playerOutput.volume, 0.5);  // the stream came back
@@ -473,6 +475,7 @@ Item {
 
         function test_a_clipped_mic_is_reported_not_silently_swallowed() {
             var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
             var out = "CALIB_LVL " + wired + " 20000\n"
                     + "CALIB_CLIP " + btSink + "\n"
                     + "CALIB_OK 150\n";
@@ -501,7 +504,7 @@ Item {
             r.e._calibVolumeBefore = 0.5;
             r.mock.playerOutput.volume = 0;    // as the calibration left it
             r.e._verifyPending = true;
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 12\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 12\n", "");
             compare(r.cfg.syncVerifiedMs, 12);
             compare(r.mock.playerOutput.volume, 0.5);
             compare(r.mock.notes[r.mock.notes.length - 1].title, "Sync verified");
@@ -546,18 +549,64 @@ Item {
         }
 
         function test_silent_in_both_rounds_leaves_the_group_by_itself() {
-            // Round 1's loud clicks straight at the sink heard nothing AND
-            // round 2's check heard nothing — two independent misses in one
-            // run. An output with nothing behind it must not spoil every
-            // verdict; it steps out, with a note saying how to come back.
+            // Deaf through both rounds of a run is one strike, not a
+            // verdict: a loud room can bury a healthy speaker's clicks.
+            // Only a SECOND deaf run makes it a property of the output —
+            // then it steps out, with a note saying how to come back.
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
             activate(r);
             r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
                            "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
-            verify(!r.e.syncDeviceIncluded(wired2));
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(r.e.syncDeviceIncluded(wired2));         // strike one: kept
+            var warn = r.mock.notes[r.mock.notes.length - 1];
+            verify(warn.text.indexOf("next calibration") !== -1);
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(!r.e.syncDeviceIncluded(wired2));        // strike two: out
             var note = r.mock.notes[r.mock.notes.length - 1];
             verify(note.text.indexOf("left out of the group") !== -1);
+        }
+
+        function test_a_heard_speaker_wipes_its_eviction_slate() {
+            // One deaf run, then a run where the mic DID hear the speaker:
+            // the strike is wiped — a later deaf run starts the count over
+            // instead of finishing an old one.
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(r.e.syncDeviceIncluded(wired2));          // strike one
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\n"
+                           + "CALIB_LVL " + wired2 + " 8000\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 12\n", "");
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(r.e.syncDeviceIncluded(wired2));          // strike ONE again, not two
+        }
+
+        function test_disable_makes_the_running_calibrations_ack_stale() {
+            // Disable mid-clicks bumps the run generation: the orphaned
+            // shell's ack minutes later must not arm a verify against a dead
+            // group — nor launch an unasked-for 85% run over whatever the
+            // user is listening to by then.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            var seq = r.e._calibRunSeq;
+            r.e.combineOutputsDisable();
+            var before = r.mock.execLog.length;
+            var notesBefore = r.mock.notes.length;
+            r.e.handleExec(": PW_CALIB " + seq + " " + btMac + " P55 ;",
+                           "CALIB_FAIL no click heard\n", "");
+            compare(r.mock.execLog.length, before);          // no 85% retry
+            compare(r.mock.notes.length, notesBefore);       // no toast
+            verify(!r.e._calibrating);
+            verify(!r.e._verifyPending);
         }
 
         function test_a_speaker_too_loud_to_measure_is_not_evicted() {
@@ -571,7 +620,7 @@ Item {
                            "CALIB_LVL " + wired + " 20000\n"
                            + "CALIB_XLAG " + wired2 + " 30\n"
                            + "CALIB_CLIP " + wired2 + "\nCALIB_OK 150\n", "");
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + wired2 + "\n", "");
             verify(r.e.syncDeviceIncluded(wired2));   // kept, loud is not silent
             var note = r.mock.notes[r.mock.notes.length - 1];
             verify(note.text.indexOf("may be muted or off") !== -1);
@@ -586,7 +635,7 @@ Item {
             r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
                            "CALIB_LVL " + wired + " 20000\n"
                            + "CALIB_LVL " + wired2 + " 9000\nCALIB_OK 150\n", "");
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + wired2 + "\n", "");
             verify(r.e.syncDeviceIncluded(wired2));
             var note = r.mock.notes[r.mock.notes.length - 1];
             verify(note.text.indexOf("may be muted or off") !== -1);
@@ -606,7 +655,7 @@ Item {
             r.e._verifyArmTimers();
             r.e._verifyLaunch();
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
-            verify(cmd.indexOf(": PW_VERIFY;") === 0);
+            verify(/^: PW_VERIFY \d+;/.test(cmd));
             verify(cmd.indexOf("pactl set-sink-volume \"$w0\" 55%") !== -1);
             verify(cmd.indexOf("pactl set-sink-volume \"$w1\" 55%") !== -1);
             verify(cmd.indexOf("${y0:-55%}") !== -1);   // the exact level returns
@@ -637,7 +686,7 @@ Item {
             r.e._combineRebuildLoopbacks();
             compare(r.mock.execLog.length, before);   // nothing fired
             verify(r.e._rebuildHeld);
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 3\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 3\n", "");
             var reloop = false;
             for (var i = before; i < r.mock.execLog.length; i++)
                 if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) reloop = true;
@@ -651,7 +700,7 @@ Item {
             var r = rig([dev(wired), dev(btSink)]);
             activate(r);
             r.e._verifyPending = true;
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 3\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 3\n", "");
             var belted = false;
             for (var i = 0; i < r.mock.execLog.length; i++)
                 if (r.mock.execLog[i].indexOf(": PW_UNMUTE;") === 0
@@ -671,7 +720,7 @@ Item {
             r.e._calibVolumeBefore = 0.5;
             r.mock.playerOutput.volume = 0;
             r.e._verifyPending = true;
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + btSink + "\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_PARTIAL " + btSink + "\n", "");
             compare(r.cfg.syncVerifiedMs, -1);            // NOT confirmed
             compare(r.mock.playerOutput.volume, 0.5);     // volume still returns
             var note = r.mock.notes[r.mock.notes.length - 1];
@@ -691,13 +740,13 @@ Item {
             r.e._calibVolumeBefore = 0.5;
             r.mock.playerOutput.volume = 0;
             r.e._verifyPending = true;
-            r.e.handleExec(": PW_VERIFY;",
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";",
                            "VERIFY_LAG " + wired + " 0\nVERIFY_LAG " + btSink + " 149\nVERIFY_OK 149\n", "");
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 362);  // 213 + 149
             verify(r.e._verifyCorrected);
             verify(r.e._verifyPending);                 // round two armed
             compare(r.mock.playerOutput.volume, 0);     // still muted for it
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 3\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 3\n", "");
             compare(r.cfg.syncVerifiedMs, 3);
             compare(r.mock.playerOutput.volume, 0.5);   // and now released
             verify(!r.e._verifyPending);
@@ -709,7 +758,7 @@ Item {
             var r = rig([dev(wired), dev(btSink)]);
             activate(r);
             r.e._verifyPending = true;
-            r.e.handleExec(": PW_VERIFY;",
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";",
                            "VERIFY_LAG " + wired + " 0\nVERIFY_LAG " + btSink + " 2320\nVERIFY_OK 2320\n", "");
             var flushed = false;
             for (var i = 0; i < r.mock.execLog.length; i++)
@@ -727,7 +776,7 @@ Item {
             r.e._calibVolumeBefore = 0.5;
             r.mock.playerOutput.volume = 0;
             r.e._verifyPending = true;
-            r.e.handleExec(": PW_VERIFY;", "VERIFY_FAIL nothing heard\n", "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_FAIL nothing heard\n", "");
             compare(r.cfg.syncVerifiedMs, -1);
             compare(r.mock.playerOutput.volume, 0.5);
             compare(r.mock.notes.length, 0);

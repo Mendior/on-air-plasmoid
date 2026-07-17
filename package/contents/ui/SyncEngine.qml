@@ -382,6 +382,9 @@ Item {
                                 amp: lvlAmp * Math.pow(calVol / calPark, 3) });
                 }
                 _calibHeard = heard;
+                // A speaker the microphone heard clears its eviction slate —
+                // strikes accumulate only across runs that stayed deaf to it.
+                for (var hh in heard) delete _verifyPartialStrikes[hh];
                 var leveled = false;
                 var trimsReplaced = false;
                 if (lvls.length >= 2) {
@@ -410,7 +413,14 @@ Item {
                 // same reason the calibration muted it: program audio drowns
                 // the clicks. Armed BEFORE any notification: a toast that
                 // throws must never be what stands between the parked stream
-                // and the verify pass that restores it.
+                // and the verify pass that restores it. NOT armed against a
+                // dead group: a run whose sync was disabled mid-clicks keeps
+                // its honest measurement in the map, but a verify would park
+                // and mute sinks the user has already routed back to.
+                if (!_combineActive) {
+                    _calibRestoreVolume();
+                    return true;
+                }
                 _verifyPending = true;
                 _verifyArmTimers();
                 var calText = leveled
@@ -469,7 +479,14 @@ Item {
         // under ~30 ms fuses to the ear (and arrivals under ~8 ms fuse in
         // the measurement itself); above that the calibration deserves
         // another run.
-        if (cmd.indexOf(": PW_VERIFY;") === 0) {
+        if (cmd.indexOf(": PW_VERIFY") === 0) {
+            // Generation gate, same contract as PW_CALIB's: a verify whose
+            // run was cancelled (disable bumps the seq) or superseded must
+            // not stop the FRESH run's guard, feed its stale VERIFY_LAG
+            // residuals into the map, or unmute members in the middle of
+            // the next measurement's isolation.
+            var vSeqM = cmd.match(/^: PW_VERIFY (\d+);/);
+            if (!vSeqM || parseInt(vSeqM[1], 10) !== _calibRunSeq) return true;
             verifyGuardTimer.stop();
             if (!_verifyPending) return true;
             _verifyPending = false;
@@ -541,9 +558,15 @@ Item {
             // unmute the members the isolation muted (idempotent when the
             // script already unmuted) and restore the parked stream. The
             // correction path above owns its own unmute so its released
-            // rebuild can carry the fresh delays.
+            // rebuild can carry the fresh delays. Re-assert the balances
+            // too: the launch raised our loopback sink-inputs to full for
+            // the clicks, and a balance the user dragged DURING the ~40 s
+            // measurement was overwritten by the shell's launch-time
+            // restore — reconciling against the stored trims is idempotent
+            // when nothing moved.
             _verifyUnmuteAll();
             _calibRestoreVolume();
+            _trimReconcile(_combineLoopbackSinkByModule);
             // Other audio (a browser video, another player) reads as extra
             // arrivals and would make the verdict a dice roll — the script
             // discards polluted recordings and says why.
@@ -565,12 +588,27 @@ Item {
                 // behind it (an unused S/PDIF port, a dead amp). It leaves
                 // the group by itself instead of spoiling every verdict —
                 // the row stays in the list, one tick brings it back.
+                // TWO strikes, not one: the room-adaptive gates get honest
+                // failures in a loud room too, and one noisy run must not
+                // silently kick a healthy speaker out of the group — the
+                // empty-jack filter already catches the true holes-in-the-
+                // air before any click is spent on them.
                 if (_calibHeard[pM[1]] === undefined) {
-                    setSyncDeviceIncluded(_trimKeyForSink(pM[1]), false);
-                    app.notify(i18n("Sync check"),
-                               i18n("%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time.",
-                                    outputDescription(pM[1])),
-                               "dialog-information");
+                    var evStrikes = (_verifyPartialStrikes[pM[1]] || 0) + 1;
+                    _verifyPartialStrikes[pM[1]] = evStrikes;
+                    if (evStrikes >= 2) {
+                        delete _verifyPartialStrikes[pM[1]];
+                        setSyncDeviceIncluded(_trimKeyForSink(pM[1]), false);
+                        app.notify(i18n("Sync check"),
+                                   i18n("%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time.",
+                                        outputDescription(pM[1])),
+                                   "dialog-information");
+                    } else {
+                        app.notify(i18n("Sync check"),
+                                   i18n("%1 made no sound the microphone could hear. If it stays silent on the next calibration too, it will be left out of the group.",
+                                        outputDescription(pM[1])),
+                                   "dialog-warning");
+                    }
                     return true;
                 }
                 app.notify(i18n("Sync check"),
@@ -1338,6 +1376,13 @@ Item {
             verifyGuardTimer.stop();
             _verifyUnmuteAll();
             _calibRestoreVolume();
+            // The cancelled run's shell is still out there and its ack still
+            // carries the CURRENT generation — without a bump it would pass
+            // the staleness gate minutes later and act on a group that no
+            // longer exists: a CALIB_OK arming the verify against nothing,
+            // or a 'no click heard' launching an unasked-for 85% run over
+            // whatever the user is listening to by then.
+            _calibRunSeq++;
         }
         _btJoinWatchStop();
         // Route away FIRST — with the choice already off the combined sink,
@@ -1480,6 +1525,13 @@ Item {
     function _verifyUnmuteAll() {
         var un = "";
         var vs = _combineRealSinks();
+        // Union with the frozen verify set: a member unticked DURING the
+        // measurement is gone from the live list, but the script may have
+        // hardware-muted it for the isolation — skipping it here would
+        // leave that sink silent everywhere, group or not, until the user
+        // finds pavucontrol.
+        for (var m = 0; m < _verifyMembers.length; m++)
+            if (vs.indexOf(_verifyMembers[m]) === -1) vs.push(_verifyMembers[m]);
         for (var i = 0; i < vs.length; i++)
             un += "pactl set-sink-mute '" + vs[i].replace(/'/g, "'\\''") + "' 0; ";
         if (un !== "")
@@ -1497,6 +1549,10 @@ Item {
     // click rounds — the partial verdict's evidence for telling a shy
     // speaker from an output with nothing audible behind it.
     property var _calibHeard: ({})
+    // Unheard-through-both-rounds counts per sink: the self-eviction needs
+    // TWO independent verdicts, so one noisy run cannot kick a healthy
+    // speaker. Being heard in any later run wipes the sink's slate.
+    property var _verifyPartialStrikes: ({})
 
     // Settle and guard are sized from the GROUP, not hard-coded: with five
     // members the measurement needs ~a minute, and the old fixed 35 s guard
@@ -1552,6 +1608,16 @@ Item {
 
     function _verifyLaunch() {
         if (!_verifyPending) return;
+        // Disabled between arm and launch: the group is gone — parking and
+        // hardware-muting the sinks the user just routed back to would turn
+        // a cancelled measurement into waves of silence over their music.
+        if (!_combineActive) {
+            _verifyPending = false;
+            verifyGuardTimer.stop();
+            _verifyUnmuteAll();
+            _calibRestoreVolume();
+            return;
+        }
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
         // The EXACT member set the guard was budgeted for (frozen at arm
         // time) — recomputing it here could hand the launch a member the
@@ -1601,7 +1667,7 @@ Item {
         // Warm-up plus up to three captures per member — the same
         // arithmetic the guard was armed with.
         var vBudget = 10 + Math.min(8, sinks.length) * 14;
-        app.exec(": PW_VERIFY;" + setup + " " + pre2
+        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + setup + " " + pre2
                  + " timeout " + vBudget + " python3 '" + script + "' verify '"
                  + _combineSinkName + "' ''" + argv + ";"
                  + restore + " " + post2 + " true # " + app.nextSeq());
