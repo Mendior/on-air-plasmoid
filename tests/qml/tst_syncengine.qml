@@ -281,7 +281,7 @@ Item {
                     + "CALIB_LVL " + wired + " 20000\n"
                     + "CALIB_LVL " + btSink + " 10000\n"
                     + "CALIB_OK 150\n";
-            r.e.handleExec(": PW_CALIB " + btMac + " ;", out, "");
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;", out, "");
             compare(r.cfg.syncOffsetMs, 150);
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 150);
             // wired: effective amp 20000*8=160000 vs bt 10000 → trim (1/16)^(1/3)
@@ -299,7 +299,8 @@ Item {
             compare(r.mock.playerOutput.volume, 0);        // stream muted for the clicks
             compare(r.e._calibVolumeBefore, 0.5);
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
-            verify(cmd.indexOf(": PW_CALIB " + btMac + " ;") === 0);
+            verify(cmd.indexOf(": PW_CALIB ") === 0);
+            verify(cmd.indexOf(" " + btMac + " ;") !== -1);   // mac after the run seq
             // Park, echo the real level for the loudness math, restore after.
             verify(cmd.indexOf("pactl set-sink-volume \"$s0\" 55%") !== -1);
             verify(cmd.indexOf("echo \"CALIBVOL $s0 ${v0:-55%}\"") !== -1);
@@ -327,7 +328,7 @@ Item {
 
         function test_calibration_failure_is_a_notification_not_a_crash() {
             var r = rig([]);
-            r.e.handleExec(": PW_CALIB " + btMac + " ;", "CALIB_FAIL no click heard\n", "");
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;", "CALIB_FAIL no click heard\n", "");
             compare(r.mock.notes.length, 1);
             compare(r.mock.notes[0].icon, "dialog-warning");
         }
@@ -340,7 +341,7 @@ Item {
             var out = "CALIB_LVL " + wired + " 20000\n"
                     + "CALIB_XLAG " + wired2 + " 34\n"
                     + "CALIB_OK 150\n";
-            r.e.handleExec(": PW_CALIB " + btMac + " ;", out, "");
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;", out, "");
             var map = JSON.parse(r.cfg.syncOffsetMap);
             compare(map[btMac], 150);
             compare(map[wired2], 34);
@@ -362,7 +363,7 @@ Item {
             r.mock.notifyThrows = true;
             var threw = false;
             try {
-                r.e.handleExec(": PW_CALIB " + btMac + " ;",
+                r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
                                "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
             } catch (e) { threw = true; }
             verify(threw);                     // the scream really happened
@@ -383,7 +384,7 @@ Item {
             var out = "CALIB_LVL " + wired + " 20000\n"
                     + "CALIB_CLIP " + btSink + "\n"
                     + "CALIB_OK 150\n";
-            r.e.handleExec(": PW_CALIB " + btMac + " ;", out, "");
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;", out, "");
             verify(r.mock.notes[0].text.indexOf("clipped") !== -1);
         }
 
@@ -459,7 +460,7 @@ Item {
             // verdict; it steps out, with a note saying how to come back.
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
             activate(r);
-            r.e.handleExec(": PW_CALIB " + btMac + " ;",
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
                            "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
             r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
             verify(!r.e.syncDeviceIncluded(wired2));
@@ -474,7 +475,7 @@ Item {
             // out as "silent through both rounds".
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
             activate(r);
-            r.e.handleExec(": PW_CALIB " + btMac + " ;",
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
                            "CALIB_LVL " + wired + " 20000\n"
                            + "CALIB_XLAG " + wired2 + " 30\n"
                            + "CALIB_CLIP " + wired2 + "\nCALIB_OK 150\n", "");
@@ -490,7 +491,7 @@ Item {
             // muted amp or a walked-off Bluetooth speaker comes back.
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
             activate(r);
-            r.e.handleExec(": PW_CALIB " + btMac + " ;",
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
                            "CALIB_LVL " + wired + " 20000\n"
                            + "CALIB_LVL " + wired2 + " 9000\nCALIB_OK 150\n", "");
             r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
@@ -508,6 +509,9 @@ Item {
             var r = rig([dev(wired), dev(btSink)]);
             activate(r);
             r.e._verifyPending = true;
+            // Members are frozen when the timers arm; the launch measures
+            // exactly that set (guard budget and argv can't disagree).
+            r.e._verifyArmTimers();
             r.e._verifyLaunch();
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
             verify(cmd.indexOf(": PW_VERIFY;") === 0);

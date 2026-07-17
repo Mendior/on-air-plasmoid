@@ -159,6 +159,14 @@ Item {
                 // have its default stolen back by the superseded load.
                 if (uns !== "") app.exec(": PW_UNCOMBINE; " + uns
                     + ((_combineActive || _combineWantActive) ? "" : restoreDef) + "true");
+                // This superseded ack carries the ONLY surviving copy of the
+                // user's real default: a fast enable→disable→re-enable means
+                // the re-enable's own get-default-sink already read THIS
+                // load's combined sink and filtered it to empty. Stash it so
+                // the live generation's ack can adopt it if its own PREVDEF
+                // came back as a combined name (i.e. empty).
+                if (_combineWantActive && !_combineActive && prevDef !== "")
+                    _combinePrevDefaultFallback = prevDef;
                 return true;
             }
             // Fatal only when the null sink itself failed, or when no
@@ -206,6 +214,13 @@ Item {
                 return true;
             }
             _combineActive = true;
+            // If our own PREVDEF read back as a combined name (empty after
+            // the filter) — a superseded load had already switched the
+            // default before this generation looked — adopt the real default
+            // a superseded ack stashed for us. Otherwise it is lost forever.
+            if (prevDef === "" && _combinePrevDefaultFallback !== "")
+                prevDef = _combinePrevDefaultFallback;
+            _combinePrevDefaultFallback = "";
             _combinePrevDefault = prevDef;
             cfg.combinePrevDefault = prevDef;
             _combinePendingRoute = true;
@@ -284,10 +299,15 @@ Item {
         }
         // Microphone calibration finished — apply and remember the lag.
         if (cmd.indexOf(": PW_CALIB") === 0) {
+            // Drop a stale ack from a superseded run (its untimeout'd restore
+            // pactl hung past the guard and only exited now, mid-next-run):
+            // it is not this generation's, so it touches nothing.
+            var calSeqM = cmd.match(/^: PW_CALIB (\d+) /);
+            if (!calSeqM || parseInt(calSeqM[1], 10) !== _calibRunSeq) return true;
             _calibrating = false;
             calibGuardTimer.stop();
             var okM = (stdout || "").match(/CALIB_OK (\d+)/);
-            var macM = cmd.match(/^: PW_CALIB ([0-9A-F:]{17}) /);
+            var macM = cmd.match(/^: PW_CALIB \d+ ([0-9A-F:]{17}) /);
             if (okM) {
                 // Same ceiling as calibrate.py's own sanity window — a
                 // 600 ms television is a real measurement, not an error,
@@ -404,6 +424,12 @@ Item {
                 app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");
             } else {
                 _calibRestoreVolume();
+                // A rebuild requested during the failed calibration (the user
+                // unticked a speaker mid-run) was held — release it now, or
+                // it is dropped for the whole session and the room keeps the
+                // old routing. Success releases it via the verify's unmute;
+                // failure has no verify, so it must release its own.
+                if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
                 app.notify(i18n("Calibration did not succeed"),
                            i18n("Make sure the microphone is not covered and both speakers can be heard, then try again."),
                            "dialog-warning");
@@ -418,11 +444,6 @@ Item {
             verifyGuardTimer.stop();
             if (!_verifyPending) return true;
             _verifyPending = false;
-            // The isolation mutes members; the script unmutes in its own
-            // finally-blocks, but a pactl that timed out on a drowsy
-            // Bluetooth link was swallowed silently — belt and braces on
-            // EVERY verdict, idempotent when everything already sings.
-            _verifyUnmuteAll();
             var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
             cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
             // THE CLOSED LOOP. A Bluetooth path's buffering is re-rolled on
@@ -443,6 +464,10 @@ Item {
                 _verifyCorrected = true;
                 var vText, vIcon;
                 if (vSpreadNow <= 900) {
+                    // Write the corrected map BEFORE unmuting: _verifyUnmuteAll
+                    // releases any rebuild held during the measurement, and a
+                    // rebuild that fires here must carry the NEW delays — or
+                    // pass 2 measures the old ones and reports "still N apart".
                     try {
                         var vMap = JSON.parse(cfg.syncOffsetMap || "{}");
                         for (var vs in residuals) {
@@ -473,14 +498,22 @@ Item {
                     vText = i18n("A speaker's route was stuck %1 ms behind — flushed it, checking once more.", vSpreadNow);
                     vIcon = "dialog-warning";
                 }
-                // Re-armed before the toast, same rule as the calibration
-                // ack: the second pass must not depend on the messenger.
+                // Now unmute — the corrected map is already written, so the
+                // held rebuild this releases carries the new delays. Re-arm
+                // pass 2 before the toast (state before speech).
+                _verifyUnmuteAll();
                 _combineRebuildLoopbacks();
                 _verifyPending = true;
                 _verifyArmTimers();
                 app.notify(i18n("Sync check"), vText, vIcon);
                 return true;
             }
+            // Every terminal verdict below is the end of the measurement —
+            // unmute the members the isolation muted (idempotent when the
+            // script already unmuted) and restore the parked stream. The
+            // correction path above owns its own unmute so its released
+            // rebuild can carry the fresh delays.
+            _verifyUnmuteAll();
             _calibRestoreVolume();
             // Other audio (a browser video, another player) reads as extra
             // arrivals and would make the verdict a dice roll — the script
@@ -1013,6 +1046,12 @@ Item {
 
     function calibrateSync() {
         if (_calibrating || _verifyPending || !_combineActive) return;
+        // Jack state can be stale: plugging a speaker into a previously empty
+        // port usually fires no device-list change, so the empty-jack filter
+        // below would still skip a now-audible speaker. Refresh first — the
+        // one-shot lag is harmless (a jack the user just plugged is not one
+        // they will immediately calibrate against in the same instant).
+        refreshPortStates();
         var sinks = _combineRealSinks();
         // Empty jacks step aside: they stay in the group (plugging in later
         // is welcome) but nobody clicks into a hole in the air.
@@ -1094,7 +1133,14 @@ Item {
         // either. Killing the python inside the guard window keeps the
         // restore lines on the path no matter how the measurement dies.
         var calBudget = Math.round(calibGuardTimer.interval / 1000) - 10;
-        app.exec(": PW_CALIB " + _btMacOfSink(bt) + " ;"
+        // Generation stamp: only the python is under `timeout`, so the setup
+        // and restore pactl calls can hang on a drowsy Bluetooth sink past
+        // the guard. If that shell finally exits DURING a second calibration,
+        // its ack must be recognized as stale and dropped — otherwise it
+        // stops the new guard, clears _calibrating mid-run and can unmute the
+        // music into the fresh measurement.
+        var calSeq = ++_calibRunSeq;
+        app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " ;"
             + setup
             + " " + pre
             + " timeout " + calBudget + " python3 '" + script + "'" + argv + ";"
@@ -1117,6 +1163,13 @@ Item {
     // set — every speaker gets two differently-delayed loopbacks (phasing)
     // and the first set leaks until the next session's sweep.
     property int _combineLoadSeq: 0
+    // Generation for calibration runs — a stale ack from a superseded run
+    // (its untimeout'd restore hung past the guard) is dropped by number.
+    property int _calibRunSeq: 0
+    // The user's real default sink, rescued from a superseded load's ack
+    // when a fast re-enable's own probe already saw the combined sink. The
+    // live generation's ack adopts it; see the PW_COMBINE handler.
+    property string _combinePrevDefaultFallback: ""
 
     function combineOutputsEnable() {
         if (!_combineAvailable || _combineWantActive) return;
@@ -1210,6 +1263,22 @@ Item {
         // busy would deadlock every rebuild of the next enable.
         _combineReloopBusy = false;
         _combineReloopPending = false;
+        // A calibration or verify in flight is measuring a sink that is about
+        // to be torn down: its clicks, its map corrections, its evictions and
+        // its mutes would all land on a dead group, and a stranded
+        // _verifyPending would hold every rebuild of the NEXT enable. Cancel
+        // the whole measurement, restore the stream, drop the held rebuild.
+        if (_calibrating || _verifyPending) {
+            _calibrating = false;
+            _verifyPending = false;
+            _verifyCorrected = false;
+            _rebuildHeld = false;
+            calibGuardTimer.stop();
+            verifySettleTimer.stop();
+            verifyGuardTimer.stop();
+            _verifyUnmuteAll();
+            _calibRestoreVolume();
+        }
         _btJoinWatchStop();
         // Route away FIRST — with the choice already off the combined sink,
         // its removal is not a "device vanished" event worth a notification.
@@ -1337,6 +1406,9 @@ Item {
         onTriggered: {
             _calibrating = false;
             _calibRestoreVolume();
+            // Same as the failure branch: a rebuild held during the lost run
+            // must not be stranded for the session.
+            if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
         }
     }
 
@@ -1377,10 +1449,19 @@ Item {
     readonly property string calibPhase: _calibrating ? "clicks"
                                          : (_verifyPending ? "verify" : "")
 
+    // The exact member set this verify pass will measure, frozen when the
+    // timers are armed. The guard budget is computed from it, and the launch
+    // (fired ~8 s later) MUST use this same list — a Bluetooth sink
+    // registering or a jack flipping in the settle window would otherwise
+    // give the launch more members than the guard budgeted for, and the
+    // script would outlive its own guard mid-measurement.
+    property var _verifyMembers: []
+
     function _verifyArmTimers() {
         // The same member set the verify will actually measure — empty
         // jacks are skipped there, so they must not inflate the budget.
-        var vs = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
+        _verifyMembers = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
+        var vs = _verifyMembers;
         var n = Math.max(1, Math.min(8, vs.length));
         var bt = 0;
         for (var i = 0; i < vs.length; i++)
@@ -1412,12 +1493,11 @@ Item {
     function _verifyLaunch() {
         if (!_verifyPending) return;
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
-        // The group members ride along for the presence phase: the
-        // verify must be able to say WHICH speaker it could not hear,
-        // and the combined pass alone cannot (in-sync arrivals fuse).
-        // Empty jacks are not members — an unpluggable partial verdict
-        // about a hole in the air taught nobody anything.
-        var sinks = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
+        // The EXACT member set the guard was budgeted for (frozen at arm
+        // time) — recomputing it here could hand the launch a member the
+        // guard never accounted for, and the script would then run past the
+        // guard that is supposed to protect it.
+        var sinks = _verifyMembers.slice();
         // The check clicks must not ride at whatever level the evening left
         // behind: a sink the connect capped polite (or the user turned down
         // for the night) drops the through-path click under the noise gate,
