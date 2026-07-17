@@ -4153,13 +4153,18 @@ PlasmoidItem {
     function _btGentleVolume(mac) {
         if (!_btValidMac(mac)) return;
         var token = mac.toLowerCase().replace(/:/g, "_");
-        executable.exec(": BT_GENTLE; for i in 1 2 3 4 5 6; do"
+        // Fast poll (0.3 s), then assert the cap THREE times a second apart:
+        // a just-paired sink appears, WirePlumber restores its level a beat
+        // later, and a one-shot cap that ran first lost the race — the loud
+        // blast lived exactly in that beat.
+        executable.exec(": BT_GENTLE; n=0; s=''; while [ \"$n\" -lt 40 ]; do"
                         + " s=$(pactl list short sinks 2>/dev/null | awk '{print $2}'"
                         + " | grep -i '" + token + "' | head -1);"
-                        + " [ -n \"$s\" ] && break; sleep 1; done;"
-                        + " [ -n \"$s\" ] && {"
+                        + " [ -n \"$s\" ] && break; n=$((n+1)); sleep 0.3; done;"
+                        + " [ -n \"$s\" ] && for p in 1 2 3; do"
                         + " v=$(pactl get-sink-volume \"$s\" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
-                        + " [ \"${v:-0}\" -gt 25 ] && pactl set-sink-volume \"$s\" 25%; }; true");
+                        + " [ \"${v:-0}\" -gt 25 ] && pactl set-sink-volume \"$s\" 25%;"
+                        + " sleep 1; done; true");
     }
 
     function _btTryRoutePending() {
