@@ -426,6 +426,7 @@ KCM.ScrollViewKCM {
                             id: trackName
 
                             text: listItem.name.trim().replace(/\n/g, " ")
+                            textFormat: Text.PlainText
                             anchors.verticalCenter: parent.verticalCenter
                             color: swipeListItem.textColor
 
@@ -456,6 +457,9 @@ KCM.ScrollViewKCM {
 
                     Kirigami.Chip {
                         text: listItem.model.codec ? listItem.model.codec : ""
+                        // Directory field — never interpret as rich text, or
+                        // an <img> in a station's codec/name fires a request.
+                        textFormat: Text.PlainText
                         closable: false
                         enabled: false
                         visible: listItem.model.codec !== "UNKNOWN"
@@ -678,6 +682,7 @@ KCM.ScrollViewKCM {
             Kirigami.Heading {
                 Kirigami.FormData.label: i18n("Name:")
 
+                textFormat: Text.PlainText
                 Layout.maximumWidth: root.width - Kirigami.Units.smallSpacing
                 Layout.preferredWidth: root.width - Kirigami.Units.smallSpacing
                 text: mainList.currentIndex !== -1 ? searchModel.get(
@@ -795,6 +800,7 @@ KCM.ScrollViewKCM {
             QQC2.Label {
                 Kirigami.FormData.label: i18n("Country:")
 
+                textFormat: Text.PlainText
                 visible: text !== ""
                 text: mainList.currentIndex !== -1 ? searchModel.get(
                                                          mainList.currentIndex).country : ""
@@ -803,6 +809,7 @@ KCM.ScrollViewKCM {
             QQC2.Label {
                 Kirigami.FormData.label: i18n("Language:")
 
+                textFormat: Text.PlainText
                 visible: text !== ""
                 text: mainList.currentIndex !== -1 ? searchModel.get(
                                                          mainList.currentIndex).language : ""
@@ -827,6 +834,7 @@ KCM.ScrollViewKCM {
                         closable: false
                         checkable: false
                         text: modelData
+                        textFormat: Text.PlainText
                     }
                 }
             }

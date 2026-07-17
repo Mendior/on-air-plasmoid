@@ -286,10 +286,14 @@ PlasmaExtras.Representation {
                 // scaled down. The old >1000 cutoff mangled honest high-rate
                 // streams (1411 kbps lossless became "1 kb/s").
                 if (br >= 8000) br = Math.round(br / 1000)
+                // The favicon lands in an Image.source — same http(s) gate
+                // the stream url gets, or a file:///data: favicon from the
+                // catalogue would probe local files behind the row.
+                var fav = (r.favicon || "").toString()
                 webResultsModel.append({
                     "name": (r.name || "").replace(/\s+/g, " ").trim() || u,
                     "url": u,
-                    "favicon": r.favicon || "",
+                    "favicon": /^https?:\/\//i.test(fav) ? fav : "",
                     "country": r.country || "",
                     "bitrate": br,
                     "codec": (r.codec || "").toUpperCase(),

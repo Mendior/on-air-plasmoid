@@ -377,7 +377,15 @@ PlasmoidItem {
         var xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
+        // A real playlist is a few hundred bytes; a hostile server could
+        // otherwise stream gigabytes into responseText and exhaust memory.
+        // Abort the moment the body crosses a generous ceiling — a truncated
+        // playlist still yields its first entry, which is all we read.
         xhr.onreadystatechange = function() {
+            if ((xhr.readyState === xhr.LOADING || xhr.readyState === xhr.DONE)
+                && xhr.responseText && xhr.responseText.length > 256 * 1024) {
+                try { xhr.abort(); } catch (e) {}
+            }
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
             var got = PlaylistLogic.classify(xhr.responseText || "", url);
@@ -1666,6 +1674,15 @@ PlasmoidItem {
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
             xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
             xhr.onreadystatechange = function() {
+                // A directory mirror is only semi-trusted — a compromised or
+                // hostile one must not be able to stream an unbounded body
+                // into memory. A limit=30 search JSON is well under this.
+                if ((xhr.readyState === xhr.LOADING || xhr.readyState === xhr.DONE)
+                    && xhr.responseText && xhr.responseText.length > 4 * 1024 * 1024) {
+                    try { xhr.abort(); } catch (e) {}
+                    tryNext();
+                    return;
+                }
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
                 if (xhr.status === 0 || xhr.status >= 500) { tryNext(); return; }
@@ -3269,7 +3286,12 @@ PlasmoidItem {
             var parts = metadata.indexOf("\t") !== -1 ? metadata.split("\t") : metadata.split("::");
             var raw = parts[0] || "";
             root.title = raw;
-            root.imageurl = parts[1] || "";
+            // The ICY StreamUrl is server-supplied and lands straight in an
+            // Image.source — a file://, qrc: or data: scheme would let a
+            // station probe local files or smuggle content, so only http(s)
+            // is allowed through to the artwork chain.
+            var icyImg = parts[1] || "";
+            root.imageurl = /^https?:\/\//i.test(icyImg) ? icyImg : "";
             var parsed = parseTrackString(raw);
             root.trackArtist = parsed.artist;
             root.trackTitle = parsed.title;

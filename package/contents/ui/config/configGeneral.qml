@@ -720,6 +720,7 @@ KCM.ScrollViewKCM {
 
                             anchors.verticalCenter: parent.verticalCenter
                             text: listItem.name
+                            textFormat: Text.PlainText
                             color: swipeListItem.textColor
 
                             XAnimator {
