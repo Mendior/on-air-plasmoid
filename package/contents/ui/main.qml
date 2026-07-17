@@ -2011,8 +2011,12 @@ PlasmoidItem {
     property bool _btControllerUp: false
 
     function btProbe() {
+        // Powered, not merely listed: a soft-off adapter (the system tray's
+        // Bluetooth switch) still appears in `list` and still serves its
+        // device cache — the menu then looked perfectly normal and every
+        // connect failed with a message blaming the innocent speaker.
         executable.exec(": BT_PROBE; command -v bluetoothctl >/dev/null 2>&1 && echo __BT_YES__; "
-                        + "timeout 3 bluetoothctl list 2>/dev/null | grep -q . && echo __BT_CTRL__; true"
+                        + "timeout 3 bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo __BT_CTRL__; true"
                         + " # " + (++_execSeq));
     }
 
@@ -2087,16 +2091,20 @@ PlasmoidItem {
     function btPairNew(mac, name) {
         if (!_btValidMac(mac) || _btPairingMac !== "" || _btConnectingMac !== "") return;
         _btPairingMac = mac;
+        _btClickedName = name || "";
         _btPendingSinkName = name || "";
         _btPendingSinkMac = mac;
+        _btSoloKicked = "";
         var ids = {};
         var outs = mediaDevices.audioOutputs;
         for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
         _btOutputIdsBeforeConnect = ids;
+        btRouteTimeout.interval = 60000;
         btRouteTimeout.restart();
         // Same verified-connect treatment as btConnect: the verdict is the
         // device's real Connected state, with one retry for sleepy speakers.
-        executable.exec(": BT_PAIRNEW; timeout 25 bluetoothctl pair " + mac
+        executable.exec(": BT_PAIRNEW; timeout 3 bluetoothctl power on >/dev/null 2>&1;"
+                        + " timeout 25 bluetoothctl pair " + mac
                         + " && timeout 5 bluetoothctl trust " + mac
                         + " && { timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
                         + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
@@ -2111,17 +2119,32 @@ PlasmoidItem {
     // "Speaker" can never substring-match the built-in "Speakers" output.
     property var _btOutputIdsBeforeConnect: ({})
 
+    // The name as clicked, surviving the route window's sweep: the OK ack
+    // can land after the timeout wiped the pending pair, and re-stashing
+    // needs the human name for the route's fallback match and any message.
+    property string _btClickedName: ""
+
     function btConnect(mac, name) {
         // A pairing in flight owns the shared pending-route state — a connect
         // clicked meanwhile would re-arm it onto the wrong device.
         if (!_btValidMac(mac) || _btConnectingMac !== "" || _btPairingMac !== "") return;
+        // A disconnect for this very device still in flight would land
+        // AFTER the connect and tear down what the user just asked for —
+        // park the wish and run it from the disconnect's ack instead.
+        if (_btDisconnectingMac === mac) {
+            _btConnectAfterDisconnect = { "mac": mac, "name": name || "" };
+            return;
+        }
         _btConnectingMac = mac;
+        _btClickedName = name || "";
         _btPendingSinkName = name || "";
         _btPendingSinkMac = mac;
+        _btSoloKicked = "";
         var ids = {};
         var outs = mediaDevices.audioOutputs;
         for (var i = 0; i < outs.length; i++) ids[String(outs[i].id)] = true;
         _btOutputIdsBeforeConnect = ids;
+        btRouteTimeout.interval = 60000;
         btRouteTimeout.restart();
         // Robust connect, measured on real hardware: a sleeping speaker
         // routinely ignores the first page attempt, and bluez may finish a
@@ -2133,7 +2156,16 @@ PlasmoidItem {
         // page itself (br-connection-page-timeout, "click it again and it
         // works") but wakes for the inquiry — measured live on a JBL that
         // refused every direct connect and answered right after one scan.
-        executable.exec(": BT_CONNECT; timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
+        // But inquiry also chews the radio bandwidth a PLAYING sibling is
+        // living on (audible stutter for the whole burst) — so when another
+        // Bluetooth sink is running, the first attempt pages directly and
+        // only the retry branch scans: an awake speaker connects clean, a
+        // sleeping one still gets its wake-up on the second try.
+        // `power on` first is idempotent and free: clicking a speaker in
+        // OUR menu is the user asking for Bluetooth.
+        executable.exec(": BT_CONNECT; timeout 3 bluetoothctl power on >/dev/null 2>&1;"
+            + " pactl list short sinks 2>/dev/null | grep bluez | grep -q RUNNING"
+            + " || timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
             + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
             + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
             + " || { timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
@@ -2160,21 +2192,63 @@ PlasmoidItem {
         // A kick already in flight for it will reconnect it in a few seconds
         // regardless — flag it so the kick's landing undoes that.
         if (sync._btKickMac === mac) sync._btKickAbort = true;
-        executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect " + mac + "; true");
+        _btDisconnectingMac = mac;
+        // The seq suffix is not decoration: a second disconnect of the same
+        // speaker in one session is a byte-identical command, and P5Support
+        // hands back the FIRST run's cached result instead of running it —
+        // the click then does nothing and the menu keeps the tick.
+        executable.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect " + mac + "; true"
+                        + " # " + (++_execSeq));
     }
+
+    // A disconnect currently in flight (cleared by its ack) and a connect
+    // wish parked behind it — see btConnect's guard.
+    property string _btDisconnectingMac: ""
+    property var _btConnectAfterDisconnect: null
+    // The one free repair a solo connect gets when the sink never appears.
+    property string _btSoloKicked: ""
 
     Timer {
         id: btRouteTimeout
         // If the sink never shows up, stop waiting for it — a stale pending
         // name must not hijack some later, unrelated output change. Wide
-        // enough to cover the connect's retry path (up to ~36 s of paging a
-        // sleeping speaker twice) plus the sink's own appearance; safe to be
-        // generous, the route is MAC-matched.
-        interval: 45000
+        // enough that the connect's WORST honest path (two scan-wake +
+        // page rounds, ~50 s) always acks inside the window; safe to be
+        // generous, the route is MAC-matched. (Re-armed to the full window
+        // by the OK ack, so the sink also gets its own full wait.)
+        interval: 60000
         repeat: false
         onTriggered: {
+            // Connected but its audio never appeared — the A2DP profile is
+            // wedged (JBLs, notoriously; the sync road has a watchdog for
+            // this, the solo road had NOTHING: it swept the pending pair in
+            // silence and the user stared at a ticked box with no sound).
+            // One free repair: profile nudge plus a fresh connect cycle,
+            // one more window — and only then the honest word.
+            var mac = root._btPendingSinkMac;
             root._btPendingSinkName = "";
             root._btPendingSinkMac = "";
+            if (mac === "" || root.sync._combineWantActive || root.sync._combineActive)
+                return;
+            if (root._btSoloKicked !== mac) {
+                root._btSoloKicked = mac;
+                root._btPendingSinkMac = mac;
+                root._btPendingSinkName = root._btClickedName;
+                executable.exec(": BT_SOLOKICK; pactl set-card-profile bluez_card."
+                    + mac.replace(/:/g, "_") + " a2dp-sink 2>/dev/null;"
+                    + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
+                    + " && { timeout 12 bluetoothctl disconnect " + mac + " >/dev/null 2>&1;"
+                    + " timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
+                    + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1; }; true"
+                    + " # " + (++root._execSeq));
+                btRouteTimeout.interval = 30000;
+                btRouteTimeout.restart();
+                return;
+            }
+            notify(i18n("%1 is connected, but its sound never arrived",
+                        root._btClickedName || i18n("The Bluetooth speaker")),
+                   i18n("Turn the speaker off and on again, then reconnect it."),
+                   "network-bluetooth");
         }
     }
 
@@ -3805,10 +3879,21 @@ PlasmoidItem {
                     root._btPendingSinkName = "";
                     root._btPendingSinkMac = "";
                 } else {
+                    // The route window may have expired while the connect's
+                    // retry path was still paging (the worst honest path is
+                    // ~50 s) — the sweep took the pending pair with it, and
+                    // without a re-stash the sink would appear to nobody:
+                    // speaker connected, music elsewhere, no error anywhere.
+                    // Same cure the pairing road already carries.
+                    if (root._btPendingSinkMac === "" && connMac !== "") {
+                        root._btPendingSinkMac = connMac;
+                        root._btPendingSinkName = root._btClickedName;
+                    }
                     // Give the sink the FULL wait window from this moment —
                     // armed at click time, a slow connect could eat most of
                     // it and the route would expire while PipeWire was still
                     // bringing the sink up.
+                    btRouteTimeout.interval = 60000;
                     btRouteTimeout.restart();
                     // The sink may already exist (device was auto-reconnected
                     // behind a stale menu row) — then no outputs change will
@@ -3816,12 +3901,22 @@ PlasmoidItem {
                     root._btTryRoutePending();
                     // With the sync on, "connected" is only half the story —
                     // the watchdog sees the speaker all the way into the group.
-                    root.sync._btJoinWatchArm(connMac, connName);
+                    root.sync._btJoinWatchArm(connMac, connName || root._btClickedName);
                 }
                 btList();
                 return;
             }
             if (cmd.indexOf(": BT_DISCONNECT;") === 0) {
+                root._btDisconnectingMac = "";
+                // A connect wish parked behind this disconnect runs now —
+                // in order, not in a race the disconnect would win.
+                var wish = root._btConnectAfterDisconnect;
+                root._btConnectAfterDisconnect = null;
+                if (wish && wish.mac) btConnect(wish.mac, wish.name);
+                btList();
+                return;
+            }
+            if (cmd.indexOf(": BT_SOLOKICK;") === 0) {
                 btList();
                 return;
             }
@@ -4460,6 +4555,12 @@ PlasmoidItem {
     // for a speaker that was simply already playing when plasmashell (and
     // this widget with it) restarted.
     property var _btSinksSeen: null
+    // Bluez sinks that VANISHED, with the moment they did: a profile or
+    // codec switch removes and re-adds the sink within a couple of seconds
+    // (a Teams call ends, pavucontrol flips a2dp back), and the returning
+    // sink is the same speaker mid-listen — capping it to 25% then is not
+    // politeness, it is yanking the user's volume down mid-song.
+    property var _btSinksGone: ({})
 
     function _btCapNewArrivals() {
         var outs = mediaDevices.audioOutputs;
@@ -4470,15 +4571,25 @@ PlasmoidItem {
         // siblings. The group's politeness lives on the master (20% at
         // enable), so the arrivals watcher only records, never caps.
         var groupOwnsTheRoom = sync._combineWantActive || sync._combineActive;
+        var nowMs = Date.now();
         var now = {};
         for (var gi = 0; gi < outs.length; gi++) {
             var gid = String(outs[gi].id);
             if (gid.indexOf("bluez_") !== 0) continue;
             now[gid] = true;
-            if (!seeding && !groupOwnsTheRoom && !_btSinksSeen[gid]) {
+            var flapped = _btSinksGone[gid] !== undefined
+                          && nowMs - _btSinksGone[gid] < 10000;
+            if (!seeding && !groupOwnsTheRoom && !_btSinksSeen[gid] && !flapped) {
                 var gm = gid.match(/([0-9A-Fa-f]{2}(?:_[0-9A-Fa-f]{2}){5})/);
                 if (gm) _btGentleVolume(gm[1].replace(/_/g, ":"));
             }
+        }
+        // Record the departures (and drop stale ancient ones on the way).
+        if (!seeding) {
+            for (var gone in _btSinksSeen)
+                if (!now[gone]) _btSinksGone[gone] = nowMs;
+            for (var old in _btSinksGone)
+                if (nowMs - _btSinksGone[old] > 60000) delete _btSinksGone[old];
         }
         _btSinksSeen = now;
     }

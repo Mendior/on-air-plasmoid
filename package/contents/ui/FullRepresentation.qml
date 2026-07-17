@@ -2808,6 +2808,18 @@ PlasmaExtras.Representation {
                     }
                 }
 
+                // A speaker powered off (or walking back in) while the menu
+                // is OPEN: nothing else refreshes the Connected ticks, and a
+                // stale tick turns the user's "reconnect" click into a
+                // disconnect of a corpse. BT_LIST is serialized and seq'd —
+                // a 5 s heartbeat costs nothing and only runs while looking.
+                Timer {
+                    running: castMenu.opened
+                    interval: 5000
+                    repeat: true
+                    onTriggered: root.btList()
+                }
+
                 QQC2.Popup {
                     id: castMenu
                     y: -height - Kirigami.Units.smallSpacing
