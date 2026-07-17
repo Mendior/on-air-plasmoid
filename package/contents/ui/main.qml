@@ -739,6 +739,13 @@ PlasmoidItem {
     // completion handler can advance exactly that entry — and only after the
     // recording actually finished, not when it started.
     property string _recActiveSchedKey: ""
+    // Consecutive-failure backoff for scheduled recordings, keyed by
+    // schedule key: how many times in a row it failed, and the epoch ms
+    // before which the tick must not retry it. Cleared when it succeeds or
+    // the occurrence advances. Without this a persistently-failing entry
+    // (ffmpeg missing, disk full, stream refusing) relaunched every 30 s.
+    property var _recRetryCount: ({})
+    property var _recRetryAfter: ({})
     // Same stable-id pattern as the MPRIS files: two widget instances must
     // never kill each other's recording via a shared pid file.
     readonly property string _recPidFile: _mprisRunDir + "/arp-rec-" + _mprisId + ".pid"
@@ -848,6 +855,12 @@ PlasmoidItem {
             + "ffmpeg -hide_banner -nostdin -loglevel error"
             + " -user_agent 'VLC/3.0.20 LibVLC/3.0.20'"
             + " -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10"
+            // A server that stops sending but holds the TCP socket open makes
+            // ffmpeg block on read forever: '-t' caps MEDIA time, which never
+            // advances, so the process (and the whole recorder) would hang
+            // for days. -rw_timeout gives up on a read after 30 s of silence,
+            // turning the stall into an EOF the reconnect logic can act on.
+            + " -rw_timeout 30000000"
             + " -i '" + safeUrl + "' " + codecArgs + " -t " + Math.max(60, Math.floor(durationSec))
             + " -metadata title='" + base.replace(/'/g, "'\\''") + "'"
             + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
@@ -938,6 +951,10 @@ PlasmoidItem {
     // had already moved to tomorrow, so nothing ever resumed.
     function _recSchedAdvance(key) {
         if (!key) return;
+        // The occurrence is over — its failure backoff dies with it (the key
+        // embeds nextRun, so the advanced entry gets a clean slate anyway).
+        delete _recRetryCount[key];
+        delete _recRetryAfter[key];
         var list = recSchedules.slice();
         for (var i = 0; i < list.length; i++) {
             var s = list[i];
@@ -963,6 +980,13 @@ PlasmoidItem {
             if (now < s.nextRun) continue;
             var key = _recSchedKey(s);
             var endMs = s.nextRun + s.durationMin * 60000;
+            // Our own entry, still recording past the nominal window end:
+            // ffmpeg's connect/buffer latency pushes its real exit a few
+            // seconds past endMs, and the completion handler owns advancing
+            // it. This guard MUST precede the missed branch, or a tick in
+            // that gap fires a false "missed" toast and advances the entry
+            // out from under a recording that is seconds from finishing.
+            if (recording && root._recActiveSchedKey === key) continue;
             if (now >= endMs) {
                 // The window closed without a completed recording (the machine
                 // was off, or every attempt failed) — only now is it missed.
@@ -972,13 +996,17 @@ PlasmoidItem {
                 continue;
             }
             if (recording) {
-                // Our own entry currently being recorded — all good.
-                if (root._recActiveSchedKey === key) continue;
                 _recSchedNotifyOnce(key, i18n("Scheduled recording skipped"),
                                     i18n("%1 — another recording is already running.", s.station),
                                     "dialog-warning");
                 continue; // the entry stays — it can still start if REC ends in time
             }
+            // A persistently failing entry (ffmpeg missing, disk full, stream
+            // refusing) must not be re-launched on every 30 s tick — that is
+            // a notification and process storm for the whole window. Hold off
+            // until the backoff deadline this entry earned from its failures.
+            if (root._recRetryAfter[key] !== undefined && now < root._recRetryAfter[key])
+                continue;
             var remainSec = Math.round((endMs - now) / 1000);
             if (remainSec >= 60) {
                 // Record the remainder of the window. The entry is advanced
@@ -3854,15 +3882,46 @@ PlasmoidItem {
                     recText = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
                     recIcon = "dialog-error";
                 }
+                var recNoFfmpeg = recOut.indexOf("__NO_FFMPEG__") !== -1;
+                // A near-instant failure (ffmpeg absent, mkdir/disk failure,
+                // stream refused at once) is what storms — a real capture
+                // that ran a while and got interrupted is not. Only the
+                // former earns backoff; the latter resumes right away.
+                var recFailedFast = !recOk && !recWasStopRequested
+                                    && (recNoFfmpeg || recElapsed < 5 || !recDone);
                 notify(recTitle, recText, recIcon);
                 if (recWasScheduled && recSchedKey) {
                     if (recOk || recWasStopRequested) {
                         // The occurrence is done — move the entry forward (or
                         // drop a "once") only NOW, after the actual outcome.
+                        delete _recRetryCount[recSchedKey];
+                        delete _recRetryAfter[recSchedKey];
                         _recSchedAdvance(recSchedKey);
+                    } else if (recNoFfmpeg) {
+                        // ffmpeg will not appear inside this window — retrying
+                        // is pointless. Give up on the occurrence with the one
+                        // toast already shown, and advance it.
+                        delete _recRetryCount[recSchedKey];
+                        delete _recRetryAfter[recSchedKey];
+                        _recSchedAdvance(recSchedKey);
+                    } else if (recFailedFast) {
+                        // Back off: 30 s, then doubling to 4 min, and after
+                        // six straight fast failures let the window age into
+                        // "missed" rather than keep pounding a dead stream.
+                        var rc = (_recRetryCount[recSchedKey] || 0) + 1;
+                        _recRetryCount[recSchedKey] = rc;
+                        if (rc >= 6) {
+                            _recRetryAfter[recSchedKey] = Date.now() + 3600000;
+                        } else {
+                            _recRetryAfter[recSchedKey] =
+                                Date.now() + Math.min(240000, 30000 * Math.pow(2, rc - 1));
+                            Qt.callLater(_recScheduleTick);
+                        }
                     } else {
-                        // Interrupted mid-window: leave the entry as it is —
-                        // the next 30 s tick resumes with the remaining time.
+                        // A real interruption mid-window (stream died after
+                        // recording a while): resume with the remaining time.
+                        delete _recRetryCount[recSchedKey];
+                        delete _recRetryAfter[recSchedKey];
                         Qt.callLater(_recScheduleTick);
                     }
                 }
