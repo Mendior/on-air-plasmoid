@@ -499,6 +499,17 @@ PlasmoidItem {
             fmtArgs = fmtArgs.replace(" --embed-metadata", "").replace(" --embed-thumbnail", "");
         var safeDir = downloadDirPath.replace(/'/g, "'\\''");
         var safeQuery = query.replace(/'/g, "'\\''");
+        // The cover is written out as well as embedded: pure QML has no way
+        // to read art back out of a local file, so the player's My Music
+        // cover comes from a same-stem sidecar image. Sidecars live in a
+        // hidden .covers/ subfolder — the music folder itself stays clean in
+        // any file manager. Converted to jpg when ffmpeg is around;
+        // otherwise the original (usually webp) stays and Qt's image
+        // plugins read it. The delete button sweeps the sidecar with the
+        // track, so nothing orphans.
+        if (fmt !== "mp4")
+            fmtArgs += " --write-thumbnail --convert-thumbnails jpg"
+                     + " -P 'thumbnail:" + safeDir + "/.covers'";
         // Check for yt-dlp BEFORE running and emit a clear sentinel if it is
         // missing — otherwise the user would see a confusing "Unknown error" (the
         // exit-127 stderr does not contain the word "ERROR" that the filter below looks for).
@@ -509,9 +520,16 @@ PlasmoidItem {
         // exits, onExited never fires and `downloading` blocks every future
         // download for the rest of the session — same hard-bound principle as
         // the recorder's ffmpeg "-t" cap. 30 min is far above any real track.
+        // The trailing sweep drops the pre-conversion .webp when a converted
+        // .jpg/.png of the same cover exists — yt-dlp keeps both, and nobody
+        // needs the same picture twice. yt-dlp's own exit code is preserved
+        // for the handler (the mutagen retry reads it).
         executable.exec(": DL_YTDLP; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
                         + "mkdir -p '" + safeDir + "' && timeout 1800 yt-dlp --no-playlist " + fmtArgs
-                        + " -o '" + safeDir + "/%(title)s.%(ext)s' 'ytsearch1:" + safeQuery + "'");
+                        + " -o '" + safeDir + "/%(title)s.%(ext)s' 'ytsearch1:" + safeQuery + "'; rc=$?; "
+                        + "for f in '" + safeDir + "'/.covers/*.webp; do s=\"${f%.webp}\"; "
+                        + "if [ -f \"$s.jpg\" ] || [ -f \"$s.png\" ]; then rm -f \"$f\"; fi; done 2>/dev/null; "
+                        + "exit $rc");
     }
 
     // ── Track history (Recently played) — persisted in config, max 30 ────────
@@ -1233,6 +1251,12 @@ PlasmoidItem {
     }
 
     // Play a downloaded file (My Music page)
+    // The local track whose sidecar cover currently owns albumArtUrl — the
+    // network art lookup and the no-metadata reset both stand down while
+    // this matches what is playing (a Deezer guess must not paint over the
+    // track's own cover, and "no ICY title" is normal for a file).
+    property string _localArtForSource: ""
+
     function playLocalFile(fileUrl, displayName) {
         if (!fileUrl) return;
         var urlStr = fileUrl.toString();
@@ -1240,6 +1264,23 @@ PlasmoidItem {
             stopWithFade();
             return;
         }
+        // Look for the track's own cover: the hidden .covers/ subfolder
+        // first (where downloads put sidecars), then beside the track
+        // (hand-copied art, and sidecars from before the subfolder existed).
+        // FolderListModel hands out percent-encoded urls — decode for the
+        // filesystem probe.
+        var artPath = urlStr.replace(/^file:\/\//, "");
+        try { artPath = decodeURIComponent(artPath); } catch (e) {}
+        var artNoExt = artPath.replace(/\.[^.\/]+$/, "");
+        var artSlash = artNoExt.lastIndexOf("/");
+        var artDir = artNoExt.substring(0, artSlash).replace(/'/g, "'\\''");
+        var artBase = artNoExt.substring(artSlash + 1).replace(/'/g, "'\\''");
+        var artStem = artNoExt.replace(/'/g, "'\\''");
+        executable.exec(": ART_LOCAL; for s in '" + artDir + "/.covers/" + artBase + "'"
+                        + " '" + artStem + "'; do"
+                        + " for e in jpg jpeg png webp; do"
+                        + " [ -f \"$s.$e\" ] && { printf '__ART__%s\\n' \"$s.$e\"; break 2; };"
+                        + " done; done; true # " + nextSeq());
         // Playing a local file outranks a heal audition in flight.
         _healClearPending();
         _healSeq++;
@@ -2706,6 +2747,9 @@ PlasmoidItem {
 
     function startWithFade(station) {
         infoTimer.stop();
+        // Whatever starts now brings its own art — a previous local track's
+        // sidecar cover must not shadow the new stream's lookups.
+        root._localArtForSource = "";
         // Station switch ends the instant recording of the previous station.
         if (recording && !_recScheduled) recStop();
         // Devices are selected — send the stream to them instead of (or in
@@ -2973,6 +3017,10 @@ PlasmoidItem {
     }
 
     function lookupAlbumArt(trackString) {
+        // A local track's own sidecar cover outranks any network guess.
+        if (root._localArtForSource !== ""
+            && playMusic.source.toString() === root._localArtForSource)
+            return;
         if (!Plasmoid.configuration.albumArtEnabled) {
             albumArtUrl = "";
             return;
@@ -3239,7 +3287,10 @@ PlasmoidItem {
             root.imageurl = "";
             root.trackArtist = "";
             root.trackTitle = "";
-            root.albumArtUrl = "";
+            // "No track metadata" is the NORMAL state for a local file —
+            // its sidecar cover stays up for the whole track.
+            if (playMusic.source.toString() !== root._localArtForSource)
+                root.albumArtUrl = "";
         }
         _mprisQueueWrite();
     }
@@ -3733,6 +3784,17 @@ PlasmoidItem {
                         // the next 30 s tick resumes with the remaining time.
                         Qt.callLater(_recScheduleTick);
                     }
+                }
+                return;
+            }
+            // Local track's sidecar cover found → show it (and pin it against
+            // the network art lookup for as long as this source plays).
+            if (cmd.indexOf(": ART_LOCAL;") === 0) {
+                var artM = (stdout || "").match(/__ART__(.+)/);
+                var artSrc = playMusic.source.toString();
+                if (artM && artSrc.indexOf("file://") === 0) {
+                    root._localArtForSource = artSrc;
+                    root.albumArtUrl = "file://" + artM[1].split("/").map(encodeURIComponent).join("/");
                 }
                 return;
             }

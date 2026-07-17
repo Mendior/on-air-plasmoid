@@ -2438,8 +2438,10 @@ PlasmaExtras.Representation {
                                             // forever.
                                             var safePath = fileItem.filePath.replace(/'/g, "'\\''")
                                             var stem = safePath.replace(/\.[^.\/]+$/, "")
+                                            var slash = stem.lastIndexOf("/")
+                                            var coverStem = stem.substring(0, slash) + "/.covers" + stem.substring(slash)
                                             executable.exec("rm -f '" + safePath + "'; "
-                                                + "for e in jpg jpeg png webp; do rm -f '" + stem + "'.\"$e\"; done")
+                                                + "for e in jpg jpeg png webp; do rm -f '" + stem + "'.\"$e\" '" + coverStem + "'.\"$e\"; done")
                                         }
                                     }
                                     Timer {
