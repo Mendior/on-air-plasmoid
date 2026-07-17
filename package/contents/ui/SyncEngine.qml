@@ -331,6 +331,17 @@ Item {
                     for (var hi = 0; hi < rsAll.length; hi++)
                         if (_btMacOfSink(rsAll[hi]) === macM[1]) heard[rsAll[hi]] = true;
                 }
+                // A LOUD speaker whose every click saturated the microphone
+                // gets a timing fix (CALIB_XLAG) and a clip flag (CALIB_CLIP)
+                // but NO level line — the mic could not measure an amplitude
+                // it was already pinned above. Both are the strongest proof a
+                // speaker was heard, so they count for the heard-map too;
+                // without them the verify's eviction kicked the loudest
+                // speaker in the room out as "silent through both rounds".
+                var hxRe = /CALIB_XLAG (\S+) -?\d+/g, hxM;
+                while ((hxM = hxRe.exec(stdout || "")) !== null) heard[hxM[1]] = true;
+                var hcRe = /CALIB_CLIP (\S+)/g, hcM;
+                while ((hcM = hcRe.exec(stdout || "")) !== null) heard[hcM[1]] = true;
                 var lvls = [], lvlRe = /CALIB_LVL (\S+) (\d+)/g, lvlM;
                 while ((lvlM = lvlRe.exec(stdout || "")) !== null) {
                     heard[lvlM[1]] = true;

@@ -467,6 +467,23 @@ Item {
             verify(note.text.indexOf("left out of the group") !== -1);
         }
 
+        function test_a_speaker_too_loud_to_measure_is_not_evicted() {
+            // A speaker so loud its clicks saturate the mic gets CALIB_XLAG
+            // and CALIB_CLIP but no CALIB_LVL. It was heard as loudly as
+            // physically possible — the eviction road must NOT then kick it
+            // out as "silent through both rounds".
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_CALIB " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\n"
+                           + "CALIB_XLAG " + wired2 + " 30\n"
+                           + "CALIB_CLIP " + wired2 + "\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(r.e.syncDeviceIncluded(wired2));   // kept, loud is not silent
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            verify(note.text.indexOf("may be muted or off") !== -1);
+        }
+
         function test_a_speaker_heard_in_round_one_is_not_thrown_out() {
             // The same partial verdict for a sink that DID click in round 1
             // is a real problem worth a warning — but not an eviction: a
