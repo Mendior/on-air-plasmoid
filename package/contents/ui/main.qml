@@ -4145,10 +4145,11 @@ PlasmoidItem {
     // must not be routed to, let alone persisted as the chosen output.
     // A speaker fresh through the door starts polite: Bluetooth hardware
     // often comes back at yesterday's party level, and at 2 AM that is a
-    // heart attack. Cap-only, once, at connect — an already-quiet speaker
-    // is left alone, and turning it up afterwards is one volume press away.
-    // The retry loop covers the sink registering a few seconds after the
-    // connect itself succeeded.
+    // heart attack. 25% is deliberately on the quiet side — a too-quiet
+    // hello costs one press of volume-up, a too-loud one costs the whole
+    // house its sleep. Cap-only, once, at connect: an already-quieter
+    // speaker is left alone. The retry loop covers the sink registering a
+    // few seconds after the connect itself succeeded.
     function _btGentleVolume(mac) {
         if (!_btValidMac(mac)) return;
         var token = mac.toLowerCase().replace(/:/g, "_");
@@ -4158,7 +4159,7 @@ PlasmoidItem {
                         + " [ -n \"$s\" ] && break; sleep 1; done;"
                         + " [ -n \"$s\" ] && {"
                         + " v=$(pactl get-sink-volume \"$s\" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
-                        + " [ \"${v:-0}\" -gt 40 ] && pactl set-sink-volume \"$s\" 40%; }; true");
+                        + " [ \"${v:-0}\" -gt 25 ] && pactl set-sink-volume \"$s\" 25%; }; true");
     }
 
     function _btTryRoutePending() {
