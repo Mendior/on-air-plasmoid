@@ -3029,8 +3029,13 @@ PlasmaExtras.Representation {
                                 text: root.sync.calibPhase === "clicks"
                                       ? i18n("Round 1 of 2 — clicks through every speaker…")
                                       : i18n("Round 2 of 2 — quiet, checking the result…")
-                                font: Kirigami.Theme.smallFont
-                                opacity: 0.7
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                font.weight: Font.DemiBold
+                                // Red on purpose: this is the one line that
+                                // must catch the eye before someone decides
+                                // the quiet gap means "done" and walks off
+                                // mid-measurement. Theme red, both schemes.
+                                color: Kirigami.Theme.negativeTextColor
                             }
                         }
 
