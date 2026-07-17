@@ -1392,24 +1392,44 @@ Item {
         // off while its buffer settled (measured live).
         interval: 6000
         repeat: false
-        onTriggered: {
-            if (!_verifyPending) return;
-            var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
-            // The group members ride along for the presence phase: the
-            // verify must be able to say WHICH speaker it could not hear,
-            // and the combined pass alone cannot (in-sync arrivals fuse).
-            // Empty jacks are not members — an unpluggable partial verdict
-            // about a hole in the air taught nobody anything.
-            var sinks = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
-            var argv = "";
-            for (var vi = 0; vi < sinks.length && vi < 8; vi++)
-                argv += " '" + sinks[vi].replace(/'/g, "'\\''") + "'";
-            // Warm-up plus up to three captures per member — the same
-            // arithmetic the guard was armed with.
-            var vBudget = 10 + Math.min(8, sinks.length) * 14;
-            app.exec(": PW_VERIFY; timeout " + vBudget + " python3 '" + script + "' verify '"
-                     + _combineSinkName + "' ''" + argv + "; true # " + app.nextSeq());
+        onTriggered: _verifyLaunch()
+    }
+
+    function _verifyLaunch() {
+        if (!_verifyPending) return;
+        var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
+        // The group members ride along for the presence phase: the
+        // verify must be able to say WHICH speaker it could not hear,
+        // and the combined pass alone cannot (in-sync arrivals fuse).
+        // Empty jacks are not members — an unpluggable partial verdict
+        // about a hole in the air taught nobody anything.
+        var sinks = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
+        // The check clicks must not ride at whatever level the evening left
+        // behind: a sink the connect capped polite (or the user turned down
+        // for the night) drops the through-path click under the noise gate,
+        // and a perfectly healthy speaker reads back as unheard. Park every
+        // member at the calibration's own 55% for the check and put the
+        // exact levels back — in the SAME shell, so nothing that happens to
+        // QML can strand the room re-leveled.
+        var setup = "", restore = "", argv = "";
+        for (var vi = 0; vi < sinks.length && vi < 8; vi++) {
+            var esc = sinks[vi].replace(/'/g, "'\\''");
+            setup += " w" + vi + "='" + esc + "';"
+                  + " y" + vi + "=$(pactl get-sink-volume \"$w" + vi + "\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
+                  + " pactl set-sink-volume \"$w" + vi + "\" 55%;";
+            // Unquoted on purpose: $yN holds one %-value PER CHANNEL and
+            // word-splitting hands pactl each as its own argument, so a
+            // left/right balance survives the round-trip.
+            restore += " pactl set-sink-volume \"$w" + vi + "\" ${y" + vi + ":-55%};";
+            argv += " \"$w" + vi + "\"";
         }
+        // Warm-up plus up to three captures per member — the same
+        // arithmetic the guard was armed with.
+        var vBudget = 10 + Math.min(8, sinks.length) * 14;
+        app.exec(": PW_VERIFY;" + setup
+                 + " timeout " + vBudget + " python3 '" + script + "' verify '"
+                 + _combineSinkName + "' ''" + argv + ";"
+                 + restore + " true # " + app.nextSeq());
     }
 
     Timer {

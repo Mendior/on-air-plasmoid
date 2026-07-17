@@ -482,6 +482,25 @@ Item {
             verify(note.text.indexOf("may be muted or off") !== -1);
         }
 
+        function test_verify_clicks_ride_at_a_known_volume() {
+            // The connect cap (or a night-time turn-down) leaves a sink at
+            // 40% — through-path clicks at that level fall under the noise
+            // gate and a healthy speaker reads as unheard. The check parks
+            // every member at the calibration's 55% and restores the exact
+            // levels in the same shell.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._verifyPending = true;
+            r.e._verifyLaunch();
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_VERIFY;") === 0);
+            verify(cmd.indexOf("pactl set-sink-volume \"$w0\" 55%") !== -1);
+            verify(cmd.indexOf("pactl set-sink-volume \"$w1\" 55%") !== -1);
+            verify(cmd.indexOf("${y0:-55%}") !== -1);   // the exact level returns
+            verify(cmd.indexOf("${y1:-55%}") !== -1);
+            verify(cmd.indexOf("' verify '") !== -1);
+        }
+
         function test_empty_jack_does_not_inflate_the_verify_budget() {
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
             activate(r);
