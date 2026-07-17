@@ -346,6 +346,25 @@ Item {
             fuzzyCompare(r.mock.playerOutput.volume, 0.5, 0.001);  // stream restored
         }
 
+        function test_retry_that_cannot_launch_still_returns_the_music() {
+            // The louder pass may refuse to arm — the Bluetooth member
+            // vanished mid-run, which is the LIKELIEST reason no click was
+            // heard. A toast promising "once more" over a stream nothing
+            // will ever unmute is the silent-forever bug; the failure path
+            // must run instead: volume restored, honest verdict.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            compare(r.e._calibVolumeBefore, 0.5);
+            var seq = r.e._calibRunSeq;
+            r.mock.mediaDevs = { audioOutputs: [dev(wired)] };   // JBL powered off
+            r.e.handleExec(": PW_CALIB " + seq + " " + btMac + " P55 ;",
+                           "CALIB_FAIL no click heard from the wired speaker\n", "");
+            verify(!r.e._calibrating);                           // nothing armed
+            fuzzyCompare(r.mock.playerOutput.volume, 0.5, 0.001); // music is back
+            compare(r.mock.notes[r.mock.notes.length - 1].title, "Calibration did not succeed");
+        }
+
         function test_level_fold_uses_the_runs_own_park() {
             // An escalated run parks at 85: a sink restored to 110% is
             // (110/85)^3 louder in playback than it measured — the fold must

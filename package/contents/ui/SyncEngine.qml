@@ -436,11 +436,21 @@ Item {
                 // so no music blasts between the rounds.
                 if (calPark < 85 && _combineActive
                     && (stdout || "").indexOf("no click heard") !== -1) {
-                    app.notify(i18n("Calibration"),
-                               i18n("The clicks were too quiet for this room — trying once more, louder."),
-                               "audio-input-microphone");
+                    // The louder pass may refuse to launch (the Bluetooth
+                    // member vanished mid-run — the very reason no click was
+                    // heard — or a rebuild emptied the group): only a retry
+                    // that actually ARMED may keep the stream muted. Anything
+                    // else falls through to the failure path, which gives the
+                    // room its music back; a toast promising "once more"
+                    // over a stream nothing will ever unmute is the exact
+                    // silent-forever bug the guard timer exists to prevent.
                     calibrateSync(85);
-                    return true;
+                    if (_calibrating) {
+                        app.notify(i18n("Calibration"),
+                                   i18n("The clicks were too quiet for this room — trying once more, louder."),
+                                   "audio-input-microphone");
+                        return true;
+                    }
                 }
                 _calibRestoreVolume();
                 // A rebuild requested during the failed calibration (the user
