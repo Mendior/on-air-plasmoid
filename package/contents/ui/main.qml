@@ -4315,7 +4315,14 @@ PlasmoidItem {
                         + " [ -n \"$s\" ] && for p in 1 2 3; do"
                         + " v=$(pactl get-sink-volume \"$s\" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
                         + " [ \"${v:-0}\" -gt 25 ] && pactl set-sink-volume \"$s\" 25%;"
-                        + " sleep 1; done; true");
+                        + " sleep 1; done; true"
+                        // The command string is fully determined by the MAC —
+                        // without a unique suffix, a second cap for the same
+                        // speaker (unplug→replug in one session) reconnects an
+                        // IDENTICAL string and P5Support's engine silently
+                        // swallows it as a duplicate, and the replug's blast
+                        // stands. Every repeat-issuable exec carries this.
+                        + " # " + nextSeq());
     }
 
     function _btTryRoutePending() {

@@ -568,7 +568,14 @@ Item {
         // only the menu's Connected states need refreshing here. Unless
         // the user clicked Disconnect while the cycle was mid-flight:
         // its reconnect phase just reverted their choice — undo that.
-        if (cmd.indexOf(": BT_KICK;") === 0) {
+        if (cmd.indexOf(": BT_KICK ") === 0) {
+            // The MAC is in the sentinel: an EARLIER kick's ack (speaker A)
+            // landing after the watchdog moved on to speaker B must not clear
+            // B's in-flight flags or reset B's ticks. Only the ack whose MAC
+            // still matches the current kick owns that state.
+            var kickM = cmd.match(/^: BT_KICK ([0-9A-F:]{17});/);
+            var ackMac = kickM ? kickM[1] : "";
+            if (ackMac !== _btKickMac) return true;    // stale kick's ack
             _btKickInFlight = false;
             if (_btKickAbort && app._btValidMac(_btKickMac))
                 // Uniquified: an identical disconnect for the same MAC may
@@ -1751,7 +1758,7 @@ Item {
             _btKickMac = _btJoinWatchMac;
             _btKickAbort = false;
             _btKickInFlight = true;
-            app.exec(": BT_KICK; timeout 5 bluetoothctl disconnect " + _btJoinWatchMac
+            app.exec(": BT_KICK " + _btJoinWatchMac + "; timeout 5 bluetoothctl disconnect " + _btJoinWatchMac
                 + " >/dev/null 2>&1; sleep 1;"
                 // Wake the speaker's radio with an inquiry before re-paging —
                 // the page itself is what sleeping speakers ignore.

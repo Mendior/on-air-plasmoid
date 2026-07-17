@@ -734,14 +734,18 @@ Item {
             compare(r.e._btJoinWatchTicks, 4);
             verify(r.e._btKickInFlight);
             var kick = r.mock.execLog[r.mock.execLog.length - 1];
-            verify(kick.indexOf(": BT_KICK;") === 0);
+            verify(kick.indexOf(": BT_KICK " + btMac + ";") === 0);   // MAC in sentinel
             verify(kick.indexOf("bluetoothctl connect " + btMac) !== -1);
             // Held while the kick is in flight — the countdown must not
             // starve the cure it started itself.
             r.e._btJoinWatchTick();
             compare(r.e._btJoinWatchTicks, 4);
-            // The kick landing resets the window for the reconnect.
-            r.e.handleExec(": BT_KICK; x", "", "");
+            // A STALE kick's ack (some other MAC) must not touch this state.
+            r.e.handleExec(": BT_KICK AA:BB:CC:DD:EE:00; x", "", "");
+            compare(r.e._btJoinWatchTicks, 4);
+            verify(r.e._btKickInFlight);
+            // The matching kick's ack resets the window for the reconnect.
+            r.e.handleExec(": BT_KICK " + btMac + "; x", "", "");
             compare(r.e._btJoinWatchTicks, 0);
             verify(!r.e._btKickInFlight);
             compare(r.mock.btListed, 1);
