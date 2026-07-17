@@ -51,6 +51,21 @@ function relevance(name, q) {
     return 2;
 }
 
+// Inflected queries find nothing in a substring-only directory: an
+// Estonian listener types "Elmari" hunting "Raadio Elmar", and "Elmar"
+// does not contain "Elmari". The fallback stems shave one, then two
+// trailing letters — never below four left — and each runs only when
+// everything longer came back empty.
+function stems(q) {
+    var t = (q || "").trim();
+    var out = [];
+    for (var cut = 1; cut <= 2; cut++) {
+        if (t.length - cut < 4) break;
+        out.push(t.substring(0, t.length - cut));
+    }
+    return out;
+}
+
 // One probe answer, read at the response headers: a definite HTTP error is
 // a dead mount, a 2xx is a live one, anything else (timeouts, transport
 // errors, ICY status lines Qt cannot parse) stays unknown — a slow or odd

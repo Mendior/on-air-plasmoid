@@ -171,6 +171,48 @@ PlasmaExtras.Representation {
             }
     }
 
+    // Every search road ends here. A directory that answered but left the
+    // list empty gets the stem retry: the query inflected ("Elmari" hunting
+    // "Elmar") or every hit already sitting in the user's own list — both
+    // read as "no results" without one more, shorter question.
+    function _webFinish(q, seq, tail, gotAnswer) {
+        if (seq !== fullRepresentation._webSearchSeq) return
+        if (gotAnswer && webResultsModel.count === 0
+            && fullRepresentation.webSearchMode === "all"
+            && _countryCodeOf(q) === "") {
+            var stems = SearchLogic.stems(q)
+            if (stems.length > 0) {
+                _webStemChain(q, stems, 0, seq, tail)
+                return
+            }
+        }
+        fullRepresentation.webSearchFailed = !gotAnswer
+        fullRepresentation.webSearching = false
+    }
+
+    function _webStemChain(q, stems, idx, seq, tail) {
+        if (seq !== fullRepresentation._webSearchSeq) return
+        if (idx >= stems.length) {
+            fullRepresentation.webSearchFailed = false
+            fullRepresentation.webSearching = false
+            return
+        }
+        root._rbFetch("/json/stations/search?name="
+                      + encodeURIComponent(stems[idx]) + tail, 4000, function(xhr) {
+            if (seq !== fullRepresentation._webSearchSeq) return
+            _webAppendResults(xhr)
+            if (webResultsModel.count > 0) {
+                _webRememberQuery(q)
+                _webBoostRelevance(stems[idx])
+                _probeKick(seq)
+                fullRepresentation.webSearchFailed = false
+                fullRepresentation.webSearching = false
+                return
+            }
+            _webStemChain(q, stems, idx + 1, seq, tail)
+        })
+    }
+
     // Stable two-pass float: exact (fold-blind) name matches keep their
     // vote order among themselves and rise first, then prefix matches —
     // the directory only ranks by fame, and fame buries the exact station
@@ -286,7 +328,7 @@ PlasmaExtras.Representation {
                     if (webResultsModel.count > 0)
                         _webRememberQuery(q)
                     _probeKick(seq)
-                    fullRepresentation.webSearching = false
+                    _webFinish(q, seq, tail, true)
                 })
                 return
             }
@@ -308,12 +350,11 @@ PlasmaExtras.Representation {
                     if (webResultsModel.count > 0)
                         _webRememberQuery(q)
                     _probeKick(seq)
-                    fullRepresentation.webSearching = false
+                    _webFinish(q, seq, tail, true)
                 })
                 return
             }
-            fullRepresentation.webSearchFailed = !gotAnswer
-            fullRepresentation.webSearching = false
+            _webFinish(q, seq, tail, gotAnswer)
         })
     }
 
@@ -2659,7 +2700,8 @@ PlasmaExtras.Representation {
     }
 
     function rebuildFilteredModel() {
-        const filter = (root.searchFilter || "").toLowerCase().trim()
+        // Fold-blind like the web search: "sobra" finds "Sõbra Raadio".
+        const filter = SearchLogic.fold(root.searchFilter)
         const favOnly = root.favoritesOnly
         filteredStationsModel.clear()
         if (favOnly) {
@@ -2675,7 +2717,7 @@ PlasmaExtras.Representation {
                 const fi = idxByName[root.favoriteNames[f]]
                 if (fi === undefined) continue
                 const fs = stationsModel.get(fi)
-                if (filter !== "" && fs.name.toLowerCase().indexOf(filter) === -1) continue
+                if (filter !== "" && SearchLogic.fold(fs.name).indexOf(filter) === -1) continue
                 filteredStationsModel.append({
                     "name": fs.name || "",
                     "hostname": fs.hostname || "",
@@ -2688,7 +2730,7 @@ PlasmaExtras.Representation {
         }
         for (var i = 0; i < stationsModel.count; i++) {
             const s = stationsModel.get(i)
-            if (filter !== "" && s.name.toLowerCase().indexOf(filter) === -1) continue
+            if (filter !== "" && SearchLogic.fold(s.name).indexOf(filter) === -1) continue
             const item = {
                 "name": s.name || "",
                 "hostname": s.hostname || "",

@@ -45,6 +45,13 @@ TestCase {
         compare(SL.relevance("anything", ""), 2);             // empty query boosts nothing
     }
 
+    function test_stems_shave_the_inflected_tail() {
+        compare(SL.stems("elmari"), ["elmar", "elma"]);   // genitive → nominative
+        compare(SL.stems("elmar"), ["elma"]);             // never below four left
+        compare(SL.stems("nova"), []);                    // short queries stay whole
+        compare(SL.stems("  "), []);
+    }
+
     function test_probe_verdict_reads_the_status_line() {
         compare(SL.probeVerdict(200), 1);    // a live mount
         compare(SL.probeVerdict(206), 1);
