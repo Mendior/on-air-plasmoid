@@ -470,9 +470,17 @@ PlasmoidItem {
         downloadTrack(_currentTrackQuery());
     }
 
-    function _startDownload(query) {
+    // skipEmbed: retry road for a machine without python-mutagen — yt-dlp
+    // downloads the track fine and then dies in POST-processing trying to
+    // embed tags/cover, taking the whole download down with it. Better a
+    // track without a cover than no track (plus an honest word about the
+    // missing package).
+    property bool _dlTriedNoEmbed: false
+
+    function _startDownload(query, skipEmbed) {
         if (!query) { downloading = false; return; }
         root._dlCurrentQuery = query;
+        if (!skipEmbed) root._dlTriedNoEmbed = false;
         var fmt = (Plasmoid.configuration.downloadFormat || "best").toLowerCase();
         var fmtArgs;
         if (fmt === "mp3") {
@@ -487,6 +495,8 @@ PlasmoidItem {
             // (e.g. to MP3) would only lose quality.
             fmtArgs = "-f bestaudio -x --audio-quality 0 --embed-metadata --embed-thumbnail";
         }
+        if (skipEmbed)
+            fmtArgs = fmtArgs.replace(" --embed-metadata", "").replace(" --embed-thumbnail", "");
         var safeDir = downloadDirPath.replace(/'/g, "'\\''");
         var safeQuery = query.replace(/'/g, "'\\''");
         // Check for yt-dlp BEFORE running and emit a clear sentinel if it is
@@ -3729,7 +3739,23 @@ PlasmoidItem {
             // yt-dlp finished → notify (sentinel-prefix match, see _startDownload)
             if (cmd.indexOf(": DL_YTDLP;") === 0) {
                 root.downloading = false;
+                var dlQuery = root._dlCurrentQuery;
                 root._dlCurrentQuery = "";
+                // Post-processing died for want of python-mutagen AFTER the
+                // track itself downloaded fine — retry once without the
+                // embedding, and say which package unlocks covers. (The
+                // partial file yt-dlp leaves behind does not collide: the
+                // retry overwrites the same output name.)
+                if (exitCode !== 0 && (stderr || "").indexOf("mutagen") !== -1
+                    && !root._dlTriedNoEmbed && dlQuery !== "") {
+                    root._dlTriedNoEmbed = true;
+                    notify(i18n("Downloading again without the cover"),
+                           i18n("Embedding tags needs the python-mutagen package — install it to get covers in your files."),
+                           "download");
+                    root.downloading = true;
+                    _startDownload(dlQuery, true);
+                    return;
+                }
                 var dlTitle, dlText, dlIcon;
                 if ((stdout || "").indexOf("__NO_YTDLP__") !== -1) {
                     dlTitle = i18n("yt-dlp is not installed");

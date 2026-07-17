@@ -133,6 +133,9 @@ PlasmaExtras.Representation {
 
     function runWebSearch(q) {
         q = (q || "").trim()
+        // A chip click runs the search NOW — a debounce still pending from
+        // typing would fire the same query a beat later as a duplicate.
+        webSearchDebounce.stop()
         webResultsModel.clear()
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
@@ -177,6 +180,11 @@ PlasmaExtras.Representation {
                               4000, function(xhr2) {
                     if (seq !== fullRepresentation._webSearchSeq) return
                     _webAppendResults(xhr2)
+                    // "jazz" can be a genre with zero NAME matches — a query
+                    // that only produced tag hits is still a successful
+                    // query, and history exists for successful queries.
+                    if (webResultsModel.count > 0)
+                        _webRememberQuery(q)
                     fullRepresentation.webSearching = false
                 })
                 return
@@ -212,7 +220,12 @@ PlasmaExtras.Representation {
         root._rbFetch(fullRepresentation._webLastQs + "&offset=" + webResultsModel.count,
                       4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
-            _webAppendResults(xhr)
+            // A failed page must give the cap back — the button's
+            // visibility compares count against the cap, and a raised cap
+            // with no rows to show made "Show more" vanish for good after
+            // one bad mirror moment.
+            if (!_webAppendResults(xhr))
+                fullRepresentation.webResultCap = Math.max(30, fullRepresentation.webResultCap - 30)
             fullRepresentation.webSearching = false
         })
     }
@@ -1381,7 +1394,12 @@ PlasmaExtras.Representation {
                         }
                         onClicked: {
                             if (previewing) {
-                                root.addStationToList(root.currentStation, root._previewUrl, root.currentStationFavicon, true)
+                                // The uuid rides along: a station saved
+                                // without its directory identity can only
+                                // ever be healed by name-guessing.
+                                root.addStationToList(root.currentStation, root._previewUrl,
+                                                      root.currentStationFavicon, true,
+                                                      root._previewUuid)
                             } else {
                                 root.toggleFavorite(root.currentStation)
                             }
@@ -2412,7 +2430,15 @@ PlasmaExtras.Representation {
                                         } else {
                                             armed = false
                                             if (fileItem.isThisPlaying) stopWithFade()
-                                            executable.exec("rm -f '" + fileItem.filePath.replace(/'/g, "'\\''") + "'")
+                                            // The track's sidecar cover art goes with it:
+                                            // yt-dlp leaves Title.webp/.jpg beside Title.opus
+                                            // when embedding was unavailable, and deleting
+                                            // only the audio strands covers in the library
+                                            // forever.
+                                            var safePath = fileItem.filePath.replace(/'/g, "'\\''")
+                                            var stem = safePath.replace(/\.[^.\/]+$/, "")
+                                            executable.exec("rm -f '" + safePath + "'; "
+                                                + "for e in jpg jpeg png webp; do rm -f '" + stem + "'.\"$e\"; done")
                                         }
                                     }
                                     Timer {
