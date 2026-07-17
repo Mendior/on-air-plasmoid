@@ -376,6 +376,12 @@ PlasmoidItem {
     // directory for the station's CURRENT address by uuid instead of giving
     // up on a rotted one.
     property string _previewUuid: ""
+    // The row's RAW submitted url — the retry ladder's last rung when the
+    // crawler's url_resolved has rotted but the station itself still lives.
+    property string _previewRawUrl: ""
+    // A human sentence for the status line when one is known — shown
+    // instead of the backend's growl while the error state stands.
+    property string _friendlyError: ""
 
     // .pls/.m3u wrappers hide the real stream one fetch away — the player
     // backend reports them as "Could not open file". Unwrap before playing;
@@ -418,7 +424,7 @@ PlasmoidItem {
 
     // LISTEN to an internet-search result (preview) — does NOT add it to the list.
     // A second click on the same result stops playback.
-    function previewStation(name, url, favicon, rbUuid) {
+    function previewStation(name, url, favicon, rbUuid, rawUrl) {
         if (!url) return;
         // A preview routed to cast devices leaves the LOCAL player idle
         // (isPlaying() false) — so the second tap must also recognize
@@ -430,6 +436,11 @@ PlasmoidItem {
         }
         root._previewUrl = url;
         root._previewUuid = rbUuid || "";
+        // The row's RAW url is the retry ladder's last rung: url_resolved
+        // is a crawler artifact that can go stale while the station's own
+        // submitted address (often a playlist) still answers.
+        root._previewRawUrl = (rawUrl && /^https?:\/\//i.test(rawUrl) && rawUrl !== url)
+                              ? rawUrl.toString() : "";
         root.lastPlay = -1;
         // A preview is an audition, not a standing order — no retry roads.
         root._wantsPlaying = false;
@@ -439,13 +450,14 @@ PlasmoidItem {
         _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "", "active": true }, true);
     }
 
-    // A dying preview's one retry: the directory knows the station's CURRENT
-    // address by identity. Reached from BOTH failure roads — the player's
-    // error signal and the connect watchdog's silent-hang verdict; the hang
-    // road used to dead-end in _tryHealStation's preview guard, leaving the
-    // listener staring at silence with no retry and no honest word.
+    // A dying preview's retry ladder: the directory's CURRENT address by
+    // identity, then the row's own raw url, then an honest human sentence.
+    // Reached from BOTH failure roads — the player's error signal and the
+    // connect watchdog's silent-hang verdict; the hang road used to
+    // dead-end in _tryHealStation's preview guard, leaving the listener
+    // staring at silence with no retry and no honest word.
     function _previewRetryByIdentity() {
-        if (root._previewUrl === "" || root._previewUuid === "") return;
+        if (root._previewUrl === "") return;
         var pvUuid = root._previewUuid;
         root._previewUuid = "";
         var pvName = root.currentStation;
@@ -458,9 +470,28 @@ PlasmoidItem {
         // previewing the NEXT result; the old retry must not hijack
         // that with yesterday's station.
         var pvKey = root._previewUrl;
+        // The last rung, and after it the honest word: a station that is
+        // gone (or answers only its own country — a geo-blocked stream
+        // reads 404 here while the directory's checker sees it fine) must
+        // not leave the listener staring at a backend growl.
+        var tryRaw = function() {
+            if (root._previewUrl !== pvKey) return;
+            var raw = root._previewRawUrl;
+            root._previewRawUrl = "";
+            if (raw !== "" && raw !== pvKey) {
+                _unwrapPlaylist(raw, function(playUrl) {
+                    if (root._previewUrl !== pvKey) return;
+                    startWithFade({ "name": pvName, "hostname": playUrl,
+                                    "favicon": pvIcon, "active": true });
+                });
+                return;
+            }
+            root._friendlyError = i18n("The station did not answer — it may be offline or not available in your country. Try another result.");
+        };
         // byuuid, not /url: the lookup must not count a listener
         // click for a stream that just refused to play (and
         // reportClicks may be off — a retry is not a listen).
+        if (pvUuid === "") { tryRaw(); return; }
         _rbFetch("/json/stations/byuuid/" + pvUuid, 4000, function(xhr) {
             if (root._previewUrl !== pvKey) return; // stopped or moved on
             var fresh = "";
@@ -475,6 +506,8 @@ PlasmoidItem {
                     startWithFade({ "name": pvName, "hostname": playUrl,
                                     "favicon": pvIcon, "active": true });
                 });
+            } else {
+                tryRaw();
             }
         });
     }
@@ -1787,7 +1820,11 @@ PlasmoidItem {
     // attempt: the bitrate upgrade, the heal lookup, clicks and votes all
     // became a lottery. Live mirrors lead the list, so the dead tail only
     // ever costs a timeout when everything ahead of it failed.
-    readonly property var _rbMirrors: ["de1", "de2", "nl1", "at1", "fi1"]
+    // The live set as of today, refreshed by _rbDiscoverMirrors at startup;
+    // 'all' is the directory's own round-robin over every healthy server.
+    property var _rbMirrors: ["de2", "de1", "all"]
+    // Index of the mirror that answered last — every fetch starts there.
+    property int _rbMirrorGood: 0
 
     // onDone(xhr) fires once with the first mirror that gave a usable
     // answer. Transport failures (dead DNS, refused, the abort-timer's
@@ -1796,10 +1833,16 @@ PlasmoidItem {
     // be identical everywhere, belongs to the caller. Every mirror down →
     // onDone(null), so callers can fall back instead of waiting forever.
     function _rbFetch(path, timeoutMs, onDone) {
+        // The order starts at the mirror that answered LAST — a mirror that
+        // just worked keeps working, and nobody waits behind a known-slow
+        // one's timeout on every single lookup.
+        var order = [];
+        for (var mi = 0; mi < root._rbMirrors.length; mi++)
+            order.push(root._rbMirrors[(root._rbMirrorGood + mi) % root._rbMirrors.length]);
         var attempt = 0;
         function tryNext() {
-            if (attempt >= root._rbMirrors.length) { onDone(null); return; }
-            var srv = root._rbMirrors[attempt++];
+            if (attempt >= order.length) { onDone(null); return; }
+            var srv = order[attempt++];
             var xhr = new XMLHttpRequest();
             var guard = null;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
@@ -1816,13 +1859,52 @@ PlasmoidItem {
                 }
                 if (xhr.readyState !== xhr.DONE) return;
                 _clearXhrTimeout(guard);
-                if (xhr.status === 0 || xhr.status >= 500) { tryNext(); return; }
+                // 429 joins the walk-on list: rate limits are PER MIRROR,
+                // and 'try again later' from one server is not the
+                // directory's answer — the next mirror serves it fine.
+                // (Measured live: a busy de1 turned a working directory
+                // into 'not reachable' for the user.)
+                if (xhr.status === 0 || xhr.status >= 500 || xhr.status === 429) {
+                    tryNext();
+                    return;
+                }
+                root._rbMirrorGood = root._rbMirrors.indexOf(srv) >= 0
+                                     ? root._rbMirrors.indexOf(srv) : 0;
                 onDone(xhr);
             };
             guard = _armXhrTimeout(xhr, timeoutMs);
             xhr.send();
         }
         tryNext();
+    }
+
+    // Ask the directory itself who its mirrors are today. Three of the five
+    // names this widget shipped with no longer resolve at all (nl1/at1/fi1
+    // were retired upstream) — a hardcoded list rots, the round-robin
+    // 'all' name does not. Names are validated to a hostname label before
+    // they may become part of a URL host.
+    function _rbDiscoverMirrors() {
+        _rbFetch("/json/servers", 5000, function(xhr) {
+            if (!xhr || xhr.status !== 200) return;
+            try {
+                var rows = JSON.parse(xhr.responseText) || [];
+                var seen = {}, fresh = [];
+                for (var i = 0; i < rows.length; i++) {
+                    var nm = String(rows[i].name || "");
+                    var mm = nm.match(/^([a-z0-9-]+)\.api\.radio-browser\.info$/);
+                    if (!mm || seen[mm[1]] || mm[1] === "all") continue;
+                    seen[mm[1]] = true;
+                    fresh.push(mm[1]);
+                }
+                // 'all' stays as the everyone-else-is-down door: it is
+                // round-robin DNS over the same healthy set.
+                if (fresh.length > 0) {
+                    fresh.push("all");
+                    root._rbMirrors = fresh;
+                    root._rbMirrorGood = 0;
+                }
+            } catch (e) {}
+        });
     }
 
     // ── Casting (Google Cast + DLNA/UPnP renderers) ──────────────────────────
@@ -2935,6 +3017,8 @@ PlasmoidItem {
         _volumeOverridePct = -1;
         root._previewUrl = "";
         root._previewUuid = "";
+        root._previewRawUrl = "";
+        root._friendlyError = "";
         // An explicit stop also cancels a heal audition in flight — "stop
         // must never start playback" applies to healing too.
         _healClearPending();
@@ -2995,6 +3079,9 @@ PlasmoidItem {
 
     function startWithFade(station) {
         infoTimer.stop();
+        // A fresh attempt clears the human error sentence — whatever
+        // happens now speaks for itself.
+        root._friendlyError = "";
         // Whatever starts now brings its own art — a previous local track's
         // sidecar cover must not shadow the new stream's lookups.
         root._localArtForSource = "";
@@ -3587,6 +3674,9 @@ PlasmoidItem {
         // Combined-output availability probe, crash sweep, restore-key
         // consumption and the steal-watch seed all live in the engine.
         syncEngine.startup();
+        // Today's mirror set, from the directory itself — the shipped list
+        // is only the door in.
+        _rbDiscoverMirrors();
         _ensureMusicDir();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
@@ -4277,10 +4367,9 @@ PlasmoidItem {
                 // URL won't re-enter this branch.
                 root._currentResolvedUrl = root._currentUnwrappedUrl;
                 bitrateFallbackTimer.restart();
-            } else if (root._previewUrl !== "" && root._previewUuid !== "") {
-                // A preview from the directory died — the directory itself
-                // knows the station's CURRENT address by identity. One
-                // retry, then honesty.
+            } else if (root._previewUrl !== "") {
+                // A preview from the directory died — the ladder: current
+                // address by identity, the row's raw url, then honesty.
                 _previewRetryByIdentity();
             } else if (playMusic.source.toString() !== ""
                        && playMusic.source.toString().indexOf("file://") !== 0

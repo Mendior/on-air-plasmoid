@@ -290,9 +290,13 @@ PlasmaExtras.Representation {
                 // the stream url gets, or a file:///data: favicon from the
                 // catalogue would probe local files behind the row.
                 var fav = (r.favicon || "").toString()
+                // The raw submitted url rides along as the preview retry
+                // ladder's last rung — same http(s) gate as the resolved one.
+                var rawU = (r.url || "").toString()
                 webResultsModel.append({
                     "name": (r.name || "").replace(/\s+/g, " ").trim() || u,
                     "url": u,
+                    "rawUrl": (/^https?:\/\//i.test(rawU) && rawU !== u) ? rawU : "",
                     "favicon": /^https?:\/\//i.test(fav) ? fav : "",
                     "country": r.country || "",
                     "bitrate": br,
@@ -731,10 +735,10 @@ PlasmaExtras.Representation {
                                 Accessible.name: webItem.isPreviewing
                                                  ? i18n("Stop preview: %1", model.name)
                                                  : i18n("Preview: %1", model.name)
-                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid)
+                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
                                 Keys.onPressed: (event) => {
                                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid)
+                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
                                         event.accepted = true
                                     }
                                 }
@@ -865,7 +869,7 @@ PlasmaExtras.Representation {
 
                                 HoverHandler { id: webHover }
                                 TapHandler {
-                                    onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid)
+                                    onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
                                 }
 
                                 PlasmaCore.ToolTipArea {
@@ -2760,7 +2764,12 @@ PlasmaExtras.Representation {
                     if (!isConnected)
                         return i18n("Check internet connection…")
                     else if (root.isError)
-                        return i18n("Error: %1", playMusic.errorString)
+                        // The human sentence beats the backend's growl when
+                        // one is known (a preview whose whole retry ladder
+                        // ran dry — offline or geo-blocked station).
+                        return root._friendlyError !== ""
+                               ? root._friendlyError
+                               : i18n("Error: %1", playMusic.errorString)
                     else if (fullRepresentation._streamActive) {
                         if (fullRepresentation._nowBitrate > 0)
                             return i18n("Bitrate: %1 kb/s", fullRepresentation._nowBitrate)
