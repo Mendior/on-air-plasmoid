@@ -377,6 +377,51 @@ Item {
             verify(!r.e._verifyPending);
         }
 
+        function test_verify_timers_scale_with_the_group() {
+            // The fixed 35 s guard fired mid-isolation on every 5-speaker
+            // run — the arithmetic must come from the group size.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._verifyArmTimers();
+            // n=2 members, 1 bluetooth: settle 8s + 3s, guard = settle +
+            // (10 + 2*14)s + 12s headroom.
+            compare(r.e.verifySettleInterval(), 11000);
+            compare(r.e.verifyGuardInterval(), 11000 + 38000 + 12000);
+        }
+
+        function test_rebuild_holds_during_measurement_and_releases_after() {
+            // A rebuild landing mid-verify unloads the loopback a click is
+            // riding — nudges and retries must wait their turn.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            var before = r.mock.execLog.length;
+            r.e._verifyPending = true;
+            r.e._combineRebuildLoopbacks();
+            compare(r.mock.execLog.length, before);   // nothing fired
+            verify(r.e._rebuildHeld);
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 3\n", "");
+            var reloop = false;
+            for (var i = before; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) reloop = true;
+            verify(reloop);                            // held rebuild ran
+            verify(!r.e._rebuildHeld);
+        }
+
+        function test_every_verdict_wears_the_unmute_belt() {
+            // The script's own unmutes can be swallowed by a drowsy pactl —
+            // the widget re-asserts them on every verdict, idempotently.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._verifyPending = true;
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_OK 3\n", "");
+            var belted = false;
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_UNMUTE;") === 0
+                    && r.mock.execLog[i].indexOf("set-sink-mute '" + btSink + "' 0") !== -1)
+                    belted = true;
+            verify(belted);
+        }
+
         function test_verify_partial_names_the_unheard_speaker() {
             // A dead or muted speaker must fail the verify LOUDLY — a small
             // spread computed from the survivors is the same optimistic-

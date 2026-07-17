@@ -352,8 +352,7 @@ Item {
                 // same reason the calibration muted it: program audio drowns
                 // the clicks.
                 _verifyPending = true;
-                verifySettleTimer.restart();
-                verifyGuardTimer.restart();
+                _verifyArmTimers();
             } else {
                 _calibRestoreVolume();
                 app.notify(i18n("Calibration did not succeed"),
@@ -370,6 +369,11 @@ Item {
             verifyGuardTimer.stop();
             if (!_verifyPending) return true;
             _verifyPending = false;
+            // The isolation mutes members; the script unmutes in its own
+            // finally-blocks, but a pactl that timed out on a drowsy
+            // Bluetooth link was swallowed silently — belt and braces on
+            // EVERY verdict, idempotent when everything already sings.
+            _verifyUnmuteAll();
             var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
             cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
             // THE CLOSED LOOP. A Bluetooth path's buffering is re-rolled on
@@ -396,7 +400,8 @@ Item {
                             var vKey = _btMacOfSink(vs) || vs;
                             var vOld = parseInt(vMap[vKey], 10);
                             if (!isFinite(vOld)) vOld = 0;
-                            vMap[vKey] = Math.max(-100, Math.min(2000, vOld + residuals[vs]));
+                            var vStep = Math.max(-600, Math.min(600, residuals[vs]));
+                            vMap[vKey] = Math.max(-100, Math.min(2000, vOld + vStep));
                         }
                         cfg.syncOffsetMap = JSON.stringify(vMap);
                     } catch (e) {}
@@ -422,8 +427,7 @@ Item {
                 }
                 _combineRebuildLoopbacks();
                 _verifyPending = true;
-                verifySettleTimer.restart();
-                verifyGuardTimer.restart();
+                _verifyArmTimers();
                 return true;
             }
             _calibRestoreVolume();
@@ -881,16 +885,21 @@ Item {
                  + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
                  + " sink='" + s + "' latency_msec=" + d + " " + chSpec + ") && echo \"LB $id " + s + "\"";
             var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
-            if (pct < 100) cmds += " && { " + _sinkInputVolCmd("$id", pct) + "}";
+            // Semicolons, not &&: the trim group returns nonzero when the
+            // sink-input has not registered yet (async), and an && chain
+            // then SKIPPED the birth flush on exactly the trimmed Bluetooth
+            // speaker that needed it.
+            if (pct < 100) cmds += "; { " + _sinkInputVolCmd("$id", pct) + "true; }";
             // Flush at birth, Bluetooth only: a loopback attached to a sink
             // that is still settling (a speaker that just connected, a codec
             // switch recreating the node) starts with a backlog it can NEVER
-            // drain — measured live at 2.3 seconds of permanent echo. One
-            // suspend/resume cycle right after the attach empties it before
-            // anyone hears anything.
+            // drain — measured live at 2.3 seconds of permanent echo. The
+            // beat of sleep lets the attach actually land first; flushing
+            // in the same breath as load-module raced the stream's birth.
             if (sinks[i].indexOf("bluez_") === 0)
-                cmds += " && pactl suspend-sink '" + s + "' 1"
-                     + " && pactl suspend-sink '" + s + "' 0";
+                cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
+                     + " pactl suspend-sink '" + s + "' 1;"
+                     + " pactl suspend-sink '" + s + "' 0; }";
             cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
         }
         return cmds;
@@ -1139,8 +1148,15 @@ Item {
     property bool _combineReloopBusy: false
     property bool _combineReloopPending: false
 
+    // A rebuild that lands mid-measurement unloads the very loopback a
+    // click is riding and suspends the sink under it — the watchdog nudge,
+    // an LBMISS retry or an outputs blink used to do exactly that during
+    // the verify. Held rebuilds run the moment the measurement ends.
+    property bool _rebuildHeld: false
+
     function _combineRebuildLoopbacks() {
         if (!_combineActive) return;
+        if (_calibrating || _verifyPending) { _rebuildHeld = true; return; }
         if (_combineReloopBusy) { _combineReloopPending = true; return; }
         _combineReloopBusy = true;
         var sinks = _combineRealSinks();
@@ -1226,9 +1242,50 @@ Item {
     // the loopbacks were rebuilt with the new delays, and the room is being
     // listened back to.
     property bool _verifyPending: false
+
+    function _verifyUnmuteAll() {
+        var un = "";
+        var vs = _combineRealSinks();
+        for (var i = 0; i < vs.length; i++)
+            un += "pactl set-sink-mute '" + vs[i].replace(/'/g, "'\\''") + "' 0; ";
+        if (un !== "")
+            app.exec(": PW_UNMUTE; " + un + "true # " + app.nextSeq());
+        // A rebuild held back during the measurement runs now.
+        if (_rebuildHeld) {
+            _rebuildHeld = false;
+            _combineRebuildLoopbacks();
+        }
+    }
     // One correction round per calibration: the loop must converge, not
     // chase its own tail. Reset when a new calibration starts.
     property bool _verifyCorrected: false
+
+    // Settle and guard are sized from the GROUP, not hard-coded: with five
+    // members the measurement needs ~a minute, and the old fixed 35 s guard
+    // fired mid-isolation on every single run — it unmuted the room in the
+    // middle of the measurement, the script kept muting members for its
+    // remaining passes (music cutting in and out, "the speaker is dead"),
+    // and the real verdict arriving later was discarded as stale. That is
+    // why no verify ever managed to record its result.
+    function _verifyArmTimers() {
+        var n = Math.max(1, Math.min(8, _combineRealSinks().length));
+        var bt = 0;
+        var vs = _combineRealSinks();
+        for (var i = 0; i < vs.length; i++)
+            if (vs[i].indexOf("bluez_") === 0) bt++;
+        // Rebuild + Bluetooth re-acquire need real time before clicks ride
+        // the fresh loopbacks; then warm-up plus up to three captures per
+        // member; then generous headroom before anyone panics.
+        verifySettleTimer.interval = 8000 + bt * 3000;
+        verifyGuardTimer.interval = verifySettleTimer.interval
+                                    + (10 + n * 14) * 1000 + 12000;
+        verifySettleTimer.restart();
+        verifyGuardTimer.restart();
+    }
+
+    // Test seams — the timers themselves are private ids.
+    function verifySettleInterval() { return verifySettleTimer.interval; }
+    function verifyGuardInterval() { return verifyGuardTimer.interval; }
 
     Timer {
         id: verifySettleTimer
@@ -1247,8 +1304,9 @@ Item {
             var argv = "";
             for (var vi = 0; vi < sinks.length && vi < 8; vi++)
                 argv += " '" + sinks[vi].replace(/'/g, "'\\''") + "'";
-            // One presence click per speaker plus the three spread clicks.
-            var vBudget = 15 + Math.min(8, sinks.length) * 8;
+            // Warm-up plus up to three captures per member — the same
+            // arithmetic the guard was armed with.
+            var vBudget = 10 + Math.min(8, sinks.length) * 14;
             app.exec(": PW_VERIFY; timeout " + vBudget + " python3 '" + script + "' verify '"
                      + _combineSinkName + "' ''" + argv + "; true # " + app.nextSeq());
         }
@@ -1266,12 +1324,7 @@ Item {
         onTriggered: {
             _verifyPending = false;
             _calibRestoreVolume();
-            var un = "";
-            var vs = _combineRealSinks();
-            for (var i = 0; i < vs.length; i++)
-                un += "pactl set-sink-mute '" + vs[i].replace(/'/g, "'\\''") + "' 0; ";
-            if (un !== "")
-                app.exec(": PW_UNMUTE; " + un + "true # " + app.nextSeq());
+            _verifyUnmuteAll();
         }
     }
 
