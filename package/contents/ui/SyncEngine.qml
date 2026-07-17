@@ -36,6 +36,11 @@ Item {
         _loadDeviceChannels();
         _loadSyncExcluded();
         app.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
+        // A session that died mid-measurement left its park levels (and the
+        // verify's hardware mutes) behind — the restore file it never got
+        // to delete puts the room back the way the user had it.
+        app.exec(": PW_PARKREST; f=\"${XDG_RUNTIME_DIR:-/tmp}/onair_park_" + app.instanceId + ".sh\";"
+                 + " [ -f \"$f\" ] && { sh \"$f\" 2>/dev/null; rm -f \"$f\"; }; true");
         refreshPortStates();
         // A crashed session can orphan the combined-output module — PipeWire
         // keeps it loaded forever. Sweep THIS instance's modules at startup
@@ -79,6 +84,38 @@ Item {
         _combineDefaultStealWatch();
         _combineTryRoute();
         refreshPortStates();
+        // The combined sink itself can die under a live group — a PipeWire
+        // restart, a hand-typed unload — and NOTHING else notices: its name
+        // is filtered out of the group math, so no signature ever changes.
+        // Worse than silence: the next rebuild's loopbacks would resolve
+        // ".monitor" against a name that no longer exists, and pactl then
+        // attaches them to the DEFAULT SOURCE — the microphone, live to the
+        // room. Rebuild the whole group instead; the enable shell's own
+        // same-name sweep clears whatever half survived.
+        // A resurrect that found no sinks yet (a PipeWire restart empties
+        // the whole device list for a beat) keeps knocking on the next few
+        // device events until the hardware is back.
+        if (_resurrectTries > 0 && !_combineActive && !_combineWantActive) {
+            _resurrectTries--;
+            combineOutputsEnable();
+        }
+        // Death needs a birth certificate first: the check only trusts a
+        // MISSING sink after having seen it alive in this same device list —
+        // an unrelated device event landing between the ack and the fresh
+        // sink's propagation into mediaDevices must not read as a corpse.
+        if (_combineActive) {
+            var couts = app.mediaDevs.audioOutputs;
+            var cAlive = false;
+            for (var cx = 0; cx < couts.length; cx++)
+                if (String(couts[cx].id).indexOf(_combineSinkName) !== -1) { cAlive = true; break; }
+            if (cAlive) {
+                _combineSinkSeen = true;
+            } else if (_combineSinkSeen) {
+                _combineSinkSeen = false;
+                _combineResurrect();
+                return;
+            }
+        }
         // A hardware sink came or went while the combined output is live —
         // rebuild the loopbacks for the CURRENT set. Snapshot-compared, or
         // the null sink's own appearance would trigger a rebuild and double
@@ -88,11 +125,48 @@ Item {
             syncOffsetDebounce.restart();
     }
 
+    // The null sink vanished under a live group. Reset the module
+    // bookkeeping (the ids died with the daemon that owned them) and run a
+    // fresh enable — membership, trims and lags all come from config, so
+    // the room comes back as it was. One-shot by construction: the moment
+    // _combineActive drops, this path is unreachable until the new
+    // generation's ack raises it again.
+    property int _resurrectTries: 0
+    // True once the live combined sink has been observed in mediaDevices —
+    // the death check's precondition.
+    property bool _combineSinkSeen: false
+
+    function _combineResurrect() {
+        _combineLoopbackIds = [];
+        _combineLoopbackSinkByModule = {};
+        _combineNullId = "";
+        _combineActive = false;
+        _combineWantActive = false;
+        // A measurement mid-flight measures a dead group — same cancel the
+        // disable does, generation bump included. The isolation's hardware
+        // mutes sit on REAL sinks that are (or will be) back: lift them.
+        if (_calibrating || _verifyPending) {
+            _calibrating = false;
+            _verifyPending = false;
+            _verifyCorrected = false;
+            _rebuildHeld = false;
+            calibGuardTimer.stop();
+            verifySettleTimer.stop();
+            verifyGuardTimer.stop();
+            _verifyUnmuteAll();
+            _calibRestoreVolume();
+            _calibRunSeq++;
+        }
+        _resurrectTries = 6;
+        combineOutputsEnable();
+    }
+
     // Every engine-owned shell round-trip lands here from main.qml's exec
     // handler; true = the command was ours and is fully handled.
     function handleExec(cmd, stdout, stderr) {
         if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0
-            || cmd.indexOf(": PW_TRIM;") === 0 || cmd.indexOf(": PW_STEALBACK;") === 0) {
+            || cmd.indexOf(": PW_TRIM;") === 0 || cmd.indexOf(": PW_STEALBACK;") === 0
+            || cmd.indexOf(": PW_RAMP;") === 0 || cmd.indexOf(": PW_PARKREST;") === 0) {
             return true; // fire-and-forget
         }
         // Combined local output: pactl availability probe
@@ -163,10 +237,19 @@ Item {
                 // user's real default: a fast enable→disable→re-enable means
                 // the re-enable's own get-default-sink already read THIS
                 // load's combined sink and filtered it to empty. Stash it so
-                // the live generation's ack can adopt it if its own PREVDEF
-                // came back as a combined name (i.e. empty).
-                if (_combineWantActive && !_combineActive && prevDef !== "")
-                    _combinePrevDefaultFallback = prevDef;
+                // the live generation's ack can adopt it — or, when the acks
+                // arrived REORDERED and the live generation is already up
+                // with an empty PREVDEF of its own, hand it over directly:
+                // without it the eventual disable has nothing to restore and
+                // WirePlumber picks the default on its own.
+                if (prevDef !== "") {
+                    if (_combineWantActive && !_combineActive) {
+                        _combinePrevDefaultFallback = prevDef;
+                    } else if (_combineActive && _combinePrevDefault === "") {
+                        _combinePrevDefault = prevDef;
+                        cfg.combinePrevDefault = prevDef;
+                    }
+                }
                 return true;
             }
             // Fatal only when the null sink itself failed, or when no
@@ -214,6 +297,7 @@ Item {
                 return true;
             }
             _combineActive = true;
+            _resurrectTries = 0;
             // If our own PREVDEF read back as a combined name (empty after
             // the filter) — a superseded load had already switched the
             // default before this generation looked — adopt the real default
@@ -223,6 +307,25 @@ Item {
             _combinePrevDefaultFallback = "";
             _combinePrevDefault = prevDef;
             cfg.combinePrevDefault = prevDef;
+            // The ramp out of the polite 20% flip, from HERE and not from
+            // the load shell: this ack is generation-checked, so a
+            // superseded enable's shell can never ramp the next
+            // generation's freshly-parked sink by name. It ends at the
+            // room's remembered master (captured by the last disable's
+            // teardown), 100% = acoustic passthrough only when nothing is
+            // remembered — a room the volume keys trimmed to 40% last
+            // evening comes back at 40%, not at a blast. 20% on the cubic
+            // curve is −42 dB, and the widget's own slider rides the
+            // stream, not the master: a room left parked there read as
+            // "the speakers don't play" (measured live on a running JBL).
+            var rampTo = Math.max(10, Math.min(100, cfg.combineMasterPct || 100));
+            var rampCmd = "";
+            var rampSteps = [35, 50, 65, 80, 90, 100].filter(function(rs) { return rs < rampTo; });
+            rampSteps.push(rampTo);
+            for (var rp = 0; rp < rampSteps.length; rp++)
+                rampCmd += "pactl set-sink-volume " + _combineSinkName + " "
+                         + rampSteps[rp] + "% 2>/dev/null; sleep 0.12; ";
+            app.exec(": PW_RAMP; " + rampCmd + "true # " + app.nextSeq());
             _combinePendingRoute = true;
             _combineTryRoute();
             _combineHandleMiss(pwOut);
@@ -291,8 +394,13 @@ Item {
         }
         // Disable's teardown ran to completion — only now is the persisted
         // default-restore key spent. Guarded: an enable inside the ack's
-        // round-trip owns the key again and must keep it.
+        // round-trip owns the key again and must keep it. The teardown also
+        // read the room's master level on its way out — that is what the
+        // volume keys were trimming all evening, and the next enable's ramp
+        // ends there instead of at a full-blast 100% the user never chose.
         if (cmd.indexOf(": PW_UNCOMBINE_DONE;") === 0) {
+            var mM = (stdout || "").match(/MASTER (\d+)/);
+            if (mM) cfg.combineMasterPct = Math.max(10, Math.min(100, parseInt(mM[1], 10)));
             if (!_combineActive && !_combineWantActive)
                 cfg.combinePrevDefault = "";
             return true;
@@ -1227,13 +1335,25 @@ Item {
         // stops the new guard, clears _calibrating mid-run and can unmute the
         // music into the fresh measurement.
         var calSeq = ++_calibRunSeq;
+        // The in-shell restore covers every way the MEASUREMENT can die —
+        // but not the shell's own death: a logout SIGTERMs the whole
+        // cgroup, and the next session then plays every speaker at the
+        // park. The saved levels are written to a runtime file the moment
+        // they are read; the same shell deletes it after restoring, and
+        // startup() replays whatever a dead session left behind.
+        var parkFile = "\"${XDG_RUNTIME_DIR:-/tmp}/onair_park_" + app.instanceId + ".sh\"";
+        var parkSave = " : > " + parkFile + ";";
+        for (var pf = 0; pf < calSinks.length; pf++)
+            parkSave += " printf 'pactl set-sink-volume \"%s\" %s\\n'"
+                      + " \"$s" + pf + "\" \"${v" + pf + ":-" + park + "%}\" >> " + parkFile + ";";
         app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " P" + park + " ;"
             + setup
+            + parkSave
             + " " + pre
             + " timeout " + calBudget + " python3 '" + script + "'" + argv + ";"
             + restore
             + " " + post
-            + " true # " + app.nextSeq());
+            + " rm -f " + parkFile + "; true # " + app.nextSeq());
         // Said AFTER the work is on its way (state before speech), because
         // it must be said: two rounds of clicks with a quiet check between
         // them read as "done" halfway through, and a calibration interrupted
@@ -1285,7 +1405,13 @@ Item {
         }
         if (sinks.length === 0) return;
         _combineWantActive = true;
-        _combinePrevOutput = cfg.audioOutputDevice || "";
+        // Never remember a combined name as "the output before the sync":
+        // a resurrect (the null sink died under a live group) arrives here
+        // with the player still routed onto the dead sink, and persisting
+        // that would hand the eventual disable a corpse to restore to.
+        var prevOut = cfg.audioOutputDevice || "";
+        if (prevOut.indexOf("onair_combined") !== -1) prevOut = _combinePrevOutput;
+        _combinePrevOutput = prevOut;
         cfg.combinePrevOutput = _combinePrevOutput;
         _combineSinksSnapshot = _combineGroupSignature();
         // Sync switched on while a speaker is still connecting: its sink is
@@ -1302,33 +1428,36 @@ Item {
         // provably scales its monitor, so one keypress now moves the whole
         // room. The previous default's level is copied over first — becoming
         // the default must not jump the loudness.
+        // The same-name sweep comes FIRST, in the same shell: a fast
+        // disable→enable races the disable's asynchronous teardown, and
+        // PipeWire happily loads a second sink under the same name — the new
+        // loopbacks then resolve ".monitor" against whichever twin the name
+        // lands on, and the old teardown kills their source out from under
+        // them. Unloading every module of OUR name before loading makes the
+        // enable idempotent no matter what is still in flight.
+        //
+        // The group master starts POLITE at 20% — no blast through hardware
+        // levels nobody audited. The ramp to the room's remembered level
+        // runs from the ACK (generation-checked), not from this shell: a
+        // superseded enable's shell must not be able to ramp the next
+        // generation's freshly-parked sink by name. The default switch is
+        // best-effort — `true` keeps the group's exit status from gating
+        // the loopbacks, which are the actual feature. The braces around
+        // the loopback block matter: a failed null sink must skip EVERY
+        // loopback, or pactl attaches them to the default source — the
+        // microphone, live to the room.
         app.exec(": PW_COMBINE " + (++_combineLoadSeq) + ";"
                         + " d=$(pactl get-default-sink); echo \"PREVDEF $d\";"
+                        + " for sw in $(pactl list short modules 2>/dev/null"
+                        + " | awk '/" + _combineSinkName + "([^0-9]|$)/ {print $1}'); do"
+                        + " pactl unload-module \"$sw\" 2>/dev/null; done;"
                         + " m=$(pactl load-module module-null-sink"
                         + " sink_name=" + _combineSinkName + " channels=2"
                         + " sink_properties='device.description=\"" + desc + "\"')"
-                        // The group master starts POLITE and then RAMPS to
-                        // acoustic passthrough. The flip itself lands at 20%
-                        // (no blast through hardware levels nobody audited),
-                        // but it must not STAY there: 20% on the cubic curve
-                        // is −42 dB, and the widget's own slider rides the
-                        // stream — it cannot raise the master, so a room
-                        // parked polite read as "the speakers don't play"
-                        // (measured live: a connected JBL nobody could hear).
-                        // The soft ~0.7 s rise ends at 100% = passthrough,
-                        // where each sink's own level (and the polite caps a
-                        // joining speaker gets) decide the loudness; the
-                        // volume keys still sit on this very sink for the
-                        // whole-room trim. The default switch is best-effort —
-                        // `true` keeps the group's exit status from gating
-                        // the loopbacks, which are the actual feature.
                         + " && { echo \"NULL $m\";"
                         + " pactl set-sink-volume " + _combineSinkName + " 20% 2>/dev/null;"
                         + " pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true; }"
-                        + " && " + _combineLoopbackCmds(sinks)
-                        + "for rv in 35 50 65 80 90 100; do"
-                        + " pactl set-sink-volume " + _combineSinkName + " ${rv}% 2>/dev/null;"
-                        + " sleep 0.12; done; true"
+                        + " && { " + _combineLoopbackCmds(sinks) + "true; }"
                         + " # " + app.nextSeq());
     }
 
@@ -1345,6 +1474,10 @@ Item {
     }
 
     function combineOutputsDisable() {
+        // The user's word beats a pending resurrect — an explicit off must
+        // not be undone by the retry ticks a dead sink armed.
+        _resurrectTries = 0;
+        _combineSinkSeen = false;
         if (!_combineWantActive) return;
         _combineWantActive = false;
         if (!_combineActive && _combineNullId === "") {
@@ -1393,10 +1526,16 @@ Item {
         var unMods = _combineUnloadCmd();
         var un = "";
         if (unMods !== "" || _combinePrevDefault !== "") {
-            // The default is read BEFORE the unloads: destroying the combined
-            // sink makes WirePlumber re-point the default on its own, and a
-            // check made after that could no longer tell our sink was holding it.
-            un = "d=$(pactl get-default-sink 2>/dev/null); " + unMods;
+            // The default AND the master level are read BEFORE the unloads:
+            // destroying the combined sink makes WirePlumber re-point the
+            // default on its own, and the master — the level the volume keys
+            // trimmed all evening — dies with the sink. It is echoed back and
+            // remembered so the next enable's ramp ends where the user left
+            // the room, not at a 100% they never chose.
+            un = "d=$(pactl get-default-sink 2>/dev/null);"
+               + " cm=$(pactl get-sink-volume " + _combineSinkName
+               + " 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%');"
+               + " echo \"MASTER ${cm:-100}\"; " + unMods;
         }
         // Hand the system default back to whoever held it before the sync —
         // but only if it is still OURS to hand back: a default the user moved
@@ -1667,10 +1806,22 @@ Item {
         // Warm-up plus up to three captures per member — the same
         // arithmetic the guard was armed with.
         var vBudget = 10 + Math.min(8, sinks.length) * 14;
-        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + setup + " " + pre2
+        // Same logout insurance as the calibration's: parks, the master and
+        // the isolation's hardware mutes all land in a runtime file that
+        // only a completed restore deletes — startup() replays a dead
+        // session's leftovers.
+        var vParkFile = "\"${XDG_RUNTIME_DIR:-/tmp}/onair_park_" + app.instanceId + ".sh\"";
+        var vParkSave = " : > " + vParkFile + ";"
+                      + " printf 'pactl set-sink-volume \"%s\" %s\\n' "
+                      + _combineSinkName + " \"${cm:-100%}\" >> " + vParkFile + ";";
+        for (var vf = 0; vf < sinks.length && vf < 8; vf++)
+            vParkSave += " printf 'pactl set-sink-volume \"%s\" %s\\n'"
+                       + " \"$w" + vf + "\" \"${y" + vf + ":-" + park + "%}\" >> " + vParkFile + ";"
+                       + " printf 'pactl set-sink-mute \"%s\" 0\\n' \"$w" + vf + "\" >> " + vParkFile + ";";
+        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + setup + vParkSave + " " + pre2
                  + " timeout " + vBudget + " python3 '" + script + "' verify '"
                  + _combineSinkName + "' ''" + argv + ";"
-                 + restore + " " + post2 + " true # " + app.nextSeq());
+                 + restore + " " + post2 + " rm -f " + vParkFile + "; true # " + app.nextSeq());
     }
 
     Timer {

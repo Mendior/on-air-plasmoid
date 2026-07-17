@@ -80,6 +80,7 @@ Item {
             property string syncExcluded: "{}"
             property string combinePrevOutput: ""
             property string combinePrevDefault: ""
+            property int combineMasterPct: 100
             property string audioOutputDevice: ""
         }
     }
@@ -128,11 +129,18 @@ Item {
             verify(cmd.indexOf("module-null-sink") !== -1);
             verify(cmd.indexOf("sink_name=onair_combined_7") !== -1);
             verify(cmd.indexOf("pactl set-default-sink onair_combined_7") !== -1);
-            // Polite flip, then the ramp to acoustic passthrough — a master
-            // parked at 20% (−42 dB cubic) read as "the speakers don't play".
+            // Polite flip only — the ramp runs from the generation-checked
+            // ack, never from this shell (a superseded enable's shell must
+            // not ramp the next generation's sink by name).
             verify(cmd.indexOf("set-sink-volume onair_combined_7 20%") !== -1);
-            verify(cmd.indexOf("for rv in 35 50 65 80 90 100") !== -1);
-            verify(cmd.indexOf("set-sink-volume onair_combined_7 ${rv}%") !== -1);
+            verify(cmd.indexOf("for rv in") === -1);
+            // The same-name sweep makes the enable idempotent against a
+            // racing disable's teardown — no same-named twins.
+            verify(cmd.indexOf("for sw in $(pactl list short modules") !== -1);
+            verify(cmd.indexOf("awk '/onair_combined_7([^0-9]|$)/") !== -1);
+            // Braced loopbacks: a failed null sink skips them ALL, or pactl
+            // would attach them to the default source — the microphone.
+            verify(cmd.indexOf("&& { if pactl list short sinks") !== -1);
             // The slowest device sets the schedule: wired waits the full lag,
             // the lagging Bluetooth sink itself waits nothing extra.
             verify(cmd.indexOf("sink='" + wired + "' latency_msec=260") !== -1);
@@ -162,6 +170,83 @@ Item {
         }
 
         // ── the PW_COMBINE ack ────────────────────────────────────────────
+
+        function test_the_ramp_runs_from_the_ack_and_ends_at_the_remembered_master() {
+            // The room's master is what the volume keys trimmed all evening;
+            // the ramp out of the polite 20% flip ends THERE, not at a 100%
+            // the user never chose. Full passthrough only when nothing is
+            // remembered.
+            var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 40 });
+            activate(r);
+            var ramp = "";
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_RAMP;") === 0) ramp = r.mock.execLog[i];
+            verify(ramp !== "");
+            verify(ramp.indexOf("set-sink-volume onair_combined_7 35%") !== -1);
+            verify(ramp.indexOf("set-sink-volume onair_combined_7 40%") !== -1);
+            verify(ramp.indexOf("100%") === -1);       // remembered beats blast
+        }
+
+        function test_disable_remembers_the_rooms_master_level() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.combineOutputsDisable();
+            var un = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(un.indexOf(": PW_UNCOMBINE_DONE;") === 0);
+            verify(un.indexOf("cm=$(pactl get-sink-volume onair_combined_7") !== -1);
+            verify(un.indexOf("echo \"MASTER ${cm:-100}\"") !== -1);
+            r.e.handleExec(": PW_UNCOMBINE_DONE;", "MASTER 40\n", "");
+            compare(r.cfg.combineMasterPct, 40);
+        }
+
+        function test_the_park_survives_a_logout_in_a_restore_file() {
+            // A logout SIGTERMs the whole cgroup — the in-shell restore
+            // never runs and the next session would play every speaker at
+            // the 55/85% park. The saved levels go to a runtime file only a
+            // COMPLETED restore deletes; startup replays the leftovers.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            var cal = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cal.indexOf("onair_park_7.sh") !== -1);
+            verify(cal.indexOf("printf 'pactl set-sink-volume \"%s\" %s\\n' \"$s0\"") !== -1);
+            verify(cal.indexOf("rm -f \"${XDG_RUNTIME_DIR:-/tmp}/onair_park_7.sh\"") !== -1);
+            r.e._verifyPending = true;
+            r.e._verifyArmTimers();
+            r.e._verifyLaunch();
+            var ver = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(ver.indexOf("onair_park_7.sh") !== -1);
+            verify(ver.indexOf("printf 'pactl set-sink-mute \"%s\" 0\\n' \"$w0\"") !== -1);
+            var r2 = rig([]);
+            r2.e.startup();
+            var seen = false;
+            for (var i = 0; i < r2.mock.execLog.length; i++)
+                if (r2.mock.execLog[i].indexOf(": PW_PARKREST;") === 0
+                    && r2.mock.execLog[i].indexOf("onair_park_7.sh") !== -1) seen = true;
+            verify(seen);
+        }
+
+        function test_a_dead_null_sink_resurrects_the_group() {
+            // A PipeWire restart (or a hand-typed unload) kills the combined
+            // sink under a live group and NOTHING else notices — its name is
+            // filtered out of the group math. Once the sink has been seen
+            // alive and then goes missing, the engine rebuilds the whole
+            // group; an unrelated device event BEFORE the sink ever appeared
+            // must not read as a corpse.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            var before = r.mock.execLog.length;
+            r.e.onOutputsChanged();                     // sink not seen yet
+            verify(r.e._combineActive);                 // no false resurrect
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(btSink), dev("onair_combined_7")] };
+            r.e.onOutputsChanged();                     // seen alive
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(btSink)] };
+            r.e.onOutputsChanged();                     // and now it is gone
+            verify(r.e._combineWantActive);             // fresh enable armed
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_COMBINE ") === 0);
+            verify(cmd.indexOf("for sw in $(pactl list short modules") !== -1);
+        }
 
         function test_ack_activates_and_remembers_the_previous_default() {
             var r = rig([dev(wired), dev(btSink)]);
