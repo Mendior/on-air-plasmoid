@@ -3353,10 +3353,15 @@ PlasmoidItem {
     // A Deezer entity without an image still returns a VALID URL — it just
     // has an empty image id ("…/images/artist//250x250-….jpg") and serves a
     // grey placeholder silhouette. Accepting one poisons the art cache with
-    // junk for the whole session; treat it as "no image".
+    // junk for the whole session; treat it as "no image". The empty id has
+    // a second spelling: d41d8cd98f00b204e9800998ecf8427e is the MD5 of ""
+    // — the same grey silhouette wearing a hash (caught live: artist
+    // fallback for an unmatched track showed the silhouette instead of
+    // falling through to the station's own logo).
     function _deezerRealArt(url) {
         var u = (url || "").toString();
-        if (u === "" || /\/images\/\w+\/\//.test(u)) return "";
+        if (u === "" || /\/images\/\w+\/\//.test(u)
+            || u.indexOf("d41d8cd98f00b204e9800998ecf8427e") !== -1) return "";
         return u;
     }
 
