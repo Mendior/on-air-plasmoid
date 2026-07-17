@@ -16,6 +16,7 @@ import org.kde.plasma.plasma5support 2.0 as P5Support
 import org.kde.plasma.plasmoid
 
 import "AlarmLogic.js" as AlarmLogic
+import "HealLogic.js" as HealLogic
 import "PlaylistLogic.js" as PlaylistLogic
 
 PlasmoidItem {
@@ -343,7 +344,10 @@ PlasmoidItem {
             // (lastPlay === -1) and the toggle-stop check above needs the match.
             lastPlay = index;
             root._previewUrl = "";
-        root._previewUuid = "";
+            root._previewUuid = "";
+            // The standing order: play, and keep playing until I say stop.
+            root._wantsPlaying = true;
+            root._healRetryAttempts = 0;
             root.currentStationFavicon = station.favicon || "";
             _playStation(station);
         }
@@ -399,6 +403,9 @@ PlasmoidItem {
         root._previewUrl = url;
         root._previewUuid = rbUuid || "";
         root.lastPlay = -1;
+        // A preview is an audition, not a standing order — no retry roads.
+        root._wantsPlaying = false;
+        healRetryTimer.stop();
         root.currentStationFavicon = favicon || "";
         _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "", "active": true });
     }
@@ -641,7 +648,28 @@ PlasmoidItem {
     // The cold-boot race is the root cause of "logos gone after login": the
     // first sync may run before the network is up. Re-sync when it comes up —
     // cheap, because everything already cached is skipped.
-    onIsConnectedChanged: if (isConnected) syncFavicons()
+    onIsConnectedChanged: {
+        if (!isConnected) return;
+        syncFavicons();
+        // The network came back while the standing order holds — resume
+        // without being asked. The settle delay covers DNS and the captive
+        // little moments a link needs after it claims to be up.
+        if (_wantsPlaying && !isPlaying() && !_casting
+            && lastPlay >= 0 && lastPlay < stationsModel.count)
+            netResumeTimer.restart();
+    }
+
+    Timer {
+        id: netResumeTimer
+        interval: 3000
+        repeat: false
+        onTriggered: {
+            if (!root._wantsPlaying || isPlaying() || root._casting) return;
+            if (lastPlay < 0 || lastPlay >= stationsModel.count) return;
+            console.log("[ARP] network is back — resuming the standing order");
+            refreshServer(lastPlay);
+        }
+    }
 
     // Backendless systems never report a reachability edge at all, so the
     // handler above may never fire — a stream that actually buffered proves
@@ -1095,6 +1123,9 @@ PlasmoidItem {
         _currentOrigUrl = a.url;
         _currentUnwrappedUrl = a.url;
         _currentResolvedUrl = a.url;
+        // An alarm IS a standing order — whatever it takes, keep trying.
+        _wantsPlaying = true;
+        _healRetryAttempts = 0;
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
         // The floor must reach the DEVICES too: while casting, the local
@@ -1213,6 +1244,10 @@ PlasmoidItem {
         root._currentOrigUrl = "";
         root._currentUnwrappedUrl = "";
         root._currentResolvedUrl = "";
+        // A local track ends on its own — replaying it after a network blip
+        // would be absurd, so the standing order does not apply.
+        root._wantsPlaying = false;
+        healRetryTimer.stop();
         // Invalidate in-flight auto-bitrate resolves — otherwise a delayed
         // radio-browser callback would hijack the just-started local file
         // (same rationale as stopWithFade).
@@ -2116,9 +2151,18 @@ PlasmoidItem {
     // that guards the name-guessed candidates.
     property bool _healByUuid: false
     property int _healSeq: 0
+    // The current heal generation's audition ladder: { seq, orig, name,
+    // norm, favicon, candidates: [{url, byUuid}], nameSearched }. Null when
+    // no heal is running. Dies with _healSeq like everything heal-shaped.
+    property var _healRun: null
+    // The user's standing order: they pressed play and never said stop.
+    // Every automatic recovery road — the retry backoff below, the
+    // network-came-back resume — exists only while this is true.
+    property bool _wantsPlaying: false
+    property int _healRetryAttempts: 0
 
     function _healNormName(s) {
-        return (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+        return HealLogic.normName(s);
     }
 
     function _healClearPending() {
@@ -2151,81 +2195,144 @@ PlasmoidItem {
         var norm = _healNormName(name);
         if (norm === "") return;
         var mySeq = ++_healSeq;
+        root._healRun = { seq: mySeq, orig: orig, name: name, norm: norm,
+                          favicon: st.favicon || "",
+                          candidates: [], nameSearched: false };
         // Identity beats guesswork: a station added from the search carries
-        // its directory uuid, and the /url endpoint answers with wherever
-        // that EXACT station lives today — no name collisions, no scoring.
-        // The name search below stays as the road for hand-added entries.
+        // its directory uuid, and byuuid answers with wherever that EXACT
+        // station lives today — no name collisions, no scoring. byuuid, not
+        // /url: /url COUNTS A LISTENER CLICK, and reportClicks promises
+        // nothing leaves the machine unless the user opted in — a lookup is
+        // not a listen. The name search stays as the road for hand-added
+        // entries and as the uuid road's fallback.
         var stUuid = (st.uuid || "").toString();
         if (stUuid !== "") {
-            _rbFetch("/json/url/" + stUuid, 5000, function(uxhr) {
+            _rbFetch("/json/stations/byuuid/" + stUuid, 5000, function(uxhr) {
                 if (mySeq !== _healSeq) return;
                 if (isPlaying() || lastPlay < 0) return;
-                var cand = "";
-                try { cand = (uxhr && JSON.parse(uxhr.responseText).url) || ""; } catch (e) {}
-                if (cand === "" || !/^https?:\/\//i.test(cand) || cand === orig) return;
-                console.log("[ARP] heal(uuid): auditioning " + cand + " for dead " + orig);
-                _unwrapPlaylist(cand, function(playUrl) {
-                    if (mySeq !== _healSeq) return;
-                    root._healOrigUrl = orig;
-                    root._healPendingUrl = playUrl;
-                    root._healByUuid = true;
-                    root._currentOrigUrl = orig;
-                    root._currentUnwrappedUrl = playUrl;
-                    root._currentResolvedUrl = playUrl;
-                    startWithFade({ "name": name, "hostname": playUrl,
-                                    "favicon": st.favicon || "", "active": true });
-                });
+                var cand = "", ok = false;
+                try {
+                    var row = (JSON.parse(uxhr.responseText) || [])[0] || {};
+                    cand = (row.url_resolved || row.url || "").toString();
+                    ok = String(row.lastcheckok) === "1";
+                } catch (e) {}
+                if (root._healRun && root._healRun.seq === mySeq
+                    && cand !== "" && /^https?:\/\//i.test(cand)
+                    && cand !== orig && ok)
+                    root._healRun.candidates.push({ url: cand, byUuid: true });
+                _healAdvance();
             });
             return;
         }
+        _healNameSearch(mySeq);
+    }
+
+    // The name-search rung: scored by HealLogic (exact name, home domain,
+    // bitrate), ranked into the ladder, at most four auditions per
+    // generation. Runs once per generation — after the uuid road came up
+    // empty, or right away for hand-added stations without a uuid.
+    function _healNameSearch(mySeq) {
+        var run = root._healRun;
+        if (!run || run.seq !== mySeq || mySeq !== _healSeq) return;
+        run.nameSearched = true;
         _rbFetch("/json/stations/search?name="
-                 + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
+                 + encodeURIComponent(run.name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
             if (mySeq !== _healSeq) return;          // superseded by a newer heal
             if (isPlaying() || lastPlay < 0) return; // user moved on / recovered
-            if (!xhr || xhr.status !== 200) return;
-            var best = null, bestScore = -1;
-            try {
-                var results = JSON.parse(xhr.responseText) || [];
-                var origBase = _baseDomain(_hostOf(orig));
-                for (var i = 0; i < results.length; i++) {
-                    var r = results[i];
-                    // lastcheckok: radio-browser's own probe reached this URL
-                    // on its latest sweep — the whole point of asking them.
-                    if (String(r.lastcheckok) !== "1") continue;
-                    var cand = (r.url_resolved || r.url || "").toString();
-                    if (!cand || cand === orig) continue;
-                    var fmt = _streamFormat(cand);
-                    if (fmt === "hls" || fmt === "playlist") continue;
-                    var rn = _healNormName(r.name);
-                    // Exact name beats contains-match; same base domain (the
-                    // station merely changed port/mount) beats everything.
-                    var score = -1;
-                    if (rn === norm) score = 2;
-                    else if (rn.indexOf(norm) !== -1) score = 1;
-                    if (score < 0) continue;
-                    if (origBase !== "" && _baseDomain(_hostOf(cand)) === origBase) score += 2;
-                    // results arrive votes-ordered, so the first hit at a
-                    // score level is also the most-voted one.
-                    if (score > bestScore) { bestScore = score; best = cand; }
+            if (xhr && xhr.status === 200) {
+                try {
+                    var results = JSON.parse(xhr.responseText) || [];
+                    var origBase = _baseDomain(_hostOf(run.orig));
+                    var rows = [];
+                    for (var i = 0; i < results.length; i++) {
+                        var r = results[i];
+                        // lastcheckok: radio-browser's own probe reached this
+                        // URL on its latest sweep — the point of asking them.
+                        if (String(r.lastcheckok) !== "1") continue;
+                        var cand = (r.url_resolved || r.url || "").toString();
+                        if (!cand || cand === run.orig) continue;
+                        var fmt = _streamFormat(cand);
+                        if (fmt === "playlist") continue;
+                        var score = HealLogic.scoreRow(_healNormName(r.name), run.norm,
+                                                       origBase !== ""
+                                                       && _baseDomain(_hostOf(cand)) === origBase);
+                        if (score < 0) continue;
+                        var br = parseInt(r.bitrate) || 0;
+                        if (br >= 8000) br = Math.round(br / 1000);
+                        rows.push({ url: cand, score: score, bitrate: br,
+                                    hls: fmt === "hls" });
+                    }
+                    var ranked = HealLogic.rank(rows);
+                    for (var j = 0; j < ranked.length && run.candidates.length < 4; j++)
+                        run.candidates.push({ url: ranked[j], byUuid: false });
+                } catch (e) {
+                    console.log("[ARP] heal parse: " + e);
                 }
-            } catch (e) {
-                console.log("[ARP] heal parse: " + e);
             }
-            if (!best) return;
-            console.log("[ARP] heal: auditioning " + best + " for dead " + orig);
-            _unwrapPlaylist(best, function(playUrl) {
-                if (mySeq !== _healSeq) return;
-                root._healOrigUrl = orig;
-                root._healPendingUrl = playUrl;
-                root._healByUuid = false;
-                root._currentOrigUrl = orig;
-                root._currentUnwrappedUrl = playUrl;
-                root._currentResolvedUrl = playUrl;
-                startWithFade({ "name": name, "hostname": playUrl,
-                                "favicon": st.favicon || "", "active": true });
-            });
+            _healAdvance();
         });
+    }
+
+    // Audition the ladder's next rung. An empty ladder falls back to the
+    // one name-search per generation; after THAT comes the honest word —
+    // and the retry backoff, because the user's play order still stands.
+    function _healAdvance() {
+        var run = root._healRun;
+        if (!run || run.seq !== _healSeq) return;
+        if (isPlaying() || lastPlay < 0) return;
+        if (run.candidates.length === 0) {
+            if (!run.nameSearched) { _healNameSearch(run.seq); return; }
+            root._healRun = null;
+            // First give-up gets the toast; the backoff retries stay quiet
+            // (a station that is down for an hour would otherwise nag five
+            // times about the same outage).
+            if (root._healRetryAttempts === 0)
+                notify(i18n("Station seems to be off the air"),
+                       i18n("%1 is not answering at any address the directory knows. It stays in your list — trying again in the background.", run.name),
+                       "network-disconnect");
+            _healArmRetry();
+            return;
+        }
+        var next = run.candidates.shift();
+        console.log("[ARP] heal: auditioning " + next.url + " for dead " + run.orig);
+        _unwrapPlaylist(next.url, function(playUrl) {
+            if (run.seq !== _healSeq) return;
+            root._healOrigUrl = run.orig;
+            root._healPendingUrl = playUrl;
+            root._healByUuid = next.byUuid === true;
+            root._currentOrigUrl = run.orig;
+            root._currentUnwrappedUrl = playUrl;
+            root._currentResolvedUrl = playUrl;
+            startWithFade({ "name": run.name, "hostname": playUrl,
+                            "favicon": run.favicon, "active": true });
+        });
+    }
+
+    // The standing-order retry: while _wantsPlaying holds, a station whose
+    // every door was closed is re-tried from the top (saved address, fresh
+    // unwrap, fresh bitrate pass, fresh heal) at 30 s, 1, 2, 4… capped at
+    // 10 minutes — outages end, and the user asked for music, not for an
+    // error message they have to notice and act on.
+    Timer {
+        id: healRetryTimer
+        repeat: false
+        interval: 30000
+        onTriggered: {
+            if (!root._wantsPlaying || isPlaying() || root._casting) return;
+            if (lastPlay < 0 || lastPlay >= stationsModel.count) return;
+            console.log("[ARP] heal retry #" + root._healRetryAttempts
+                        + ": replaying the saved address");
+            refreshServer(lastPlay);
+        }
+    }
+
+    function _healArmRetry() {
+        if (!_wantsPlaying) return;
+        var n = Math.min(5, _healRetryAttempts);
+        _healRetryAttempts++;
+        healRetryTimer.interval = Math.min(600000, 30000 * Math.pow(2, n));
+        healRetryTimer.restart();
     }
 
     // The auditioned address buffered for real. Make it permanent ONLY when
@@ -2239,6 +2346,10 @@ PlasmoidItem {
         var oldUrl = _healOrigUrl;
         var byUuid = _healByUuid;
         _healClearPending();
+        // The generation found its door — the ladder and the backoff die.
+        root._healRun = null;
+        root._healRetryAttempts = 0;
+        healRetryTimer.stop();
         var oldBase = _baseDomain(_hostOf(oldUrl));
         // A uuid-resolved address IS the station, by the directory's own
         // identity — the cross-domain caution below exists only for
@@ -2515,6 +2626,12 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         connectWatchdog.stop();
+        // An explicit stop cancels the standing order — every automatic
+        // recovery road (retry backoff, network-back resume) dies with it.
+        root._wantsPlaying = false;
+        root._healRetryAttempts = 0;
+        healRetryTimer.stop();
+        netResumeTimer.stop();
         // A stop inside the wake-tone window is the person saying "I'm up" —
         // the fallback chime must not blare over it half a minute later, and
         // the alarm's volume override dies with the session it raised.
@@ -3699,9 +3816,11 @@ PlasmoidItem {
             // Negative-cache it and retry with the original URL.
             if (root._healPendingUrl !== ""
                 && playMusic.source.toString() === root._healPendingUrl) {
-                // The auditioned replacement is dead too — give up quietly
-                // (_healTried caps how soon this station is looked up again).
+                // The auditioned replacement is dead too — next rung of the
+                // ladder (or, inside _healAdvance, the honest give-up and
+                // the standing-order retry).
                 root._healClearPending();
+                root._healAdvance();
                 return;
             }
             if (root._currentUnwrappedUrl !== ""
@@ -3738,10 +3857,16 @@ PlasmoidItem {
                 // previewing the NEXT result; the old retry must not hijack
                 // that with yesterday's station.
                 var pvKey = root._previewUrl;
-                _rbFetch("/json/url/" + pvUuid, 4000, function(xhr) {
+                // byuuid, not /url: the lookup must not count a listener
+                // click for a stream that just refused to play (and
+                // reportClicks may be off — a retry is not a listen).
+                _rbFetch("/json/stations/byuuid/" + pvUuid, 4000, function(xhr) {
                     if (root._previewUrl !== pvKey) return; // stopped or moved on
                     var fresh = "";
-                    try { fresh = (xhr && JSON.parse(xhr.responseText).url) || ""; } catch (e) {}
+                    try {
+                        var pvRow = (JSON.parse(xhr.responseText) || [])[0] || {};
+                        fresh = (pvRow.url_resolved || pvRow.url || "").toString();
+                    } catch (e) {}
                     if (fresh !== "" && /^https?:\/\//i.test(fresh)
                         && fresh !== pvKey) {
                         _unwrapPlaylist(fresh, function(playUrl) {
@@ -3787,10 +3912,15 @@ PlasmoidItem {
             } else {
                 stallTimer.stop();
             }
-            // Data arrived — the connect watchdog's question is answered.
+            // Data arrived — the connect watchdog's question is answered,
+            // and the standing-order retry chain starts over from clean.
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia
                 || playMusic.mediaStatus === MediaPlayer.BufferingMedia)
                 connectWatchdog.stop();
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia) {
+                root._healRetryAttempts = 0;
+                healRetryTimer.stop();
+            }
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && !root._favSyncedOnPlay) {
                 root._favSyncedOnPlay = true;
                 syncFavicons();
@@ -4013,10 +4143,17 @@ PlasmoidItem {
                 if (root._stallAttempts >= 3) {
                     console.log("[ARP] stall watchdog: still starving after "
                                 + root._stallAttempts + " retries — treating as dead");
+                    var starvedAudition = (root._healPendingUrl !== ""
+                        && playMusic.source.toString() === root._healPendingUrl);
                     playMusic.stop();
                     isError = true;
                     errorTimer.restart();
-                    healTimer.restart();
+                    if (starvedAudition) {
+                        root._healClearPending();
+                        root._healAdvance();
+                    } else {
+                        healTimer.restart();
+                    }
                     return;
                 }
                 root._stallAttempts += 1;
@@ -4041,10 +4178,18 @@ PlasmoidItem {
                 || playMusic.mediaStatus === MediaPlayer.BufferingMedia) return;
             if (!isPlaying()) return;
             console.log("[ARP] connect watchdog: no data after 15 s from " + src);
+            var wasAudition = (root._healPendingUrl !== "" && src === root._healPendingUrl);
             playMusic.stop();
             isError = true;
             errorTimer.restart();
-            healTimer.restart();
+            // A hung AUDITION advances the ladder directly — healTimer would
+            // re-enter _tryHealStation and bounce off its own 10-min lock.
+            if (wasAudition) {
+                root._healClearPending();
+                root._healAdvance();
+            } else {
+                healTimer.restart();
+            }
         }
     }
 
