@@ -176,6 +176,18 @@ PlasmoidItem {
     // _resolveCallSeq prevents stale async callbacks from re-triggering an
     // older click if the user has already moved on.
     property var _bitrateCache: ({})
+    // FIFO bound for _bitrateCache: plasmashell runs for weeks and every
+    // distinct url ever resolved — including every previewed search result —
+    // left a permanent entry. Same pattern as _artCache.
+    property var _bitrateCacheKeys: []
+    function _bitrateCachePut(key, val) {
+        if (_bitrateCache[key] === undefined) {
+            _bitrateCacheKeys.push(key);
+            if (_bitrateCacheKeys.length > 300)
+                delete _bitrateCache[_bitrateCacheKeys.shift()];
+        }
+        _bitrateCache[key] = val;
+    }
     // The playing station's identity, three addresses deep. orig = the
     // CONFIGURED url (what the user's list stores — possibly a .pls/.m3u
     // wrapper); unwrapped = the stream the wrapper pointed at (equal to orig
@@ -1623,7 +1635,7 @@ PlasmoidItem {
         const stationName = (station.name || "").replace(/\s+/g, " ").trim();
         const origBase = _baseDomain(_hostOf(origUrl));
         if (!stationName || !origBase) {
-            _bitrateCache[origUrl] = origUrl;
+            _bitrateCachePut(origUrl, origUrl);
             onPicked(origUrl);
             return;
         }
@@ -1660,7 +1672,7 @@ PlasmoidItem {
                     // If we can't find the user's URL in radio-browser we can't
                     // judge "higher bitrate" safely — skip the upgrade entirely.
                     if (!foundOrig) {
-                        _bitrateCache[origUrl] = origUrl;
+                        _bitrateCachePut(origUrl, origUrl);
                         onPicked(origUrl);
                         return;
                     }
@@ -1695,7 +1707,7 @@ PlasmoidItem {
                     console.log("[ARP] auto-bitrate parse error: " + e);
                 }
             }
-            _bitrateCache[origUrl] = pickedUrl;
+            _bitrateCachePut(origUrl, pickedUrl);
             if (pickedUrl !== origUrl) {
                 console.log("[ARP] auto-bitrate upgrade: " + stationName + " => " + pickedUrl);
             }
@@ -4105,7 +4117,7 @@ PlasmoidItem {
                 // wrapper station's death — handing the raw wrapper to the
                 // player (a guaranteed second error) and poisoning the
                 // bitrate cache under a key the resolver never reads.
-                _bitrateCache[root._currentUnwrappedUrl] = root._currentUnwrappedUrl;
+                _bitrateCachePut(root._currentUnwrappedUrl, root._currentUnwrappedUrl);
                 console.log("[ARP] auto-bitrate fallback: " + root._currentResolvedUrl
                             + " failed, retrying with " + root._currentUnwrappedUrl);
                 bitrateFallbackTimer.fallbackUrl = root._currentUnwrappedUrl;

@@ -1180,9 +1180,14 @@ PlasmaExtras.Representation {
                         implicitHeight: liveRow.implicitHeight + Kirigami.Units.smallSpacing
                         implicitWidth: liveRow.implicitWidth + Kirigami.Units.largeSpacing
                         radius: height / 2
-                        color: Qt.alpha("#e0463c", 0.16)
+                        // Theme red, not a fixed dark-theme red: on a light
+                        // popup (a station with no cover, so no dark backdrop)
+                        // the old #e0463c pill left #ff8a80 text at ~1.9:1
+                        // contrast — unreadable. negativeTextColor stays red
+                        // and legible in both schemes.
+                        color: Qt.alpha(Kirigami.Theme.negativeTextColor, 0.16)
                         border.width: 1
-                        border.color: Qt.alpha("#e0463c", 0.4)
+                        border.color: Qt.alpha(Kirigami.Theme.negativeTextColor, 0.4)
 
                         RowLayout {
                             id: liveRow
@@ -1194,7 +1199,7 @@ PlasmaExtras.Representation {
                                 width: 7
                                 height: 7
                                 radius: 3.5
-                                color: "#ff5c52"
+                                color: Kirigami.Theme.negativeTextColor
                                 SequentialAnimation on opacity {
                                     loops: Animation.Infinite
                                     running: fullRepresentation._streamActive && root.view === 1 && root.expanded
@@ -1207,7 +1212,7 @@ PlasmaExtras.Representation {
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 font.weight: Font.Bold
                                 font.letterSpacing: 1.2
-                                color: "#ff8a80"
+                                color: Kirigami.Theme.negativeTextColor
                             }
                         }
                     }
@@ -2809,7 +2814,10 @@ PlasmaExtras.Representation {
                     x: -width + parent.width
                     padding: Kirigami.Units.smallSpacing
                     modal: false
-                    implicitWidth: Kirigami.Units.gridUnit * 18
+                    // 21 gu — the full-representation's own width. At 18 the
+                    // balance row (checkbox + a full speaker name + slider +
+                    // % + channel button) starved the slider to a sliver.
+                    implicitWidth: Kirigami.Units.gridUnit * 21
                     // CloseOnPressOutsideParent (not ...Outside): the default
                     // policy closed the popup on the toggle button's own
                     // press, so the click's release always saw opened=false
@@ -2874,7 +2882,15 @@ PlasmaExtras.Representation {
                             icon.name: "computer"
                             checked: root._castTargets.length === 0 || root._castLocalPlay
                             enabled: root._castTargets.length > 0
-                            onToggled: root.castToggleLocal()
+                            onToggled: {
+                                root.castToggleLocal()
+                                // Toggling breaks the declared checked binding
+                                // — restore it, or after casting ends the sole
+                                // playing output would read as unchecked.
+                                checked = Qt.binding(function() {
+                                    return root._castTargets.length === 0 || root._castLocalPlay
+                                })
+                            }
                         }
 
                         // Local output picker (Bluetooth speakers, HDMI,
@@ -2979,7 +2995,12 @@ PlasmaExtras.Representation {
                                     var v = parseInt(text, 10);
                                     if (isFinite(v)) {
                                         v = Math.max(0, Math.min(900, v));
-                                        syncSlider.value = v;
+                                        // setSyncOffset writes the config; the
+                                        // slider's declared value binding pulls
+                                        // it along. Assigning syncSlider.value
+                                        // directly would DESTROY that binding,
+                                        // and a later calibration result would
+                                        // then never move the slider again.
                                         root.sync.setSyncOffset(v);
                                     }
                                     // Hand the display back to the slider —
@@ -3104,6 +3125,10 @@ PlasmaExtras.Representation {
                                 PlasmaComponents3.Slider {
                                     id: balanceSlider
                                     Layout.fillWidth: true
+                                    // Never collapse to a sliver, whatever the
+                                    // name label claims — a balance slider you
+                                    // cannot grab is not a control.
+                                    Layout.minimumWidth: Kirigami.Units.gridUnit * 3.5
                                     Accessible.name: i18n("Balance of %1", root.sync.outputDescription(balanceRow.modelData))
                                     from: 5
                                     to: 100
