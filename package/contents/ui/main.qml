@@ -435,7 +435,48 @@ PlasmoidItem {
         root._wantsPlaying = false;
         healRetryTimer.stop();
         root.currentStationFavicon = favicon || "";
-        _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "", "active": true });
+        // noUpgrade: the row is directory-fresh — play it as-is, instantly.
+        _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "", "active": true }, true);
+    }
+
+    // A dying preview's one retry: the directory knows the station's CURRENT
+    // address by identity. Reached from BOTH failure roads — the player's
+    // error signal and the connect watchdog's silent-hang verdict; the hang
+    // road used to dead-end in _tryHealStation's preview guard, leaving the
+    // listener staring at silence with no retry and no honest word.
+    function _previewRetryByIdentity() {
+        if (root._previewUrl === "" || root._previewUuid === "") return;
+        var pvUuid = root._previewUuid;
+        root._previewUuid = "";
+        var pvName = root.currentStation;
+        var pvIcon = root.currentStationFavicon;
+        // _previewUrl KEEPS the original address: the result row's
+        // "is previewing" marker compares against it, and the fresh
+        // address plays under the row's identity. The guard checks
+        // identity, not emptiness — the directory can take many
+        // seconds across mirrors, and by then the user may be
+        // previewing the NEXT result; the old retry must not hijack
+        // that with yesterday's station.
+        var pvKey = root._previewUrl;
+        // byuuid, not /url: the lookup must not count a listener
+        // click for a stream that just refused to play (and
+        // reportClicks may be off — a retry is not a listen).
+        _rbFetch("/json/stations/byuuid/" + pvUuid, 4000, function(xhr) {
+            if (root._previewUrl !== pvKey) return; // stopped or moved on
+            var fresh = "";
+            try {
+                var pvRow = (JSON.parse(xhr.responseText) || [])[0] || {};
+                fresh = (pvRow.url_resolved || pvRow.url || "").toString();
+            } catch (e) {}
+            if (fresh !== "" && /^https?:\/\//i.test(fresh)
+                && fresh !== pvKey) {
+                _unwrapPlaylist(fresh, function(playUrl) {
+                    if (root._previewUrl !== pvKey) return;
+                    startWithFade({ "name": pvName, "hostname": playUrl,
+                                    "favicon": pvIcon, "active": true });
+                });
+            }
+        });
     }
 
     // ── YouTube search and downloading ──────────────────────────────────
@@ -2758,7 +2799,7 @@ PlasmoidItem {
         _saveLiked();
     }
 
-    function _playStation(station) {
+    function _playStation(station, noUpgrade) {
         // A user-initiated play always outranks a heal audition in flight —
         // and someone picking a station is awake: the wake tone stands down
         // and the alarm's volume override hands control back.
@@ -2775,23 +2816,31 @@ PlasmoidItem {
         // the player itself) wants the stream, not its wrapper.
         _unwrapPlaylist((station.hostname || "").toString(), function(playUrl) {
             if (mySeq !== _resolveCallSeq) return;
-            var st = { "name": station.name, "hostname": playUrl,
-                       "favicon": station.favicon, "active": station.active };
-        _autoSelectBitrate(st, function(resolvedUrl) {
-            // Bail out if the user clicked another station while we were
-            // waiting for the radio-browser response.
-            if (mySeq !== _resolveCallSeq) return;
-            root._currentOrigUrl = (station.hostname || "").toString();
-            root._currentUnwrappedUrl = playUrl;
-            root._currentResolvedUrl = resolvedUrl;
-            const effective = {
-                "name": station.name,
-                "hostname": resolvedUrl,
-                "favicon": station.favicon,
-                "active": station.active
+            var finish = function(resolvedUrl) {
+                // Bail out if the user clicked another station while we were
+                // waiting for the radio-browser response.
+                if (mySeq !== _resolveCallSeq) return;
+                root._currentOrigUrl = (station.hostname || "").toString();
+                root._currentUnwrappedUrl = playUrl;
+                root._currentResolvedUrl = resolvedUrl;
+                startWithFade({
+                    "name": station.name,
+                    "hostname": resolvedUrl,
+                    "favicon": station.favicon,
+                    "active": station.active
+                });
             };
-            startWithFade(effective);
-        });
+            // A preview row came out of the directory seconds ago — that row
+            // IS the freshest answer there is. Asking the directory again
+            // (the bitrate upgrade is a full name-search) put the whole
+            // mirror chain's worst case — five mirrors, four seconds each —
+            // between the click and the first note, and its "upgrade" could
+            // swap in a sibling URL the row never promised. Play what the
+            // row says, instantly; upgrades belong to saved stations.
+            if (noUpgrade) { finish(playUrl); return; }
+            _autoSelectBitrate({ "name": station.name, "hostname": playUrl,
+                                 "favicon": station.favicon,
+                                 "active": station.active }, finish);
         });
     }
 
@@ -2936,11 +2985,17 @@ PlasmoidItem {
         // A dead-but-polite server accepts the TCP connect and then sends
         // nothing: no data, no error, "Connecting…" forever. The watchdog
         // turns that silence into an honest failure the heal road can act
-        // on. Local files load from disk — nothing to watch.
-        if (station.hostname && station.hostname.toString().indexOf("file://") !== 0)
+        // on. Local files load from disk — nothing to watch. A PREVIEW gets
+        // a shorter leash: the listener is sitting right there waiting, and
+        // eight seconds of nothing already answers the only question a
+        // preview asks — the identity retry should start knocking, not the
+        // listener keep hoping.
+        if (station.hostname && station.hostname.toString().indexOf("file://") !== 0) {
+            connectWatchdog.interval = root._previewUrl !== "" ? 8000 : 15000;
             connectWatchdog.restart();
-        else
+        } else {
             connectWatchdog.stop();
+        }
         if (Plasmoid.configuration.fadeEnabled) {
             fadeInAnimation.from = 0;
             fadeInAnimation.to = targetVolume();
@@ -4129,37 +4184,7 @@ PlasmoidItem {
                 // A preview from the directory died — the directory itself
                 // knows the station's CURRENT address by identity. One
                 // retry, then honesty.
-                var pvUuid = root._previewUuid;
-                root._previewUuid = "";
-                var pvName = root.currentStation;
-                var pvIcon = root.currentStationFavicon;
-                // _previewUrl KEEPS the original address: the result row's
-                // "is previewing" marker compares against it, and the fresh
-                // address plays under the row's identity. The guard checks
-                // identity, not emptiness — the directory can take many
-                // seconds across mirrors, and by then the user may be
-                // previewing the NEXT result; the old retry must not hijack
-                // that with yesterday's station.
-                var pvKey = root._previewUrl;
-                // byuuid, not /url: the lookup must not count a listener
-                // click for a stream that just refused to play (and
-                // reportClicks may be off — a retry is not a listen).
-                _rbFetch("/json/stations/byuuid/" + pvUuid, 4000, function(xhr) {
-                    if (root._previewUrl !== pvKey) return; // stopped or moved on
-                    var fresh = "";
-                    try {
-                        var pvRow = (JSON.parse(xhr.responseText) || [])[0] || {};
-                        fresh = (pvRow.url_resolved || pvRow.url || "").toString();
-                    } catch (e) {}
-                    if (fresh !== "" && /^https?:\/\//i.test(fresh)
-                        && fresh !== pvKey) {
-                        _unwrapPlaylist(fresh, function(playUrl) {
-                            if (root._previewUrl !== pvKey) return;
-                            startWithFade({ "name": pvName, "hostname": playUrl,
-                                            "favicon": pvIcon, "active": true });
-                        });
-                    }
-                });
+                _previewRetryByIdentity();
             } else if (playMusic.source.toString() !== ""
                        && playMusic.source.toString().indexOf("file://") !== 0
                        && root._previewUrl === "") {
@@ -4549,16 +4574,21 @@ PlasmoidItem {
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia
                 || playMusic.mediaStatus === MediaPlayer.BufferingMedia) return;
             if (!isPlaying()) return;
-            console.log("[ARP] connect watchdog: no data after 15 s from " + src);
+            console.log("[ARP] connect watchdog: no data after "
+                        + Math.round(interval / 1000) + " s from " + src);
             var wasAudition = (root._healPendingUrl !== "" && src === root._healPendingUrl);
             playMusic.stop();
             isError = true;
             errorTimer.restart();
             // A hung AUDITION advances the ladder directly — healTimer would
             // re-enter _tryHealStation and bounce off its own 10-min lock.
+            // A hung PREVIEW takes the identity road: healTimer's road ends
+            // at _tryHealStation's preview guard — a silent dead end.
             if (wasAudition) {
                 root._healClearPending();
                 root._healAdvance();
+            } else if (root._previewUrl !== "") {
+                _previewRetryByIdentity();
             } else {
                 healTimer.restart();
             }
