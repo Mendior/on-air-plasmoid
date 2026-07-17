@@ -107,7 +107,23 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       echo 'lint FAILED: a role/property named "model" shadows the delegate model object:'
       printf '%s\n' "$bad_model"; fail=1
     fi
-    # 2) Every versioned OnAir/<x.y> User-Agent must match metadata.json —
+    # 2) Notifications go through notify() ONLY. A KNotification with
+    #    autoDelete self-destructs after its first close, the QML id turns
+    #    null, and every direct dlNotification use after that throws —
+    #    aborting the caller mid-function (the 2026.18 calibration left the
+    #    stream at volume 0 exactly this way). notify() wraps the object in
+    #    a try/catch; nothing else may touch it, and autoDelete stays off.
+    ndirect="$(grep -c 'dlNotification\.sendEvent' "$PKG/contents/ui/main.qml" || true)"
+    if [ "${ndirect}" != "1" ]; then
+      echo "lint FAILED: dlNotification.sendEvent appears ${ndirect}x in main.qml — direct use outside notify() (must be exactly 1)"
+      fail=1
+    fi
+    bad_autodel="$(grep -rn 'autoDelete:[[:space:]]*true' "$PKG/contents/ui" --include='*.qml' || true)"
+    if [ -n "$bad_autodel" ]; then
+      echo 'lint FAILED: autoDelete: true on a declared Notification (self-deletes after first close, id turns null):'
+      printf '%s\n' "$bad_autodel"; fail=1
+    fi
+    # 3) Every versioned OnAir/<x.y> User-Agent must match metadata.json —
     #    the release ritual used to rely on remembering a grep.
     ver="$(python3 -c "import json; print(json.load(open('$PKG/metadata.json'))['KPlugin']['Version'])")"
     bad_ua="$(grep -rhoE 'OnAir/[0-9][0-9.]*' "$PKG" | sort -u | grep -vx "OnAir/$ver" || true)"

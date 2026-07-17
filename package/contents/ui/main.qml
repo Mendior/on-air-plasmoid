@@ -114,7 +114,13 @@ PlasmoidItem {
         id: dlNotification
         componentName: "plasma_workspace"
         eventId: "notification"
-        autoDelete: true
+        // Never autoDelete a declared notification: KNotification deletes
+        // the C++ object after the popup closes, the QML id turns null, and
+        // every later use throws — aborting whatever the caller was doing
+        // after the "harmless" toast (a calibration's volume restore, an
+        // alarm's fallback tone). One notification per session worked and
+        // everything after it broke, which is why it went unseen for so long.
+        autoDelete: false
     }
 
     // Fired once the music-library folder is guaranteed to exist — the My
@@ -777,12 +783,8 @@ PlasmoidItem {
             + "bytes=$(stat -c %s '" + safeOut + "' 2>/dev/null || echo 0); "
             + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then echo \"__REC_DONE__ rc=$rc bytes=$bytes\"; "
             + "else rm -f '" + safeOut + "' '" + safeTracks + "'; echo \"__REC_EMPTY__ rc=$rc\"; fi");
-        if (scheduled) {
-            dlNotification.title = i18n("Scheduled recording started");
-            dlNotification.text = stationName;
-            dlNotification.iconName = "media-record";
-            dlNotification.sendEvent();
-        }
+        if (scheduled)
+            notify(i18n("Scheduled recording started"), stationName, "media-record");
     }
 
     // ── Scheduled recordings ─────────────────────────────────────────────────
@@ -849,10 +851,7 @@ PlasmoidItem {
         if (_recSchedNotified[key]) return;
         if (Object.keys(_recSchedNotified).length > 50) _recSchedNotified = {};
         _recSchedNotified[key] = true;
-        dlNotification.title = title;
-        dlNotification.text = text;
-        dlNotification.iconName = icon;
-        dlNotification.sendEvent();
+        notify(title, text, icon);
     }
 
     // Advance (or remove, for "once") the schedule entry that just produced a
@@ -1015,11 +1014,10 @@ PlasmoidItem {
             var dec = AlarmLogic.fireDecision(a.nextRun, now, AlarmLogic.GRACE_MS);
             if (dec === "wait") continue;
             if (dec === "missed") {
-                dlNotification.title = i18n("Wake-up alarm missed");
-                dlNotification.text = i18n("%1 was set for %2 — the computer was off or asleep at that time.",
-                                           a.station, _pad2(a.hh) + ":" + _pad2(a.mm));
-                dlNotification.iconName = "dialog-warning";
-                dlNotification.sendEvent();
+                notify(i18n("Wake-up alarm missed"),
+                       i18n("%1 was set for %2 — the computer was off or asleep at that time.",
+                            a.station, _pad2(a.hh) + ":" + _pad2(a.mm)),
+                       "dialog-warning");
             } else {
                 due.push(a);
             }
@@ -1051,11 +1049,10 @@ PlasmoidItem {
             if (due.length > 1) {
                 var others = [];
                 for (var j = 1; j < due.length; j++) others.push(due[j].station);
-                dlNotification.title = i18n("Wake-up alarm");
-                dlNotification.text = i18n("%1 came due at the same time — playing %2 instead.",
-                                           others.join(", "), due[0].station);
-                dlNotification.iconName = "clock";
-                dlNotification.sendEvent();
+                notify(i18n("Wake-up alarm"),
+                       i18n("%1 came due at the same time — playing %2 instead.",
+                            others.join(", "), due[0].station),
+                       "clock");
             }
         }
     }
@@ -1105,10 +1102,7 @@ PlasmoidItem {
                 if (stationsModel.get(k).hostname === a.url) { lastPlay = k; break; }
             }
         });
-        dlNotification.title = i18n("Wake-up alarm");
-        dlNotification.text = a.station;
-        dlNotification.iconName = "clock";
-        dlNotification.sendEvent();
+        notify(i18n("Wake-up alarm"), a.station, "clock");
     }
 
     // The wake tone: if the station has not become audibly alive within the
@@ -1142,15 +1136,16 @@ PlasmoidItem {
                                                 root._alarmCastConfirmed,
                                                 root._castLocalPlay)) return;
             if (isPlaying() && playMusic.mediaStatus === MediaPlayer.BufferedMedia) return;
-            dlNotification.title = i18n("Wake-up alarm");
-            dlNotification.text = i18n("The station could not start — playing the built-in tone instead.");
-            dlNotification.iconName = "dialog-warning";
-            dlNotification.sendEvent();
             // file:// skips the cast branch in startWithFade — the tone
-            // plays locally, which is exactly where the sleeper is.
+            // plays locally, which is exactly where the sleeper is. The tone
+            // starts BEFORE the toast: the sleeper needs sound, not words,
+            // and nothing is allowed to sit between them and it.
             startWithFade({ "name": i18n("Wake-up alarm"),
                             "hostname": root._alarmToneUrl,
                             "favicon": "", "active": true });
+            notify(i18n("Wake-up alarm"),
+                   i18n("The station could not start — playing the built-in tone instead."),
+                   "dialog-warning");
         }
     }
 
@@ -1706,11 +1701,19 @@ PlasmoidItem {
     function exec(cmd) { executable.exec(cmd); }
     function nextSeq() { return ++_execSeq; }
 
+    // The ONLY door to dlNotification (dev.sh lints direct use). A toast is
+    // decoration: callers run real state changes around it — volume restores,
+    // schedule advances, alarm tones — and an exception escaping from here
+    // would cut those off mid-function. Whatever goes wrong stays inside.
     function notify(title, text, icon) {
-        dlNotification.title = title;
-        dlNotification.text = text;
-        dlNotification.iconName = icon;
-        dlNotification.sendEvent();
+        try {
+            dlNotification.title = title;
+            dlNotification.text = text;
+            dlNotification.iconName = icon;
+            dlNotification.sendEvent();
+        } catch (e) {
+            console.warn("[ARP] notify failed: " + e);
+        }
     }
 
     // The cast half of a balance change: the engine owns the store, the
@@ -2228,10 +2231,9 @@ PlasmoidItem {
             // stop-and-replay inside the lock window heals again right away
             // (the saved address is still the dead one, on purpose).
             delete _healTried[oldUrl];
-            dlNotification.title = i18n("Playing from a backup address");
-            dlNotification.text = i18n("The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept.");
-            dlNotification.iconName = "network-connect";
-            dlNotification.sendEvent();
+            notify(i18n("Playing from a backup address"),
+                   i18n("The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."),
+                   "network-connect");
             return;
         }
         try {
@@ -2258,10 +2260,9 @@ PlasmoidItem {
                         }
                     }
                 });
-                dlNotification.title = i18n("Station found at a new address");
-                dlNotification.text = i18n("%1 moved — the new address was saved to your list.", stName);
-                dlNotification.iconName = "network-connect";
-                dlNotification.sendEvent();
+                notify(i18n("Station found at a new address"),
+                       i18n("%1 moved — the new address was saved to your list.", stName),
+                       "network-connect");
                 return;
             }
         } catch (e) {
@@ -3287,15 +3288,13 @@ PlasmoidItem {
             if (cmd.indexOf(": CAST_PLAY;") === 0) {
                 var castOut = stdout || "";
                 if (castOut.indexOf("__NO_PYCHROMECAST__") !== -1) {
-                    dlNotification.title = i18n("Casting needs python-chromecast");
-                    dlNotification.text = i18n("Install the python-chromecast package to cast to your devices.");
-                    dlNotification.iconName = "dialog-warning";
-                    dlNotification.sendEvent();
+                    notify(i18n("Casting needs python-chromecast"),
+                           i18n("Install the python-chromecast package to cast to your devices."),
+                           "dialog-warning");
                 } else if (castOut.indexOf("__CAST_OK__") === -1) {
-                    dlNotification.title = i18n("Could not cast to %1", root._castName || i18n("the device"));
-                    dlNotification.text = i18n("The device could not play this station.");
-                    dlNotification.iconName = "dialog-error";
-                    dlNotification.sendEvent();
+                    notify(i18n("Could not cast to %1", root._castName || i18n("the device")),
+                           i18n("The device could not play this station."),
+                           "dialog-error");
                 } else {
                     // A device really took the stream — the wake-tone gate
                     // may now trust the casting route (multi-device: any one
@@ -3385,11 +3384,10 @@ PlasmoidItem {
                     // message with a second one.
                     if (connMac !== "" && root.sync._btJoinWatchMac === connMac)
                         root.sync._btJoinWatchStop();
-                    dlNotification.title = i18n("Could not connect to %1",
-                        root._btPendingSinkName || i18n("the Bluetooth device"));
-                    dlNotification.text = i18n("Make sure the speaker is switched on and in range.");
-                    dlNotification.iconName = "network-bluetooth";
-                    dlNotification.sendEvent();
+                    notify(i18n("Could not connect to %1",
+                                root._btPendingSinkName || i18n("the Bluetooth device")),
+                           i18n("Make sure the speaker is switched on and in range."),
+                           "network-bluetooth");
                     root._btPendingSinkName = "";
                     root._btPendingSinkMac = "";
                 } else {
@@ -3459,11 +3457,10 @@ PlasmoidItem {
                     }
                 } else {
                     btRouteTimeout.stop();
-                    dlNotification.title = i18n("Could not pair with %1",
-                        root._btPendingSinkName || i18n("the Bluetooth device"));
-                    dlNotification.text = i18n("Put the speaker in pairing mode (hold its Bluetooth button) and try again.");
-                    dlNotification.iconName = "network-bluetooth";
-                    dlNotification.sendEvent();
+                    notify(i18n("Could not pair with %1",
+                                root._btPendingSinkName || i18n("the Bluetooth device")),
+                           i18n("Put the speaker in pairing mode (hold its Bluetooth button) and try again."),
+                           "network-bluetooth");
                     root._btPendingSinkName = "";
                     root._btPendingSinkMac = "";
                 }
@@ -3550,26 +3547,27 @@ PlasmoidItem {
                 var recTooSmall = recBytes < Math.max(1, recElapsed / 60) * 10240;
                 var recOk = recDone && (recWasStopRequested || (recRanFull && recRc === 0)) && !recTooSmall;
                 var recInterrupted = recDone && !recOk;
+                var recTitle, recText, recIcon;
                 if (recOut.indexOf("__NO_FFMPEG__") !== -1) {
-                    dlNotification.title = i18n("ffmpeg is not installed");
-                    dlNotification.text = i18n("Install ffmpeg to record radio.");
-                    dlNotification.iconName = "dialog-warning";
+                    recTitle = i18n("ffmpeg is not installed");
+                    recText = i18n("Install ffmpeg to record radio.");
+                    recIcon = "dialog-warning";
                 } else if (recOk) {
-                    dlNotification.title = i18n("Recording saved ✓ (%1)", recDur);
-                    dlNotification.text = recName;
-                    dlNotification.iconName = "media-record";
+                    recTitle = i18n("Recording saved ✓ (%1)", recDur);
+                    recText = recName;
+                    recIcon = "media-record";
                 } else if (recInterrupted) {
-                    dlNotification.title = i18n("Recording interrupted (%1 captured)", recDur);
-                    dlNotification.text = recTooSmall
+                    recTitle = i18n("Recording interrupted (%1 captured)", recDur);
+                    recText = recTooSmall
                         ? i18n("%1 — the file is much smaller than expected.", recName)
                         : recName;
-                    dlNotification.iconName = "dialog-warning";
+                    recIcon = "dialog-warning";
                 } else {
-                    dlNotification.title = i18n("Recording failed");
-                    dlNotification.text = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
-                    dlNotification.iconName = "dialog-error";
+                    recTitle = i18n("Recording failed");
+                    recText = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
+                    recIcon = "dialog-error";
                 }
-                dlNotification.sendEvent();
+                notify(recTitle, recText, recIcon);
                 if (recWasScheduled && recSchedKey) {
                     if (recOk || recWasStopRequested) {
                         // The occurrence is done — move the entry forward (or
@@ -3587,20 +3585,21 @@ PlasmoidItem {
             if (cmd.indexOf(": DL_YTDLP;") === 0) {
                 root.downloading = false;
                 root._dlCurrentQuery = "";
+                var dlTitle, dlText, dlIcon;
                 if ((stdout || "").indexOf("__NO_YTDLP__") !== -1) {
-                    dlNotification.title = i18n("yt-dlp is not installed");
-                    dlNotification.text = i18n("Install yt-dlp (and ffmpeg) to download tracks.");
-                    dlNotification.iconName = "dialog-warning";
+                    dlTitle = i18n("yt-dlp is not installed");
+                    dlText = i18n("Install yt-dlp (and ffmpeg) to download tracks.");
+                    dlIcon = "dialog-warning";
                 } else if (exitCode === 0) {
-                    dlNotification.title = i18n("Track downloaded ✓");
-                    dlNotification.text = i18n("Saved to: ") + root.downloadDirPath;
-                    dlNotification.iconName = "download";
+                    dlTitle = i18n("Track downloaded ✓");
+                    dlText = i18n("Saved to: ") + root.downloadDirPath;
+                    dlIcon = "download";
                 } else {
-                    dlNotification.title = i18n("Download failed");
-                    dlNotification.text = ((stderr || "").split("\n").filter(function(l){ return l.indexOf("ERROR") >= 0; })[0] || i18n("Unknown error")).substring(0, 120);
-                    dlNotification.iconName = "dialog-error";
+                    dlTitle = i18n("Download failed");
+                    dlText = ((stderr || "").split("\n").filter(function(l){ return l.indexOf("ERROR") >= 0; })[0] || i18n("Unknown error")).substring(0, 120);
+                    dlIcon = "dialog-error";
                 }
-                dlNotification.sendEvent();
+                notify(dlTitle, dlText, dlIcon);
                 return;
             }
             if (cmd.indexOf("reader.py") < 0) return;
@@ -3853,10 +3852,9 @@ PlasmoidItem {
             var outs = mediaDevices.audioOutputs;
             for (var i = 0; i < outs.length; i++)
                 if (String(outs[i].id) === wanted) return;
-            dlNotification.title = i18n("Audio output changed");
-            dlNotification.text = i18n("The chosen output device disappeared — using the system default instead.");
-            dlNotification.iconName = "audio-volume-high";
-            dlNotification.sendEvent();
+            notify(i18n("Audio output changed"),
+                   i18n("The chosen output device disappeared — using the system default instead."),
+                   "audio-volume-high");
         }
     }
 
