@@ -214,10 +214,24 @@ def peak_of(path, tpl=None):
         match = corr_peak / (best * tpl_l1) if best > 0 else 0.0
         if match < 0.35 or best < 300:
             return None
-    elif best < 600:
-        return None
-    if best < 8 * max(floor, 60) or best < 4 * max(med_all, 1):
-        return None
+        # The amplitude bars scale with the filter's confidence. A noisy
+        # room (a studio mic over a fan-loud desktop measured a floor of
+        # ~540 where the quiet bench sat at ~40) pushes 8x-the-floor out of
+        # reach of a speaker the filter recognizes UNMISTAKABLY — measured
+        # there: a genuine click at 7.9x the floor with match 0.65, against
+        # music transients that never pass 0.24. A strong shape verdict is
+        # exactly what buys down the amplitude requirement; a marginal one
+        # keeps the full bars.
+        if match >= 0.5:
+            if best < 4 * max(floor, 60) or best < 2.5 * max(med_all, 1):
+                return None
+        elif best < 8 * max(floor, 60) or best < 4 * max(med_all, 1):
+            return None
+    else:
+        if best < 600:
+            return None
+        if best < 8 * max(floor, 60) or best < 4 * max(med_all, 1):
+            return None
     return (start + pos) / rate, best, clipped >= CLIP_COUNT
 
 
@@ -376,8 +390,16 @@ def _raw_arrival(sink, click, mic):
             return None
         window = samples[start:]
         best_i = max(range(len(window)), key=lambda i: abs(window[i]))
-        if abs(window[best_i]) < 200:
-            return None  # nothing rose above the mic's own hiss
+        best = abs(window[best_i])
+        # The bar is the ROOM's, not a constant: a studio mic over a
+        # fan-loud desktop idles at a median of ~540, and a fixed 200 let
+        # every capture of pure noise report an "arrival" — three of those
+        # agree by chance often enough to feed a fabricated residual into
+        # the stored lags. Standing 4x above the capture's own median is
+        # the same impulsiveness the calibration demands.
+        med = sorted(abs(s) for s in window)[len(window) // 2]
+        if best < max(200, 4 * med):
+            return None  # nothing rose above the room
         return best_i / rate
     finally:
         try:
@@ -386,7 +408,7 @@ def _raw_arrival(sink, click, mic):
             pass
 
 
-def _two_that_agree(times, tol=0.15):
+def _two_that_agree(times, tol=0.06):
     """The mean of the first pair within `tol` of each other, else None."""
     for i in range(len(times)):
         for j in range(i + 1, len(times)):

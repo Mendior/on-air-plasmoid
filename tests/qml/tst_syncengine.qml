@@ -300,7 +300,7 @@ Item {
             compare(r.e._calibVolumeBefore, 0.5);
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
             verify(cmd.indexOf(": PW_CALIB ") === 0);
-            verify(cmd.indexOf(" " + btMac + " ;") !== -1);   // mac after the run seq
+            verify(cmd.indexOf(" " + btMac + " P55 ;") !== -1); // mac + park level
             // Park, echo the real level for the loudness math, restore after.
             verify(cmd.indexOf("pactl set-sink-volume \"$s0\" 55%") !== -1);
             verify(cmd.indexOf("echo \"CALIBVOL $s0 ${v0:-55%}\"") !== -1);
@@ -309,6 +309,74 @@ Item {
             verify(cmd.indexOf("\"$s1\" ''") !== -1);
             // A wedged measurement dies INSIDE the guard window (60s - 10s).
             verify(cmd.indexOf(" timeout 50 python3 '") !== -1);
+        }
+
+        function test_inaudible_clicks_escalate_the_park_once() {
+            // A noisy room buries the 55% clicks (measured here: 1976 over a
+            // floor of ~570). The failure handler retries ONCE at 85% —
+            // stream still muted, original volume remembered, no premature
+            // failure toast — and only the louder round's failure is final.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            compare(r.e._calibVolumeBefore, 0.5);
+            var seq = r.e._calibRunSeq;
+            r.e.handleExec(": PW_CALIB " + seq + " " + btMac + " P55 ;",
+                           "CALIB_FAIL no click heard from the wired speaker\n", "");
+            verify(r.e._calibrating);                        // retry in flight
+            compare(r.e._calibParkPct, 85);
+            compare(r.e._calibVolumeBefore, 0.5);            // not clobbered to 0
+            compare(r.mock.playerOutput.volume, 0);          // still muted
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(" " + btMac + " P85 ;") !== -1);
+            verify(cmd.indexOf("pactl set-sink-volume \"$s0\" 85%") !== -1);
+            verify(cmd.indexOf("${v0:-85%}") !== -1);
+            var lastNote = r.mock.notes[r.mock.notes.length - 1];
+            verify(lastNote.text.indexOf("too quiet") !== -1);
+            // The louder round failing too is the end of the road.
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " P85 ;",
+                           "CALIB_FAIL no click heard from the wired speaker\n", "");
+            verify(!r.e._calibrating);
+            compare(r.mock.notes[r.mock.notes.length - 1].title, "Calibration did not succeed");
+            fuzzyCompare(r.mock.playerOutput.volume, 0.5, 0.001);  // stream restored
+        }
+
+        function test_level_fold_uses_the_runs_own_park() {
+            // An escalated run parks at 85: a sink restored to 110% is
+            // (110/85)^3 louder in playback than it measured — the fold must
+            // use the run's park, not the historic 55.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            var out = "CALIBVOL " + wired + " 110%\n"
+                    + "CALIBVOL " + btSink + " 85%\n"
+                    + "CALIB_LVL " + wired + " 10000\n"
+                    + "CALIB_LVL " + btSink + " 10000\n"
+                    + "CALIB_OK 200\n";
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " P85 ;", out, "");
+            // wired eff = 10000*(110/85)^3 = 21670 vs bt 10000 → wired trims
+            // to (10000/21670)^(1/3) ≈ 0.774
+            fuzzyCompare(r.e.trimOf(wired), 0.77, 0.011);
+            compare(r.e.trimOf(btMac), 1.0);
+        }
+
+        function test_verify_rides_at_known_levels() {
+            // The deployed-path check must not inherit the evening's knobs:
+            // combined master to acoustic passthrough, members to the park
+            // the calibration measured at, trims to full — all restored in
+            // the same shell.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._calibParkPct = 85;
+            r.e._verifyPending = true;
+            r.e._verifyMembers = [wired, btSink];
+            r.e._verifyLaunch();
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_VERIFY;") === 0);
+            verify(cmd.indexOf("pactl set-sink-volume onair_combined_7 100%") !== -1);
+            verify(cmd.indexOf("pactl set-sink-volume onair_combined_7 ${cm:-100%}") !== -1);
+            verify(cmd.indexOf("pactl set-sink-volume \"$w0\" 85%") !== -1);
+            verify(cmd.indexOf("${y0:-85%}") !== -1);
+            verify(cmd.indexOf("' verify '") !== -1);
         }
 
         function test_sync_offset_persists_per_mac_and_rebuilds() {

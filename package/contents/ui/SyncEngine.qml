@@ -308,6 +308,11 @@ Item {
             calibGuardTimer.stop();
             var okM = (stdout || "").match(/CALIB_OK (\d+)/);
             var macM = cmd.match(/^: PW_CALIB \d+ ([0-9A-F:]{17}) /);
+            // The park level this very run measured at — the sentinel
+            // carries it so a louder retry's levels fold with the right
+            // reference (pre-park commands default to the historic 55).
+            var parkM = cmd.match(/ P(\d+) ;/);
+            var calPark = parkM ? Math.max(1, parseInt(parkM[1], 10)) : 55;
             if (okM) {
                 // Same ceiling as calibrate.py's own sanity window — a
                 // 600 ms television is a real measurement, not an error,
@@ -367,14 +372,14 @@ Item {
                     heard[lvlM[1]] = true;
                     var lvlAmp = parseInt(lvlM[2], 10);
                     if (lvlAmp <= 0) continue;
-                    // The clicks compared the speakers at an equal 55% —
+                    // The clicks compared the speakers at an equal park —
                     // pure sensitivity. Playback runs at each sink's own
                     // restored level, so that level is folded back in
                     // (software volumes are cubic) or the trims would
                     // equalize a room the user never actually hears.
-                    var calVol = volBySink[lvlM[1]] !== undefined ? volBySink[lvlM[1]] : 55;
+                    var calVol = volBySink[lvlM[1]] !== undefined ? volBySink[lvlM[1]] : calPark;
                     lvls.push({ sink: lvlM[1],
-                                amp: lvlAmp * Math.pow(calVol / 55, 3) });
+                                amp: lvlAmp * Math.pow(calVol / calPark, 3) });
                 }
                 _calibHeard = heard;
                 var leveled = false;
@@ -423,6 +428,20 @@ Item {
                     calText += " " + i18n("The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again.", clipped.join(", "));
                 app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");
             } else {
+                // Inaudible clicks at the polite park are a ROOM property,
+                // not a verdict: fans plus a sensitive microphone bury a 55%
+                // click that an 85% one clears with room to spare (measured
+                // here: 1976 vs 6550 over a floor of ~570). One louder pass
+                // before giving up; the stream stays muted across the retry
+                // so no music blasts between the rounds.
+                if (calPark < 85 && _combineActive
+                    && (stdout || "").indexOf("no click heard") !== -1) {
+                    app.notify(i18n("Calibration"),
+                               i18n("The clicks were too quiet for this room — trying once more, louder."),
+                               "audio-input-microphone");
+                    calibrateSync(85);
+                    return true;
+                }
                 _calibRestoreVolume();
                 // A rebuild requested during the failed calibration (the user
                 // unticked a speaker mid-run) was held — release it now, or
@@ -1051,7 +1070,14 @@ Item {
         return _portUnplugged[sink] === true;
     }
 
-    function calibrateSync() {
+    // parkPct: the level every sink is parked at for the clicks. The 55%
+    // default is polite for a quiet room; a noisy one (fans, a sensitive
+    // studio mic — a floor of ~540 measured where the bench sat at ~40)
+    // can bury the clicks in it, and the failure handler then retries once
+    // at 85% before giving up.
+    property int _calibParkPct: 55
+
+    function calibrateSync(parkPct) {
         if (_calibrating || _verifyPending || !_combineActive) return;
         // Jack state can be stale: plugging a speaker into a previously empty
         // port usually fires no device-list change, so the empty-jack filter
@@ -1074,6 +1100,8 @@ Item {
             else if (wired === "") wired = sinks[i];
         }
         if (wired === "" || bt === "") return;
+        var park = parkPct || 55;
+        _calibParkPct = park;
         _calibrating = true;
         _verifyCorrected = false;
         // The natural moment to calibrate is WHILE listening — but program
@@ -1082,7 +1110,11 @@ Item {
         // a plausible-but-wrong lag gets persisted for the device. Silence
         // the stream at its source for the measurement; the clicks are
         // played straight at the sinks and don't pass through it.
-        _calibVolumeBefore = app.playerOutput.volume;
+        // Captured only when nothing is held yet: the louder retry arrives
+        // with the stream already muted by the first run, and re-capturing
+        // here would remember "0" as the level to put back.
+        if (_calibVolumeBefore < 0)
+            _calibVolumeBefore = app.playerOutput.volume;
         app.playerOutput.volume = 0;
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
         // The timing pair goes first; EVERY other speaker in the group rides
@@ -1120,15 +1152,15 @@ Item {
             setup += " s" + si + "='" + esc + "';"
                   + " v" + si + "=$(pactl get-sink-volume \"$s" + si + "\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
                   // The restored volume rides along for the loudness math:
-                  // the clicks are measured at the parked 55%, but playback
+                  // the clicks are measured at the park level, but playback
                   // happens at THIS level — the handler folds it back in.
-                  + " echo \"CALIBVOL $s" + si + " ${v" + si + ":-55%}\";"
-                  + " pactl set-sink-volume \"$s" + si + "\" 55%;";
+                  + " echo \"CALIBVOL $s" + si + " ${v" + si + ":-" + park + "%}\";"
+                  + " pactl set-sink-volume \"$s" + si + "\" " + park + "%;";
             // Unquoted on purpose: $vN holds one %-value PER CHANNEL and
             // word-splitting hands pactl each as its own argument, so a
             // left/right balance survives the round-trip. An unreadable
-            // volume falls back to the 55% the calibration itself used.
-            restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-55%};";
+            // volume falls back to the park the calibration itself used.
+            restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-" + park + "%};";
             argv += " \"$s" + si + "\"";
             if (si === 1) argv += " ''"; // the mic placeholder sits between
                                          // the timing pair and the extras
@@ -1147,7 +1179,7 @@ Item {
         // stops the new guard, clears _calibrating mid-run and can unmute the
         // music into the fresh measurement.
         var calSeq = ++_calibRunSeq;
-        app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " ;"
+        app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " P" + park + " ;"
             + setup
             + " " + pre
             + " timeout " + calBudget + " python3 '" + script + "'" + argv + ";"
@@ -1157,11 +1189,14 @@ Item {
         // Said AFTER the work is on its way (state before speech), because
         // it must be said: two rounds of clicks with a quiet check between
         // them read as "done" halfway through, and a calibration interrupted
-        // at half-time is worse than none.
-        var calNote = i18n("Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes.");
-        if (skipped.length > 0)
-            calNote += " " + i18n("Skipped (empty jack): %1.", skipped.join(", "));
-        app.notify(i18n("Calibration started"), calNote, "audio-input-microphone");
+        // at half-time is worse than none. The louder retry announces itself
+        // from the failure handler instead — no second "started" toast.
+        if (park === 55) {
+            var calNote = i18n("Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes.");
+            if (skipped.length > 0)
+                calNote += " " + i18n("Skipped (empty jack): %1.", skipped.join(", "));
+            app.notify(i18n("Calibration started"), calNote, "audio-input-microphone");
+        }
     }
 
     // Every load carries this generation: PipeWire happily loads a SECOND
@@ -1509,28 +1544,49 @@ Item {
         // behind: a sink the connect capped polite (or the user turned down
         // for the night) drops the through-path click under the noise gate,
         // and a perfectly healthy speaker reads back as unheard. Park every
-        // member at the calibration's own 55% for the check and put the
-        // exact levels back — in the SAME shell, so nothing that happens to
-        // QML can strand the room re-leveled.
-        var setup = "", restore = "", argv = "";
+        // member at the level the calibration itself measured at (55%, or
+        // its louder retry) and put the exact levels back — in the SAME
+        // shell, so nothing that happens to QML can strand the room
+        // re-leveled. The deployed path has two more knobs the direct
+        // clicks never met, and both must sit at a KNOWN level too: the
+        // combined master (its cubic curve at a polite 50% already eats
+        // ~7/8 of the click — measured here as a healthy speaker reading
+        // "unheard") goes to 100% = acoustic passthrough, and our loopback
+        // sink-inputs (a calibration just balance-trimmed the loud ones
+        // down) go to full, exactly like the calibration's own pre/post.
+        var park = _calibParkPct || 55;
+        var pre2 = "", post2 = "";
+        for (var pi = 0; pi < sinks.length && pi < 8; pi++) {
+            var vMod = _combineModuleForKey(_trimKeyForSink(sinks[pi]));
+            var vPct = Math.round(trimOf(_trimKeyForSink(sinks[pi])) * 100);
+            if (vMod !== "" && vPct < 100) {
+                pre2 += _sinkInputVolCmd(vMod, 100);
+                post2 += _sinkInputVolCmd(vMod, vPct);
+            }
+        }
+        var setup = " cm=$(pactl get-sink-volume " + _combineSinkName
+                  + " | grep -o '[0-9]*%' | head -1);"
+                  + " pactl set-sink-volume " + _combineSinkName + " 100%;";
+        var restore = " pactl set-sink-volume " + _combineSinkName + " ${cm:-100%};";
+        var argv = "";
         for (var vi = 0; vi < sinks.length && vi < 8; vi++) {
             var esc = sinks[vi].replace(/'/g, "'\\''");
             setup += " w" + vi + "='" + esc + "';"
                   + " y" + vi + "=$(pactl get-sink-volume \"$w" + vi + "\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
-                  + " pactl set-sink-volume \"$w" + vi + "\" 55%;";
+                  + " pactl set-sink-volume \"$w" + vi + "\" " + park + "%;";
             // Unquoted on purpose: $yN holds one %-value PER CHANNEL and
             // word-splitting hands pactl each as its own argument, so a
             // left/right balance survives the round-trip.
-            restore += " pactl set-sink-volume \"$w" + vi + "\" ${y" + vi + ":-55%};";
+            restore += " pactl set-sink-volume \"$w" + vi + "\" ${y" + vi + ":-" + park + "%};";
             argv += " \"$w" + vi + "\"";
         }
         // Warm-up plus up to three captures per member — the same
         // arithmetic the guard was armed with.
         var vBudget = 10 + Math.min(8, sinks.length) * 14;
-        app.exec(": PW_VERIFY;" + setup
+        app.exec(": PW_VERIFY;" + setup + " " + pre2
                  + " timeout " + vBudget + " python3 '" + script + "' verify '"
                  + _combineSinkName + "' ''" + argv + ";"
-                 + restore + " true # " + app.nextSeq());
+                 + restore + " " + post2 + " true # " + app.nextSeq());
     }
 
     Timer {

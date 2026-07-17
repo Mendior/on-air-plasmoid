@@ -283,3 +283,51 @@ def test_recorder_parecord_takes_the_mic(calib, monkeypatch):
     monkeypatch.setitem(calib, "shutil",
                         types.SimpleNamespace(which=lambda n: None))
     assert "--device=alsa_input.usb" in calib["recorder_args"]("alsa_input.usb", "/x.wav")
+
+
+def test_strong_template_match_lowers_the_amplitude_bar(calib, tmp_path):
+    # A fan-loud room with a sensitive mic: floor ~600, click at ~3500 —
+    # under the 8x-the-floor bar, but the matched filter recognizes the
+    # burst unmistakably (measured live: match 0.65 at 7.9x the floor).
+    # With the template in hand the strong shape verdict buys the amplitude
+    # bar down to 4x; without it the full bar still stands.
+    import random
+    rate = calib["RATE"]
+    rng = random.Random(7)
+    samples = [rng.randint(-1200, 1200) for i in range(int(rate * 1.5))]
+    inject_click(samples, rate, 0.9, 3500)
+    p = tmp_path / "noisyroom.wav"
+    write_wav(p, samples, rate)
+    tpl = calib["click_template"]()
+    got = calib["peak_of"](str(p), tpl)
+    assert got is not None
+    assert abs(got[0] - 0.9) < 0.01
+    # The template-less path keeps the old, stricter bar.
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_a_thump_in_noise_is_still_not_a_click(calib, tmp_path):
+    # The relaxed bar leans on the SHAPE verdict — a low-frequency thump at
+    # the same amplitude must not ride in through the lowered gate.
+    import random
+    rate = calib["RATE"]
+    rng = random.Random(11)
+    samples = [rng.randint(-1200, 1200) for i in range(int(rate * 1.5))]
+    n = int(rate * 0.01)
+    for i in range(n):
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / n))
+        samples[int(0.9 * rate) + i] += int(3500 * env
+                                            * math.sin(2.0 * math.pi * 150.0 * i / rate))
+    p = tmp_path / "thump.wav"
+    write_wav(p, [max(-32768, min(32767, s)) for s in samples], rate)
+    assert calib["peak_of"](str(p), calib["click_template"]()) is None
+
+
+def test_agreement_window_matches_the_measured_repeatability(calib):
+    # Deployed-path arrivals repeat within ~50 ms (measured); the agreement
+    # window is 60 ms so chance alignments of room noise across a ~3 s
+    # capture stay rare. 150 ms let roughly a third of pure-noise runs
+    # fabricate an "arrival" that then fed the residual back into the lags.
+    assert calib["_two_that_agree"]([1.00, 1.05]) is not None
+    assert calib["_two_that_agree"]([1.00, 1.10]) is None
+    assert calib["_two_that_agree"]([1.00, 1.30, 1.34]) is not None
