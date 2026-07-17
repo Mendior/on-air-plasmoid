@@ -31,66 +31,6 @@ KCM.SimpleKCM {
     property alias cfg_downloadDir: dirField.text
     property string cfg_downloadFormat
 
-    // Every key in main.xml is pushed onto EVERY config page as cfg_<key>
-    // and cfg_<key>Default initial properties — a page that does not
-    // declare them sprays "Setting initial properties failed" into the
-    // journal on each dialog open. Declared inert below; only the wired
-    // properties above actually drive this page.
-    property var cfg_servers
-    property var cfg_serversDefault
-    property var cfg_speedfactorDefault
-    property var cfg_lastplayDefault
-    property var cfg_icon
-    property var cfg_iconDefault
-    property var cfg_iconFallback
-    property var cfg_iconFallbackDefault
-    property var cfg_defaultVolumeDefault
-    property var cfg_fadeEnabledDefault
-    property var cfg_fadeDurationDefault
-    property var cfg_albumArtEnabledDefault
-    property var cfg_blurBackdropDefault
-    property var cfg_favorites
-    property var cfg_favoritesDefault
-    property var cfg_mprisEnabledDefault
-    property var cfg_autoBitrateDefault
-    property var cfg_syncOffsetMap
-    property var cfg_syncOffsetMapDefault
-    property var cfg_searchHistory
-    property var cfg_searchHistoryDefault
-    property var cfg_syncVerifiedMs
-    property var cfg_syncVerifiedMsDefault
-    property var cfg_deviceTrims
-    property var cfg_deviceTrimsDefault
-    property var cfg_deviceChannels
-    property var cfg_deviceChannelsDefault
-    property var cfg_syncExcluded
-    property var cfg_syncExcludedDefault
-    property var cfg_syncOffsetMs
-    property var cfg_syncOffsetMsDefault
-    property var cfg_combinePrevOutput
-    property var cfg_combinePrevOutputDefault
-    property var cfg_combinePrevDefault
-    property var cfg_combinePrevDefaultDefault
-    property var cfg_autoHealDefault
-    property var cfg_downloadFormatDefault
-    property var cfg_history
-    property var cfg_historyDefault
-    property var cfg_likedSongs
-    property var cfg_likedSongsDefault
-    property var cfg_reportClicksDefault
-    property var cfg_downloadDirDefault
-    property var cfg_aiHelperEnabledDefault
-    property var cfg_followSystemAccentDefault
-    property var cfg_recordMaxMinutes
-    property var cfg_recordMaxMinutesDefault
-    property var cfg_recordFormat
-    property var cfg_recordFormatDefault
-    property var cfg_recSchedules
-    property var cfg_recSchedulesDefault
-    property var cfg_alarms
-    property var cfg_alarmsDefault
-    property var cfg_audioOutputDevice
-    property var cfg_audioOutputDeviceDefault
 
     Kirigami.FormLayout {
         Item {
