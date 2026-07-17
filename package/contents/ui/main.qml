@@ -1225,6 +1225,21 @@ PlasmoidItem {
                                                 root._alarmCastConfirmed,
                                                 root._castLocalPlay)) return;
             if (isPlaying() && playMusic.mediaStatus === MediaPlayer.BufferedMedia) return;
+            // The tone is the LAST word — nothing may replace it. A heal
+            // audition launched a beat ago has an XHR in flight whose
+            // callback would call startWithFade on the found stream and kill
+            // the looping chime. Retire every heal leg (bump the generation,
+            // stop the timers, drop the pending audition) and end the
+            // standing-order replay so no road can start a station over the
+            // tone. The person is asleep; the tone must not go quiet.
+            _healSeq++;
+            _healClearPending();
+            _healRun = null;
+            healTimer.stop();
+            healRetryTimer.stop();
+            netResumeTimer.stop();
+            connectWatchdog.stop();
+            _wantsPlaying = false;
             // file:// skips the cast branch in startWithFade — the tone
             // plays locally, which is exactly where the sleeper is. The tone
             // starts BEFORE the toast: the sleeper needs sound, not words,
@@ -2750,9 +2765,13 @@ PlasmoidItem {
             _castStopAll();
             _casting = false;
             _castCurrentUrl = "";
-            // Multi-room: local playback is also running — fall through to
-            // the normal local stop below.
-            if (!(_castLocalPlay && isPlaying())) {
+            // Fall through to the normal local stop whenever anything is
+            // ACTUALLY playing locally — not only in multi-room. A cast-only
+            // alarm whose device never answered dropped to the local
+            // fallback tone (file:// skips the cast branch); the old
+            // _castLocalPlay-only test then took the early return and left
+            // the infinite chime blaring while the UI read "stopped".
+            if (!isPlaying()) {
                 root.title = Plasmoid.title;
                 root.currentStation = "";
                 root.currentStationFavicon = "";
