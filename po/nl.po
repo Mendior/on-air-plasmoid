@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-17 16:32+0300\n"
+"POT-Creation-Date: 2026-07-17 18:10+0300\n"
 "PO-Revision-Date: 2026-07-12 11:12\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Dutch\n"
@@ -15,502 +15,350 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/config/config.qml⁩:13
+#: /home/egon/Projects/on-air-plasmoid/package/contents/config/config.qml:13
 msgid "Stations"
 msgstr "Zenders"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/config/config.qml⁩:18
+#: /home/egon/Projects/on-air-plasmoid/package/contents/config/config.qml:18
 msgid "Appearance"
 msgstr "Uiterlijk"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/config/config.qml⁩:23
+#: /home/egon/Projects/on-air-plasmoid/package/contents/config/config.qml:23
 msgid "Recording"
 msgstr "Opname"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/config/config.qml⁩:28
+#: /home/egon/Projects/on-air-plasmoid/package/contents/config/config.qml:28
 msgid "Search"
 msgstr "Zoeken"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:50
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:50
 msgid "%1 — recording"
 msgstr "%1 — opname loopt"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:52
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:52
 msgid "%1 — playing %2"
 msgstr "%1 — speelt %2 af"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:86
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:37
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:37
 msgid "Audio"
 msgstr "Audio"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:86
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2286
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3497
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2286
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3509
 msgid "Volume"
 msgstr "Volume"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:87
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:87
 msgid "Muted"
 msgstr "Gedempt"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:42
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:42
 msgid "Default volume:"
 msgstr "Standaardvolume:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:61
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:61
 msgid "Smooth fade:"
 msgstr "Vloeiende overgang:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:62
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:62
 msgid "Fade volume when changing stations"
 msgstr "Volume vervagen bij het wisselen van station"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:67
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:67
 msgid "Fade duration (ms):"
 msgstr "Duur van de overgang (ms):"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:76
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:76
 msgid "Stream quality:"
 msgstr "Streamkwaliteit:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:77
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:77
 msgid "Automatically switch to the highest-bitrate variant of a station"
 msgstr "Automatisch overschakelen naar de variant met de hoogste bitrate"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:80
-msgid ""
-"Looks the station up on radio-browser.info and picks the best-quality stream"
-" URL"
-msgstr ""
-"Zoekt het station op via radio-browser.info en kiest de stream-URL met de "
-"beste kwaliteit"
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:80
+msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
+msgstr "Zoekt het station op via radio-browser.info en kiest de stream-URL met de beste kwaliteit"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:85
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:85
 msgid "Find a station's new address when its stream dies"
 msgstr "Zoek het nieuwe adres van een zender wanneer de stream sterft"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:88
-msgid ""
-"Stations move servers; when playback fails, the station is looked up on "
-"radio-browser.info and the address it is reachable at now is saved to your "
-"list"
-msgstr ""
-"Zenders wisselen van server; als het afspelen mislukt, wordt de zender "
-"opgezocht op radio-browser.info en wordt het nu werkende adres in je lijst "
-"opgeslagen"
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:88
+msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
+msgstr "Zenders wisselen van server; als het afspelen mislukt, wordt de zender opgezocht op radio-browser.info en wordt het nu werkende adres in je lijst opgeslagen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:93
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:93
 msgid "Count my listening in the worldwide station catalog"
 msgstr "Mijn luisteren meetellen in de wereldwijde zendercatalogus"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:96
-msgid ""
-"When a station starts playing, an anonymous click is reported to radio-"
-"browser.info (station id only, nothing about you) — popular stations become "
-"easier to find for everyone"
-msgstr ""
-"Wanneer een zender begint te spelen, wordt een anonieme klik gemeld aan "
-"radio-browser.info (alleen het zender-id, niets over jou) — populaire "
-"zenders zijn voor iedereen makkelijker te vinden"
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:96
+msgid "When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone"
+msgstr "Wanneer een zender begint te spelen, wordt een anonieme klik gemeld aan radio-browser.info (alleen het zender-id, niets over jou) — populaire zenders zijn voor iedereen makkelijker te vinden"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:104
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:104
 msgid "Visuals"
 msgstr "Uiterlijk"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:110
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:110
 msgid "Album art:"
 msgstr "Albumhoes:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:111
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:111
 msgid "Look up cover art via iTunes"
 msgstr "Albumhoezen opzoeken via iTunes"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:116
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:116
 msgid "Backdrop:"
 msgstr "Achtergrond:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:117
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:117
 msgid "Blurred album art behind now playing"
 msgstr "Vervaagde albumhoes achter het huidige nummer"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:123
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:123
 msgid "Accent color:"
 msgstr "Accentkleur:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:124
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:124
 msgid "Follow the system accent color instead of the built-in emerald"
-msgstr ""
-"De accentkleur van het systeem volgen in plaats van het ingebouwde "
-"smaragdgroen"
+msgstr "De accentkleur van het systeem volgen in plaats van het ingebouwde smaragdgroen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:132
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:132
 msgid "Integration"
 msgstr "Integratie"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:138
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:138
 msgid "System integration:"
 msgstr "Systeemintegratie:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:139
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:139
 msgid "Allow control via media keys (MPRIS)"
 msgstr "Bediening via mediatoetsen toestaan (MPRIS)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:147
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:147
 msgid "Downloads"
 msgstr "Downloads"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:153
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:27
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:153
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:27
 msgid "Format:"
 msgstr "Formaat:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:155
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:155
 msgid "Best quality (no re-encode)"
 msgstr "Beste kwaliteit (geen heromcodering)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:156
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:156
 msgid "MP3"
 msgstr "MP3"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:157
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:157
 msgid "Opus"
 msgstr "Opus"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:158
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:158
 msgid "MP4 (video)"
 msgstr "MP4 (video)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:168
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:168
 msgid "Save to folder:"
 msgstr "Opslaan in map:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:175
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:175
 msgid "Title cleanup:"
 msgstr "Titels opschonen:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:176
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:176
 msgid "Use Claude CLI to clean up messy titles before download (optional)"
-msgstr ""
-"Claude CLI gebruiken om rommelige titels op te schonen vóór het downloaden "
-"(optioneel)"
+msgstr "Claude CLI gebruiken om rommelige titels op te schonen vóór het downloaden (optioneel)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:184
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:184
 msgid "Behavior"
 msgstr "Gedrag"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:189
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:189
 msgid "Marquee speed:"
 msgstr "Scrollsnelheid:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:207
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:207
 msgid "Slower"
 msgstr "Langzamer"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:209
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:209
 msgid "Faster"
 msgstr "Sneller"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:215
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:215
 msgid "Panel click:"
 msgstr "Paneelklik:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:216
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:216
 msgid "Middle click to toggle last station"
 msgstr "Middelklik om het laatste station te schakelen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:220
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configAppearance.qml:220
 msgid "Middle-click the panel icon to play or stop the last station"
-msgstr ""
-"Middelklik op het paneelpictogram om het laatste station af te spelen of te "
-"stoppen"
+msgstr "Middelklik op het paneelpictogram om het laatste station af te spelen of te stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:135
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:135
 msgid "All stations already have a logo."
 msgstr "Alle stations hebben al een logo."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:149
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:149
 msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
-msgstr ""
-"Logo's ophalen voltooid: %1 / %2 stations bijgewerkt. Klik op Toepassen om "
-"op te slaan."
+msgstr "Logo's ophalen voltooid: %1 / %2 stations bijgewerkt. Klik op Toepassen om op te slaan."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:151
-msgid ""
-"Logo fetch complete: %1 / %2 stations updated (%3 could not be found "
-"automatically). Click Apply to save."
-msgstr ""
-"Logo's ophalen voltooid: %1 / %2 stations bijgewerkt (%3 niet automatisch "
-"gevonden). Klik op Toepassen om op te slaan."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:151
+msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
+msgstr "Logo's ophalen voltooid: %1 / %2 stations bijgewerkt (%3 niet automatisch gevonden). Klik op Toepassen om op te slaan."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:547
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:547
 msgid "No stations to refresh."
 msgstr "Geen stations om te vernieuwen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:632
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:632
 msgid "Edit"
 msgstr "Bewerken"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:640
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:640
 msgid "Hide"
 msgstr "Verbergen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:640
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:640
 msgid "Show"
 msgstr "Tonen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:650
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:650
 msgid "Remove"
 msgstr "Verwijderen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:770
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:502
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:770
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:502
 msgid "Add Station"
 msgstr "Station toevoegen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:770
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:770
 msgid "Edit station"
 msgstr "Station bewerken"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:817
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:683
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:817
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:683
 msgid "Name:"
 msgstr "Naam:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:823
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:823
 msgid "URL:"
 msgstr "URL:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:830
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:830
 msgid "Logo URL:"
 msgstr "Logo-URL:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:831
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:831
 msgid "e.g. https://example.com/logo.png"
 msgstr "bijv. https://example.com/logo.png"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:839
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:839
 msgid "Active"
 msgstr "Actief"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:915
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:915
 msgid "Configuration has been loaded. Click 'Apply' to save changes."
-msgstr ""
-"Configuratie geladen. Klik op 'Toepassen' om de wijzigingen op te slaan."
+msgstr "Configuratie geladen. Klik op 'Toepassen' om de wijzigingen op te slaan."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:917
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:917
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "Fout bij het laden van de configuratie. Probeer een ander bestand."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:921
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:921
 msgid "Your configuration was saved successfully."
 msgstr "Uw configuratie is opgeslagen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:923
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:923
 msgid "Error, make sure the selected directory is writable!"
 msgstr "Fout: controleer of de gekozen map schrijfbaar is!"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:983
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:983
 msgid "Add…"
 msgstr "Toevoegen…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:992
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:992
 msgid "Fetching… %1 / %2"
 msgstr "Ophalen… %1 / %2"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:993
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:993
 msgid "Fetch missing logos"
 msgstr "Ontbrekende logo's ophalen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1002
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1002
 msgid "Re-fetch all"
 msgstr "Alles opnieuw ophalen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1007
-msgid ""
-"Fetch fresh logos for all stations; existing logos are kept if nothing "
-"better is found"
-msgstr ""
-"Haalt nieuwe logo's op voor alle stations; bestaande logo's blijven behouden"
-" als er niets beters wordt gevonden"
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1007
+msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
+msgstr "Haalt nieuwe logo's op voor alle stations; bestaande logo's blijven behouden als er niets beters wordt gevonden"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1022
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1022
 msgid "Import…"
 msgstr "Importeren…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1028
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configGeneral.qml:1028
 msgid "Export…"
 msgstr "Exporteren…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:21
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:21
 msgid "Stream recording"
 msgstr "Streamopname"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:29
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:29
 msgid "Original stream (bit-exact copy, recommended)"
 msgstr "Originele stream (bit-exacte kopie, aanbevolen)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:30
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:30
 msgid "MP3 (re-encode — max compatibility)"
 msgstr "MP3 (heromcoderen — maximale compatibiliteit)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:31
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:31
 msgid "WAV (uncompressed — very large files)"
 msgstr "WAV (ongecomprimeerd — zeer grote bestanden)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:40
-msgid ""
-"Radio streams are already compressed — the bit-exact copy IS the maximum "
-"quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose "
-"them only for device compatibility or editing."
-msgstr ""
-"Radiostreams zijn al gecomprimeerd — de bit-exacte kopie IS de maximale "
-"kwaliteit. Heromcoderen (MP3) of uitpakken (WAV) voegt nooit kwaliteit toe; "
-"kies ze alleen voor compatibiliteit of bewerking."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:40
+msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
+msgstr "Radiostreams zijn al gecomprimeerd — de bit-exacte kopie IS de maximale kwaliteit. Heromcoderen (MP3) of uitpakken (WAV) voegt nooit kwaliteit toe; kies ze alleen voor compatibiliteit of bewerking."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:49
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:49
 msgid "Max length:"
 msgstr "Maximale duur:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:53
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2043
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:53
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2043
 msgid "%1 min"
 msgstr "%1 min"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:58
-msgid ""
-"A hard safety cap for one recording — protects the disk if you forget to "
-"stop."
-msgstr ""
-"Een harde veiligheidslimiet voor één opname — beschermt de schijf als u "
-"vergeet te stoppen."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:58
+msgid "A hard safety cap for one recording — protects the disk if you forget to stop."
+msgstr "Een harde veiligheidslimiet voor één opname — beschermt de schijf als u vergeet te stoppen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:70
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1839
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:70
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1839
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1930
 msgid "Scheduled recordings"
 msgstr "Geplande opnamen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:75
-msgid ""
-"Schedules are managed in the widget itself: open the popup, press the music-"
-"note button in the footer to open My Music, then press the stopwatch button "
-"next to \"My Music\". Pick a station, start time, duration and repeat (once "
-"/ daily / weekly) — the widget records in the background, even while nothing"
-" is playing."
-msgstr ""
-"Planningen beheert u in de widget zelf: open de pop-up, druk op de "
-"muzieknootknop onderaan om Mijn muziek te openen en druk dan op de "
-"stopwatchknop naast \"Mijn muziek\". Kies een station, starttijd, duur en "
-"herhaling (eenmalig / dagelijks / wekelijks) — de widget neemt op de "
-"achtergrond op, ook als er niets speelt."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:75
+msgid "Schedules are managed in the widget itself: open the popup, press the music-note button in the footer to open My Music, then press the stopwatch button next to \"My Music\". Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing."
+msgstr "Planningen beheert u in de widget zelf: open de pop-up, druk op de muzieknootknop onderaan om Mijn muziek te openen en druk dan op de stopwatchknop naast \"Mijn muziek\". Kies een station, starttijd, duur en herhaling (eenmalig / dagelijks / wekelijks) — de widget neemt op de achtergrond op, ook als er niets speelt."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:82
-msgid ""
-"Recordings are saved to your music folder and are for personal use only — do"
-" not redistribute them."
-msgstr ""
-"Opnamen worden opgeslagen in uw muziekmap en zijn alleen voor persoonlijk "
-"gebruik — verspreid ze niet."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configRecording.qml:82
+msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
+msgstr "Opnamen worden opgeslagen in uw muziekmap en zijn alleen voor persoonlijk gebruik — verspreid ze niet."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:136
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:194
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:599
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:136
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:194
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:599
 msgid ""
 "Get list of stations\n"
 "Please wait…"
@@ -518,8 +366,7 @@ msgstr ""
 "Stationslijst ophalen\n"
 "Even geduld…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:193
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:193
 msgid ""
 "Nothing found\n"
 "Try changing your query"
@@ -527,486 +374,379 @@ msgstr ""
 "Niets gevonden\n"
 "Probeer uw zoekopdracht aan te passen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:206
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:219
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:206
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:219
 msgid "Error: Could not connect to API servers"
 msgstr "Fout: kon geen verbinding maken met de API-servers"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:334
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:334
 msgid "Search Station"
 msgstr "Station zoeken"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:340
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:340
 msgid "Search by"
 msgstr "Zoeken op"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:347
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:347
 msgid "name"
 msgstr "naam"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:348
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:348
 msgid "country"
 msgstr "land"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:349
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:349
 msgid "language"
 msgstr "taal"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:350
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:350
 msgid "tags"
 msgstr "labels"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:472
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:472
 msgid "%1 kBit/s"
 msgstr "%1 kbit/s"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:485
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:485
 msgid "Info"
 msgstr "Info"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:527
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:527
 msgid "Station is added. Click 'Apply' to save changes."
-msgstr ""
-"Station toegevoegd. Klik op 'Toepassen' om de wijzigingen op te slaan."
+msgstr "Station toegevoegd. Klik op 'Toepassen' om de wijzigingen op te slaan."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:542
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1352
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:542
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1352
 msgid "Stop"
 msgstr "Stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:542
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1352
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:542
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1352
 msgid "Play"
 msgstr "Afspelen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:645
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:645
 msgid "Search…"
 msgstr "Zoeken…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:655
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:655
 msgid "Clear Results"
 msgstr "Resultaten wissen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:677
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:677
 msgid "Station Info"
 msgstr "Stationsinfo"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:695
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:695
 msgid "Favicon:"
 msgstr "Favicon:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:707
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:707
 msgid "Homepage:"
 msgstr "Website:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:717
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:717
 msgid "Stream URL:"
 msgstr "Stream-URL:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:731
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:731
 msgid "OK"
 msgstr "OK"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:733
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:733
 msgid "Error"
 msgstr "Fout"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:740
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:740
 msgid "Server status:"
 msgstr "Serverstatus:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:751
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:751
 msgid "%1 (last check: %2)"
 msgstr "%1 (laatste controle: %2)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:772
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:772
 msgid "Codec:"
 msgstr "Codec:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:783
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:783
 msgid "Bitrate:"
 msgstr "Bitrate:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:789
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:789
 msgid "kBit/s"
 msgstr "kbit/s"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:801
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:801
 msgid "Country:"
 msgstr "Land:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:810
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:810
 msgid "Language:"
 msgstr "Taal:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:819
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:819
 msgid "Tags:"
 msgstr "Labels:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:851
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2763
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/config/configSearch.qml:851
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2763
 msgid "Error: %1"
 msgstr "Fout: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:460
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:460
 msgid "Search station or country… (e.g. Finland, jazz)"
 msgstr "Zoek een station of land… (bijv. Nederland, jazz)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:481
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:481
 msgid "Show all stations"
 msgstr "Alle stations tonen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:481
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:481
 msgid "Show only favorites"
 msgstr "Alleen favorieten tonen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:500
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:500
 msgid "All"
 msgstr "Alles"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:501
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:501
 msgid "Genre"
 msgstr "Genre"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:502
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:502
 msgid "Country"
 msgstr "Land"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:503
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:503
 msgid "Language"
 msgstr "Taal"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:519
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:519
 msgid "Top voted"
 msgstr "Best beoordeeld"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:520
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:520
 msgid "Trending"
 msgstr "Trending"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:521
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:521
 msgid "Bitrate"
 msgstr "Bitrate"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:538
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:538
 msgid "Trending now"
 msgstr "Nu trending"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:554
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:554
 msgid "Search again — right-click removes this entry"
 msgstr "Opnieuw zoeken — rechtsklik verwijdert dit item"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:568
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:568
 msgid "Clear search history"
 msgstr "Zoekgeschiedenis wissen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:698
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:698
 msgid "Searching the web…"
 msgstr "Zoeken op het web…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:699
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:699
 msgid "From the web"
 msgstr "Van het web"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:699
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1668
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1828
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:699
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1668
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1828
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:732
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:732
 msgid "Stop preview: %1"
 msgstr "Voorbeeld stoppen: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:733
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:733
 msgid "Preview: %1"
 msgstr "Voorbeeld: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:813
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1232
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:813
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1232
 msgid "%1 kb/s"
 msgstr "%1 kb/s"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:859
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1409
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:859
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1409
 msgid "Add to my stations + favorites"
 msgstr "Toevoegen aan mijn stations + favorieten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:874
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:874
 msgid "Click = stop preview"
 msgstr "Klik = voorbeeld stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:875
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:875
 msgid "Click = preview · ⭐ = add to my stations"
 msgstr "Klik = voorbeeld · ⭐ = toevoegen aan mijn stations"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:884
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:884
 msgid "Show more results"
 msgstr "Meer resultaten tonen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:911
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:911
 msgid "No favorite stations yet"
 msgstr "Nog geen favoriete stations"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:913
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:913
 msgid "The station directory is not reachable"
 msgstr "De zendergids is niet bereikbaar"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:914
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:914
 msgid "No matching stations"
 msgstr "Geen overeenkomende stations"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:914
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:914
 msgid "No stations"
 msgstr "Geen stations"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:927
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:927
 msgid "Tap the heart on a station to add it here"
 msgstr "Tik op het hartje van een station om het hier toe te voegen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:929
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:929
 msgid "Check the connection and type to search again"
 msgstr "Controleer de verbinding en typ om opnieuw te zoeken"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:930
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:930
 msgid "Try a different search term"
 msgstr "Probeer een andere zoekterm"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1211
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1211
 msgid "LIVE"
 msgstr "LIVE"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1317
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1317
 msgid "Nothing playing"
 msgstr "Er speelt niets"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1334
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1334
 msgid "Previous station"
 msgstr "Vorig station"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1372
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1372
 msgid "Next station"
 msgstr "Volgend station"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1395
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1395
 msgid "Search this track on YouTube"
 msgstr "Dit nummer zoeken op YouTube"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1410
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:354
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1410
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:354
 msgid "Remove from favorites"
 msgstr "Verwijderen uit favorieten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1410
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:354
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1410
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:354
 msgid "Add to favorites"
 msgstr "Toevoegen aan favorieten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1437
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1796
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1437
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1796
 msgid "Remove from liked songs"
 msgstr "Verwijderen uit gelikete nummers"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1438
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1438
 msgid "Like this song (saved to My Music)"
 msgstr "Dit nummer liken (opgeslagen in Mijn muziek)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1456
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1456
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Stem verzonden — bedankt voor het steunen van de zender!"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1457
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1457
 msgid "Sending the vote…"
 msgstr "Stem wordt verzonden…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1458
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1458
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Stem op deze zender in de wereldwijde catalogus"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1477
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2755
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1477
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2755
 msgid "Downloading…"
 msgstr "Downloaden…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1478
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1478
 msgid "Download this track (for offline listening)"
 msgstr "Dit nummer downloaden (voor offline luisteren)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1503
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1503
 msgid "A scheduled recording is running (%1)"
 msgstr "Er loopt een geplande opname (%1)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1505
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1505
 msgid "Recording %1 — click to stop"
 msgstr "Opname van %1 — klik om te stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1507
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2090
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1507
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2090
 msgid "This source cannot be recorded"
 msgstr "Deze bron kan niet worden opgenomen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1508
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1508
 msgid "Record this station (personal use only)"
 msgstr "Dit station opnemen (alleen persoonlijk gebruik)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1592
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1592
 msgid "Downloading: %1"
 msgstr "Downloaden: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1645
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1645
 msgid "Stop recording"
 msgstr "Opname stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1669
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1669
 msgid "Liked songs"
 msgstr "Gelikete nummers"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1669
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1669
 msgid "Recently played"
 msgstr "Onlangs afgespeeld"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1684
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1684
 msgid "Show play history"
 msgstr "Afspeelgeschiedenis tonen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1685
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1685
 msgid "Show liked songs"
 msgstr "Gelikete nummers tonen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1695
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1695
 msgid "Clear history"
 msgstr "Geschiedenis wissen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1726
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1726
 msgid "Search YouTube for %1"
 msgstr "%1 zoeken op YouTube"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1785
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1785
 msgid "Download this track"
 msgstr "Dit nummer downloaden"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1809
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1809
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klik = zoeken op YouTube · ⬇ = downloaden"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1828
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/Heading.qml⁩:24
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1400
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1828
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:24
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1441
 msgid "My Music"
 msgstr "Mijn muziek"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1869
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2147
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1869
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2147
 msgid "Wake-up alarms"
 msgstr "Wekkers"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1897
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1897
 msgid "Open folder in file manager"
 msgstr "Map openen in bestandsbeheer"
 
@@ -1018,1091 +758,759 @@ msgstr "Map openen in bestandsbeheer"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1955
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2063
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2172
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2267
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Sun"
 msgstr "zo"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1955
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2063
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2172
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2267
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Mon"
 msgstr "ma"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1955
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2063
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2172
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2267
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Tue"
 msgstr "di"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1955
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2063
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2172
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2267
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1955
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2063
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2172
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2267
 msgid "Wed"
 msgstr "wo"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1956
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2064
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2173
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2268
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1956
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2064
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2173
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2268
 msgid "Thu"
 msgstr "do"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1956
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2064
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2173
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2268
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1956
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2064
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2173
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2268
 msgid "Fri"
 msgstr "vr"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1956
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2064
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2173
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2268
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1956
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2064
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2173
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2268
 msgid "Sat"
 msgstr "za"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1958
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2056
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2175
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2259
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1958
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2175
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
 msgid "Daily"
 msgstr "Dagelijks"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1959
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2176
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1959
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2176
 msgid "Every %1"
 msgstr "Elke %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1974
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1974
 msgid "Remove this schedule"
 msgstr "Deze planning verwijderen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1982
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1982
 msgid "No scheduled recordings yet — add one below."
 msgstr "Nog geen geplande opnamen — voeg er hieronder een toe."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1997
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2214
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:1997
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2214
 msgid "Station:"
 msgstr "Station:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2005
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2222
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2005
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2222
 msgid "Station"
 msgstr "Station"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2009
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2226
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2009
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2226
 msgid "Start:"
 msgstr "Start:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2020
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2237
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2020
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2237
 msgid "Start hour"
 msgstr "Startuur"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2030
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2247
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2030
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2247
 msgid "Start minute"
 msgstr "Startminuut"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2035
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2035
 msgid "Duration:"
 msgstr "Duur:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2045
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2045
 msgid "Duration in minutes"
 msgstr "Duur in minuten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2049
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2252
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2049
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2252
 msgid "Repeat:"
 msgstr "Herhalen:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2056
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2259
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
 msgid "Once"
 msgstr "Eenmalig"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2056
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2259
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2056
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2259
 msgid "Weekly"
 msgstr "Wekelijks"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2057
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2261
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2057
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2261
 msgid "Repeat"
 msgstr "Herhalen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2066
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2270
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2066
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2270
 msgid "Weekday"
 msgstr "Weekdag"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2077
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2077
 msgid "Recordings are for personal use only."
 msgstr "Opnamen zijn alleen voor persoonlijk gebruik."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2102
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2303
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2102
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2303
 msgid "Add"
 msgstr "Toevoegen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2191
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2191
 msgid "Remove this alarm"
 msgstr "Verwijder deze wekker"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2199
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2199
 msgid "No alarms yet — add one below."
 msgstr "Nog geen wekkers — voeg er hieronder een toe."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2275
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2275
 msgid "Volume:"
 msgstr "Volume:"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2297
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2297
 msgid "Keep the computer awake until the alarm"
 msgstr "Houd de computer wakker tot de wekker"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2358
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2358
 msgid "Stop: %1"
 msgstr "Stoppen: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2358
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2358
 msgid "Play: %1"
 msgstr "Afspelen: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2443
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2443
 msgid "Click again to confirm delete"
 msgstr "Klik nogmaals om het verwijderen te bevestigen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2443
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2443
 msgid "Delete file"
 msgstr "Bestand verwijderen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2499
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2499
 msgid "Nothing here yet"
 msgstr "Nog niets hier"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2510
-msgid ""
-"When a good song plays on the radio, press ⬇ — it will be saved here for "
-"offline listening"
-msgstr ""
-"Als er een goed nummer op de radio komt, druk op ⬇ — het wordt hier "
-"opgeslagen voor offline luisteren"
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2510
+msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
+msgstr "Als er een goed nummer op de radio komt, druk op ⬇ — het wordt hier opgeslagen voor offline luisteren"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2664
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2664
 msgid "My Music (downloaded tracks)"
 msgstr "Mijn muziek (gedownloade nummers)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2678
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2678
 msgid "Sleep timer: %1"
 msgstr "Slaaptimer: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2679
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2679
 msgid "Sleep timer"
 msgstr "Slaaptimer"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2711
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2711
 msgid "Sleep in 15 minutes"
 msgstr "Slapen over 15 minuten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2712
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2712
 msgid "Sleep in 30 minutes"
 msgstr "Slapen over 30 minuten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2713
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2713
 msgid "Sleep in 60 minutes"
 msgstr "Slapen over 60 minuten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2714
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2714
 msgid "Sleep in 90 minutes"
 msgstr "Slapen over 90 minuten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2717
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2717
 msgid "Cancel timer"
 msgstr "Timer annuleren"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2752
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2752
 msgid "Sleeping in %1"
 msgstr "Slaapt over %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2758
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:66
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2758
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:66
 msgid "Casting to %1"
 msgstr "Casten naar %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2761
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2761
 msgid "Check internet connection…"
 msgstr "Controleer de internetverbinding…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2766
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2766
 msgid "Bitrate: %1 kb/s"
 msgstr "Bitrate: %1 kb/s"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2771
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2771
 msgid "Playing"
 msgstr "Speelt af"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2771
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2774
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2771
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2774
 msgid "Connecting…"
 msgstr "Verbinden…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2776
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2776
 msgid "Choose station and enjoy…"
 msgstr "Kies een station en geniet…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2795
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2795
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Casten naar %1 — klik om te kiezen of te stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2796
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2796
 msgid "Play on a device (Chromecast, TV, speaker)"
 msgstr "Afspelen op een apparaat (Chromecast, tv, speaker)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2868
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2880
 msgid "Play on"
 msgstr "Afspelen op"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2881
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2893
 msgid "This computer"
 msgstr "Deze computer"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2905
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2917
 msgid "System default output"
 msgstr "Standaard systeemuitvoer"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2932
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2944
 msgid "All local outputs, in sync"
 msgstr "Alle lokale uitgangen, synchroon"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2949
-msgid ""
-"Plays on every connected speaker at the same time — wired outputs are "
-"delayed to stay in step with Bluetooth."
-msgstr ""
-"Speelt tegelijk op elke aangesloten luidspreker — bekabelde uitgangen worden"
-" vertraagd om gelijk te lopen met Bluetooth."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2961
+msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
+msgstr "Speelt tegelijk op elke aangesloten luidspreker — bekabelde uitgangen worden vertraagd om gelijk te lopen met Bluetooth."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2963
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2970
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2975
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2982
 msgid "Sync fine-tune"
 msgstr "Sync-fijnafstelling"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2980
-msgid ""
-"If the Bluetooth speaker still trails the wired ones, raise this until they "
-"play together."
-msgstr ""
-"Loopt de Bluetooth-luidspreker nog achter op de bekabelde, verhoog dit tot "
-"ze samen spelen."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2992
+msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
+msgstr "Loopt de Bluetooth-luidspreker nog achter op de bekabelde, verhoog dit tot ze samen spelen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2992
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3004
 msgid "Sync delay in milliseconds"
 msgstr "Synchronisatievertraging in milliseconden"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3014
-msgid ""
-"Type an exact delay in milliseconds — the slider moves in steps of ten."
-msgstr ""
-"Typ een exacte vertraging in milliseconden — de schuifregelaar beweegt in "
-"stappen van tien."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3026
+msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
+msgstr "Typ een exacte vertraging in milliseconden — de schuifregelaar beweegt in stappen van tien."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3018
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3030
 msgid "ms"
 msgstr "ms"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3032
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3044
 msgid "Calibrate with the microphone"
 msgstr "Kalibreren met de microfoon"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3037
-msgid ""
-"Plays a few loud clicks through each speaker and measures with the "
-"microphone how far the Bluetooth speaker trails — the delay is set "
-"automatically."
-msgstr ""
-"Speelt een paar luide klikken door elke luidspreker en meet met de microfoon"
-" hoeveel de Bluetooth-luidspreker achterloopt — de vertraging wordt "
-"automatisch ingesteld."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3049
+msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
+msgstr "Speelt een paar luide klikken door elke luidspreker en meet met de microfoon hoeveel de Bluetooth-luidspreker achterloopt — de vertraging wordt automatisch ingesteld."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3057
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3069
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Ronde 1 van 2 — klikken door elke luidspreker…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3058
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3070
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Ronde 2 van 2 — stil, resultaat wordt gecontroleerd…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3096
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3108
 msgid "%1 plays in the group"
 msgstr "%1 speelt in de groep"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3109
-msgid ""
-"Whether this speaker plays in the group — untick to leave it out without "
-"disconnecting it. Remembered for the device."
-msgstr ""
-"Of deze luidspreker in de groep meespeelt — vink uit om hem over te slaan "
-"zonder de verbinding te verbreken. Onthouden voor het apparaat."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3121
+msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
+msgstr "Of deze luidspreker in de groep meespeelt — vink uit om hem over te slaan zonder de verbinding te verbreken. Onthouden voor het apparaat."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3118
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3130
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (niets aangesloten)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3132
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3144
 msgid "Balance of %1"
 msgstr "Balans van %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3141
-msgid ""
-"This speaker's share of the volume — the balance follows every master move "
-"and is remembered for the device. It scales only what this widget plays; the"
-" per-device volume in the system's audio settings is a separate, untouched "
-"layer — which is why those numbers differ from these sliders."
-msgstr ""
-"Het aandeel van deze luidspreker in het volume — de balans volgt elke "
-"beweging van de hoofdregelaar en wordt voor het apparaat onthouden. Hij "
-"werkt alleen op wat deze widget afspeelt; het volume per apparaat in de "
-"systeeminstellingen is een aparte, onaangeroerde laag — daarom wijken die "
-"getallen af van deze schuifregelaars."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3153
+msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
+msgstr "Het aandeel van deze luidspreker in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden. Hij werkt alleen op wat deze widget afspeelt; het volume per apparaat in de systeeminstellingen is een aparte, onaangeroerde laag — daarom wijken die getallen af van deze schuifregelaars."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3158
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3170
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3159
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3171
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3160
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3172
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3161
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3173
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3166
-msgid ""
-"Which channels this speaker plays: stereo, left only, right only, or a mono "
-"mix of both. Set one speaker to L and another to R for a true stereo pair — "
-"remembered for the device."
-msgstr ""
-"Welke kanalen deze luidspreker speelt: stereo, alleen links, alleen rechts "
-"of een monomix van beide. Zet één luidspreker op L en een andere op R voor "
-"een echt stereopaar — onthouden voor het apparaat."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3178
+msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
+msgstr "Welke kanalen deze luidspreker speelt: stereo, alleen links, alleen rechts of een monomix van beide. Zet één luidspreker op L en een andere op R voor een echt stereopaar — onthouden voor het apparaat."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3196
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3208
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3211
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3223
 msgid "Bluetooth is off or no adapter is available — check System Settings."
-msgstr ""
-"Bluetooth staat uit of er is geen adapter beschikbaar — controleer "
-"Systeeminstellingen."
+msgstr "Bluetooth staat uit of er is geen adapter beschikbaar — controleer Systeeminstellingen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3222
-msgid ""
-"No paired Bluetooth audio devices — pair the speaker once in System Settings"
-" and it appears here."
-msgstr ""
-"Geen gekoppelde Bluetooth-audioapparaten — koppel de luidspreker eenmalig in"
-" Systeeminstellingen en hij verschijnt hier."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3234
+msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
+msgstr "Geen gekoppelde Bluetooth-audioapparaten — koppel de luidspreker eenmalig in Systeeminstellingen en hij verschijnt hier."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3236
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3248
 msgid "%1 — connecting…"
 msgstr "%1 — verbinden…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3254
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3266
 msgid "%1 — pairing…"
 msgstr "%1 — koppelen…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3255
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3267
 msgid "%1 — new, click to pair"
 msgstr "%1 — nieuw, klik om te koppelen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3266
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3278
 msgid "Pair a new speaker…"
 msgstr "Nieuwe luidspreker koppelen…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3282
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3294
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Zoeken — zet de luidspreker in koppelmodus…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3303
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3315
 msgid "WiFi & network"
 msgstr "WiFi & netwerk"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3335
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3347
 msgid "%1 (speaker group)"
 msgstr "%1 (luidsprekergroep)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3363
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3375
 msgid "Balance"
 msgstr "Balans"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3377
-msgid ""
-"This device's share of the volume — the balance follows every master move "
-"and is remembered for the device."
-msgstr ""
-"Het aandeel van dit apparaat in het volume — de balans volgt elke beweging "
-"van de hoofdregelaar en wordt voor het apparaat onthouden."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3389
+msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
+msgstr "Het aandeel van dit apparaat in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3399
-msgid ""
-"Each device buffers on its own, so rooms may play a few seconds apart. For "
-"perfectly synced speakers, group them in the Google Home app — the group "
-"appears here as a single device."
-msgstr ""
-"Elk apparaat buffert de stream zelf, waardoor kamers enkele seconden uit "
-"elkaar kunnen lopen. Groepeer luidsprekers in de Google Home-app voor "
-"perfecte synchronisatie — de groep verschijnt hier als één apparaat."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3411
+msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
+msgstr "Elk apparaat buffert de stream zelf, waardoor kamers enkele seconden uit elkaar kunnen lopen. Groepeer luidsprekers in de Google Home-app voor perfecte synchronisatie — de groep verschijnt hier als één apparaat."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3409
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3421
 msgid "Stop casting everywhere"
 msgstr "Casten overal stoppen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3427
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3439
 msgid "Searching for devices…"
 msgstr "Zoeken naar apparaten…"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3436
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3448
 msgid "No devices found on your network"
 msgstr "Geen apparaten gevonden in uw netwerk"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3458
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3470
 msgid "Volume: %1% (scroll to adjust)"
 msgstr "Volume: %1% (scroll om aan te passen)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/Heading.qml⁩:37
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:37
 msgid "Back to stations"
 msgstr "Terug naar stations"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/Heading.qml⁩:126
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/Heading.qml:126
 msgid "Show now playing"
 msgstr "Huidig nummer tonen"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:893
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:934
 msgid "Scheduled recording started"
 msgstr "Geplande opname gestart"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1009
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1050
 msgid "Scheduled recording missed"
 msgstr "Geplande opname gemist"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1015
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1056
 msgid "Scheduled recording skipped"
 msgstr "Geplande opname overgeslagen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1016
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1057
 msgid "%1 — another recording is already running."
 msgstr "%1 — er loopt al een andere opname."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1143
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1184
 msgid "Wake-up alarm missed"
 msgstr "Wekker gemist"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1144
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1185
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
-msgstr ""
-"%1 stond ingesteld op %2 — de computer was op dat moment uit of in "
-"slaapstand."
+msgstr "%1 stond ingesteld op %2 — de computer was op dat moment uit of in slaapstand."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1178
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1243
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1296
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1299
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1219
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1284
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1337
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1340
 msgid "Wake-up alarm"
 msgstr "Wekker"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1179
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1220
 msgid "%1 came due at the same time — playing %2 instead."
-msgstr ""
-"%1 was op hetzelfde moment aan de beurt — in plaats daarvan speelt %2."
+msgstr "%1 was op hetzelfde moment aan de beurt — in plaats daarvan speelt %2."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1300
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1341
 msgid "The station could not start — playing the built-in tone instead."
-msgstr ""
-"De zender kon niet starten — in plaats daarvan speelt de ingebouwde wektoon."
+msgstr "De zender kon niet starten — in plaats daarvan speelt de ingebouwde wektoon."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1814
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:1855
 msgid "%1 devices"
 msgstr "%1 apparaten"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2463
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2249
+msgid "The Bluetooth speaker"
+msgstr "De Bluetooth-speaker"
+
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2248
+msgid "%1 is connected, but its sound never arrived"
+msgstr "%1 is verbonden, maar het geluid kwam nooit aan"
+
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2250
+msgid "Turn the speaker off and on again, then reconnect it."
+msgstr "Zet de speaker uit en weer aan en verbind hem opnieuw."
+
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2578
 msgid "Station seems to be off the air"
 msgstr "De zender lijkt uit de lucht te zijn"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2464
-msgid ""
-"%1 is not answering at any address the directory knows. It stays in your "
-"list — trying again in the background."
-msgstr ""
-"%1 antwoordt op geen enkel adres dat de gids kent. De zender blijft in je "
-"lijst — op de achtergrond wordt het opnieuw geprobeerd."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2579
+msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
+msgstr "%1 antwoordt op geen enkel adres dat de gids kent. De zender blijft in je lijst — op de achtergrond wordt het opnieuw geprobeerd."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2534
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2649
 msgid "Playing from a backup address"
 msgstr "Speelt af via een reserveadres"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2535
-msgid ""
-"The station's saved address is not answering — playing the directory's "
-"closest match for now. Your saved address was kept."
-msgstr ""
-"Het opgeslagen adres van de zender antwoordt niet — voorlopig speelt de "
-"dichtstbijzijnde treffer uit de gids. Je opgeslagen adres is bewaard."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2650
+msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
+msgstr "Het opgeslagen adres van de zender antwoordt niet — voorlopig speelt de dichtstbijzijnde treffer uit de gids. Je opgeslagen adres is bewaard."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2564
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2679
 msgid "Station found at a new address"
 msgstr "Zender gevonden op een nieuw adres"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2565
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:2680
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 is verhuisd — het nieuwe adres is in je lijst opgeslagen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3650
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3779
 msgid "Casting needs python-chromecast"
 msgstr "Casten vereist python-chromecast"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3651
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3780
 msgid "Install the python-chromecast package to cast to your devices."
-msgstr ""
-"Installeer het pakket python-chromecast om naar uw apparaten te casten."
+msgstr "Installeer het pakket python-chromecast om naar uw apparaten te casten."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3654
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3783
 msgid "the device"
 msgstr "het apparaat"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3654
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3783
 msgid "Could not cast to %1"
 msgstr "Kon niet casten naar %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3655
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3784
 msgid "The device could not play this station."
 msgstr "Het apparaat kon dit station niet afspelen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3747
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3820
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3876
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3970
 msgid "the Bluetooth device"
 msgstr "het Bluetooth-apparaat"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3746
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3875
 msgid "Could not connect to %1"
 msgstr "Kon geen verbinding maken met %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3748
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3877
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Controleer of de luidspreker aanstaat en binnen bereik is."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3819
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3969
 msgid "Could not pair with %1"
 msgstr "Koppelen met %1 mislukt"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3821
-msgid ""
-"Put the speaker in pairing mode (hold its Bluetooth button) and try again."
-msgstr ""
-"Zet de luidspreker in koppelmodus (houd de Bluetooth-knop ingedrukt) en "
-"probeer opnieuw."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:3971
+msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
+msgstr "Zet de luidspreker in koppelmodus (houd de Bluetooth-knop ingedrukt) en probeer opnieuw."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3911
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4061
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg is niet geïnstalleerd"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3912
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4062
 msgid "Install ffmpeg to record radio."
 msgstr "Installeer ffmpeg om radio op te nemen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3915
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4065
 msgid "Recording saved ✓ (%1)"
 msgstr "Opname opgeslagen ✓ (%1)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3919
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4069
 msgid "Recording interrupted (%1 captured)"
 msgstr "Opname onderbroken (%1 vastgelegd)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3921
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4071
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — het bestand is veel kleiner dan verwacht."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3925
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4075
 msgid "Recording failed"
 msgstr "Opname mislukt"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3926
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4076
 msgid "The stream could not be captured."
 msgstr "De stream kon niet worden vastgelegd."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4010
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4160
 msgid "Downloading again without the cover"
 msgstr "Opnieuw downloaden zonder de hoes"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4011
-msgid ""
-"Embedding tags needs the python-mutagen package — install it to get covers "
-"in your files."
-msgstr ""
-"Voor het insluiten van tags is het pakket python-mutagen nodig — installeer "
-"het om hoezen in je bestanden te krijgen."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4161
+msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
+msgstr "Voor het insluiten van tags is het pakket python-mutagen nodig — installeer het om hoezen in je bestanden te krijgen."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4019
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4169
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp is niet geïnstalleerd"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4020
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4170
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installeer yt-dlp (en ffmpeg) om nummers te downloaden."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4023
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4173
 msgid "Track downloaded ✓"
 msgstr "Nummer gedownload ✓"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4024
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4174
 msgid "Saved to: %1"
 msgstr "Opgeslagen in: %1"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4027
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4177
 msgid "Download failed"
 msgstr "Download mislukt"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4028
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4178
 msgid "Unknown error"
 msgstr "Onbekende fout"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4335
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4455
 msgid "Audio output changed"
 msgstr "Audio-uitvoer gewijzigd"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4336
-msgid ""
-"The chosen output device disappeared — using the system default instead."
-msgstr ""
-"Het gekozen uitvoerapparaat is verdwenen — in plaats daarvan wordt de "
-"systeemstandaard gebruikt."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/main.qml:4456
+msgid "The chosen output device disappeared — using the system default instead."
+msgstr "Het gekozen uitvoerapparaat is verdwenen — in plaats daarvan wordt de systeemstandaard gebruikt."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:261
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:261
 msgid "Move up"
 msgstr "Omhoog"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:285
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:285
 msgid "Move down"
 msgstr "Omlaag"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:317
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:317
 msgid "Click again to confirm removal"
 msgstr "Klik nogmaals om het verwijderen te bevestigen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:318
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/MediaListItem.qml:318
 msgid "Remove station from list"
 msgstr "Station uit de lijst verwijderen"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:197
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:280
 msgid "Could not combine the outputs"
 msgstr "Kon de uitgangen niet combineren"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:198
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:281
 msgid "pactl refused to create the combined output."
 msgstr "pactl weigerde de gecombineerde uitgang aan te maken."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:417
-msgid ""
-"The Bluetooth speaker trails by %1 ms, and every speaker's loudness was "
-"matched at the microphone — all set and remembered."
-msgstr ""
-"De Bluetooth-luidspreker loopt %1 ms achter, en het volume van alle "
-"luidsprekers is bij de microfoon gelijkgetrokken — alles ingesteld en "
-"onthouden."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:535
+msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
+msgstr "De Bluetooth-luidspreker loopt %1 ms achter, en het volume van alle luidsprekers is bij de microfoon gelijkgetrokken — alles ingesteld en onthouden."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:418
-msgid ""
-"The Bluetooth speaker trails by %1 ms — the delay is set and remembered for "
-"this device."
-msgstr ""
-"De Bluetooth-luidspreker loopt %1 ms achter — de vertraging is ingesteld en "
-"onthouden voor dit apparaat."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:536
+msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
+msgstr "De Bluetooth-luidspreker loopt %1 ms achter — de vertraging is ingesteld en onthouden voor dit apparaat."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:420
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:538
 msgid "Balance levels set earlier were replaced by the measured ones."
-msgstr ""
-"Eerder ingestelde balansniveaus zijn vervangen door de gemeten niveaus."
+msgstr "Eerder ingestelde balansniveaus zijn vervangen door de gemeten niveaus."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:428
-msgid ""
-"The microphone clipped on %1 — that balance was left unchanged; lower the "
-"speaker's volume and calibrate again."
-msgstr ""
-"De microfoon sloeg over bij %1 — die balans bleef ongewijzigd; zet de "
-"luidspreker zachter en kalibreer opnieuw."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:546
+msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
+msgstr "De microfoon sloeg over bij %1 — die balans bleef ongewijzigd; zet de luidspreker zachter en kalibreer opnieuw."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:429
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:547
 msgid "Speakers calibrated"
 msgstr "Luidsprekers gekalibreerd"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:439
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:567
 msgid "Calibration"
 msgstr "Kalibratie"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:440
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:568
 msgid "The clicks were too quiet for this room — trying once more, louder."
 msgstr "De klikken waren te zacht voor deze kamer — nog één poging, luider."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:452
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:580
 msgid "Calibration did not succeed"
 msgstr "Kalibratie is niet gelukt"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:453
-msgid ""
-"Make sure the microphone is not covered and both speakers can be heard, then"
-" try again."
-msgstr ""
-"Zorg dat de microfoon niet is afgedekt en beide luidsprekers hoorbaar zijn, "
-"en probeer het opnieuw."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:581
+msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
+msgstr "Zorg dat de microfoon niet is afgedekt en beide luidsprekers hoorbaar zijn, en probeer het opnieuw."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:502
-msgid ""
-"The speakers were %1 ms apart — adjusted from the measurement, checking once"
-" more."
-msgstr ""
-"De luidsprekers zaten %1 ms uit elkaar — bijgesteld op basis van de meting, "
-"wordt nogmaals gecontroleerd."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:637
+msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
+msgstr "De luidsprekers zaten %1 ms uit elkaar — bijgesteld op basis van de meting, wordt nogmaals gecontroleerd."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:517
-msgid ""
-"A speaker's route was stuck %1 ms behind — flushed it, checking once more."
-msgstr ""
-"De route van een luidspreker zat %1 ms vast — doorgespoeld, wordt nogmaals "
-"gecontroleerd."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:652
+msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
+msgstr "De route van een luidspreker zat %1 ms vast — doorgespoeld, wordt nogmaals gecontroleerd."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:527
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:541
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:560
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:566
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:579
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:662
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:682
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:710
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:715
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:722
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:735
 msgid "Sync check"
 msgstr "Synchronisatiecontrole"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:542
-msgid ""
-"The room was not quiet enough to verify — pause other audio and calibrate "
-"once more."
-msgstr ""
-"De kamer was niet stil genoeg om te verifiëren — pauzeer andere audio en "
-"kalibreer nogmaals."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:683
+msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
+msgstr "De kamer was niet stil genoeg om te verifiëren — pauzeer andere audio en kalibreer nogmaals."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:561
-msgid ""
-"%1 stayed silent through both rounds — it was left out of the group. Tick it"
-" back in the speaker list any time."
-msgstr ""
-"%1 bleef in beide rondes stil — het is buiten de groep gelaten. Vink het in "
-"de luidsprekerlijst weer aan wanneer je wilt."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:711
+msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
+msgstr "%1 bleef in beide rondes stil — het is buiten de groep gelaten. Vink het in de luidsprekerlijst weer aan wanneer je wilt."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:567
-msgid ""
-"Could not hear %1 during the check — the speaker may be muted or off. The "
-"calibration was kept."
-msgstr ""
-"%1 was tijdens de controle niet te horen — de luidspreker staat mogelijk uit"
-" of gedempt. De kalibratie is bewaard."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:716
+msgid "%1 made no sound the microphone could hear. If it stays silent on the next calibration too, it will be left out of the group."
+msgstr "%1 maakte geen geluid dat de microfoon kon horen. Blijft hij ook bij de volgende kalibratie stil, dan wordt hij buiten de groep gelaten."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:575
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:723
+msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
+msgstr "%1 was tijdens de controle niet te horen — de luidspreker staat mogelijk uit of gedempt. De kalibratie is bewaard."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:731
 msgid "Sync verified"
 msgstr "Synchronisatie geverifieerd"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:576
-msgid ""
-"Every speaker arrives within %1 ms at the microphone — in step to the ear."
-msgstr ""
-"Elke luidspreker komt binnen %1 ms aan bij de microfoon — voor het oor in de"
-" maat."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:732
+msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
+msgstr "Elke luidspreker komt binnen %1 ms aan bij de microfoon — voor het oor in de maat."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:580
-msgid ""
-"The speakers still arrive %1 ms apart. Calibrate once more, or nudge the "
-"delay slider."
-msgstr ""
-"De luidsprekers komen nog %1 ms uit elkaar aan. Kalibreer nogmaals of "
-"verschuif de vertragingsschuif."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:736
+msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
+msgstr "De luidsprekers komen nog %1 ms uit elkaar aan. Kalibreer nogmaals of verschuif de vertragingsschuif."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1195
-msgid ""
-"Two rounds of clicks with a quiet check between them — about two minutes in "
-"total. The music stays silent until the check finishes."
-msgstr ""
-"Twee rondes klikken met een stille controle ertussen — in totaal ongeveer "
-"twee minuten. De muziek blijft stil tot de controle klaar is."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1363
+msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
+msgstr "Twee rondes klikken met een stille controle ertussen — in totaal ongeveer twee minuten. De muziek blijft stil tot de controle klaar is."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1197
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1365
 msgid "Skipped (empty jack): %1."
 msgstr "Overgeslagen (lege aansluiting): %1."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1198
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1366
 msgid "Calibration started"
 msgstr "Kalibratie gestart"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1249
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1423
 msgid "All local outputs (On Air)"
 msgstr "Alle lokale uitgangen (On Air)"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1830
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:2065
 msgid "%1 did not join the sync"
 msgstr "%1 heeft zich niet bij de synchronisatie gevoegd"
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1832
-msgid ""
-"The speaker is connected but could not be pulled into the group — switch the"
-" sync off and on to rebuild it."
-msgstr ""
-"De luidspreker is verbonden, maar kon niet aan de groep worden toegevoegd — "
-"zet de synchronisatie uit en weer aan."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:2067
+msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
+msgstr "De luidspreker is verbonden, maar kon niet aan de groep worden toegevoegd — zet de synchronisatie uit en weer aan."
 
-#: ⁨/home/egon/minu
-#: projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1833
-msgid ""
-"The speaker is connected but its audio output never appeared — switch the "
-"speaker off and on, then connect it again."
-msgstr ""
-"De luidspreker is verbonden, maar zijn audio-uitgang is nooit verschenen — "
-"zet de luidspreker uit en weer aan en verbind opnieuw."
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:2068
+msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
+msgstr "De luidspreker is verbonden, maar zijn audio-uitgang is nooit verschenen — zet de luidspreker uit en weer aan en verbind opnieuw."
 
 #~ msgid "Listening to the clicks…"
 #~ msgstr "Luisteren naar de klikken…"
 
-#~ msgid ""
-#~ "This speaker's share of the volume — the balance follows every master move "
-#~ "and is remembered for the device."
-#~ msgstr ""
-#~ "Het aandeel van deze luidspreker in het volume — de balans volgt elke "
-#~ "beweging van de hoofdregelaar en wordt voor het apparaat onthouden."
+#~ msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device."
+#~ msgstr "Het aandeel van deze luidspreker in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden."
 
 #~ msgid "Volume: "
 #~ msgstr "Volume: "
