@@ -60,6 +60,9 @@ PlasmaExtras.Representation {
                                           || (isPlaying()
                                               && (playMusic.mediaStatus === MediaPlayer.BufferedMedia
                                                   || playMusic.mediaStatus === MediaPlayer.BufferingMedia))
+    // A local track is playback too, but it is not an "eter": no LIVE pill,
+    // no "Connecting…" — it plays from disk or it does not play at all.
+    readonly property bool _localPlayback: playMusic.source.toString().indexOf("file://") === 0
 
     readonly property int _nowBitrate: {
         if (!_streamActive) return 0
@@ -1163,8 +1166,11 @@ PlasmaExtras.Representation {
                     Layout.topMargin: Kirigami.Units.smallSpacing
                     spacing: Kirigami.Units.smallSpacing
                     visible: fullRepresentation._streamActive
+                             && (!fullRepresentation._localPlayback
+                                 || fullRepresentation._nowBitrate > 0)
 
                     Rectangle {
+                        visible: !fullRepresentation._localPlayback
                         implicitHeight: liveRow.implicitHeight + Kirigami.Units.smallSpacing
                         implicitWidth: liveRow.implicitWidth + Kirigami.Units.largeSpacing
                         radius: height / 2
@@ -2748,7 +2754,10 @@ PlasmaExtras.Representation {
                         if (fullRepresentation._nowBitrate > 0)
                             return i18n("Bitrate: %1 kb/s", fullRepresentation._nowBitrate)
                         else
-                            return root.title !== Plasmoid.title ? "♪ " + i18n("Playing") : i18n("Connecting…")
+                            // A playing local file has no ICY title to wait
+                            // for — it is simply playing, never "connecting".
+                            return (root.title !== Plasmoid.title || fullRepresentation._localPlayback)
+                                   ? "♪ " + i18n("Playing") : i18n("Connecting…")
                     } else if (playMusic.mediaStatus === MediaPlayer.LoadingMedia
                                || playMusic.mediaStatus === MediaPlayer.LoadedMedia)
                         return i18n("Connecting…")
