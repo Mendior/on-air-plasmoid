@@ -376,9 +376,18 @@ PlasmoidItem {
     // directory for the station's CURRENT address by uuid instead of giving
     // up on a rotted one.
     property string _previewUuid: ""
-    // The row's RAW submitted url — the retry ladder's last rung when the
-    // crawler's url_resolved has rotted but the station itself still lives.
+    // The row's RAW submitted url — a late retry rung when the crawler's
+    // url_resolved has rotted but the station itself still lives.
     property string _previewRawUrl: ""
+    // One name-search rescue per preview: the directory often lists the
+    // same station twice — one entry pointing at a dead mount its checker
+    // last reached months ago, one at wherever the station streams today.
+    // byuuid can only ever return the rotted row again; the living twin
+    // sits one name search away. The search runs once; its ranked
+    // candidates audition one per failure round until one plays or the
+    // ladder is empty.
+    property bool _previewRescueSpent: false
+    property var _previewRescueCands: []
     // A human sentence for the status line when one is known — shown
     // instead of the backend's growl while the error state stands.
     property string _friendlyError: ""
@@ -441,6 +450,8 @@ PlasmoidItem {
         // submitted address (often a playlist) still answers.
         root._previewRawUrl = (rawUrl && /^https?:\/\//i.test(rawUrl) && rawUrl !== url)
                               ? rawUrl.toString() : "";
+        root._previewRescueSpent = false;
+        root._previewRescueCands = [];
         root.lastPlay = -1;
         // A preview is an audition, not a standing order — no retry roads.
         root._wantsPlaying = false;
@@ -470,10 +481,11 @@ PlasmoidItem {
         // previewing the NEXT result; the old retry must not hijack
         // that with yesterday's station.
         var pvKey = root._previewUrl;
-        // The last rung, and after it the honest word: a station that is
-        // gone (or answers only its own country — a geo-blocked stream
-        // reads 404 here while the directory's checker sees it fine) must
-        // not leave the listener staring at a backend growl.
+        // The raw rung, and after it the name rescue and the honest word:
+        // a station that is gone (or answers only its own country — a
+        // geo-blocked stream reads 404 here while the directory's checker
+        // sees it fine) must not leave the listener staring at a backend
+        // growl.
         var tryRaw = function() {
             if (root._previewUrl !== pvKey) return;
             var raw = root._previewRawUrl;
@@ -486,7 +498,7 @@ PlasmoidItem {
                 });
                 return;
             }
-            root._friendlyError = i18n("The station did not answer — it may be offline or not available in your country. Try another result.");
+            _previewNameRescue(pvKey, pvName, pvIcon);
         };
         // byuuid, not /url: the lookup must not count a listener
         // click for a stream that just refused to play (and
@@ -509,6 +521,78 @@ PlasmoidItem {
             } else {
                 tryRaw();
             }
+        });
+    }
+
+    // The preview ladder's last real rung, before the honest word: ask the
+    // directory for the station BY NAME and audition the best living twin.
+    // Bauer Media Finland proved the need — their old host answers 404 on
+    // every mount, the entries still read "checked fine" from January, and
+    // the same stations sit in the same directory again under their new
+    // host. HealLogic ranks candidates exactly like the list-station heal:
+    // exact name beats contains, the station's own base domain beats both.
+    function _previewNameRescue(pvKey, pvName, pvIcon) {
+        if (root._previewUrl !== pvKey) return;
+        if (root._previewRescueSpent) {
+            _previewRescueAudition(pvKey, pvName, pvIcon);
+            return;
+        }
+        root._previewRescueSpent = true;
+        var norm = _healNormName(pvName);
+        _rbFetch("/json/stations/search?name=" + encodeURIComponent(pvName)
+                 + "&hidebroken=true&order=votes&reverse=true&limit=30",
+                 5000, function(xhr) {
+            if (root._previewUrl !== pvKey) return;
+            var ranked = [];
+            if (xhr && xhr.status === 200) {
+                try {
+                    var results = JSON.parse(xhr.responseText) || [];
+                    var origBase = _baseDomain(_hostOf(pvKey));
+                    var rows = [];
+                    for (var i = 0; i < results.length; i++) {
+                        var r = results[i];
+                        if (String(r.lastcheckok) !== "1") continue;
+                        var cand = (r.url_resolved || r.url || "").toString();
+                        if (!cand || !/^https?:\/\//i.test(cand) || cand === pvKey) continue;
+                        var fmt = _streamFormat(cand);
+                        if (fmt === "playlist") continue;
+                        var score = HealLogic.scoreRow(_healNormName(r.name), norm,
+                                                       origBase !== ""
+                                                       && _baseDomain(_hostOf(cand)) === origBase);
+                        if (score < 0) continue;
+                        var br = parseInt(r.bitrate) || 0;
+                        if (br >= 8000) br = Math.round(br / 1000);
+                        rows.push({ url: cand, score: score, bitrate: br,
+                                    hls: fmt === "hls" });
+                    }
+                    ranked = HealLogic.rank(rows);
+                } catch (e) {}
+            }
+            // Same audition budget as the list-station heal: the twin is
+            // almost always near the top, and a preview must not spend a
+            // minute chewing through a famous name's thirty entries.
+            root._previewRescueCands = ranked.slice(0, 4);
+            _previewRescueAudition(pvKey, pvName, pvIcon);
+        });
+    }
+
+    // Play the next rescue candidate, or say the honest word when the
+    // ladder is empty. Each audition that fails routes back here through
+    // the ordinary preview failure roads.
+    function _previewRescueAudition(pvKey, pvName, pvIcon) {
+        if (root._previewUrl !== pvKey) return;
+        var cands = root._previewRescueCands;
+        if (!cands || cands.length === 0) {
+            root._friendlyError = i18n("The station did not answer — it may be offline or not available in your country. Try another result.");
+            return;
+        }
+        var next = cands.shift();
+        root._previewRescueCands = cands;
+        console.log("[ARP] preview rescue: auditioning " + next + " for dead " + pvKey);
+        _unwrapPlaylist(next, function(playUrl) {
+            if (root._previewUrl !== pvKey) return;
+            startWithFade({ "name": pvName, "hostname": playUrl,
+                            "favicon": pvIcon, "active": true });
         });
     }
 
