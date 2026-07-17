@@ -506,6 +506,13 @@ def main():
     wired, bt = sys.argv[1], sys.argv[2]
     mic = sys.argv[3] if len(sys.argv) > 3 else ""
     extras = sys.argv[4:4 + MAX_EXTRA_SINKS]
+    # The widget's guard runs this under `timeout`, which SIGTERMs a run that
+    # overran (a dying sink holding each paplay for its full 5 s). A plain
+    # SIGTERM skips every finally-block, leaking the click and recording WAVs
+    # in /tmp on each wedged run — cmd_verify already converts it; the
+    # calibration path must too. SystemExit is not caught by `except
+    # Exception`, so the sentinel protocol is unchanged.
+    signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
     click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
         make_click(click)

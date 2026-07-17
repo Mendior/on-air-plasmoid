@@ -3438,6 +3438,15 @@ PlasmoidItem {
         _flushHistory();
         recStop();
         _mprisStop();
+        // The keep-awake holder is a DETACHED process group (setsid) that
+        // outlives the widget — removing the plasmoid would otherwise leave
+        // the machine unable to sleep for up to 12 hours, plus a stale pid
+        // file. Kill it identity-checked, the same block the re-arm uses.
+        var pf = _alarmInhibitPidFile.replace(/'/g, "'\\''");
+        executable.exec(": ALARM_INHIBIT; if [ -f '" + pf + "' ]; then "
+            + "p=$(cat '" + pf + "' 2>/dev/null); "
+            + "[ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'systemd-inhibit.*On Air' "
+            + "&& kill -- -\"$p\" 2>/dev/null; rm -f '" + pf + "'; fi; true # " + (++_execSeq));
         // Best effort — if the exec doesn't get out before teardown, the
         // startup sweep above reclaims the module on the next session.
         syncEngine.combineOutputsDisable();
