@@ -4,8 +4,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 # Local agent/working notes — not part of the public repo
-CLAUDE.md
-.claude/
 STORE-TEKSTID.md
 FOORUMI-POSTITUS.md
 package/contents/locale/
