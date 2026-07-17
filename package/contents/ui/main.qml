@@ -4140,6 +4140,24 @@ PlasmoidItem {
     // overlapping names ("Speaker", "Speaker 2") must never cross-route. No
     // "any new sink" rule either: an HDMI plug landing in the wait window
     // must not be routed to, let alone persisted as the chosen output.
+    // A speaker fresh through the door starts polite: Bluetooth hardware
+    // often comes back at yesterday's party level, and at 2 AM that is a
+    // heart attack. Cap-only, once, at connect — an already-quiet speaker
+    // is left alone, and turning it up afterwards is one volume press away.
+    // The retry loop covers the sink registering a few seconds after the
+    // connect itself succeeded.
+    function _btGentleVolume(mac) {
+        if (!_btValidMac(mac)) return;
+        var token = mac.toLowerCase().replace(/:/g, "_");
+        executable.exec(": BT_GENTLE; for i in 1 2 3 4 5 6; do"
+                        + " s=$(pactl list short sinks 2>/dev/null | awk '{print $2}'"
+                        + " | grep -i '" + token + "' | head -1);"
+                        + " [ -n \"$s\" ] && break; sleep 1; done;"
+                        + " [ -n \"$s\" ] && {"
+                        + " v=$(pactl get-sink-volume \"$s\" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
+                        + " [ \"${v:-0}\" -gt 40 ] && pactl set-sink-volume \"$s\" 40%; }; true");
+    }
+
     function _btTryRoutePending() {
         if (_btPendingSinkMac === "") return false;
         // While the combined output is (becoming) active it owns the
@@ -4148,6 +4166,7 @@ PlasmoidItem {
         // the combined sink feeding silence to every other output — with
         // the sync checkbox still reading on.
         if (sync._combineWantActive || sync._combineActive) {
+            _btGentleVolume(_btPendingSinkMac);
             _btPendingSinkMac = "";
             _btPendingSinkName = "";
             btRouteTimeout.stop();
@@ -4172,6 +4191,7 @@ PlasmoidItem {
                 pick = fresh[0];
         }
         if (!pick) return false;
+        _btGentleVolume(_btPendingSinkMac);
         _btPendingSinkName = "";
         _btPendingSinkMac = "";
         btRouteTimeout.stop();

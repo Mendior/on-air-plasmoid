@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-17 11:52+0300\n"
+"POT-Creation-Date: 2026-07-17 12:05+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Polish\n"
@@ -46,7 +46,7 @@ msgstr "Dźwięk"
 
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/CompactRepresentation.qml:86
 #: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2275
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3426
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3455
 msgid "Volume"
 msgstr "Głośność"
 
@@ -1033,131 +1033,143 @@ msgstr "Dostrajanie synchronizacji"
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Jeśli głośnik Bluetooth wciąż jest opóźniony względem przewodowych, zwiększaj to, aż zagrają razem."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2976
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2970
+msgid "Sync delay in milliseconds"
+msgstr "Opóźnienie synchronizacji w milisekundach"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2987
+msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
+msgstr "Wpisz dokładne opóźnienie w milisekundach — suwak porusza się co dziesięć."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2991
+msgid "ms"
+msgstr "ms"
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3005
 msgid "Calibrate with the microphone"
 msgstr "Skalibruj mikrofonem"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:2981
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3010
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Odtwarza kilka głośnych kliknięć przez każdy głośnik i mierzy mikrofonem, o ile spóźnia się głośnik Bluetooth — opóźnienie ustawia się samo."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3001
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3030
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Runda 1 z 2 — kliknięcia przez każdy głośnik…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3002
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3031
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Runda 2 z 2 — cisza, sprawdzanie wyniku…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3032
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3061
 msgid "%1 plays in the group"
 msgstr "%1 gra w grupie"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3045
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3074
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Czy ten głośnik gra w grupie — odznacz, aby go pominąć bez rozłączania. Zapamiętywane dla urządzenia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3051
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3080
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (nic nie podłączono)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3061
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3090
 msgid "Balance of %1"
 msgstr "Balans %1"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3070
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3099
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Udział tego głośnika w głośności — balans podąża za każdym ruchem głównego suwaka i jest zapamiętywany dla urządzenia. Działa tylko na to, co odtwarza ten widżet; głośność urządzenia w ustawieniach dźwięku systemu to osobna, nietknięta warstwa — dlatego tamte liczby różnią się od tych suwaków."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3087
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3116
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3088
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3117
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3089
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3118
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3090
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3119
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3095
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3124
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Które kanały gra ten głośnik: stereo, tylko lewy, tylko prawy lub miks mono obu. Ustaw jeden głośnik na L, a drugi na R, aby uzyskać prawdziwą parę stereo — zapamiętywane dla urządzenia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3125
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3154
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3140
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3169
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth jest wyłączony lub brak adaptera — sprawdź Ustawienia systemowe."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3151
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3180
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Brak sparowanych urządzeń audio Bluetooth — sparuj głośnik raz w Ustawieniach systemowych, a pojawi się tutaj."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3165
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3194
 msgid "%1 — connecting…"
 msgstr "%1 — łączenie…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3183
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3212
 msgid "%1 — pairing…"
 msgstr "%1 — parowanie…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3184
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3213
 msgid "%1 — new, click to pair"
 msgstr "%1 — nowy, kliknij aby sparować"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3195
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3224
 msgid "Pair a new speaker…"
 msgstr "Sparuj nowy głośnik…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3211
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3240
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Szukam — przełącz głośnik w tryb parowania…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3232
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3261
 msgid "WiFi & network"
 msgstr "WiFi i sieć"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3264
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3293
 msgid "%1 (speaker group)"
 msgstr "%1 (grupa głośników)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3292
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3321
 msgid "Balance"
 msgstr "Balans"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3306
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3335
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Udział tego urządzenia w głośności — balans podąża za każdym ruchem suwaka głównego i jest zapamiętywany dla urządzenia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3328
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3357
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Każde urządzenie buforuje strumień osobno, więc pomieszczenia mogą grać z kilkusekundowym przesunięciem. Aby głośniki grały idealnie równo, zgrupuj je w aplikacji Google Home — grupa pojawi się tutaj jako jedno urządzenie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3338
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3367
 msgid "Stop casting everywhere"
 msgstr "Zatrzymaj odtwarzanie na wszystkich urządzeniach"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3356
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3385
 msgid "Searching for devices…"
 msgstr "Wyszukiwanie urządzeń…"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3365
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3394
 msgid "No devices found on your network"
 msgstr "Nie znaleziono urządzeń w Twojej sieci"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3387
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/FullRepresentation.qml:3416
 msgid "Volume: %1% (scroll to adjust)"
 msgstr "Głośność: %1% (przewiń, aby zmienić)"
 
@@ -1369,94 +1381,99 @@ msgstr "Nie udało się połączyć wyjść"
 msgid "pactl refused to create the combined output."
 msgstr "pactl odmówił utworzenia połączonego wyjścia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:368
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:381
 msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
 msgstr "Głośnik Bluetooth jest opóźniony o %1 ms, a głośność wszystkich głośników została wyrównana przy mikrofonie — wszystko ustawione i zapamiętane."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:369
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:382
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Głośnik Bluetooth spóźnia się o %1 ms — opóźnienie zostało ustawione i zapamiętane dla tego urządzenia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:371
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:384
 msgid "Balance levels set earlier were replaced by the measured ones."
 msgstr "Ustawione wcześniej poziomy balansu zastąpiono zmierzonymi."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:379
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:392
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
 msgstr "Mikrofon przesterował na %1 — ten balans pozostał bez zmian; ścisz głośnik i skalibruj ponownie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:380
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:393
 msgid "Speakers calibrated"
 msgstr "Głośniki skalibrowane"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:383
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:396
 msgid "Calibration did not succeed"
 msgstr "Kalibracja się nie powiodła"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:384
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:397
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Upewnij się, że mikrofon nie jest zasłonięty i słychać oba głośniki, po czym spróbuj ponownie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:434
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:447
 msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
 msgstr "Głośniki dzieliło %1 ms — skorygowano według pomiaru, trwa ponowna kontrola."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:449
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:462
 msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
 msgstr "Trasa jednego z głośników utknęła %1 ms w tyle — opróżniono ją, trwa ponowna kontrola."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:457
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:465
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:475
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:488
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:470
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:478
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:497
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:503
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:516
 msgid "Sync check"
 msgstr "Kontrola synchronizacji"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:466
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:479
 msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
 msgstr "W pomieszczeniu nie było wystarczająco cicho, by zweryfikować — wstrzymaj inne dźwięki i skalibruj ponownie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:476
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:498
+msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
+msgstr "%1 milczał w obu rundach — został pominięty w grupie. Zaznacz go na liście głośników, kiedy zechcesz."
+
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:504
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "Podczas kontroli nie było słychać %1 — głośnik może być wyciszony lub wyłączony. Kalibrację zachowano."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:484
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:512
 msgid "Sync verified"
 msgstr "Synchronizacja potwierdzona"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:485
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:513
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Każdy głośnik dociera do mikrofonu w granicach %1 ms — dla ucha w pełnym rytmie."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:489
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:517
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Głośniki wciąż docierają w odstępie %1 ms. Skalibruj ponownie albo przesuń suwak opóźnienia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1069
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1097
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Dwie rundy kliknięć z cichym sprawdzeniem pomiędzy — łącznie około dwóch minut. Muzyka pozostaje wyciszona do końca sprawdzenia."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1071
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1099
 msgid "Skipped (empty jack): %1."
 msgstr "Pominięto (puste gniazdo): %1."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1072
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1100
 msgid "Calibration started"
 msgstr "Rozpoczęto kalibrację"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1115
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1143
 msgid "All local outputs (On Air)"
 msgstr "Wszystkie lokalne wyjścia (On Air)"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1621
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1653
 msgid "%1 did not join the sync"
 msgstr "%1 nie dołączył do synchronizacji"
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1623
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1655
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Głośnik jest połączony, ale nie udało się go włączyć do grupy — wyłącz i włącz synchronizację."
 
-#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1624
+#: /home/egon/Projects/on-air-plasmoid/package/contents/ui/SyncEngine.qml:1656
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Głośnik jest połączony, ale jego wyjście audio nigdy się nie pojawiło — wyłącz i włącz głośnik, a następnie połącz go ponownie."
 

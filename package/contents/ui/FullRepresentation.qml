@@ -2958,8 +2958,37 @@ PlasmaExtras.Representation {
                                     text: i18n("If the Bluetooth speaker still trails the wired ones, raise this until they play together.")
                                 }
                             }
+                            // Typing beats nudging: the slider steps by 10
+                            // (coarse and fast), but an ear that knows it
+                            // wants exactly 154 gets to say 154.
+                            PlasmaComponents3.TextField {
+                                id: syncMsField
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 3
+                                horizontalAlignment: Text.AlignRight
+                                font: Kirigami.Theme.smallFont
+                                validator: IntValidator { bottom: 0; top: 900 }
+                                Accessible.name: i18n("Sync delay in milliseconds")
+                                text: Math.round(syncSlider.value).toString()
+                                onEditingFinished: {
+                                    var v = parseInt(text, 10);
+                                    if (isFinite(v)) {
+                                        v = Math.max(0, Math.min(900, v));
+                                        syncSlider.value = v;
+                                        root.sync.setSyncOffset(v);
+                                    }
+                                    // Hand the display back to the slider —
+                                    // an edit must not freeze the field for
+                                    // the rest of the session.
+                                    text = Qt.binding(function() {
+                                        return Math.round(syncSlider.value).toString();
+                                    });
+                                }
+                                PlasmaComponents3.ToolTip {
+                                    text: i18n("Type an exact delay in milliseconds — the slider moves in steps of ten.")
+                                }
+                            }
                             PlasmaComponents3.Label {
-                                text: Math.round(syncSlider.value) + " ms"
+                                text: i18n("ms")
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.7
                             }

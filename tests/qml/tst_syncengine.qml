@@ -452,6 +452,36 @@ Item {
             verify(note.text.indexOf("desc of " + wired2) !== -1);
         }
 
+        function test_silent_in_both_rounds_leaves_the_group_by_itself() {
+            // Round 1's loud clicks straight at the sink heard nothing AND
+            // round 2's check heard nothing — two independent misses in one
+            // run. An output with nothing behind it must not spoil every
+            // verdict; it steps out, with a note saying how to come back.
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_CALIB " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(!r.e.syncDeviceIncluded(wired2));
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            verify(note.text.indexOf("left out of the group") !== -1);
+        }
+
+        function test_a_speaker_heard_in_round_one_is_not_thrown_out() {
+            // The same partial verdict for a sink that DID click in round 1
+            // is a real problem worth a warning — but not an eviction: a
+            // muted amp or a walked-off Bluetooth speaker comes back.
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_CALIB " + btMac + " ;",
+                           "CALIB_LVL " + wired + " 20000\n"
+                           + "CALIB_LVL " + wired2 + " 9000\nCALIB_OK 150\n", "");
+            r.e.handleExec(": PW_VERIFY;", "VERIFY_PARTIAL " + wired2 + "\n", "");
+            verify(r.e.syncDeviceIncluded(wired2));
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            verify(note.text.indexOf("may be muted or off") !== -1);
+        }
+
         function test_empty_jack_does_not_inflate_the_verify_budget() {
             var r = rig([dev(wired), dev(wired2), dev(btSink)]);
             activate(r);
@@ -499,10 +529,13 @@ Item {
         }
 
         function test_verify_partial_names_the_unheard_speaker() {
-            // A dead or muted speaker must fail the verify LOUDLY — a small
-            // spread computed from the survivors is the same optimistic-
-            // signal disease the wake tone was cured of.
+            // A speaker that DID click in round 1 but vanished in round 2
+            // must fail the verify LOUDLY — a small spread computed from
+            // the survivors is the same optimistic-signal disease the wake
+            // tone was cured of. (A speaker silent in BOTH rounds takes the
+            // eviction road instead — its own test below.)
             var r = rig([dev(wired), dev(btSink)]);
+            r.e._calibHeard = (function() { var h = {}; h[btSink] = true; return h; })();
             r.e._calibVolumeBefore = 0.5;
             r.mock.playerOutput.volume = 0;
             r.e._verifyPending = true;

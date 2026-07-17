@@ -320,8 +320,20 @@ Item {
                 var cvRe = /CALIBVOL (\S+) (\d+)%/g, cvM;
                 while ((cvM = cvRe.exec(stdout || "")) !== null)
                     volBySink[cvM[1]] = Math.max(1, parseInt(cvM[2], 10));
+                // Who actually made a sound this run: every CALIB_LVL line
+                // is a click the microphone heard from that sink, and the
+                // CALIB_OK itself proves the Bluetooth member spoke. The
+                // verify's partial verdict reads this to tell a shy speaker
+                // from an output with nothing behind it.
+                var heard = {};
+                if (macM) {
+                    var rsAll = _combineRealSinks();
+                    for (var hi = 0; hi < rsAll.length; hi++)
+                        if (_btMacOfSink(rsAll[hi]) === macM[1]) heard[rsAll[hi]] = true;
+                }
                 var lvls = [], lvlRe = /CALIB_LVL (\S+) (\d+)/g, lvlM;
                 while ((lvlM = lvlRe.exec(stdout || "")) !== null) {
+                    heard[lvlM[1]] = true;
                     var lvlAmp = parseInt(lvlM[2], 10);
                     if (lvlAmp <= 0) continue;
                     // The clicks compared the speakers at an equal 55% —
@@ -333,6 +345,7 @@ Item {
                     lvls.push({ sink: lvlM[1],
                                 amp: lvlAmp * Math.pow(calVol / 55, 3) });
                 }
+                _calibHeard = heard;
                 var leveled = false;
                 var trimsReplaced = false;
                 if (lvls.length >= 2) {
@@ -472,6 +485,21 @@ Item {
             // computed from the survivors — the calibration itself stands.
             var pM = (stdout || "").match(/VERIFY_PARTIAL (\S+)/);
             if (pM) {
+                // Silent through BOTH rounds of the same run — the loud
+                // calibration clicks straight at the sink and the check
+                // through the deployed path both heard nothing. That is not
+                // a shy speaker, that is an output with nothing audible
+                // behind it (an unused S/PDIF port, a dead amp). It leaves
+                // the group by itself instead of spoiling every verdict —
+                // the row stays in the list, one tick brings it back.
+                if (_calibHeard[pM[1]] === undefined) {
+                    setSyncDeviceIncluded(_trimKeyForSink(pM[1]), false);
+                    app.notify(i18n("Sync check"),
+                               i18n("%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time.",
+                                    outputDescription(pM[1])),
+                               "dialog-information");
+                    return true;
+                }
                 app.notify(i18n("Sync check"),
                            i18n("Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept.",
                                 outputDescription(pM[1])),
@@ -1319,6 +1347,10 @@ Item {
     // One correction round per calibration: the loop must converge, not
     // chase its own tail. Reset when a new calibration starts.
     property bool _verifyCorrected: false
+    // Sinks the microphone actually heard during the LAST calibration's
+    // click rounds — the partial verdict's evidence for telling a shy
+    // speaker from an output with nothing audible behind it.
+    property var _calibHeard: ({})
 
     // Settle and guard are sized from the GROUP, not hard-coded: with five
     // members the measurement needs ~a minute, and the old fixed 35 s guard
