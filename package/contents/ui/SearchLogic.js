@@ -66,12 +66,15 @@ function stems(q) {
     return out;
 }
 
-// One probe answer, read at the response headers: a definite HTTP error is
-// a dead mount, a 2xx is a live one, anything else (timeouts, transport
-// errors, ICY status lines Qt cannot parse) stays unknown — a slow or odd
-// server is not a dead station.
+// One probe answer, read at the response headers. Dead is ONLY what
+// stream hosts actually say about a mount that is gone: not found,
+// forbidden (geo-blocks read this way), gone. Everything else stays
+// unknown — 5xx hiccups, 429, timeouts, ICY status lines Qt cannot
+// parse, and the non-standard codes CDNs throttle with (a living
+// national station answered 460 to every fresh connection the moment
+// a rate limiter woke up; a throttle is not a death certificate).
 function probeVerdict(status) {
     if (status >= 200 && status < 400) return 1;
-    if (status >= 400) return 0;
+    if (status === 403 || status === 404 || status === 410) return 0;
     return -1;
 }

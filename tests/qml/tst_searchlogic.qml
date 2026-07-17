@@ -56,8 +56,11 @@ TestCase {
         compare(SL.probeVerdict(200), 1);    // a live mount
         compare(SL.probeVerdict(206), 1);
         compare(SL.probeVerdict(404), 0);    // a dead mount, definitively
-        compare(SL.probeVerdict(403), 0);
-        compare(SL.probeVerdict(503), 0);
+        compare(SL.probeVerdict(403), 0);    // geo-blocks read as forbidden
+        compare(SL.probeVerdict(410), 0);
+        compare(SL.probeVerdict(429), -1);   // a throttle is not a death certificate
+        compare(SL.probeVerdict(460), -1);   // CDN rate limiter, measured live
+        compare(SL.probeVerdict(503), -1);   // a server hiccup is not a dead station
         compare(SL.probeVerdict(0), -1);     // transport error: unknown, not dead
     }
 }

@@ -60,8 +60,11 @@ PlasmaExtras.Representation {
         // the row the listener just heard fail gets its offline tag, so
         // the list learns what the ear already knows.
         function on_FriendlyErrorChanged() {
-            if (root._friendlyError !== "" && root._previewUrl !== "")
+            if (root._friendlyError !== "" && root._previewUrl !== "") {
+                fullRepresentation._probeVerdicts[root._previewUrl] =
+                    { "v": 0, "t": Date.now() }
                 fullRepresentation._webSetAlive(root._previewUrl, 0)
+            }
         }
     }
 
@@ -113,13 +116,27 @@ PlasmaExtras.Representation {
     // unknown — a slow server is not a dead station.
     property var _probeSpent: ({})
     property int _probeActive: 0
+    // Verdicts remembered for the session (15 min a piece) — retyping a
+    // query must not re-knock on the same thirty hosts. A CDN throttled
+    // exactly that burst during testing: every fresh connection got a
+    // non-standard 460, playback included. The cache is why the widget
+    // itself can never work a host up to that point.
+    property var _probeVerdicts: ({})
+    readonly property int _probeVerdictTtlMs: 15 * 60 * 1000
 
     function _probeKick(seq) {
         if (seq !== fullRepresentation._webSearchSeq) return
-        for (var i = 0; i < webResultsModel.count
-             && fullRepresentation._probeActive < 6; i++) {
+        var now = Date.now()
+        for (var i = 0; i < webResultsModel.count; i++) {
             var row = webResultsModel.get(i)
             if (row.alive !== -1 || fullRepresentation._probeSpent[row.url]) continue
+            var hit = fullRepresentation._probeVerdicts[row.url]
+            if (hit !== undefined && now - hit.t < fullRepresentation._probeVerdictTtlMs) {
+                fullRepresentation._probeSpent[row.url] = true
+                if (hit.v !== -1) _webSetAlive(row.url, hit.v)
+                continue
+            }
+            if (fullRepresentation._probeActive >= 6) continue
             fullRepresentation._probeSpent[row.url] = true
             fullRepresentation._probeActive++
             _probeOne(row.url, seq)
@@ -135,6 +152,9 @@ PlasmaExtras.Representation {
             settled = true
             root._clearXhrTimeout(guard)
             fullRepresentation._probeActive = Math.max(0, fullRepresentation._probeActive - 1)
+            // Unknowns are cached too: a host that just timed out does not
+            // deserve a knock from every retyped query either.
+            fullRepresentation._probeVerdicts[url] = { "v": verdict, "t": Date.now() }
             if (seq === fullRepresentation._webSearchSeq && verdict !== -1)
                 _webSetAlive(url, verdict)
             // The next probe starts on a fresh tick, never from inside a
