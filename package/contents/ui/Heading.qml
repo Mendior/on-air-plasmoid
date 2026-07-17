@@ -101,7 +101,10 @@ RowLayout {
                    ? Kirigami.Theme.highlightedTextColor
                    : Kirigami.Theme.textColor
             transform: Translate { id: secondaryShift; y: 0 }
-            onTextChanged: if (text !== "") secondaryReveal.restart()
+            // Qualified on purpose: a bare `text` here resolves to the
+            // INJECTED signal parameter (deprecated in Qt 6, removal
+            // announced), not to this label's property.
+            onTextChanged: if (secondaryLabel.text !== "") secondaryReveal.restart()
 
             // On track change, the new title slides in smoothly
             ParallelAnimation {

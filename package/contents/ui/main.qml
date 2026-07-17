@@ -1434,7 +1434,7 @@ PlasmoidItem {
                     const h = stationsModel.get(k).hostname;
                     if (keepPlaying && h === url) {
                         root._previewUrl = "";
-        root._previewUuid = "";
+                        root._previewUuid = "";
                         lastPlay = k;
                         refreshServer(k);
                         return;
@@ -3763,7 +3763,7 @@ PlasmoidItem {
                     dlIcon = "dialog-warning";
                 } else if (exitCode === 0) {
                     dlTitle = i18n("Track downloaded ✓");
-                    dlText = i18n("Saved to: ") + root.downloadDirPath;
+                    dlText = i18n("Saved to: %1", root.downloadDirPath);
                     dlIcon = "download";
                 } else {
                     dlTitle = i18n("Download failed");
