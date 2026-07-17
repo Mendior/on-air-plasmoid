@@ -26,6 +26,7 @@ Always exits 0 — a failure is a sentinel, not a crash.
 import math
 import os
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -435,6 +436,12 @@ def cmd_verify(argv):
         if len(argv) < 3:
             print("VERIFY_FAIL usage")
             return
+        # The isolation mutes OTHER speakers while one is measured. If the
+        # widget's guard timeout kills this process mid-member, a plain
+        # SIGTERM would skip every finally-block and leave the machine's
+        # audio half muted — not ours to break. Convert it to a normal
+        # exit so the unmutes always run.
+        signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
         sink, mic = argv[0], argv[1]
         sinks = argv[2:2 + 8]
         click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name

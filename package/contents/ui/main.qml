@@ -2093,6 +2093,10 @@ PlasmoidItem {
     property var _healTried: ({})        // dead url → epoch ms of last lookup
     property string _healPendingUrl: ""  // candidate being auditioned
     property string _healOrigUrl: ""     // the dead configured url it replaces
+    // Whether the audition came from the station's own directory uuid —
+    // identity-proven, so committing it may skip the same-domain caution
+    // that guards the name-guessed candidates.
+    property bool _healByUuid: false
     property int _healSeq: 0
 
     function _healNormName(s) {
@@ -2102,6 +2106,7 @@ PlasmoidItem {
     function _healClearPending() {
         _healPendingUrl = "";
         _healOrigUrl = "";
+        _healByUuid = false;
     }
 
     Timer {
@@ -2128,6 +2133,32 @@ PlasmoidItem {
         var norm = _healNormName(name);
         if (norm === "") return;
         var mySeq = ++_healSeq;
+        // Identity beats guesswork: a station added from the search carries
+        // its directory uuid, and the /url endpoint answers with wherever
+        // that EXACT station lives today — no name collisions, no scoring.
+        // The name search below stays as the road for hand-added entries.
+        var stUuid = (st.uuid || "").toString();
+        if (stUuid !== "") {
+            _rbFetch("/json/url/" + stUuid, 5000, function(uxhr) {
+                if (mySeq !== _healSeq) return;
+                if (isPlaying() || lastPlay < 0) return;
+                var cand = "";
+                try { cand = (uxhr && JSON.parse(uxhr.responseText).url) || ""; } catch (e) {}
+                if (cand === "" || !/^https?:\/\//i.test(cand) || cand === orig) return;
+                console.log("[ARP] heal(uuid): auditioning " + cand + " for dead " + orig);
+                _unwrapPlaylist(cand, function(playUrl) {
+                    if (mySeq !== _healSeq) return;
+                    root._healOrigUrl = orig;
+                    root._healPendingUrl = playUrl;
+                    root._healByUuid = true;
+                    root._currentOrigUrl = orig;
+                    root._currentResolvedUrl = playUrl;
+                    startWithFade({ "name": name, "hostname": playUrl,
+                                    "favicon": st.favicon || "", "active": true });
+                });
+            });
+            return;
+        }
         _rbFetch("/json/stations/search?name="
                  + encodeURIComponent(name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
@@ -2164,12 +2195,16 @@ PlasmoidItem {
             }
             if (!best) return;
             console.log("[ARP] heal: auditioning " + best + " for dead " + orig);
-            root._healOrigUrl = orig;
-            root._healPendingUrl = best;
-            root._currentOrigUrl = orig;
-            root._currentResolvedUrl = best;
-            startWithFade({ "name": name, "hostname": best,
-                            "favicon": st.favicon || "", "active": true });
+            _unwrapPlaylist(best, function(playUrl) {
+                if (mySeq !== _healSeq) return;
+                root._healOrigUrl = orig;
+                root._healPendingUrl = playUrl;
+                root._healByUuid = false;
+                root._currentOrigUrl = orig;
+                root._currentResolvedUrl = playUrl;
+                startWithFade({ "name": name, "hostname": playUrl,
+                                "favicon": st.favicon || "", "active": true });
+            });
         });
     }
 
@@ -2182,9 +2217,13 @@ PlasmoidItem {
     function _healCommit() {
         var newUrl = _healPendingUrl;
         var oldUrl = _healOrigUrl;
+        var byUuid = _healByUuid;
         _healClearPending();
         var oldBase = _baseDomain(_hostOf(oldUrl));
-        if (oldBase === "" || _baseDomain(_hostOf(newUrl)) !== oldBase) {
+        // A uuid-resolved address IS the station, by the directory's own
+        // identity — the cross-domain caution below exists only for
+        // name-guessed candidates from a publicly writable catalog.
+        if (!byUuid && (oldBase === "" || _baseDomain(_hostOf(newUrl)) !== oldBase)) {
             // The audition WORKED — release the per-station retry lock so a
             // stop-and-replay inside the lock window heals again right away
             // (the saved address is still the dead one, on purpose).

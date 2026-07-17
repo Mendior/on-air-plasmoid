@@ -1256,12 +1256,22 @@ Item {
 
     Timer {
         id: verifyGuardTimer
-        // A lost verify must not leave the stream muted forever.
+        // A lost verify must not leave the stream muted forever — nor any
+        // SPEAKER: the verify isolates members by hardware mute, and a
+        // measurement that died mid-member would otherwise leave the
+        // machine's own audio half silenced. Belt and braces on top of the
+        // script's own signal handling.
         interval: 35000
         repeat: false
         onTriggered: {
             _verifyPending = false;
             _calibRestoreVolume();
+            var un = "";
+            var vs = _combineRealSinks();
+            for (var i = 0; i < vs.length; i++)
+                un += "pactl set-sink-mute '" + vs[i].replace(/'/g, "'\\''") + "' 0; ";
+            if (un !== "")
+                app.exec(": PW_UNMUTE; " + un + "true # " + app.nextSeq());
         }
     }
 

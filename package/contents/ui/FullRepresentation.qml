@@ -219,12 +219,29 @@ PlasmaExtras.Representation {
 
     function _webRememberQuery(q) {
         if (q.length < 3) return
+        var ql = q.toLowerCase()
         var h = fullRepresentation.webHistory.filter(function(e) {
-            return e.toLowerCase() !== q.toLowerCase()
+            var el = e.toLowerCase()
+            // A stored entry that is a prefix of the new query is the same
+            // search half-typed (the debounce saved "eston" on the way to
+            // "estonia") — it collapses into the finished one. And typing
+            // BACKWARDS must not respawn the fragments.
+            return el !== ql && ql.indexOf(el) !== 0 && el.indexOf(ql) !== 0
         })
         h.unshift(q)
         fullRepresentation.webHistory = h.slice(0, 8)
         Plasmoid.configuration.searchHistory = JSON.stringify(fullRepresentation.webHistory)
+    }
+
+    function _webForgetQuery(q) {
+        fullRepresentation.webHistory = fullRepresentation.webHistory.filter(
+            function(e) { return e !== q })
+        Plasmoid.configuration.searchHistory = JSON.stringify(fullRepresentation.webHistory)
+    }
+
+    function _webClearHistory() {
+        fullRepresentation.webHistory = []
+        Plasmoid.configuration.searchHistory = "[]"
     }
 
     // Appends one directory answer to the results model (deduped against the
@@ -506,12 +523,29 @@ PlasmaExtras.Representation {
                 Repeater {
                     model: root.searchFilter === "" ? fullRepresentation.webHistory : []
                     delegate: PlasmaComponents3.ToolButton {
+                        id: historyChip
                         required property string modelData
                         text: modelData
                         icon.name: "view-history"
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         onClicked: filterField.text = modelData
+
+                        PlasmaComponents3.ToolTip {
+                            text: i18n("Search again — right-click removes this entry")
+                        }
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: fullRepresentation._webForgetQuery(historyChip.modelData)
+                        }
                     }
+                }
+                PlasmaComponents3.ToolButton {
+                    visible: root.searchFilter === "" && fullRepresentation.webHistory.length > 0
+                    icon.name: "edit-clear-history"
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    onClicked: fullRepresentation._webClearHistory()
+
+                    PlasmaComponents3.ToolTip { text: i18n("Clear search history") }
                 }
             }
 
