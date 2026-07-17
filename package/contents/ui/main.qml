@@ -16,6 +16,7 @@ import org.kde.plasma.plasma5support 2.0 as P5Support
 import org.kde.plasma.plasmoid
 
 import "AlarmLogic.js" as AlarmLogic
+import "PlaylistLogic.js" as PlaylistLogic
 
 PlasmoidItem {
     id: root
@@ -358,12 +359,14 @@ PlasmoidItem {
 
     // .pls/.m3u wrappers hide the real stream one fetch away — the player
     // backend reports them as "Could not open file". Unwrap before playing;
-    // .m3u8 (HLS) is a real format the backend speaks itself.
-    function _unwrapPlaylist(url, cb) {
-        var low = url.toLowerCase().split("?")[0];
-        if (!/^https?:\/\//i.test(url)
-            || !(low.indexOf(".pls", low.length - 4) !== -1
-                 || low.indexOf(".m3u", low.length - 4) !== -1)) {
+    // .m3u8 (HLS) is a real format the backend speaks itself. The parsing
+    // decisions live in PlaylistLogic.js under qmltestrunner: relative
+    // entries resolve against the wrapper's address, HLS media wearing a
+    // .m3u name is handed over whole, and a wrapper pointing at another
+    // wrapper gets exactly one more hop.
+    function _unwrapPlaylist(url, cb, depth) {
+        var hop = depth || 0;
+        if (!/^https?:\/\//i.test(url) || !PlaylistLogic.isWrapper(url)) {
             cb(url);
             return;
         }
@@ -373,22 +376,13 @@ PlasmoidItem {
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
-            var out = url;
-            var txt = xhr.responseText || "";
-            var m = txt.match(/^File\d+\s*=\s*(\S+)/mi);
-            if (m && /^https?:\/\//i.test(m[1])) {
-                out = m[1];
-            } else {
-                var lines = txt.split("\n");
-                for (var i = 0; i < lines.length; i++) {
-                    var ln = lines[i].trim();
-                    if (ln !== "" && ln.indexOf("#") !== 0 && /^https?:\/\//i.test(ln)) {
-                        out = ln;
-                        break;
-                    }
-                }
+            var got = PlaylistLogic.classify(xhr.responseText || "", url);
+            if (got.kind === "entry" && hop < 1 && got.url !== url
+                && PlaylistLogic.isWrapper(got.url)) {
+                _unwrapPlaylist(got.url, cb, hop + 1);
+                return;
             }
-            cb(out);
+            cb(got.url);
         };
         guard = _armXhrTimeout(xhr, 4000);
         xhr.send();
