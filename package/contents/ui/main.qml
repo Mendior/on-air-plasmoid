@@ -1881,8 +1881,12 @@ PlasmoidItem {
         // Every bluetoothctl call is capped (like btConnect's timeout 12):
         // a wedged bluez daemon otherwise hangs the whole listing, onExited
         // never fires and _btListing stays true for the rest of the session.
+        // The sed strips ANSI color: newer bluez colorizes the CONNECTED
+        // device's line even when piped, so the ^Device anchor stopped
+        // matching exactly the speaker currently playing — which then
+        // vanished from the menu while its idle siblings stayed listed.
         executable.exec(": BT_LIST; list=$({ timeout 3 bluetoothctl devices Paired; timeout 3 bluetoothctl paired-devices; } 2>/dev/null "
-            + "| grep '^Device ' | sort -u); "
+            + "| sed 's/\\x1b\\[[0-9;]*m//g' | grep '^Device ' | sort -u); "
             + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
             + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
             + 'info=$(timeout 3 bluetoothctl info "$mac" 2>/dev/null); '
@@ -1918,7 +1922,8 @@ PlasmoidItem {
         _btScanning = true;
         btFoundModel.clear();
         executable.exec(": BT_SCAN; timeout 16 bluetoothctl --timeout 12 scan on >/dev/null 2>&1; "
-            + 'list=$(timeout 3 bluetoothctl devices 2>/dev/null | grep "^Device "); '
+            + 'list=$(timeout 3 bluetoothctl devices 2>/dev/null '
+            + "| sed 's/\\x1b\\[[0-9;]*m//g' | grep '^Device '); "
             + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
             + 'case "$mac" in [0-9A-Fa-f][0-9A-Fa-f]:*) ;; *) continue;; esac; '
             + 'info=$(timeout 3 bluetoothctl info "$mac" 2>/dev/null); '
