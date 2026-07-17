@@ -3613,7 +3613,9 @@ PlasmoidItem {
             + "&& kill -- -\"$p\" 2>/dev/null; rm -f '" + pf + "'; fi; true # " + (++_execSeq));
         // Best effort — if the exec doesn't get out before teardown, the
         // startup sweep above reclaims the module on the next session.
-        syncEngine.combineOutputsDisable();
+        // fromTeardown: a logout is not the user saying "sync off" — the
+        // wish survives and the next session's probe rebuilds the room.
+        syncEngine.combineOutputsDisable(true);
     }
 
     StationsModel {

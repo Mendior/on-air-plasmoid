@@ -121,6 +121,10 @@
             <label>Combined output master level the room was left at — the next enable's ramp ends here instead of at full passthrough</label>
             <default>100</default>
         </entry>
+        <entry name="combineWanted" type="bool">
+            <label>The sync switch as the user left it — a login rebuilds the group instead of silently dropping it</label>
+            <default>false</default>
+        </entry>
         <entry name="autoHeal" type="bool">
             <label>When a saved station's stream dies, look up its current address on radio-browser.info and follow it</label>
             <default>true</default>

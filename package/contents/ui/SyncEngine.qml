@@ -172,6 +172,16 @@ Item {
         // Combined local output: pactl availability probe
         if (cmd.indexOf(": PW_PROBE;") === 0) {
             _combineAvailable = (stdout || "").indexOf("__PACTL_YES__") !== -1;
+            // The room comes back the way it was left: the wish persisted,
+            // the sweep has cleared the old body, and the remembered master
+            // keeps the return from being a blast. The device list can
+            // still be empty this early — the resurrect knocks ride the
+            // next few device events until the hardware is standing.
+            if (_combineAvailable && cfg.combineWanted
+                && !_combineActive && !_combineWantActive) {
+                _resurrectTries = 6;
+                combineOutputsEnable();
+            }
             return true;
         }
         // Jack detection: which sinks' active ports report "not available"
@@ -1405,6 +1415,10 @@ Item {
         }
         if (sinks.length === 0) return;
         _combineWantActive = true;
+        // The wish outlives the session: a login used to silently drop the
+        // whole group (the startup sweep tears it down and nothing rebuilt
+        // it) — "all speakers" meant "until the next reboot".
+        cfg.combineWanted = true;
         // Never remember a combined name as "the output before the sync":
         // a resurrect (the null sink died under a live group) arrives here
         // with the player still routed onto the dead sink, and persisting
@@ -1473,11 +1487,14 @@ Item {
         return cmd;
     }
 
-    function combineOutputsDisable() {
+    function combineOutputsDisable(fromTeardown) {
         // The user's word beats a pending resurrect — an explicit off must
-        // not be undone by the retry ticks a dead sink armed.
+        // not be undone by the retry ticks a dead sink armed. A teardown
+        // (logout, widget removal) is NOT the user's word: the wish
+        // persists and the next session's probe rebuilds the room.
         _resurrectTries = 0;
         _combineSinkSeen = false;
+        if (fromTeardown !== true) cfg.combineWanted = false;
         if (!_combineWantActive) return;
         _combineWantActive = false;
         if (!_combineActive && _combineNullId === "") {

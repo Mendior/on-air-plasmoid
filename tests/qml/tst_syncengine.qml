@@ -81,6 +81,7 @@ Item {
             property string combinePrevOutput: ""
             property string combinePrevDefault: ""
             property int combineMasterPct: 100
+            property bool combineWanted: false
             property string audioOutputDevice: ""
         }
     }
@@ -197,6 +198,27 @@ Item {
             verify(un.indexOf("echo \"MASTER ${cm:-100}\"") !== -1);
             r.e.handleExec(": PW_UNCOMBINE_DONE;", "MASTER 40\n", "");
             compare(r.cfg.combineMasterPct, 40);
+        }
+
+        function test_the_sync_wish_survives_a_login() {
+            // The startup sweep tears the group down and nothing rebuilt it:
+            // "all speakers" used to mean "until the next reboot". The wish
+            // persists; the probe ack rebuilds; only the USER's off clears
+            // it — a logout's teardown does not.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            compare(r.cfg.combineWanted, true);
+            r.e.combineOutputsDisable(true);              // logout teardown
+            compare(r.cfg.combineWanted, true);           // wish survives
+            var r2 = rig([dev(wired), dev(btSink)], { combineWanted: true });
+            r2.e.handleExec(": PW_PROBE;", "__PACTL_YES__\n", "");
+            verify(r2.e._combineWantActive);              // the room is coming back
+            var cmd = r2.mock.execLog[r2.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_COMBINE ") === 0);
+            var r3 = rig([dev(wired), dev(btSink)]);
+            activate(r3);
+            r3.e.combineOutputsDisable();                 // the user's own off
+            compare(r3.cfg.combineWanted, false);         // wish cleared
         }
 
         function test_the_park_survives_a_logout_in_a_restore_file() {
