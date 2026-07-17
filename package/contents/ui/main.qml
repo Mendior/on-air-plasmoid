@@ -1955,7 +1955,11 @@ PlasmoidItem {
         var idx = castTargetIndex(dev.uuid);
         var targets = _castTargets.slice();
         if (idx >= 0) {
-            _castStopDevice(targets[idx]);
+            // Stop only what WE started: a device can be checked while
+            // nothing plays (or stay checked after a stop), and by the time
+            // it is unchecked another app may be using it — the same rule
+            // setUserVolume already lives by.
+            if (root._casting) _castStopDevice(targets[idx]);
             targets.splice(idx, 1);
             _castTargets = targets;
             if (targets.length === 0) {
@@ -2510,6 +2514,7 @@ PlasmoidItem {
 
     function stopWithFade() {
         infoTimer.stop();
+        connectWatchdog.stop();
         // A stop inside the wake-tone window is the person saying "I'm up" —
         // the fallback chime must not blare over it half a minute later, and
         // the alarm's volume override dies with the session it raised.
@@ -2632,6 +2637,14 @@ PlasmoidItem {
         playMusic.loops = (station.hostname && station.hostname.toString() === root._alarmToneUrl.toString())
                           ? MediaPlayer.Infinite : 1;
         playMusic.play();
+        // A dead-but-polite server accepts the TCP connect and then sends
+        // nothing: no data, no error, "Connecting…" forever. The watchdog
+        // turns that silence into an honest failure the heal road can act
+        // on. Local files load from disk — nothing to watch.
+        if (station.hostname && station.hostname.toString().indexOf("file://") !== 0)
+            connectWatchdog.restart();
+        else
+            connectWatchdog.stop();
         if (Plasmoid.configuration.fadeEnabled) {
             fadeInAnimation.from = 0;
             fadeInAnimation.to = targetVolume();
@@ -3669,6 +3682,12 @@ PlasmoidItem {
         id: playMusic
 
         onErrorOccurred: {
+            connectWatchdog.stop();
+            // An error landing inside a stop's fade-out window is the dying
+            // stream's last word, not a reason to resurrect it: re-arming
+            // the fallback or heal timers here used to restart playback
+            // seconds after the user explicitly pressed Stop.
+            if (fadeOutAnimation.running) return;
             isError = true;
             // restart, not start: a second error inside the 5 s window used
             // to inherit the first one's nearly-spent timer and blink away.
@@ -3768,6 +3787,10 @@ PlasmoidItem {
             } else {
                 stallTimer.stop();
             }
+            // Data arrived — the connect watchdog's question is answered.
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia
+                || playMusic.mediaStatus === MediaPlayer.BufferingMedia)
+                connectWatchdog.stop();
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && !root._favSyncedOnPlay) {
                 root._favSyncedOnPlay = true;
                 syncFavicons();
@@ -3981,12 +4004,47 @@ PlasmoidItem {
         interval: Math.min(300000, 15000 * Math.pow(2, root._stallAttempts))
         onTriggered: {
             if (playMusic.mediaStatus === MediaPlayer.StalledMedia) {
+                // Three stalls with growing patience is not a hiccup — a
+                // stream that cannot carry itself is dead in every way that
+                // matters, and retrying the same address at 5-minute
+                // intervals forever is not a recovery plan. Hand it to the
+                // same road a hard error takes: the heal can find where the
+                // station actually lives now.
+                if (root._stallAttempts >= 3) {
+                    console.log("[ARP] stall watchdog: still starving after "
+                                + root._stallAttempts + " retries — treating as dead");
+                    playMusic.stop();
+                    isError = true;
+                    errorTimer.restart();
+                    healTimer.restart();
+                    return;
+                }
                 root._stallAttempts += 1;
                 var src = playMusic.source;
                 playMusic.stop();
                 playMusic.source = src;
                 playMusic.play();
             }
+        }
+    }
+
+    Timer {
+        id: connectWatchdog
+        running: false
+        repeat: false
+        interval: 15000
+        onTriggered: {
+            var src = playMusic.source.toString();
+            if (src === "" || src.indexOf("file://") === 0) return;
+            if (fadeOutAnimation.running) return;
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia
+                || playMusic.mediaStatus === MediaPlayer.BufferingMedia) return;
+            if (!isPlaying()) return;
+            console.log("[ARP] connect watchdog: no data after 15 s from " + src);
+            playMusic.stop();
+            isError = true;
+            errorTimer.restart();
+            healTimer.restart();
         }
     }
 
