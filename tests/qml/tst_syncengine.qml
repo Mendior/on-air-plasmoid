@@ -427,6 +427,44 @@ Item {
             compare(r.e.verifyGuardInterval(), 11000 + 38000 + 12000);
         }
 
+        function test_empty_jacks_step_aside_from_the_clicks() {
+            // Jack detection said "not available" — nobody clicks into a
+            // hole in the air, and the start note says who sat out. The
+            // real room this comes from: two never-used front-panel jacks
+            // took turns failing the verify, one alarming verdict per run.
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_PORTS;", JSON.stringify([
+                { name: wired2, active_port: "p",
+                  ports: [{ name: "p", availability: "not available" }] },
+                { name: wired, active_port: "q",
+                  ports: [{ name: "q", availability: "availability unknown" }] }
+            ]), "");
+            verify(r.e.portUnplugged(wired2));
+            verify(!r.e.portUnplugged(wired));   // unknown is not unplugged
+            r.e.calibrateSync();
+            var cal = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cal.indexOf(": PW_CALIB") === 0);
+            verify(cal.indexOf(wired2) === -1);
+            verify(cal.indexOf(wired) !== -1);
+            var note = r.mock.notes[r.mock.notes.length - 1];
+            compare(note.title, "Calibration started");
+            verify(note.text.indexOf("desc of " + wired2) !== -1);
+        }
+
+        function test_empty_jack_does_not_inflate_the_verify_budget() {
+            var r = rig([dev(wired), dev(wired2), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_PORTS;", JSON.stringify([
+                { name: wired2, active_port: "p",
+                  ports: [{ name: "p", availability: "not available" }] }
+            ]), "");
+            r.e._verifyArmTimers();
+            // Two measurable members (wired + bt), not three.
+            compare(r.e.verifySettleInterval(), 11000);
+            compare(r.e.verifyGuardInterval(), 11000 + 38000 + 12000);
+        }
+
         function test_rebuild_holds_during_measurement_and_releases_after() {
             // A rebuild landing mid-verify unloads the loopback a click is
             // riding — nudges and retries must wait their turn.

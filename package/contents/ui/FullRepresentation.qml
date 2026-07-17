@@ -2971,7 +2971,7 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.ItemDelegate {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
-                            visible: root.sync._combineWantActive && !root.sync._calibrating
+                            visible: root.sync._combineWantActive && root.sync.calibPhase === ""
                             enabled: root.sync.calibPairReady()
                             text: i18n("Calibrate with the microphone")
                             icon.name: "audio-input-microphone"
@@ -2982,19 +2982,24 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // The whole ride, both rounds: the quiet gap between
+                        // the calibration clicks and the check clicks reads
+                        // as "done" — this row stays up until it really is.
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             Layout.margins: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
-                            visible: root.sync._calibrating
+                            visible: root.sync.calibPhase !== ""
                             PlasmaComponents3.BusyIndicator {
                                 implicitWidth: Kirigami.Units.iconSizes.small
                                 implicitHeight: implicitWidth
                             }
                             PlasmaComponents3.Label {
                                 Layout.fillWidth: true
-                                text: i18n("Listening to the clicks…")
+                                text: root.sync.calibPhase === "clicks"
+                                      ? i18n("Round 1 of 2 — clicks through every speaker…")
+                                      : i18n("Round 2 of 2 — quiet, checking the result…")
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.7
                             }
@@ -3042,7 +3047,10 @@ PlasmaExtras.Representation {
                                 }
                                 PlasmaComponents3.Label {
                                     Layout.preferredWidth: Kirigami.Units.gridUnit * 6
-                                    text: root.sync.outputDescription(balanceRow.modelData)
+                                    text: root.sync.portUnplugged(balanceRow.modelData)
+                                          ? i18n("%1 (nothing plugged in)",
+                                                 root.sync.outputDescription(balanceRow.modelData))
+                                          : root.sync.outputDescription(balanceRow.modelData)
                                     font: Kirigami.Theme.smallFont
                                     opacity: balanceRow.inGroup ? 0.7 : 0.35
                                     elide: Text.ElideRight

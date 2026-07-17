@@ -36,6 +36,7 @@ Item {
         _loadDeviceChannels();
         _loadSyncExcluded();
         app.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
+        refreshPortStates();
         // A crashed session can orphan the combined-output module — PipeWire
         // keeps it loaded forever. Sweep THIS instance's modules at startup
         // (per-instance sink name; a second widget's live combine survives),
@@ -77,6 +78,7 @@ Item {
     function onOutputsChanged() {
         _combineDefaultStealWatch();
         _combineTryRoute();
+        refreshPortStates();
         // A hardware sink came or went while the combined output is live —
         // rebuild the loopbacks for the CURRENT set. Snapshot-compared, or
         // the null sink's own appearance would trigger a rebuild and double
@@ -96,6 +98,27 @@ Item {
         // Combined local output: pactl availability probe
         if (cmd.indexOf(": PW_PROBE;") === 0) {
             _combineAvailable = (stdout || "").indexOf("__PACTL_YES__") !== -1;
+            return true;
+        }
+        // Jack detection: which sinks' active ports report "not available"
+        // (nothing physically plugged in). Only that exact answer counts —
+        // "availability unknown" (S/PDIF, most desktop line-outs) proves
+        // nothing either way and is left alone.
+        if (cmd.indexOf(": PW_PORTS;") === 0) {
+            var pm = {};
+            try {
+                var sinksJ = JSON.parse(stdout || "[]");
+                for (var pi = 0; pi < sinksJ.length; pi++) {
+                    var sj = sinksJ[pi];
+                    if (!sj || !sj.name || !sj.active_port || !sj.ports) continue;
+                    for (var pj = 0; pj < sj.ports.length; pj++)
+                        if (sj.ports[pj].name === sj.active_port
+                            && String(sj.ports[pj].availability) === "not available")
+                            pm[sj.name] = true;
+                }
+            } catch (e) {}
+            _portUnplugged = pm;
+            _portRev++;
             return true;
         }
         // Combined local output created — route onto it when its sink
@@ -932,9 +955,34 @@ Item {
     // Stream volume to put back after calibration (-1 = nothing to restore).
     property real _calibVolumeBefore: -1
 
+    // Jack detection, refreshed at startup, on device changes and before a
+    // calibration: sink name → true when its active port says "not
+    // available" (an empty jack). An empty jack can never pass the check —
+    // measuring it wastes half a minute and ends in an alarming partial
+    // verdict about a "speaker" that does not exist.
+    property var _portUnplugged: ({})
+    property int _portRev: 0
+
+    function refreshPortStates() {
+        app.exec(": PW_PORTS; pactl --format=json list sinks 2>/dev/null; true");
+    }
+
+    function portUnplugged(sink) {
+        void _portRev;
+        return _portUnplugged[sink] === true;
+    }
+
     function calibrateSync() {
         if (_calibrating || _verifyPending || !_combineActive) return;
         var sinks = _combineRealSinks();
+        // Empty jacks step aside: they stay in the group (plugging in later
+        // is welcome) but nobody clicks into a hole in the air.
+        var skipped = [];
+        sinks = sinks.filter(function(s) {
+            if (!portUnplugged(s)) return true;
+            skipped.push(outputDescription(s));
+            return false;
+        });
         var wired = "", bt = "";
         for (var i = 0; i < sinks.length; i++) {
             if (sinks[i].indexOf("bluez_") === 0) { if (bt === "") bt = sinks[i]; }
@@ -1014,6 +1062,14 @@ Item {
             + restore
             + " " + post
             + " true # " + app.nextSeq());
+        // Said AFTER the work is on its way (state before speech), because
+        // it must be said: two rounds of clicks with a quiet check between
+        // them read as "done" halfway through, and a calibration interrupted
+        // at half-time is worse than none.
+        var calNote = i18n("Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes.");
+        if (skipped.length > 0)
+            calNote += " " + i18n("Skipped (empty jack): %1.", skipped.join(", "));
+        app.notify(i18n("Calibration started"), calNote, "audio-input-microphone");
     }
 
     // Every load carries this generation: PipeWire happily loads a SECOND
@@ -1271,10 +1327,16 @@ Item {
     // remaining passes (music cutting in and out, "the speaker is dead"),
     // and the real verdict arriving later was discarded as stale. That is
     // why no verify ever managed to record its result.
+    // Busy phase for the UI: "" when idle, otherwise which round is on.
+    readonly property string calibPhase: _calibrating ? "clicks"
+                                         : (_verifyPending ? "verify" : "")
+
     function _verifyArmTimers() {
-        var n = Math.max(1, Math.min(8, _combineRealSinks().length));
+        // The same member set the verify will actually measure — empty
+        // jacks are skipped there, so they must not inflate the budget.
+        var vs = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
+        var n = Math.max(1, Math.min(8, vs.length));
         var bt = 0;
-        var vs = _combineRealSinks();
         for (var i = 0; i < vs.length; i++)
             if (vs[i].indexOf("bluez_") === 0) bt++;
         // Rebuild + Bluetooth re-acquire need real time before clicks ride
@@ -1304,7 +1366,9 @@ Item {
             // The group members ride along for the presence phase: the
             // verify must be able to say WHICH speaker it could not hear,
             // and the combined pass alone cannot (in-sync arrivals fuse).
-            var sinks = _combineRealSinks();
+            // Empty jacks are not members — an unpluggable partial verdict
+            // about a hole in the air taught nobody anything.
+            var sinks = _combineRealSinks().filter(function(s) { return !portUnplugged(s); });
             var argv = "";
             for (var vi = 0; vi < sinks.length && vi < 8; vi++)
                 argv += " '" + sinks[vi].replace(/'/g, "'\\''") + "'";
