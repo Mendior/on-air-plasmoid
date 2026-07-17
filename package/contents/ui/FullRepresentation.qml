@@ -718,7 +718,9 @@ PlasmaExtras.Representation {
                                 id: webItem
                                 required property var model
                                 required property int index
-                                readonly property bool isPreviewing: root._previewUrl === model.url && isPlaying()
+                                // A cast preview leaves the local player idle
+                                // — the row must still show its stop state.
+                                readonly property bool isPreviewing: root._previewUrl === model.url && (isPlaying() || root._casting)
                                 width: parent.width
                                 height: Kirigami.Units.gridUnit * 3
 

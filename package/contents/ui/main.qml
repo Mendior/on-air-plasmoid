@@ -408,7 +408,11 @@ PlasmoidItem {
     // A second click on the same result stops playback.
     function previewStation(name, url, favicon, rbUuid) {
         if (!url) return;
-        if (isPlaying() && root._previewUrl === url) {
+        // A preview routed to cast devices leaves the LOCAL player idle
+        // (isPlaying() false) — so the second tap must also recognize
+        // "casting this preview" as playing, or the row offers no way to
+        // stop it and a re-tap restarts instead of toggling off.
+        if ((isPlaying() || _casting) && root._previewUrl === url) {
             stopWithFade();
             return;
         }
@@ -1109,9 +1113,14 @@ PlasmoidItem {
             // Recompute every schedule from its hh:mm fields — 07:00 must
             // mean 07:00 where the machine now lives. Idempotent across DST
             // flips (nextOccurrence already builds zone-correct instants).
+            // Anchored at now - GRACE, not now: a machine woken at 07:10 to
+            // a 07:00 alarm across a DST flip must still see 07:00 as a
+            // just-passed occurrence the fire scan below catches, not get it
+            // recomputed forward to tomorrow and silently skipped.
             for (var r = 0; r < list.length; r++)
                 list[r].nextRun = AlarmLogic.nextOccurrence(
-                    list[r].hh, list[r].mm, list[r].repeat, list[r].weekday, now);
+                    list[r].hh, list[r].mm, list[r].repeat, list[r].weekday,
+                    now - AlarmLogic.GRACE_MS);
             changed = true;
         }
         for (var i = list.length - 1; i >= 0; i--) {
@@ -1319,6 +1328,10 @@ PlasmoidItem {
     // this matches what is playing (a Deezer guess must not paint over the
     // track's own cover, and "no ICY title" is normal for a file).
     property string _localArtForSource: ""
+    // Generation + expected source for the local-cover probe, so a rapid
+    // track switch cannot land an older track's cover on the new one.
+    property int _artLocalSeq: 0
+    property string _artLocalWant: ""
 
     function playLocalFile(fileUrl, displayName) {
         if (!fileUrl) return;
@@ -1339,7 +1352,13 @@ PlasmoidItem {
         var artDir = artNoExt.substring(0, artSlash).replace(/'/g, "'\\''");
         var artBase = artNoExt.substring(artSlash + 1).replace(/'/g, "'\\''");
         var artStem = artNoExt.replace(/'/g, "'\\''");
-        executable.exec(": ART_LOCAL; for s in '" + artDir + "/.covers/" + artBase + "'"
+        // Tag this probe with its own generation and the exact source it is
+        // for: a rapid A->B track switch would otherwise let A's result land
+        // on B, pinning A's cover onto B for B's whole duration (and B's own
+        // empty probe could never clear it).
+        var artSeq = ++_artLocalSeq;
+        _artLocalWant = urlStr;
+        executable.exec(": ART_LOCAL " + artSeq + "; for s in '" + artDir + "/.covers/" + artBase + "'"
                         + " '" + artStem + "'; do"
                         + " for e in jpg jpeg png webp; do"
                         + " [ -f \"$s.$e\" ] && { printf '__ART__%s\\n' \"$s.$e\"; break 2; };"
@@ -1532,7 +1551,11 @@ PlasmoidItem {
             // This triggers onServersChanged → reloadStationsModel (stop + reload),
             // so we continue only after an event-loop cycle.
             Plasmoid.configuration.servers = JSON.stringify(servers);
-            if (makeFavorite) toggleFavorite(stName);
+            // Favorites are keyed by NAME: starring a new station whose name
+            // already matches an existing favorite must not TOGGLE that
+            // favorite off. Guard on isFavorite, same as the already-in-list
+            // branch above.
+            if (makeFavorite && !isFavorite(stName)) toggleFavorite(stName);
             Qt.callLater(function() {
                 for (var k = 0; k < stationsModel.count; k++) {
                     const h = stationsModel.get(k).hostname;
@@ -3938,12 +3961,24 @@ PlasmoidItem {
             }
             // Local track's sidecar cover found → show it (and pin it against
             // the network art lookup for as long as this source plays).
-            if (cmd.indexOf(": ART_LOCAL;") === 0) {
-                var artM = (stdout || "").match(/__ART__(.+)/);
+            if (cmd.indexOf(": ART_LOCAL ") === 0) {
+                // Apply only the LATEST probe, and only if the file it was
+                // for is still the one playing — a stale A-probe landing
+                // during B must change nothing.
+                var artSeqM = cmd.match(/^: ART_LOCAL (\d+);/);
                 var artSrc = playMusic.source.toString();
-                if (artM && artSrc.indexOf("file://") === 0) {
+                if (!artSeqM || parseInt(artSeqM[1], 10) !== root._artLocalSeq
+                    || artSrc !== root._artLocalWant || artSrc.indexOf("file://") !== 0)
+                    return;
+                var artM = (stdout || "").match(/__ART__(.+)/);
+                if (artM) {
                     root._localArtForSource = artSrc;
                     root.albumArtUrl = "file://" + artM[1].split("/").map(encodeURIComponent).join("/");
+                } else {
+                    // This file has no sidecar cover of its own — clear any
+                    // leftover so a previous track's cover does not linger.
+                    root._localArtForSource = "";
+                    root.albumArtUrl = "";
                 }
                 return;
             }
