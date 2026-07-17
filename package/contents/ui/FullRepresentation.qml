@@ -689,7 +689,7 @@ PlasmaExtras.Representation {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: fullRepresentation.webSearching
                                       ? i18n("Searching the web…")
-                                      : i18n("From the web") + " (" + webResultsModel.count + ")"
+                                      : i18n("%1 (%2)", i18n("From the web"), webResultsModel.count)
                                 font.weight: Font.DemiBold
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 color: root.accent
@@ -1648,8 +1648,9 @@ PlasmaExtras.Representation {
                 }
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
-                    text: (libraryPage.showLiked ? i18n("Liked songs") : i18n("Recently played"))
-                          + " (" + (libraryPage.showLiked ? likedModel.count : historyModel.count) + ")"
+                    text: i18n("%1 (%2)",
+                               libraryPage.showLiked ? i18n("Liked songs") : i18n("Recently played"),
+                               libraryPage.showLiked ? likedModel.count : historyModel.count)
                     font.weight: Font.DemiBold
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: root.accent
@@ -1807,7 +1808,7 @@ PlasmaExtras.Representation {
                 }
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
-                    text: i18n("My Music") + " (" + musicFolder.count + ")"
+                    text: i18n("%1 (%2)", i18n("My Music"), musicFolder.count)
                     font.weight: Font.DemiBold
                     color: root.accent
                 }
@@ -2814,6 +2815,11 @@ PlasmaExtras.Representation {
                             castMenuColumn.implicitHeight,
                             fullRepresentation.height - Kirigami.Units.gridUnit * 3)
                         contentWidth: availableWidth
+                        // The content is fitted to the width by design — an
+                        // AsNeeded horizontal bar only feeds the padding<->
+                        // visibility binding loop Plasma's ScrollView logs
+                        // on every popup open.
+                        PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
                         ColumnLayout {
                         id: castMenuColumn
@@ -3042,7 +3048,7 @@ PlasmaExtras.Representation {
                                     onMoved: root.sync.setDeviceTrim(balanceRow.trimKey, value / 100)
 
                                     PlasmaComponents3.ToolTip {
-                                        text: i18n("This speaker's share of the volume — the balance follows every master move and is remembered for the device.")
+                                        text: i18n("This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders.")
                                     }
                                 }
                                 PlasmaComponents3.Label {
