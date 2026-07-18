@@ -197,12 +197,26 @@ TestCase {
     function test_sanitize_keeps_a_good_entry_whole() {
         var out = AL.sanitizeAlarms(JSON.stringify([{
             station: "Radio", url: "http://r", favicon: "http://f", hh: 6, mm: 45,
-            repeat: "weekly", weekday: 1, volumePct: 60, keepAwake: true, nextRun: 123456
+            repeat: "weekly", weekday: 1, volumePct: 60, keepAwake: true, nextRun: 123456,
+            uuid: "abc-123"
         }]))
         compare(out.length, 1)
         compare(out[0].station, "Radio")
         compare(out[0].nextRun, 123456)
         compare(out[0].keepAwake, true)
+        compare(out[0].uuid, "abc-123")
+    }
+
+    function test_sanitize_defaults_a_missing_uuid_to_empty() {
+        // Entries saved before the uuid field existed must load unchanged —
+        // an empty uuid just means the heal takes the name-search road.
+        var out = AL.sanitizeAlarms(JSON.stringify([
+            { url: "http://r", hh: 7, mm: 0 },
+            { url: "http://s", hh: 7, mm: 0, uuid: 42 }
+        ]))
+        compare(out.length, 2)
+        compare(out[0].uuid, "")
+        compare(out[1].uuid, "42")   // coerced to string, never a number
     }
 
     // ── sanitizeRecSchedules ──────────────────────────────────────────────

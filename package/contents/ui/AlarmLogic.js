@@ -98,6 +98,9 @@ function sanitizeAlarms(raw, nowMs) {
             station: (a.station || url).toString(),
             url: url,
             favicon: (a.favicon || "").toString(),
+            // Directory identity, kept across save/load: a deleted
+            // station's alarm heals by uuid where a name search may miss.
+            uuid: (a.uuid || "").toString(),
             hh: hh,
             mm: mm,
             repeat: repeat,

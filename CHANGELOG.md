@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **An alarm outlives its station's deletion — fully.** Every playback recovery road (the retry backoff, the network-back resume, the directory heal and its callbacks) now falls back to the order's own saved copy of the station when the list row is gone, instead of only re-knocking on the dead address: the full heal ladder runs for a deleted station's alarm, the directory identity rides on the alarm entry so heal-by-identity works too, the alarm's volume floor and fallback tone survive every automated replay, and a heal that finds the station's new address updates the copy itself.
+- **A zone change cannot resurrect a long-missed entry.** Re-expressing schedules after a timezone move now skips entries no zone shift could still save — a Saturday once-alarm missed by days reports itself missed instead of ringing on whatever day the offset happened to move.
+- **Media keys survive a quick off-and-on.** The media-key bridge's delayed sweeper recognizes helpers by a name that never changes — re-enabling inside its two-second window handed it a brand-new helper to kill. The restart now waits the window out and starts clean.
+- **Every station gets a face.** Stations whose logo field is empty ask the directory themselves (identity first, exact name otherwise) and the find is saved; the logo cache no longer blacklists everything for 24 hours after an offline login and only caches formats the player can actually show; a corrupt cached logo heals itself everywhere through one shared mechanism; and a station with no obtainable logo shows its initials on its own fixed color — in the list and on the vinyl label — with the row number returning the moment a reorder control is used. The Add dialog looks up a logo for a station saved without one, "Fetch missing logos" also upgrades known-tiny icons, and every road a logo URL can enter the configuration passes one http(s)-or-empty gate.
+
 ## 2026.19
 
 The audit release. Three independent full-codebase sweeps — hundreds of adversarially verified findings, every fix regression-tested, the test suite tripled (129 QML + 83 Python checks). Short version below; the commit history tells each story in full.

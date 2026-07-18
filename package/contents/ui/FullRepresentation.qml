@@ -2595,7 +2595,8 @@ PlasmaExtras.Representation {
                                               alarmHH.value, alarmMM.value,
                                               repeats[alarmRepeat.currentIndex],
                                               alarmWeekday.currentIndex,
-                                              alarmVolume.value, alarmAwake.checked)
+                                              alarmVolume.value, alarmAwake.checked,
+                                              st.uuid || "")
                             }
                         }
                     }

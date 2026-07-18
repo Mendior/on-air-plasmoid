@@ -355,9 +355,11 @@ PlasmoidItem {
             // the Space shortcut pass a fallback index after a preview/local file
             // (lastPlay === -1) and the toggle-stop check above needs the match.
             lastPlay = index;
+            // A pick with a live row retires the orphan copy — the index
+            // roads answer for the order again.
+            root._orphanOrder = null;
             root._previewUrl = "";
             root._previewUuid = "";
-            root._standingOrderUrl = "";
             // The standing order: play, and keep playing until I say stop.
             root._wantsPlaying = true;
             // Only a genuine user pick resets the backoff ladder — an
@@ -474,8 +476,10 @@ PlasmoidItem {
         root._previewRescueSpent = false;
         root._previewRescueCands = [];
         root.lastPlay = -1;
-        // A preview is an audition, not a standing order — no retry roads.
+        // A preview is an audition, not a standing order — no retry roads,
+        // and any orphaned order (a ringing alarm's copy) dies with it.
         root._wantsPlaying = false;
+        root._orphanOrder = null;
         healRetryTimer.stop();
         root.currentStationFavicon = favicon || "";
         // noUpgrade: the row is directory-fresh — play it as-is, instantly.
@@ -971,8 +975,7 @@ PlasmoidItem {
         // without being asked. The settle delay covers DNS and the captive
         // little moments a link needs after it claims to be up.
         if (_wantsPlaying && !isPlaying() && !_casting
-            && ((lastPlay >= 0 && lastPlay < stationsModel.count)
-                || _standingOrderUrl !== ""))
+            && _orderSubject() !== null)
             netResumeTimer.restart();
     }
 
@@ -982,12 +985,9 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (!root._wantsPlaying || isPlaying() || root._casting) return;
-            if (lastPlay < 0 || lastPlay >= stationsModel.count) {
-                _standingOrderReplay();
-                return;
-            }
+            if (_orderSubject() === null) return;
             console.log("[ARP] network is back — resuming the standing order");
-            refreshServer(lastPlay, false);
+            _replayOrder();
         }
     }
 
@@ -1327,8 +1327,11 @@ PlasmoidItem {
     }
 
     // ── Wake-up alarms ───────────────────────────────────────────────────────
-    // Entries: { station, url, favicon, hh, mm, repeat: "once"|"daily"|"weekly",
+    // Entries: { station, url, favicon, uuid, hh, mm,
+    //            repeat: "once"|"daily"|"weekly",
     //            weekday: 0-6, volumePct, keepAwake, nextRun: epoch ms }.
+    // uuid is the radio-browser identity when the station came from the
+    // search — it gives a deleted station's alarm the byuuid heal road.
     // Same wall-clock scheduling as the recordings above (AlarmLogic.js), but
     // a SEPARATE list on purpose: a recording entry means "capture the rest
     // of its window", an alarm means "start playing, loud enough to wake" —
@@ -1343,7 +1346,7 @@ PlasmoidItem {
         Plasmoid.configuration.alarms = JSON.stringify(alarms);
     }
 
-    function addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake) {
+    function addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake, uuid) {
         if (!url) return;
         // One defaulted weekday for BOTH the stored entry and the schedule
         // math — feeding nextOccurrence the raw undefined made the computed
@@ -1354,6 +1357,7 @@ PlasmoidItem {
             "station": stationName || url,
             "url": url,
             "favicon": favicon || "",
+            "uuid": (uuid || "").toString(),
             "hh": hh, "mm": mm,
             "repeat": repeat || "once",
             "weekday": wd,
@@ -1540,6 +1544,13 @@ PlasmoidItem {
         lastPlay = -1;
         healRetryTimer.stop();
         netResumeTimer.stop();
+        // The order's own copy: recovery must survive the station having
+        // been deleted from the list. Every road that used to look the
+        // station up by row index falls back to this via _orderSubject —
+        // without it, a mid-alarm stream death ended the wake-up for good.
+        _orphanOrder = { "name": a.station, "hostname": a.url,
+                         "favicon": a.favicon || "",
+                         "uuid": (a.uuid || "").toString() };
         startWithFade({ "name": a.station, "hostname": a.url,
                         "favicon": a.favicon || "", "active": true });
         // The floor must reach the DEVICES too: while casting, the local
@@ -1552,18 +1563,12 @@ PlasmoidItem {
         alarmFallbackTimer.restart();
         // Keep the station list's playing-row marker honest when the alarm
         // station is in the visible list (same courtesy the heal path pays).
-        // NOT in the list (deleted since the alarm was made): every recovery
-        // road is keyed on lastPlay, so without this standalone order a
-        // stream death at 07:20 left the sleeper in silence with no retry,
-        // no tone, nothing — the standing order must be able to replay the
-        // alarm's own URL with no row to stand on.
+        // Deleted-station recovery itself rides _orphanOrder (set above) —
+        // the roads fall back to it via _orderSubject when no row answers.
         Qt.callLater(function() {
-            root._standingOrderUrl = a.url;
-            root._standingOrderName = a.station || "";
             for (var k = 0; k < stationsModel.count; k++) {
                 if (stationsModel.get(k).hostname === a.url) {
                     lastPlay = k;
-                    root._standingOrderUrl = "";
                     break;
                 }
             }
@@ -1726,6 +1731,7 @@ PlasmoidItem {
         // A local track ends on its own — replaying it after a network blip
         // would be absurd, so the standing order does not apply.
         root._wantsPlaying = false;
+        root._orphanOrder = null;
         healRetryTimer.stop();
         // Invalidate in-flight auto-bitrate resolves — otherwise a delayed
         // radio-browser callback would hijack the just-started local file
@@ -2883,6 +2889,45 @@ PlasmoidItem {
     property bool _wantsPlaying: false
     property int _healRetryAttempts: 0
 
+    // The standing order's own copy of the station it is about — set when
+    // playback starts from something the list cannot answer for (an alarm
+    // can ring for a station deleted since it was set). Every recovery
+    // road used to look the station up by row index and went quiet the
+    // moment that index was gone: a mid-alarm stream death then ended the
+    // wake-up in permanent silence. Cleared by every explicit routing act
+    // (stop, a station pick, a preview, a local file).
+    property var _orphanOrder: null
+
+    // The subject of the recovery roads: the live list row while lastPlay
+    // still points at one, else the orphan copy — but only while the
+    // standing order holds AND the orphan still matches what is actually
+    // being recovered (a preview or local file retires it via
+    // _wantsPlaying/_currentOrigUrl without touching this function).
+    function _orderSubject() {
+        if (lastPlay >= 0 && lastPlay < stationsModel.count)
+            return stationsModel.get(lastPlay);
+        if (_orphanOrder && _wantsPlaying
+            && _currentOrigUrl === _orphanOrder.hostname)
+            return _orphanOrder;
+        return null;
+    }
+
+    // Replay the standing order from the top. A live row takes the usual
+    // full road (refreshServer: fresh unwrap, fresh bitrate pass); an
+    // orphaned order replays its own saved copy — automated=true, so a
+    // ringing alarm's volume floor and fallback tone survive the restart.
+    function _replayOrder() {
+        if (lastPlay >= 0 && lastPlay < stationsModel.count) {
+            refreshServer(lastPlay, false);
+            return;
+        }
+        var st = _orderSubject();
+        if (!st) return;
+        root.currentStationFavicon = st.favicon || "";
+        _playStation({ "name": st.name, "hostname": st.hostname,
+                       "favicon": st.favicon || "", "active": true }, false, true);
+    }
+
     function _healNormName(s) {
         return HealLogic.normName(s);
     }
@@ -2904,16 +2949,9 @@ PlasmoidItem {
 
     function _tryHealStation() {
         if (isPlaying() || _casting) return;
-        if (root._previewUrl !== "" || lastPlay < 0 || lastPlay >= stationsModel.count) {
-            // No row to heal by — but a rowless standing order (an alarm
-            // whose station was deleted) still owes the sleeper the
-            // heartbeat, or one stream death ends the wake-up for good.
-            if (root._previewUrl === "" && root._wantsPlaying
-                && root._standingOrderUrl !== "")
-                _healArmRetry();
-            return;
-        }
-        var st = stationsModel.get(lastPlay);
+        if (root._previewUrl !== "") return;
+        var st = _orderSubject();
+        if (st === null) return;
         var orig = (st.hostname || "").toString();
         // Only heal the station we actually failed on.
         if (orig === "" || orig.indexOf("file://") === 0 || orig !== root._currentOrigUrl) return;
@@ -2955,7 +2993,7 @@ PlasmoidItem {
         if (stUuid !== "") {
             _rbFetch("/json/stations/byuuid/" + stUuid, 5000, function(uxhr) {
                 if (mySeq !== _healSeq) return;
-                if (isPlaying() || lastPlay < 0) return;
+                if (isPlaying() || _orderSubject() === null) return;
                 var cand = "", ok = false;
                 try {
                     var row = (JSON.parse(uxhr.responseText) || [])[0] || {};
@@ -2985,7 +3023,7 @@ PlasmoidItem {
                  + encodeURIComponent(run.name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
             if (mySeq !== _healSeq) return;          // superseded by a newer heal
-            if (isPlaying() || lastPlay < 0) return; // user moved on / recovered
+            if (isPlaying() || _orderSubject() === null) return; // user moved on / recovered
             if (xhr && xhr.status === 200) {
                 try {
                     var results = JSON.parse(xhr.responseText) || [];
@@ -3030,7 +3068,7 @@ PlasmoidItem {
     function _healAdvance() {
         var run = root._healRun;
         if (!run || run.seq !== _healSeq) return;
-        if (isPlaying() || lastPlay < 0) return;
+        if (isPlaying() || _orderSubject() === null) return;
         if (run.candidates.length === 0) {
             if (!run.nameSearched) { _healNameSearch(run.seq); return; }
             root._healRun = null;
@@ -3070,31 +3108,11 @@ PlasmoidItem {
         interval: 30000
         onTriggered: {
             if (!root._wantsPlaying || isPlaying() || root._casting) return;
-            if (lastPlay < 0 || lastPlay >= stationsModel.count) {
-                _standingOrderReplay();
-                return;
-            }
+            if (_orderSubject() === null) return;
             console.log("[ARP] heal retry #" + root._healRetryAttempts
                         + ": replaying the saved address");
-            refreshServer(lastPlay, false);
+            _replayOrder();
         }
-    }
-
-    // A standing order with no list row to stand on — an alarm whose
-    // station was deleted after the alarm was made. The row-based roads
-    // replay refreshServer(lastPlay); this replays the remembered URL
-    // directly, so the sleeper still gets every retry the row road gives.
-    property string _standingOrderUrl: ""
-    property string _standingOrderName: ""
-
-    function _standingOrderReplay() {
-        if (_standingOrderUrl === "" || !_wantsPlaying) return;
-        console.log("[ARP] standing order: replaying the rowless URL");
-        _currentOrigUrl = _standingOrderUrl;
-        _currentUnwrappedUrl = _standingOrderUrl;
-        _currentResolvedUrl = _standingOrderUrl;
-        startWithFade({ "name": _standingOrderName || _standingOrderUrl,
-                        "hostname": _standingOrderUrl, "favicon": "", "active": true });
     }
 
     function _healArmRetry() {
@@ -3166,6 +3184,19 @@ PlasmoidItem {
             }
         } catch (e) {
             console.log("[ARP] healCommit: " + e);
+        }
+        // No list row answered for oldUrl — an orphaned order (an alarm can
+        // ring for a station deleted from the list) rewrites its own copy
+        // instead, so the next death this session replays the live address
+        // rather than knocking on the dead one until the lookup lock expires.
+        // Only byUuid/same-domain commits reach here (the cross-domain
+        // stopgap returned above), so the rewrite carries the same trust the
+        // saved-list rewrite demands.
+        if (root._orphanOrder && root._orphanOrder.hostname === oldUrl) {
+            root._orphanOrder.hostname = newUrl;
+            root._currentOrigUrl = newUrl;
+            root._currentUnwrappedUrl = newUrl;
+            root._currentResolvedUrl = newUrl;
         }
     }
 
@@ -3412,8 +3443,8 @@ PlasmoidItem {
         // An explicit stop cancels the standing order — every automatic
         // recovery road (retry backoff, network-back resume) dies with it.
         root._wantsPlaying = false;
+        root._orphanOrder = null;
         root._healRetryAttempts = 0;
-        root._standingOrderUrl = "";
         healRetryTimer.stop();
         netResumeTimer.stop();
         // A stop inside the wake-tone window is the person saying "I'm up" —
