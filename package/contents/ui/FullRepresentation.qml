@@ -3276,11 +3276,24 @@ PlasmaExtras.Representation {
                             // every toggle, because the click itself severs a
                             // declarative binding. A failed load resets the
                             // intent and the box unchecks itself.
+                            // Wanted-but-idle-parked still reads as ON: the
+                            // graph is only sleeping and the next play wakes
+                            // it — an unchecked box here would let that wake
+                            // contradict what the user just looked at, and
+                            // unchecking a PARKED sync must genuinely turn
+                            // it off (the disable clears the wish before its
+                            // not-active early return).
                             checked: root.sync._combineWantActive
+                                     || (root.sync._combineIdleParked
+                                         && Plasmoid.configuration.combineWanted === true)
                             onToggled: {
                                 if (checked) root.sync.combineOutputsEnable()
                                 else root.sync.combineOutputsDisable()
-                                checked = Qt.binding(function() { return root.sync._combineWantActive })
+                                checked = Qt.binding(function() {
+                                    return root.sync._combineWantActive
+                                           || (root.sync._combineIdleParked
+                                               && Plasmoid.configuration.combineWanted === true)
+                                })
                             }
 
                             PlasmaComponents3.ToolTip {
@@ -3296,6 +3309,8 @@ PlasmaExtras.Representation {
                             Layout.rightMargin: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
                             visible: root.sync._combineWantActive
+                                     || (root.sync._combineIdleParked
+                                         && Plasmoid.configuration.combineWanted === true)
 
                             PlasmaComponents3.Label {
                                 text: i18n("Sync fine-tune")

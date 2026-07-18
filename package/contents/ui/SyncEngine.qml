@@ -186,10 +186,6 @@ Item {
         // The kick-abort's own disconnect landed — only the menu wants to
         // know; the user-disconnect handler (parked wishes, in-flight state)
         // is deliberately NOT on this road.
-        if (cmd.indexOf(": BT_KICK_ABORT;") === 0) {
-            app.btList();
-            return true;
-        }
         // Combined local output: pactl availability probe
         if (cmd.indexOf(": PW_PROBE;") === 0) {
             _combineAvailable = (stdout || "").indexOf("__PACTL_YES__") !== -1;
@@ -459,6 +455,14 @@ Item {
             if (mM) cfg.combineMasterPct = Math.max(10, Math.min(100, parseInt(mM[1], 10)));
             if (!_combineActive && !_combineWantActive)
                 cfg.combinePrevDefault = "";
+            // The park's unload has fully landed — a wake that arrived
+            // mid-tail can now take the clean road.
+            _combineParkTail = false;
+            if (_combineWakeQueued && _combineIdleParked
+                && cfg.combineWanted === true && !_combineActive && !_combineWantActive
+                && _appPlaying)
+                _combineWakeFromPark();
+            else _combineWakeQueued = false;
             return true;
         }
         // Microphone calibration finished — apply and remember the lag.
@@ -834,10 +838,20 @@ Item {
             var rlM = cmd.match(/^: PW_REFLAT ([CS]) ([0-9A-F:]{17})/);
             if (!rlM) return true;
             var rlUs = (stdout || "").match(/REFLAT (\d+)/);
-            if (!rlUs) return true;              // sink absent: nothing to read
-            var rlMs = Math.round(parseInt(rlUs[1], 10) / 1000);
+            var rlMs = rlUs ? Math.round(parseInt(rlUs[1], 10) / 1000) : -1;
             // A suspended sink reports 0; anything past 3 s is not a report.
-            if (rlMs <= 0 || rlMs > 3000) return true;
+            // Either way an unusable reading also RETIRES a pending first
+            // sighting — a stale one from minutes ago must not later stand
+            // as the "confirming twin" of a fresh transient.
+            if (rlMs <= 0 || rlMs > 3000) {
+                if (_refLatPending[rlM[2]] !== undefined) {
+                    var mz = {};
+                    for (var kz in _refLatPending)
+                        if (kz !== rlM[2]) mz[kz] = _refLatPending[kz];
+                    _refLatPending = mz;
+                }
+                return true;
+            }
             if (rlM[1] === "C") {
                 // Calibration context: this reading IS the reference the
                 // stored lag was measured under — and a fresh calibration
@@ -857,14 +871,15 @@ Item {
             }
             var refV;
             try { refV = JSON.parse(cfg.syncRefLatMap || "{}")[rlM[2]]; } catch (e) {}
-            if (refV !== undefined && Math.abs(rlMs - refV) > 300) {
-                // A LARGE move needs a second opinion: a codec switch can
-                // read seconds-deep for a beat before the transport settles,
-                // and acting on that transient would have the corrector
-                // itself throw the room audibly out for a rebuild cycle.
-                // Two consecutive readings within 100 ms of each other make
-                // it real; the retry probe is armed only on FIRST sight, so
-                // an oscillating transport cannot turn this into a drumbeat.
+            if (refV === undefined || Math.abs(rlMs - refV) > 300) {
+                // Anything CONSEQUENTIAL needs a second opinion — a large
+                // move against the reference, and equally the ADOPTION of a
+                // first-ever reference: a codec switch can read seconds-deep
+                // for a beat, and persisting that transient as the reference
+                // would drive every later shift from a lie. Two consecutive
+                // readings within 100 ms make it real; the retry probe is
+                // armed only on FIRST sight, so an oscillating transport
+                // cannot turn this into a drumbeat.
                 var pend = _refLatPending[rlM[2]];
                 if (pend === undefined || Math.abs(pend - rlMs) > 100) {
                     var mp = {};
@@ -882,8 +897,8 @@ Item {
                 _refLatPending = mc;
             }
             if (refV === undefined) {
-                // Calibrated before this mechanism existed: adopt the
-                // current reading as the reference — future re-rolls
+                // Calibrated before this mechanism existed: adopt the now
+                // twin-confirmed reading as the reference — future re-rolls
                 // correct relative to here.
                 try {
                     var refA = JSON.parse(cfg.syncRefLatMap || "{}");
@@ -1187,16 +1202,41 @@ Item {
         onTriggered: _idleTeardownTick()
     }
 
+    // True from the park's disable dispatch until its PW_UNCOMBINE_DONE ack
+    // lands — a wake inside that window would race the unload shell for the
+    // default sink and the remembered master level, so it queues instead.
+    property bool _combineParkTail: false
+    property bool _combineWakeQueued: false
+
     function _idleTeardownTick() {
         if (!_combineActive || cfg.combineWanted !== true) return;
         if (_appPlaying) return;
-        // Never park under a measurement, a mid-cure watchdog or a kick —
-        // each owns audio state the disable road would fight over.
+        // Never park under a measurement, a mid-cure watchdog, a kick or an
+        // in-flight loopback rebuild — each owns audio state the disable
+        // road would fight over (a surviving PW_RELOOP shell would attach
+        // fresh loopbacks to whatever became the default source).
         if (_calibrating || _verifyPending || _btKickInFlight
-            || _btJoinWatchMac !== "") { idleTeardownTimer.restart(); return; }
+            || _btJoinWatchMac !== "" || _combineReloopBusy) {
+            idleTeardownTimer.restart();
+            return;
+        }
         console.log("[ARP] sync: idle — parking the combined graph");
         _combineIdleParked = true;
+        _combineParkTail = true;
         combineOutputsDisable(true);
+    }
+
+    function _combineWakeFromPark() {
+        _combineIdleParked = false;
+        _combineWakeQueued = false;
+        console.log("[ARP] sync: sound is back — waking the combined graph");
+        // Same insurance the startup probe carries: if the enable no-ops on
+        // a thin device list (the Bluetooth speaker auto-powered off during
+        // the park), the resurrect knocks retry it as sinks reappear —
+        // otherwise the graph stayed down for the whole session with the
+        // wish still set.
+        _resurrectTries = 6;
+        combineOutputsEnable();
     }
 
     on_AppPlayingChanged: {
@@ -1204,9 +1244,11 @@ Item {
             idleTeardownTimer.stop();
             if (_combineIdleParked && cfg.combineWanted === true && !_combineActive
                 && !_combineWantActive) {
-                _combineIdleParked = false;
-                console.log("[ARP] sync: sound is back — waking the combined graph");
-                combineOutputsEnable();
+                // Inside the park-disable's async tail the unload shell is
+                // still running — queue the wake for its ack instead of
+                // racing it for the default sink and the master memory.
+                if (_combineParkTail) _combineWakeQueued = true;
+                else _combineWakeFromPark();
             }
         } else if (_combineActive && cfg.combineWanted === true) {
             idleTeardownTimer.restart();
@@ -1752,7 +1794,13 @@ Item {
         // persists and the next session's probe rebuilds the room.
         _resurrectTries = 0;
         _combineSinkSeen = false;
-        if (fromTeardown !== true) cfg.combineWanted = false;
+        if (fromTeardown !== true) {
+            cfg.combineWanted = false;
+            // A real off while parked (or any manual off) retires the park
+            // state — nothing may wake a sync the user switched off.
+            _combineIdleParked = false;
+            _combineWakeQueued = false;
+        }
         if (!_combineWantActive) return;
         _combineWantActive = false;
         if (!_combineActive && _combineNullId === "") {
@@ -2369,7 +2417,7 @@ Item {
                 // Remember the profile that was active — if BOTH standard
                 // A2DP names fail after the off, restoring it is the last
                 // resort that keeps the card from being left dead on "off".
-                + "; p=$(pactl list cards | awk '/Name: bluez_card." + kickMacU + "/{f=1}"
+                + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + kickMacU + "/{f=1}"
                 + " f && /Active Profile:/{print $3; exit}')"
                 + "; timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
                 + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"

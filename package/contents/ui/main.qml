@@ -550,7 +550,9 @@ PlasmoidItem {
         // rescued stations with a dead URL and no identity to heal by.
         if (root._previewUuid === "" || root._previewIdRetried) { tryRaw(); return; }
         root._previewIdRetried = true;
-        _rbFetch("/json/stations/byuuid/" + root._previewUuid, 4000, function(xhr) {
+        // encodeURIComponent: the fourth and last byuuid site adopts the
+        // same invariant as its three siblings — a uuid stays a path SEGMENT.
+        _rbFetch("/json/stations/byuuid/" + encodeURIComponent(root._previewUuid), 4000, function(xhr) {
             if (!live()) return; // stopped, moved on, or re-clicked
             var fresh = "";
             try {
@@ -1915,6 +1917,18 @@ PlasmoidItem {
     // hostname match would delete the wrong (first) row.
     function removeStation(popupIndex, name, hostname) {
         if (!hostname) return;
+        // Deleting the station the standing order is ABOUT retires the
+        // order with it — playing or mid-recovery alike. Without this the
+        // order stood forever: the idle teardown never parked, and the next
+        // network edge replayed whatever row inherited index 0. An order
+        // about a DIFFERENT station is left alone (it resumes below).
+        if (root._wantsPlaying && root._currentOrigUrl === hostname) {
+            root._wantsPlaying = false;
+            root._orphanOrder = null;
+            root._healRetryAttempts = 0;
+            healRetryTimer.stop();
+            netResumeTimer.stop();
+        }
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             // The popup list holds only ACTIVE stations — map the popup index to
@@ -4236,8 +4250,11 @@ PlasmoidItem {
         if (cmd === "Stop" || cmd === "Pause") {
             // Stop/Pause must NEVER start playback — only stop if playing.
             // Cast-only playback counts: the media key must reach the
-            // bedroom speaker too.
-            if (isPlaying() || _casting) stopWithFade();
+            // bedroom speaker too. And a standing order mid-recovery counts
+            // as well — silence is what the key asked for, and the retry
+            // ladder (up to 10 min between knocks) would otherwise restart
+            // the stream the user just refused.
+            if (isPlaying() || _casting || _wantsPlaying) stopWithFade();
         } else if (cmd === "PlayPause") {
             // PlayPause is the only toggle.
             if (isPlaying() || _casting) {

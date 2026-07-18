@@ -1124,10 +1124,15 @@ Item {
             verify(!r.e._combineActive);            // parked...
             compare(r.cfg.combineWanted, true);     // ...but still wanted
             verify(r.e._combineIdleParked);
+            // Sound comes back INSIDE the park's async tail — the wake must
+            // queue for the unload ack, not race it for the default sink.
             var lenBefore = r.mock.execLog.length;
-            r.mock.anythingPlaying = true;          // sound comes back
+            r.mock.anythingPlaying = true;
+            verify(r.mock.execLog.slice(lenBefore).join("\n").indexOf(": PW_COMBINE") === -1);
+            verify(r.e._combineWakeQueued);
+            // The tail lands — the queued wake takes the normal enable road.
+            r.e.handleExec(": PW_UNCOMBINE_DONE;", "MASTER 80\n", "");
             verify(!r.e._combineIdleParked);
-            // The normal enable road was taken again.
             var fresh = r.mock.execLog.slice(lenBefore).join("\n");
             verify(fresh.indexOf(": PW_COMBINE") !== -1);
         }
@@ -1187,19 +1192,50 @@ Item {
             compare(r.e._lagForSink(btSink), 960);   // 300 + (910 − 250)
         }
 
-        function test_reflat_without_reference_adopts_and_stays_put() {
+        function test_reflat_without_reference_adopts_only_a_twinned_reading() {
             var r = rig([dev(wired), dev(btSink)],
                         { syncOffsetMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 300 }) });
             activate(r);
-            // Calibrated before the mechanism existed: the first reading
-            // becomes the reference, no shift is invented from thin air.
+            // Calibrated before the mechanism existed: a SINGLE reading is
+            // never adopted — a codec-switch transient as the persisted
+            // reference would drive every later shift from a lie.
             r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 500000\n", "");
+            verify(JSON.parse(r.cfg.syncRefLatMap)["AA:BB:CC:DD:EE:FF"] === undefined);
+            // The confirming twin adopts; no shift is invented from thin air.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 505000\n", "");
+            compare(JSON.parse(r.cfg.syncRefLatMap)["AA:BB:CC:DD:EE:FF"], 505);
             compare(r.e._lagForSink(btSink), 300);
-            compare(JSON.parse(r.cfg.syncRefLatMap)["AA:BB:CC:DD:EE:FF"], 500);
-            // An absent or suspended (0) reading changes nothing.
-            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "", "");
+        }
+
+        function test_reflat_unusable_reading_retires_a_pending_sighting() {
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 300 }),
+                          syncRefLatMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 250 }) });
+            activate(r);
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 900000\n", "");
+            // A suspended (0) reading between the sighting and its would-be
+            // twin retires the sighting — minutes-later confirmation of a
+            // stale transient must be impossible.
             r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 0\n", "");
-            compare(r.e._lagForSink(btSink), 300);
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 905000\n", "");
+            compare(r.e._lagForSink(btSink), 300);   // first sight again, no move
+        }
+
+        function test_wake_from_park_arms_the_resurrect_insurance() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._idleTeardownTick();
+            // The park's async tail: its unload ack lands before the wake.
+            r.e.handleExec(": PW_UNCOMBINE_DONE;", "MASTER 80\n", "");
+            verify(!r.e._combineActive);
+            // The Bluetooth speaker auto-powered off during the park — the
+            // wake's enable no-ops on a thin device list, but the resurrect
+            // insurance is armed so the sink's return can retry it.
+            r.mock.mediaDevs = { audioOutputs: [dev(wired)] };
+            var lenBefore = r.mock.execLog.length;
+            r.mock.anythingPlaying = true;
+            verify(r.mock.execLog.slice(lenBefore).join("\n").indexOf(": PW_COMBINE") === -1);
+            compare(r.e._resurrectTries, 6);
         }
 
         // ── the steal watch ───────────────────────────────────────────────
