@@ -17,6 +17,26 @@ var GRACE_MS = 60 * 60 * 1000;
 
 // Next occurrence of hh:mm strictly after fromMs. Recomputed from the wall
 // clock each time (not "+24h") so DST changes don't drift the start time.
+//
+// The spring-forward hole needs its own word: on the night the clock jumps
+// 03:00→04:00, a 03:30 simply does not exist — and Qt's JS engine resolves
+// the nonexistent time BACKWARD (03:30 becomes wall-clock 02:30, measured
+// on Qt 6.11 under Europe/Tallinn), so a 03:30 alarm rang an hour EARLY
+// and a scheduled recording captured the hour before the show. V8 resolves
+// the same hole forward; relying on either is a coin toss. When the
+// resolved wall clock does not read back the asked-for hour, the moment
+// fell into the hole — push one hour forward, which lands on the first
+// instant that actually exists (03:30 → 04:30 new time).
+function _resolveGap(d, hh) {
+    if (d.getHours() !== hh) {
+        var fixed = new Date(d.getTime() + 3600 * 1000);
+        // Only accept the push when it lands sanely past the hole — a
+        // double-shift zone oddity must not loop or overshoot silently.
+        if (fixed.getDate() === d.getDate() || fixed.getHours() >= hh) return fixed;
+    }
+    return d;
+}
+
 function nextOccurrence(hh, mm, repeat, weekday, fromMs) {
     var d = new Date(fromMs);
     d.setHours(hh, mm, 0, 0);
@@ -27,6 +47,7 @@ function nextOccurrence(hh, mm, repeat, weekday, fromMs) {
     } else if (d.getTime() <= fromMs) {
         d.setDate(d.getDate() + 1);
     }
+    d = _resolveGap(d, hh);
     return d.getTime();
 }
 

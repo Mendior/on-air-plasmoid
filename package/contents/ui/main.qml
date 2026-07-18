@@ -357,6 +357,7 @@ PlasmoidItem {
             lastPlay = index;
             root._previewUrl = "";
             root._previewUuid = "";
+            root._standingOrderUrl = "";
             // The standing order: play, and keep playing until I say stop.
             root._wantsPlaying = true;
             // Only a genuine user pick resets the backoff ladder — an
@@ -918,7 +919,10 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (!root._wantsPlaying || isPlaying() || root._casting) return;
-            if (lastPlay < 0 || lastPlay >= stationsModel.count) return;
+            if (lastPlay < 0 || lastPlay >= stationsModel.count) {
+                _standingOrderReplay();
+                return;
+            }
             console.log("[ARP] network is back — resuming the standing order");
             refreshServer(lastPlay, false);
         }
@@ -1348,8 +1352,19 @@ PlasmoidItem {
         }
         if (recSchedules.length > 0) {
             var rl = recSchedules.slice();
-            for (var r = 0; r < rl.length; r++)
+            for (var r = 0; r < rl.length; r++) {
+                // The ACTIVE recording's entry is keyed url@nextRun, and
+                // the running ffmpeg was started under the OLD instant —
+                // retiming it out from under the key orphans the guards:
+                // the tick reads its own recording as a stranger's ('...
+                // skipped — another recording is already running') and the
+                // completion path loses the entry it should advance. The
+                // key follows the retime.
+                var wasKey = _recSchedKey(rl[r]);
                 rl[r].nextRun = AlarmLogic.retimeForZone(rl[r], now);
+                if (recording && root._recActiveSchedKey === wasKey)
+                    root._recActiveSchedKey = _recSchedKey(rl[r]);
+            }
             recSchedules = rl;
             _saveRecSchedules();
         }
@@ -1464,9 +1479,20 @@ PlasmoidItem {
         alarmFallbackTimer.restart();
         // Keep the station list's playing-row marker honest when the alarm
         // station is in the visible list (same courtesy the heal path pays).
+        // NOT in the list (deleted since the alarm was made): every recovery
+        // road is keyed on lastPlay, so without this standalone order a
+        // stream death at 07:20 left the sleeper in silence with no retry,
+        // no tone, nothing — the standing order must be able to replay the
+        // alarm's own URL with no row to stand on.
         Qt.callLater(function() {
+            root._standingOrderUrl = a.url;
+            root._standingOrderName = a.station || "";
             for (var k = 0; k < stationsModel.count; k++) {
-                if (stationsModel.get(k).hostname === a.url) { lastPlay = k; break; }
+                if (stationsModel.get(k).hostname === a.url) {
+                    lastPlay = k;
+                    root._standingOrderUrl = "";
+                    break;
+                }
             }
         });
         notify(i18n("Wake-up alarm"), a.station, "clock");
@@ -1581,6 +1607,12 @@ PlasmoidItem {
             stopWithFade();
             return;
         }
+        // Picking a track is as clear an "I'm up" as picking a station:
+        // the alarm's volume floor and the fallback chime stand down here
+        // too, or the whole My Music session plays at wake-up loudness.
+        _alarmFallbackArmed = false;
+        alarmFallbackTimer.stop();
+        _volumeOverridePct = -1;
         // Look for the track's own cover: the hidden .covers/ subfolder
         // first (where downloads put sidecars), then beside the track
         // (hand-copied art, and sidecars from before the subfolder existed).
@@ -2743,7 +2775,15 @@ PlasmoidItem {
 
     function _tryHealStation() {
         if (isPlaying() || _casting) return;
-        if (root._previewUrl !== "" || lastPlay < 0 || lastPlay >= stationsModel.count) return;
+        if (root._previewUrl !== "" || lastPlay < 0 || lastPlay >= stationsModel.count) {
+            // No row to heal by — but a rowless standing order (an alarm
+            // whose station was deleted) still owes the sleeper the
+            // heartbeat, or one stream death ends the wake-up for good.
+            if (root._previewUrl === "" && root._wantsPlaying
+                && root._standingOrderUrl !== "")
+                _healArmRetry();
+            return;
+        }
         var st = stationsModel.get(lastPlay);
         var orig = (st.hostname || "").toString();
         // Only heal the station we actually failed on.
@@ -2901,11 +2941,31 @@ PlasmoidItem {
         interval: 30000
         onTriggered: {
             if (!root._wantsPlaying || isPlaying() || root._casting) return;
-            if (lastPlay < 0 || lastPlay >= stationsModel.count) return;
+            if (lastPlay < 0 || lastPlay >= stationsModel.count) {
+                _standingOrderReplay();
+                return;
+            }
             console.log("[ARP] heal retry #" + root._healRetryAttempts
                         + ": replaying the saved address");
             refreshServer(lastPlay, false);
         }
+    }
+
+    // A standing order with no list row to stand on — an alarm whose
+    // station was deleted after the alarm was made. The row-based roads
+    // replay refreshServer(lastPlay); this replays the remembered URL
+    // directly, so the sleeper still gets every retry the row road gives.
+    property string _standingOrderUrl: ""
+    property string _standingOrderName: ""
+
+    function _standingOrderReplay() {
+        if (_standingOrderUrl === "" || !_wantsPlaying) return;
+        console.log("[ARP] standing order: replaying the rowless URL");
+        _currentOrigUrl = _standingOrderUrl;
+        _currentUnwrappedUrl = _standingOrderUrl;
+        _currentResolvedUrl = _standingOrderUrl;
+        startWithFade({ "name": _standingOrderName || _standingOrderUrl,
+                        "hostname": _standingOrderUrl, "favicon": "", "active": true });
     }
 
     function _healArmRetry() {
@@ -3224,6 +3284,7 @@ PlasmoidItem {
         // recovery road (retry backoff, network-back resume) dies with it.
         root._wantsPlaying = false;
         root._healRetryAttempts = 0;
+        root._standingOrderUrl = "";
         healRetryTimer.stop();
         netResumeTimer.stop();
         // A stop inside the wake-tone window is the person saying "I'm up" —
@@ -3919,8 +3980,11 @@ PlasmoidItem {
         executable.exec(": REC_CLEAN; p=$(cat '" + safePid + "' 2>/dev/null);"
             + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*-rw_timeout'; then"
             + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "'; true");
-        // Catch a schedule that came due while the shell was down/starting.
-        Qt.callLater(_recScheduleTick);
+        // The resume tick waits for the sweep's ack (see the REC_CLEAN
+        // handler): both run async shells over the SAME pid file, and a
+        // resume that started first wrote a fresh ffmpeg pid into the very
+        // file the sweep was about to kill and delete — the orphan sweep
+        // then shot the just-started continuation instead of the orphan.
     }
 
     Component.onDestruction: {
@@ -4314,6 +4378,13 @@ PlasmoidItem {
             }
             if (cmd.indexOf(": ALARM_INHIBIT;") === 0) {
                 return; // fire-and-forget
+            }
+            // Orphan sweep done — only NOW may a due schedule resume: both
+            // shells work the same pid file, and a resume racing the sweep
+            // used to get its fresh ffmpeg shot as "the orphan".
+            if (cmd.indexOf(": REC_CLEAN;") === 0) {
+                Qt.callLater(_recScheduleTick);
+                return;
             }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {
