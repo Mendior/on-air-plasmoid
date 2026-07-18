@@ -68,11 +68,14 @@ class MPRISBridge(dbus.service.Object):
             return
         if mtime_ns == self._last_mtime_ns:
             return
-        self._last_mtime_ns = mtime_ns
         try:
             new_state = json.loads(self.state_file.read_text())
         except (OSError, ValueError):
+            # A read that raced the writer mid-truncate: do NOT consume the
+            # mtime — the finished write can land within the same clock tick,
+            # and committing here would make the poll skip it forever.
             return
+        self._last_mtime_ns = mtime_ns
 
         changed_player = {}
         with self._lock:

@@ -39,6 +39,7 @@ import http.client
 import json
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -388,10 +389,23 @@ def _msearch(st, wait, target=None):
     return locations
 
 
-def _http_get(url, timeout=3.0):
+def _http_get(url, timeout=3.0, max_bytes=512 * 1024):
+    # http(s) only: LOCATION comes from an unauthenticated SSDP reply, and
+    # urllib's default opener would happily serve file:// or ftp:// — a
+    # hostile LAN host must not be able to point the description parser at
+    # local files.
+    scheme = urllib.parse.urlsplit(url).scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError("unsupported scheme %r" % scheme)
     req = urllib.request.Request(url, headers={"User-Agent": "OnAir"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+        # Capped read: the socket timeout bounds each recv, not the total —
+        # an endless body would otherwise buffer wholesale into RAM. No
+        # device description has business being half a megabyte.
+        data = resp.read(max_bytes + 1)
+        if len(data) > max_bytes:
+            raise ValueError("description larger than %d bytes" % max_bytes)
+        return data
 
 
 def _describe_renderer(location):
@@ -674,7 +688,9 @@ def _soap(control_url, service_type, action, args_xml, timeout=5.0):
         conn.endheaders()
         conn.send(payload)
         resp = conn.getresponse()
-        data = resp.read().decode("utf-8", "replace")
+        # Same cap rationale as _http_get: a SOAP reply is a few KB, and a
+        # dripping or endless body must not hold the helper's memory open.
+        data = resp.read(512 * 1024).decode("utf-8", "replace")
         # Parity with urlopen: a SOAP fault (HTTP 500 etc.) must raise, the
         # callers' except blocks turn it into FAIL sentinels / fallbacks.
         # >= 300 because http.client does not follow redirects — a 3xx here
@@ -857,10 +873,22 @@ def cmd_discover(seconds):
     _out(DONE)
 
 
+def _alarm_bail(signum, frame):
+    _out("%s helper timed out" % FAIL)
+    sys.exit(1)
+
+
 def main():
     if len(sys.argv) < 2:
         _out("%s usage: cast.py <command>" % FAIL)
         return
+    # Total-duration backstop (reader.py's own rationale): socket timeouts
+    # bound each recv, not the conversation — a renderer dripping one byte
+    # per second held the helper and its command open forever. Ninety
+    # seconds outlives the longest legitimate discovery round.
+    if hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, _alarm_bail)
+        signal.alarm(90)
     command = sys.argv[1]
     args = sys.argv[2:]
     if command == "probe":
