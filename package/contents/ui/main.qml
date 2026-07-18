@@ -3885,9 +3885,32 @@ PlasmoidItem {
         _abortSleepFade();
     }
 
+    // When the last _mprisStop ran, epoch ms. Its delayed sweeper (the
+    // setsid sleep-2 chain below) matches daemons by the STATE FILE PATH,
+    // which is stable by design — it cannot tell the swept generation from
+    // a fresh one. A re-enable inside that window would hand the sweep a
+    // brand-new daemon to kill (and its files to delete), so the start
+    // waits the window out instead of racing it.
+    property double _mprisStopAtMs: 0
+
+    Timer {
+        id: mprisDeferredStart
+        repeat: false
+        onTriggered: root._mprisStart()
+    }
+
     function _mprisStart() {
         if (_mprisStarted) return;
         if (!Plasmoid.configuration.mprisEnabled) return;
+        var sinceStop = Date.now() - _mprisStopAtMs;
+        if (_mprisStopAtMs > 0 && sinceStop < 2600) {
+            // 2600 = the sweeper's 2 s sleep + spawn latency headroom. The
+            // start lands right after the sweep has passed; the launcher
+            // recreates the files the sweep removed.
+            mprisDeferredStart.interval = Math.max(50, 2600 - sinceStop);
+            mprisDeferredStart.restart();
+            return;
+        }
         // A new daemon starts from seq=1 and the launcher clears the cmd file —
         // an old high seq would block all new commands (media keys "dead").
         _mprisCmdSeq = 0;
@@ -3907,6 +3930,11 @@ PlasmoidItem {
     }
 
     function _mprisStop() {
+        // A disable during the deferred-start window must cancel the start
+        // itself — _mprisStarted is still false then, so the early return
+        // below would otherwise leave the timer armed to start a daemon
+        // the user just turned off.
+        mprisDeferredStart.stop();
         if (!_mprisStarted) return;
         mprisCmdPoll.stop();
         mprisStateDebounce.stop();
@@ -3927,6 +3955,7 @@ PlasmoidItem {
         // ^python3 anchor: must never match this wrapper's own sh cmdline.
         executable.exec("setsid sh -c 'sleep 2; pkill -f \"^python3 .*mpris.py " + safeState + "\"; rm -f \"" + safeState + "\" \"" + safeCmd + "\"' >/dev/null 2>&1 &");
         _mprisStarted = false;
+        _mprisStopAtMs = Date.now();
     }
 
     function _mprisQueueWrite() {
