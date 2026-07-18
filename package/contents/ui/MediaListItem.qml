@@ -192,7 +192,9 @@ PlasmaComponents3.ItemDelegate {
                 // genuinely matters.
                 PlasmaComponents3.Label {
                     anchors.centerIn: parent
-                    readonly property bool reorderHover: moveUpButton.hovered || moveDownButton.hovered
+                    readonly property bool reorderHover: moveUpButton.hovered
+                                                         || moveDownButton.hovered
+                                                         || dragArea.pressed
                     text: (reorderHover || avatar.mono === "")
                           ? (listItem.targetIndex + 1) : avatar.mono
                     // Monogram ink serves the number during arrow-hover too —
@@ -241,11 +243,13 @@ PlasmaComponents3.ItemDelegate {
                            ? root.accentTextOn
                            : Kirigami.Theme.textColor
                     visible: {
-                        // While a reorder arrow is hovered the position
-                        // number takes this slot — not the play/stop
-                        // affordance, on the current row included: the row
-                        // being MOVED is the one whose position matters most.
-                        if (moveUpButton.hovered || moveDownButton.hovered) return false
+                        // While a reorder arrow is hovered or the row is
+                        // being DRAGGED, the position number takes this slot
+                        // — not the play/stop affordance, on the current row
+                        // included: the row being moved is the one whose
+                        // position matters most.
+                        if (moveUpButton.hovered || moveDownButton.hovered
+                            || dragArea.pressed) return false
                         if (listItem.isCurrent && listItem.hovered) return true
                         if (listItem.isCurrent) return false
                         return listItem.hovered && !listItem.isLoading
