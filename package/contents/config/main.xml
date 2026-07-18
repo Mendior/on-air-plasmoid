@@ -85,6 +85,10 @@
             <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
             <default>{}</default>
         </entry>
+        <entry name="syncAutoCare" type="Bool">
+            <label>Keep the sync tuned automatically: a passive microphone drift check on the playing audio, and one automatic re-verify when it confirms a drift. Audio is processed in place and never stored or transmitted.</label>
+            <default>false</default>
+        </entry>
         <entry name="syncRefLatMap" type="String">
             <label>Bluetooth sink's PipeWire-reported latency in ms at calibration time, keyed by MAC (JSON) — the reference the silent recompensation shifts against</label>
             <default>{}</default>

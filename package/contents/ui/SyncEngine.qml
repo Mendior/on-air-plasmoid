@@ -839,6 +839,36 @@ Item {
         // only the menu's Connected states need refreshing here. Unless
         // the user clicked Disconnect while the cycle was mid-flight:
         // its reconnect phase just reverted their choice — undo that.
+        if (cmd.indexOf(": PW_DRIFT;") === 0) {
+            var deM = (stdout || "").match(/DRIFT_EST (\d+)/);
+            if (!deM) { _driftPendingMs = -1; return true; }  // quiet/no signal
+            var deMs = parseInt(deM[1], 10);
+            if (deMs < 25) { _driftPendingMs = -1; return true; }  // in sync
+            // Twin confirmation, same philosophy as REFLAT: one estimate is
+            // a hypothesis, two within 15 ms are a fact.
+            if (_driftPendingMs < 0 || Math.abs(_driftPendingMs - deMs) > 15) {
+                _driftPendingMs = deMs;
+                return true;
+            }
+            _driftPendingMs = -1;
+            if (!_autoCareVerifyDone) {
+                _autoCareVerifyDone = true;
+                console.log("[ARP] sync: program material shows " + deMs
+                            + " ms split — running the automatic verify");
+                // The verify's one-shot correction is re-armed: the last
+                // calibration's pass already spent it, and an auto-care
+                // verify without its correction would measure and shrug.
+                _verifyCorrected = false;
+                _verifyPending = true;
+                _verifyArmTimers();
+            } else if (!_driftHintShown) {
+                _driftHintShown = true;
+                app.notify(i18n("Sync has drifted"),
+                           i18n("The speakers are audibly apart again — run Calibrate when convenient."),
+                           "audio-speakers");
+            }
+            return true;
+        }
         if (cmd.indexOf(": PW_REFLAT ") === 0) {
             var rlM = cmd.match(/^: PW_REFLAT ([CS]) ([0-9A-F:]{17})/);
             if (!rlM) return true;
@@ -1392,6 +1422,37 @@ Item {
     property var _refLatPending: ({})
     // One drift hint per session — a wandering link must not nag.
     property bool _refLatHintShown: false
+
+    // ── Automatic care (opt-in): passive drift check + one auto-verify ──
+    // Every few minutes while music plays, calibrate.py listens to the
+    // room next to the combined sink's monitor and cross-correlates their
+    // envelopes — no clicks, nothing stored, nothing leaves the machine.
+    // A twin-confirmed audible split arms ONE automatic verify (which
+    // measures with clicks and corrects, machinery that already exists);
+    // any later confirmation in the same session only says a quiet word.
+    property int _driftPendingMs: -1
+    property bool _autoCareVerifyDone: false
+    property bool _driftHintShown: false
+
+    Timer {
+        id: driftMonitorTimer
+        interval: 6 * 60 * 1000
+        repeat: true
+        running: cfg.syncAutoCare === true && _combineActive
+                 && app.anythingPlaying === true
+        onTriggered: _driftProbe()
+    }
+
+    function _driftProbe() {
+        // Never over a measurement, a recovery cure, a recording or an
+        // alarm — the check must be invisible, in every sense.
+        if (_calibrating || _verifyPending || _combineReloopBusy
+            || _btKickInFlight || app.recording === true
+            || app.alarmEngaged === true) return;
+        var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
+        app.exec(": PW_DRIFT; timeout 20 python3 '" + script + "' drift "
+                 + _combineSinkName + " ''; true # " + app.nextSeq());
+    }
 
     function _lagForSink(sinkId) {
         var mac = _btMacOfSink(sinkId);

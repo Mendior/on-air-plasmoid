@@ -213,6 +213,11 @@ PlasmoidItem {
     // never be parked out from under something that still owes sound.
     readonly property bool anythingPlaying: isPlaying() || _casting || recording || _wantsPlaying
 
+    // Whether a wake-up alarm currently owns the audio state (ringing, or
+    // its one-shot volume floor still standing). The sync's automatic
+    // care must NEVER measure or correct over an alarm.
+    readonly property bool alarmEngaged: _alarmFallbackArmed || _volumeOverridePct >= 0
+
     function parseFavorites(s) {
         try {
             const arr = JSON.parse(s || "[]");

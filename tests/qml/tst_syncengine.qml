@@ -45,6 +45,8 @@ Item {
             property var castApplied: []
             property bool playing: false
             property bool anythingPlaying: false
+            property bool recording: false
+            property bool alarmEngaged: false
             property var mediaDevs: ({ audioOutputs: [] })
             property var playerOutput: ({ volume: 0.5, device: null })
             property string instanceId: "7"
@@ -77,6 +79,7 @@ Item {
             property int syncVerifiedMs: -1
             property string syncOffsetMap: "{}"
             property string syncRefLatMap: "{}"
+            property bool syncAutoCare: false
             property string deviceTrims: "{}"
             property string deviceChannels: "{}"
             property string syncExcluded: "{}"
@@ -1148,6 +1151,41 @@ Item {
             r.mock.anythingPlaying = false;
             r.e._idleTeardownTick();
             verify(!r.e._combineActive);
+        }
+
+        // ── the automatic caretaker ───────────────────────────────────────
+
+        function test_drift_confirmation_launches_one_auto_verify_then_hints() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            // One estimate is a hypothesis — nothing happens.
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            verify(!r.e._verifyPending);
+            // Its twin (within 15 ms) makes it a fact: ONE auto verify,
+            // with the one-shot correction re-armed for it.
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", "");
+            verify(r.e._verifyPending);
+            verify(!r.e._verifyCorrected);
+            // A later confirmed drift in the same session only says a word.
+            r.e._verifyPending = false;
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 90\n", "");
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 92\n", "");
+            verify(!r.e._verifyPending);
+            compare(r.mock.notes.length, 1);
+        }
+
+        function test_drift_quiet_or_small_resets_the_pending_sighting() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            // Silence between the sighting and its would-be twin retires it.
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_QUIET\n", "");
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 82\n", "");
+            verify(!r.e._verifyPending);        // first sight again
+            // An in-sync reading does the same.
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 0\n", "");
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 81\n", "");
+            verify(!r.e._verifyPending);
         }
 
         // ── the silent Bluetooth recompensation ───────────────────────────

@@ -708,7 +708,130 @@ def cmd_verify(argv):
         print("VERIFY_FAIL %s" % str(exc)[:120])
 
 
+# ── Passive drift estimation from program material ───────────────────────
+# No clicks, no interruption: capture what the room is PLAYING (mic) next
+# to what was SENT (the combined sink's monitor) and cross-correlate their
+# energy ENVELOPES. Each speaker's path shows up as a correlation peak at
+# its total delay; in sync the peaks merge into one, drifted apart they
+# split — the separation IS the inter-speaker error, and the (unknown,
+# common) capture start skew cancels out of it. Envelopes at 500 Hz keep
+# the pure-python correlation fast (~740 lags x ~4000 blocks) with ±2-4 ms
+# resolution — plenty against the 25 ms audibility bar.
+
+DRIFT_SECONDS = 8.0
+DRIFT_ENV_MS = 2                # envelope block: 2 ms -> 500 Hz
+DRIFT_MIN_LAG_S = 0.02          # below this the peaks are one blur anyway
+DRIFT_MAX_LAG_S = 1.5
+DRIFT_SPLIT_MIN_MS = 25         # a second peak closer than this is sidelobe
+DRIFT_SECOND_PEAK = 0.4         # second arrival must be a REAL echo of the first
+DRIFT_MIN_CORR = 0.25           # below this the material carried no timing
+
+
+def _envelope(samples, rate, block_ms=DRIFT_ENV_MS):
+    n = max(1, int(rate * block_ms / 1000.0))
+    out = []
+    for i in range(0, len(samples) - n, n):
+        acc = 0
+        for j in range(i, i + n):
+            v = samples[j]
+            acc += v * v
+        out.append(math.sqrt(acc / float(n)))
+    return out
+
+
+def _drift_estimate(mic_samples, mon_samples, rate):
+    """One verdict line for a simultaneous mic + monitor capture pair.
+
+    Returns "DRIFT_QUIET" (nothing playing / dead mic), "DRIFT_NOSIG"
+    (material too flat to carry timing), or "DRIFT_EST <ms>" where 0
+    means the arrivals merge into one peak (in sync)."""
+    if _is_dead_capture(mic_samples) or _is_dead_capture(mon_samples):
+        return "DRIFT_QUIET"
+    env_rate = 1000.0 / DRIFT_ENV_MS
+    a = _envelope(mic_samples, rate)
+    b = _envelope(mon_samples, rate)
+    n = min(len(a), len(b))
+    if n < int(2.0 * env_rate):
+        return "DRIFT_QUIET"
+    a, b = a[:n], b[:n]
+    ma = sum(a) / n
+    mb = sum(b) / n
+    a = [v - ma for v in a]
+    b = [v - mb for v in b]
+    ea = math.sqrt(sum(v * v for v in a)) or 1.0
+    eb = math.sqrt(sum(v * v for v in b)) or 1.0
+    lo = int(DRIFT_MIN_LAG_S * env_rate)
+    hi = min(int(DRIFT_MAX_LAG_S * env_rate), n - int(0.5 * env_rate))
+    if hi <= lo:
+        return "DRIFT_NOSIG"
+    corr = []
+    for lag in range(lo, hi):
+        s = 0.0
+        for t in range(lag, n):
+            s += a[t] * b[t - lag]
+        corr.append(s / (ea * eb))
+    i1 = max(range(len(corr)), key=lambda i: corr[i])
+    c1 = corr[i1]
+    if c1 < DRIFT_MIN_CORR:
+        return "DRIFT_NOSIG"
+    guard = int(DRIFT_SPLIT_MIN_MS * env_rate / 1000.0)
+    rest = [(i, c) for i, c in enumerate(corr) if abs(i - i1) > guard]
+    if not rest:
+        return "DRIFT_EST 0"
+    i2, c2 = max(rest, key=lambda p: p[1])
+    if c2 < DRIFT_SECOND_PEAK * c1:
+        return "DRIFT_EST 0"
+    ms = abs(i2 - i1) * 1000.0 / env_rate
+    return "DRIFT_EST %d" % round(ms)
+
+
+def cmd_drift(argv):
+    if not argv:
+        print("DRIFT_NOSIG")
+        return
+    combined = argv[0]
+    mic = argv[1] if len(argv) > 1 else ""
+    mic_f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    mon_f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    procs = []
+    try:
+        procs.append(subprocess.Popen(recorder_args(mic, mic_f),
+                                      stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL))
+        procs.append(subprocess.Popen(recorder_args(combined + ".monitor", mon_f),
+                                      stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL))
+        time.sleep(DRIFT_SECONDS)
+    finally:
+        for p in procs:
+            try:
+                p.terminate()
+                p.wait(timeout=2)
+            except Exception:
+                try:
+                    p.kill()
+                    p.wait(timeout=1)
+                except Exception:
+                    pass
+    try:
+        mic_s, rate = read_mono(mic_f)
+        mon_s, _ = read_mono(mon_f)
+    finally:
+        for f in (mic_f, mon_f):
+            try:
+                os.unlink(f)
+            except OSError:
+                pass
+    if not mic_s or not mon_s:
+        print("DRIFT_QUIET")
+        return
+    print(_drift_estimate(mic_s, mon_s, rate))
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "drift":
+        cmd_drift(sys.argv[2:])
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "verify":
         cmd_verify(sys.argv[2:])
         return

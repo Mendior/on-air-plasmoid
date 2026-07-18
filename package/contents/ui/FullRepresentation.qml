@@ -3415,6 +3415,24 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // The opt-in caretaker: a passive microphone check
+                        // on the playing audio every few minutes, one
+                        // automatic click-verify when it confirms a drift.
+                        PlasmaComponents3.CheckBox {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            visible: root.sync._combineWantActive
+                                     || (root.sync._combineIdleParked
+                                         && Plasmoid.configuration.combineWanted === true)
+                            checked: Plasmoid.configuration.syncAutoCare === true
+                            onToggled: Plasmoid.configuration.syncAutoCare = checked
+                            text: i18n("Keep sync tuned automatically")
+
+                            PlasmaComponents3.ToolTip {
+                                text: i18n("Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere.")
+                            }
+                        }
+
                         // The whole ride, both rounds: the quiet gap between
                         // the calibration clicks and the check clicks reads
                         // as "done" — this row stays up until it really is.
