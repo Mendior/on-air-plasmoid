@@ -233,11 +233,19 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # ALL of contents/, not just ui/: config/config.qml lives one level up
     # and its four i18n() category names were never extracted — the settings
     # dialog's tabs stayed English in every translation.
-    find "$PKG/contents" -name '*.qml' | sort > /tmp/onair-qml-files.txt
-    xgettext --from-code=UTF-8 -C -kde -ci18n -ki18n:1 -ki18nc:1c,2 -ki18np:1,2 -ki18ncp:1c,2,3 \
-      --package-name='plasma_applet_io.github.mendior.onair' \
-      --msgid-bugs-address='https://github.com/Mendior/on-air-plasmoid/issues' \
-      -o "$REPO_DIR/po/template.pot" --files-from=/tmp/onair-qml-files.txt 2>/dev/null
+    # Paths are REPO-RELATIVE: absolute paths would embed this machine's
+    # home directory into the public catalogs (they did — 400+ references),
+    # and a reference comment only helps a translator when it points inside
+    # the repo. The kde-format flags make msgfmt --check actually validate
+    # %1/%2 placeholders in translations from now on.
+    ( cd "$REPO_DIR" && find "package/contents" -name '*.qml' | sort > /tmp/onair-qml-files.txt \
+      && xgettext --from-code=UTF-8 -C -kde -ci18n -ki18n:1 -ki18nc:1c,2 -ki18np:1,2 -ki18ncp:1c,2,3 \
+        --flag=i18n:1:kde-format --flag=i18nc:2:kde-format \
+        --flag=i18np:1:kde-format --flag=i18np:2:kde-format \
+        --flag=i18ncp:2:kde-format --flag=i18ncp:3:kde-format \
+        --package-name='plasma_applet_io.github.mendior.onair' \
+        --msgid-bugs-address='https://github.com/Mendior/on-air-plasmoid/issues' \
+        -o po/template.pot --files-from=/tmp/onair-qml-files.txt 2>/dev/null )
     for po in "$REPO_DIR"/po/*.po; do
       [ -e "$po" ] || continue
       msgmerge --no-wrap -q --update --backup=off "$po" "$REPO_DIR/po/template.pot"

@@ -21,7 +21,6 @@ test. Fix the cause, not the check.
 - `package/metadata.json` → `Version`.
 - `CHANGELOG.md` → new section at the top.
 - `README.md` → install example filename (`on-air-<version>.plasmoid`).
-- `STORE-TEKSTID.md` → filename reference.
 - User-Agent strings: `grep -rn 'OnAir/' package/` — every versioned hit
   must match the new version (the lint gate fails the release if forgotten).
 - If UI strings changed: `scripts/dev.sh i18n` and commit the updated

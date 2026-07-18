@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-17 21:46+0300\n"
+"POT-Creation-Date: 2026-07-18 04:04+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Ukrainian\n"
@@ -15,339 +15,350 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/config/config.qml⁩:13
+#: package/contents/config/config.qml:13
 msgid "Stations"
 msgstr "Станції"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/config/config.qml⁩:18
+#: package/contents/config/config.qml:18
 msgid "Appearance"
 msgstr "Вигляд"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/config/config.qml⁩:23
+#: package/contents/config/config.qml:23
 msgid "Recording"
 msgstr "Запис"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/config/config.qml⁩:28
+#: package/contents/config/config.qml:28
 msgid "Search"
 msgstr "Пошук"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:50
+#: package/contents/ui/CompactRepresentation.qml:50
 msgid "%1 — recording"
 msgstr "%1 — записує"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:52
+#: package/contents/ui/CompactRepresentation.qml:52
 msgid "%1 — playing %2"
 msgstr "%1 — грає %2"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:86 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:37
+#: package/contents/ui/CompactRepresentation.qml:86
+#: package/contents/ui/config/configAppearance.qml:37
 msgid "Audio"
 msgstr "Звук"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:86 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2419 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3647
+#: package/contents/ui/CompactRepresentation.qml:86
+#: package/contents/ui/FullRepresentation.qml:2486
+#: package/contents/ui/FullRepresentation.qml:3715
 msgid "Volume"
 msgstr "Гучність"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/CompactRepresentation.qml⁩:87
+#: package/contents/ui/CompactRepresentation.qml:87
 msgid "Muted"
 msgstr "Звук вимкнено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:42
+#: package/contents/ui/config/configAppearance.qml:42
 msgid "Default volume:"
 msgstr "Типова гучність:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:61
+#: package/contents/ui/config/configAppearance.qml:61
 msgid "Smooth fade:"
 msgstr "Плавний перехід:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:62
+#: package/contents/ui/config/configAppearance.qml:62
 msgid "Fade volume when changing stations"
 msgstr "Плавний перехід гучності при зміні станції"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:67
+#: package/contents/ui/config/configAppearance.qml:67
 msgid "Fade duration (ms):"
 msgstr "Тривалість переходу (мс):"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:76
+#: package/contents/ui/config/configAppearance.qml:76
 msgid "Stream quality:"
 msgstr "Якість потоку:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:77
+#: package/contents/ui/config/configAppearance.qml:77
 msgid "Automatically switch to the highest-bitrate variant of a station"
 msgstr "Автоматично перемикатися на варіант станції з найвищим бітрейтом"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:80
+#: package/contents/ui/config/configAppearance.qml:80
 msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
 msgstr "Шукає станцію на radio-browser.info і вибирає потік із найкращою якістю"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:85
+#: package/contents/ui/config/configAppearance.qml:85
 msgid "Find a station's new address when its stream dies"
 msgstr "Знаходити нову адресу станції, коли її потік помирає"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:88
+#: package/contents/ui/config/configAppearance.qml:88
 msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
 msgstr "Станції змінюють сервери; якщо відтворення не вдається, станцію шукають на radio-browser.info і збережуть адресу, що працює зараз, у вашому списку"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:93
+#: package/contents/ui/config/configAppearance.qml:93
 msgid "Count my listening in the worldwide station catalog"
 msgstr "Враховувати моє прослуховування у світовому каталозі станцій"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:96
+#: package/contents/ui/config/configAppearance.qml:96
 msgid "When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone"
 msgstr "Коли станція починає грати, radio-browser.info отримує анонімний клік (лише ID станції, нічого про вас) — популярні станції стає легше знайти всім"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:104
+#: package/contents/ui/config/configAppearance.qml:104
 msgid "Visuals"
 msgstr "Вигляд"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:110
+#: package/contents/ui/config/configAppearance.qml:110
 msgid "Album art:"
 msgstr "Обкладинка альбому:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:111
+#: package/contents/ui/config/configAppearance.qml:111
 msgid "Look up cover art via iTunes"
 msgstr "Шукати обкладинки в iTunes"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:116
+#: package/contents/ui/config/configAppearance.qml:116
 msgid "Backdrop:"
 msgstr "Тло:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:117
+#: package/contents/ui/config/configAppearance.qml:117
 msgid "Blurred album art behind now playing"
 msgstr "Розмита обкладинка позаду панелі відтворення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:123
+#: package/contents/ui/config/configAppearance.qml:123
 msgid "Accent color:"
 msgstr "Акцентний колір:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:124
+#: package/contents/ui/config/configAppearance.qml:124
 msgid "Follow the system accent color instead of the built-in emerald"
 msgstr "Використовувати акцентний колір системи замість вбудованого смарагдового"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:132
+#: package/contents/ui/config/configAppearance.qml:132
 msgid "Integration"
 msgstr "Інтеграція"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:138
+#: package/contents/ui/config/configAppearance.qml:138
 msgid "System integration:"
 msgstr "Інтеграція із системою:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:139
+#: package/contents/ui/config/configAppearance.qml:139
 msgid "Allow control via media keys (MPRIS)"
 msgstr "Дозволити керування мультимедійними клавішами (MPRIS)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:147
+#: package/contents/ui/config/configAppearance.qml:147
 msgid "Downloads"
 msgstr "Завантаження"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:153 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:27
+#: package/contents/ui/config/configAppearance.qml:153
+#: package/contents/ui/config/configRecording.qml:27
 msgid "Format:"
 msgstr "Формат:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:155
+#: package/contents/ui/config/configAppearance.qml:155
 msgid "Best quality (no re-encode)"
 msgstr "Найкраща якість (без перекодування)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:156
+#: package/contents/ui/config/configAppearance.qml:156
 msgid "MP3"
 msgstr "MP3"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:157
+#: package/contents/ui/config/configAppearance.qml:157
 msgid "Opus"
 msgstr "Opus"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:158
+#: package/contents/ui/config/configAppearance.qml:158
 msgid "MP4 (video)"
 msgstr "MP4 (відео)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:168
+#: package/contents/ui/config/configAppearance.qml:168
 msgid "Save to folder:"
 msgstr "Зберігати до теки:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:175
+#: package/contents/ui/config/configAppearance.qml:175
 msgid "Title cleanup:"
 msgstr "Очищення назв:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:176
+#: package/contents/ui/config/configAppearance.qml:176
 msgid "Use Claude CLI to clean up messy titles before download (optional)"
 msgstr "Використовувати Claude CLI для очищення безладних назв перед завантаженням (необов'язково)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:184
+#: package/contents/ui/config/configAppearance.qml:184
 msgid "Behavior"
 msgstr "Поведінка"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:189
+#: package/contents/ui/config/configAppearance.qml:189
 msgid "Marquee speed:"
 msgstr "Швидкість рухомого тексту:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:207
+#: package/contents/ui/config/configAppearance.qml:207
 msgid "Slower"
 msgstr "Повільніше"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:209
+#: package/contents/ui/config/configAppearance.qml:209
 msgid "Faster"
 msgstr "Швидше"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:215
+#: package/contents/ui/config/configAppearance.qml:215
 msgid "Panel click:"
 msgstr "Клацання на панелі:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:216
+#: package/contents/ui/config/configAppearance.qml:216
 msgid "Middle click to toggle last station"
 msgstr "Середня кнопка вмикає/зупиняє останню станцію"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configAppearance.qml⁩:220
+#: package/contents/ui/config/configAppearance.qml:220
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "Клацання середньою кнопкою на піктограмі панелі вмикає або зупиняє останню станцію"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:135
+#: package/contents/ui/config/configGeneral.qml:135
 msgid "All stations already have a logo."
 msgstr "Усі станції вже мають логотип."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:149
+#: package/contents/ui/config/configGeneral.qml:149
 msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
 msgstr "Отримання логотипів завершено: оновлено %1 / %2 станцій. Натисніть «Застосувати», щоб зберегти."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:151
+#: package/contents/ui/config/configGeneral.qml:151
 msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
 msgstr "Отримання логотипів завершено: оновлено %1 / %2 станцій (%3 не вдалося знайти автоматично). Натисніть «Застосувати», щоб зберегти."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:547
+#: package/contents/ui/config/configGeneral.qml:547
 msgid "No stations to refresh."
 msgstr "Немає станцій для оновлення."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:632
+#: package/contents/ui/config/configGeneral.qml:632
 msgid "Edit"
 msgstr "Змінити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:640
+#: package/contents/ui/config/configGeneral.qml:640
 msgid "Hide"
 msgstr "Приховати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:640
+#: package/contents/ui/config/configGeneral.qml:640
 msgid "Show"
 msgstr "Показати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:650
+#: package/contents/ui/config/configGeneral.qml:650
 msgid "Remove"
 msgstr "Вилучити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:770 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:502
+#: package/contents/ui/config/configGeneral.qml:770
+#: package/contents/ui/config/configSearch.qml:502
 msgid "Add Station"
 msgstr "Додати станцію"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:770
+#: package/contents/ui/config/configGeneral.qml:770
 msgid "Edit station"
 msgstr "Змінити станцію"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:817 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:683
+#: package/contents/ui/config/configGeneral.qml:817
+#: package/contents/ui/config/configSearch.qml:683
 msgid "Name:"
 msgstr "Назва:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:823
+#: package/contents/ui/config/configGeneral.qml:823
 msgid "URL:"
 msgstr "Адреса:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:830
+#: package/contents/ui/config/configGeneral.qml:830
 msgid "Logo URL:"
 msgstr "Адреса логотипа:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:831
+#: package/contents/ui/config/configGeneral.qml:831
 msgid "e.g. https://example.com/logo.png"
 msgstr "напр. https://example.com/logo.png"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:839
+#: package/contents/ui/config/configGeneral.qml:839
 msgid "Active"
 msgstr "Активна"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:915
+#: package/contents/ui/config/configGeneral.qml:915
 msgid "Configuration has been loaded. Click 'Apply' to save changes."
 msgstr "Налаштування завантажено. Натисніть «Застосувати», щоб зберегти зміни."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:917
+#: package/contents/ui/config/configGeneral.qml:917
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "Помилка завантаження налаштувань. Спробуйте вибрати інший файл."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:921
+#: package/contents/ui/config/configGeneral.qml:921
 msgid "Your configuration was saved successfully."
 msgstr "Ваші налаштування успішно збережено."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:923
+#: package/contents/ui/config/configGeneral.qml:923
 msgid "Error, make sure the selected directory is writable!"
 msgstr "Помилка — переконайтеся, що вибраний каталог доступний для запису!"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:983
+#: package/contents/ui/config/configGeneral.qml:983
 msgid "Add…"
 msgstr "Додати…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:992
+#: package/contents/ui/config/configGeneral.qml:992
 msgid "Fetching… %1 / %2"
 msgstr "Отримання… %1 / %2"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:993
+#: package/contents/ui/config/configGeneral.qml:993
 msgid "Fetch missing logos"
 msgstr "Отримати відсутні логотипи"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1002
+#: package/contents/ui/config/configGeneral.qml:1002
 msgid "Re-fetch all"
 msgstr "Отримати всі заново"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1007
+#: package/contents/ui/config/configGeneral.qml:1007
 msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
 msgstr "Отримати свіжі логотипи для всіх станцій; наявні буде збережено, якщо не знайдеться кращих"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1022
+#: package/contents/ui/config/configGeneral.qml:1022
 msgid "Import…"
 msgstr "Імпортувати…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configGeneral.qml⁩:1028
+#: package/contents/ui/config/configGeneral.qml:1028
 msgid "Export…"
 msgstr "Експортувати…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:21
+#: package/contents/ui/config/configRecording.qml:21
 msgid "Stream recording"
 msgstr "Запис потоку"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:29
+#: package/contents/ui/config/configRecording.qml:29
 msgid "Original stream (bit-exact copy, recommended)"
 msgstr "Оригінальний потік (побітова копія, рекомендовано)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:30
+#: package/contents/ui/config/configRecording.qml:30
 msgid "MP3 (re-encode — max compatibility)"
 msgstr "MP3 (перекодування — найкраща сумісність)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:31
+#: package/contents/ui/config/configRecording.qml:31
 msgid "WAV (uncompressed — very large files)"
 msgstr "WAV (без стиснення — дуже великі файли)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:40
+#: package/contents/ui/config/configRecording.qml:40
 msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
 msgstr "Радіопотоки вже стиснуті — побітова копія і Є максимальною якістю. Перекодування (MP3) чи розпакування (WAV) ніколи не додасть якості; обирайте їх лише для сумісності з пристроями або редагування."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:49
+#: package/contents/ui/config/configRecording.qml:49
 msgid "Max length:"
 msgstr "Максимальна тривалість:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:53 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2176
+#: package/contents/ui/config/configRecording.qml:53
+#: package/contents/ui/FullRepresentation.qml:2243
 msgid "%1 min"
 msgstr "%1 хв"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:58
+#: package/contents/ui/config/configRecording.qml:58
 msgid "A hard safety cap for one recording — protects the disk if you forget to stop."
 msgstr "Жорстке обмеження тривалості одного запису — захищає диск, якщо ви забудете зупинити."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:70 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1972 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2063
+#: package/contents/ui/config/configRecording.qml:70
+#: package/contents/ui/FullRepresentation.qml:2039
+#: package/contents/ui/FullRepresentation.qml:2130
 msgid "Scheduled recordings"
 msgstr "Заплановані записи"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:75
+#: package/contents/ui/config/configRecording.qml:75
 msgid "Schedules are managed in the widget itself: open the popup, press the music-note button in the footer to open My Music, then press the stopwatch button next to \"My Music\". Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing."
 msgstr "Розкладами керують у самому віджеті: відкрийте віконце, натисніть кнопку з нотою внизу, щоб відкрити «Мою музику», а потім кнопку із секундоміром поруч. Виберіть станцію, час початку, тривалість і повторення (один раз / щодня / щотижня) — віджет записує у фоні, навіть коли нічого не грає."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configRecording.qml⁩:82
+#: package/contents/ui/config/configRecording.qml:82
 msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
 msgstr "Записи зберігаються у вашій теці з музикою і призначені лише для особистого користування — не розповсюджуйте їх."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:136 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:194 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:599
+#: package/contents/ui/config/configSearch.qml:136
+#: package/contents/ui/config/configSearch.qml:194
+#: package/contents/ui/config/configSearch.qml:599
 msgid ""
 "Get list of stations\n"
 "Please wait…"
@@ -355,7 +366,7 @@ msgstr ""
 "Отримання списку станцій\n"
 "Зачекайте, будь ласка…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:193
+#: package/contents/ui/config/configSearch.qml:193
 msgid ""
 "Nothing found\n"
 "Try changing your query"
@@ -363,367 +374,382 @@ msgstr ""
 "Нічого не знайдено\n"
 "Спробуйте змінити запит"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:206 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:219
+#: package/contents/ui/config/configSearch.qml:206
+#: package/contents/ui/config/configSearch.qml:219
 msgid "Error: Could not connect to API servers"
 msgstr "Помилка: не вдалося з'єднатися із серверами API"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:334
+#: package/contents/ui/config/configSearch.qml:334
 msgid "Search Station"
 msgstr "Пошук станції"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:340
+#: package/contents/ui/config/configSearch.qml:340
 msgid "Search by"
 msgstr "Шукати за"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:347
+#: package/contents/ui/config/configSearch.qml:347
 msgid "name"
 msgstr "назва"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:348
+#: package/contents/ui/config/configSearch.qml:348
 msgid "country"
 msgstr "країна"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:349
+#: package/contents/ui/config/configSearch.qml:349
 msgid "language"
 msgstr "мова"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:350
+#: package/contents/ui/config/configSearch.qml:350
 msgid "tags"
 msgstr "мітки"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:472
+#: package/contents/ui/config/configSearch.qml:472
 msgid "%1 kBit/s"
 msgstr "%1 кбіт/с"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:485
+#: package/contents/ui/config/configSearch.qml:485
 msgid "Info"
 msgstr "Відомості"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:527
+#: package/contents/ui/config/configSearch.qml:527
 msgid "Station is added. Click 'Apply' to save changes."
 msgstr "Станцію додано. Натисніть «Застосувати», щоб зберегти зміни."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:542 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1485
+#: package/contents/ui/config/configSearch.qml:542
+#: package/contents/ui/FullRepresentation.qml:1552
 msgid "Stop"
 msgstr "Зупинити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:542 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1485
+#: package/contents/ui/config/configSearch.qml:542
+#: package/contents/ui/FullRepresentation.qml:1552
 msgid "Play"
 msgstr "Відтворити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:645
+#: package/contents/ui/config/configSearch.qml:645
 msgid "Search…"
 msgstr "Пошук…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:655
+#: package/contents/ui/config/configSearch.qml:655
 msgid "Clear Results"
 msgstr "Очистити результати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:677
+#: package/contents/ui/config/configSearch.qml:677
 msgid "Station Info"
 msgstr "Відомості про станцію"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:695
+#: package/contents/ui/config/configSearch.qml:695
 msgid "Favicon:"
 msgstr "Логотип:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:707
+#: package/contents/ui/config/configSearch.qml:707
 msgid "Homepage:"
 msgstr "Домашня сторінка:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:717
+#: package/contents/ui/config/configSearch.qml:717
 msgid "Stream URL:"
 msgstr "Адреса потоку:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:731
+#: package/contents/ui/config/configSearch.qml:731
 msgid "OK"
 msgstr "Гаразд"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:733
+#: package/contents/ui/config/configSearch.qml:733
 msgid "Error"
 msgstr "Помилка"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:740
+#: package/contents/ui/config/configSearch.qml:740
 msgid "Server status:"
 msgstr "Стан сервера:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:751
+#: package/contents/ui/config/configSearch.qml:751
 msgid "%1 (last check: %2)"
 msgstr "%1 (остання перевірка: %2)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:772
+#: package/contents/ui/config/configSearch.qml:772
 msgid "Codec:"
 msgstr "Кодек:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:783
+#: package/contents/ui/config/configSearch.qml:783
 msgid "Bitrate:"
 msgstr "Бітрейт:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:789
+#: package/contents/ui/config/configSearch.qml:789
 msgid "kBit/s"
 msgstr "кбіт/с"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:801
+#: package/contents/ui/config/configSearch.qml:801
 msgid "Country:"
 msgstr "Країна:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:810
+#: package/contents/ui/config/configSearch.qml:810
 msgid "Language:"
 msgstr "Мова:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:819
+#: package/contents/ui/config/configSearch.qml:819
 msgid "Tags:"
 msgstr "Мітки:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/config/configSearch.qml⁩:851 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2901
+#: package/contents/ui/config/configSearch.qml:851
+#: package/contents/ui/FullRepresentation.qml:2969
 msgid "Error: %1"
 msgstr "Помилка: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:585
+#: package/contents/ui/FullRepresentation.qml:652
 msgid "Search station or country… (e.g. Finland, jazz)"
 msgstr "Шукайте станцію чи країну… (напр. Україна, джаз)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:606
+#: package/contents/ui/FullRepresentation.qml:673
 msgid "Show all stations"
 msgstr "Показати всі станції"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:606
+#: package/contents/ui/FullRepresentation.qml:673
 msgid "Show only favorites"
 msgstr "Показати лише улюблені"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:625
+#: package/contents/ui/FullRepresentation.qml:692
 msgid "All"
 msgstr "Усі"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:626
+#: package/contents/ui/FullRepresentation.qml:693
 msgid "Genre"
 msgstr "Жанр"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:627
+#: package/contents/ui/FullRepresentation.qml:694
 msgid "Country"
 msgstr "Країна"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:628
+#: package/contents/ui/FullRepresentation.qml:695
 msgid "Language"
 msgstr "Мова"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:644
+#: package/contents/ui/FullRepresentation.qml:711
 msgid "Top voted"
 msgstr "Найкращі за голосами"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:645
+#: package/contents/ui/FullRepresentation.qml:712
 msgid "Trending"
 msgstr "У тренді"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:646
+#: package/contents/ui/FullRepresentation.qml:713
 msgid "Bitrate"
 msgstr "Бітрейт"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:663
+#: package/contents/ui/FullRepresentation.qml:730
 msgid "Trending now"
 msgstr "Зараз у тренді"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:679
+#: package/contents/ui/FullRepresentation.qml:746
 msgid "Search again — right-click removes this entry"
 msgstr "Шукати знову — правий клік вилучає запис"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:693
+#: package/contents/ui/FullRepresentation.qml:760
 msgid "Clear search history"
 msgstr "Очистити історію пошуку"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:823
+#: package/contents/ui/FullRepresentation.qml:890
 msgid "Searching the web…"
 msgstr "Пошук в інтернеті…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:824
+#: package/contents/ui/FullRepresentation.qml:891
 msgid "From the web"
 msgstr "З інтернету"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:824 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1801 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1961
+#: package/contents/ui/FullRepresentation.qml:891
+#: package/contents/ui/FullRepresentation.qml:1868
+#: package/contents/ui/FullRepresentation.qml:2028
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:857
+#: package/contents/ui/FullRepresentation.qml:924
 msgid "Stop preview: %1"
 msgstr "Зупинити прослуховування: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:858
+#: package/contents/ui/FullRepresentation.qml:925
 msgid "Preview: %1"
 msgstr "Прослухати: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:941
+#: package/contents/ui/FullRepresentation.qml:1008
 msgid "not answering"
 msgstr "не відповідає"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:943 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1365
+#: package/contents/ui/FullRepresentation.qml:1010
+#: package/contents/ui/FullRepresentation.qml:1432
 msgid "%1 kb/s"
 msgstr "%1 кбіт/с"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:992 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1542
+#: package/contents/ui/FullRepresentation.qml:1059
+#: package/contents/ui/FullRepresentation.qml:1609
 msgid "Add to my stations + favorites"
 msgstr "Додати до моїх станцій та улюблених"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1007
+#: package/contents/ui/FullRepresentation.qml:1074
 msgid "Click = stop preview"
 msgstr "Клац = зупинити прослуховування"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1008
+#: package/contents/ui/FullRepresentation.qml:1075
 msgid "Click = preview · ⭐ = add to my stations"
 msgstr "Клац = прослухати · ⭐ = додати до моїх станцій"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1017
+#: package/contents/ui/FullRepresentation.qml:1084
 msgid "Show more results"
 msgstr "Показати більше результатів"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1044
+#: package/contents/ui/FullRepresentation.qml:1111
 msgid "No favorite stations yet"
 msgstr "Улюблених станцій ще немає"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1046
+#: package/contents/ui/FullRepresentation.qml:1113
 msgid "The station directory is not reachable"
 msgstr "Каталог станцій недоступний"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1047
+#: package/contents/ui/FullRepresentation.qml:1114
 msgid "No matching stations"
 msgstr "Немає відповідних станцій"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1047
+#: package/contents/ui/FullRepresentation.qml:1114
 msgid "No stations"
 msgstr "Немає станцій"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1060
+#: package/contents/ui/FullRepresentation.qml:1127
 msgid "Tap the heart on a station to add it here"
 msgstr "Торкніться сердечка біля станції, щоб додати її сюди"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1062
+#: package/contents/ui/FullRepresentation.qml:1129
 msgid "Check the connection and type to search again"
 msgstr "Перевірте з'єднання і введіть запит ще раз"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1063
+#: package/contents/ui/FullRepresentation.qml:1130
 msgid "Try a different search term"
 msgstr "Спробуйте інший пошуковий запит"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1344
+#: package/contents/ui/FullRepresentation.qml:1411
 msgid "LIVE"
 msgstr "НАЖИВО"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1450
+#: package/contents/ui/FullRepresentation.qml:1517
 msgid "Nothing playing"
 msgstr "Нічого не грає"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1467
+#: package/contents/ui/FullRepresentation.qml:1534
 msgid "Previous station"
 msgstr "Попередня станція"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1505
+#: package/contents/ui/FullRepresentation.qml:1572
 msgid "Next station"
 msgstr "Наступна станція"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1528
+#: package/contents/ui/FullRepresentation.qml:1595
 msgid "Search this track on YouTube"
 msgstr "Шукати цю композицію на YouTube"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1543 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:354
+#: package/contents/ui/FullRepresentation.qml:1610
+#: package/contents/ui/MediaListItem.qml:354
 msgid "Remove from favorites"
 msgstr "Вилучити з улюблених"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1543 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:354
+#: package/contents/ui/FullRepresentation.qml:1610
+#: package/contents/ui/MediaListItem.qml:354
 msgid "Add to favorites"
 msgstr "Додати до улюблених"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1570 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1929
+#: package/contents/ui/FullRepresentation.qml:1637
+#: package/contents/ui/FullRepresentation.qml:1996
 msgid "Remove from liked songs"
 msgstr "Вилучити з уподобаних пісень"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1571
+#: package/contents/ui/FullRepresentation.qml:1638
 msgid "Like this song (saved to My Music)"
 msgstr "Вподобати пісню (зберігається в Моїй музиці)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1589
+#: package/contents/ui/FullRepresentation.qml:1656
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Голос надіслано — дякуємо за підтримку станції!"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1590
+#: package/contents/ui/FullRepresentation.qml:1657
 msgid "Sending the vote…"
 msgstr "Надсилання голосу…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1591
+#: package/contents/ui/FullRepresentation.qml:1658
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Проголосуйте за цю станцію у світовому каталозі"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1610 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2888
+#: package/contents/ui/FullRepresentation.qml:1677
+#: package/contents/ui/FullRepresentation.qml:2956
 msgid "Downloading…"
 msgstr "Завантаження…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1611
+#: package/contents/ui/FullRepresentation.qml:1678
 msgid "Download this track (for offline listening)"
 msgstr "Завантажити цю композицію (для прослуховування офлайн)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1636
+#: package/contents/ui/FullRepresentation.qml:1703
 msgid "A scheduled recording is running (%1)"
 msgstr "Триває запланований запис (%1)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1638
+#: package/contents/ui/FullRepresentation.qml:1705
 msgid "Recording %1 — click to stop"
 msgstr "Запис: %1 — клацніть, щоб зупинити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1640 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2223
+#: package/contents/ui/FullRepresentation.qml:1707
+#: package/contents/ui/FullRepresentation.qml:2290
 msgid "This source cannot be recorded"
 msgstr "Це джерело неможливо записати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1641
+#: package/contents/ui/FullRepresentation.qml:1708
 msgid "Record this station (personal use only)"
 msgstr "Записати цю станцію (лише для особистого користування)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1725
+#: package/contents/ui/FullRepresentation.qml:1792
 msgid "Downloading: %1"
 msgstr "Завантаження: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1778
+#: package/contents/ui/FullRepresentation.qml:1845
 msgid "Stop recording"
 msgstr "Зупинити запис"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1802
+#: package/contents/ui/FullRepresentation.qml:1869
 msgid "Liked songs"
 msgstr "Уподобані пісні"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1802
+#: package/contents/ui/FullRepresentation.qml:1869
 msgid "Recently played"
 msgstr "Нещодавно відтворені"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1817
+#: package/contents/ui/FullRepresentation.qml:1884
 msgid "Show play history"
 msgstr "Показати історію відтворення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1818
+#: package/contents/ui/FullRepresentation.qml:1885
 msgid "Show liked songs"
 msgstr "Показати вподобані пісні"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1828
+#: package/contents/ui/FullRepresentation.qml:1895
 msgid "Clear history"
 msgstr "Очистити журнал"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1859
+#: package/contents/ui/FullRepresentation.qml:1926
 msgid "Search YouTube for %1"
 msgstr "Шукати на YouTube: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1918
+#: package/contents/ui/FullRepresentation.qml:1985
 msgid "Download this track"
 msgstr "Завантажити цю композицію"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1942
+#: package/contents/ui/FullRepresentation.qml:2009
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Клац = шукати на YouTube · ⬇ = завантажити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:1961 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/Heading.qml⁩:24 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1540
+#: package/contents/ui/FullRepresentation.qml:2028
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:1561
 msgid "My Music"
 msgstr "Моя музика"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2002 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2280
+#: package/contents/ui/FullRepresentation.qml:2069
+#: package/contents/ui/FullRepresentation.qml:2347
 msgid "Wake-up alarms"
 msgstr "Будильники"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2030
+#: package/contents/ui/FullRepresentation.qml:2097
 msgid "Open folder in file manager"
 msgstr "Відкрити теку в менеджері файлів"
 
@@ -735,711 +761,759 @@ msgstr "Відкрити теку в менеджері файлів"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2088 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2196 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2305 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2400
+#: package/contents/ui/FullRepresentation.qml:2155
+#: package/contents/ui/FullRepresentation.qml:2263
+#: package/contents/ui/FullRepresentation.qml:2372
+#: package/contents/ui/FullRepresentation.qml:2467
 msgid "Sun"
 msgstr "нд"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2088 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2196 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2305 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2400
+#: package/contents/ui/FullRepresentation.qml:2155
+#: package/contents/ui/FullRepresentation.qml:2263
+#: package/contents/ui/FullRepresentation.qml:2372
+#: package/contents/ui/FullRepresentation.qml:2467
 msgid "Mon"
 msgstr "пн"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2088 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2196 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2305 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2400
+#: package/contents/ui/FullRepresentation.qml:2155
+#: package/contents/ui/FullRepresentation.qml:2263
+#: package/contents/ui/FullRepresentation.qml:2372
+#: package/contents/ui/FullRepresentation.qml:2467
 msgid "Tue"
 msgstr "вт"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2088 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2196 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2305 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2400
+#: package/contents/ui/FullRepresentation.qml:2155
+#: package/contents/ui/FullRepresentation.qml:2263
+#: package/contents/ui/FullRepresentation.qml:2372
+#: package/contents/ui/FullRepresentation.qml:2467
 msgid "Wed"
 msgstr "ср"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2089 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2197 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2306 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2401
+#: package/contents/ui/FullRepresentation.qml:2156
+#: package/contents/ui/FullRepresentation.qml:2264
+#: package/contents/ui/FullRepresentation.qml:2373
+#: package/contents/ui/FullRepresentation.qml:2468
 msgid "Thu"
 msgstr "чт"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2089 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2197 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2306 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2401
+#: package/contents/ui/FullRepresentation.qml:2156
+#: package/contents/ui/FullRepresentation.qml:2264
+#: package/contents/ui/FullRepresentation.qml:2373
+#: package/contents/ui/FullRepresentation.qml:2468
 msgid "Fri"
 msgstr "пт"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2089 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2197 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2306 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2401
+#: package/contents/ui/FullRepresentation.qml:2156
+#: package/contents/ui/FullRepresentation.qml:2264
+#: package/contents/ui/FullRepresentation.qml:2373
+#: package/contents/ui/FullRepresentation.qml:2468
 msgid "Sat"
 msgstr "сб"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2091 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2189 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2308 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2392
+#: package/contents/ui/FullRepresentation.qml:2158
+#: package/contents/ui/FullRepresentation.qml:2256
+#: package/contents/ui/FullRepresentation.qml:2375
+#: package/contents/ui/FullRepresentation.qml:2459
 msgid "Daily"
 msgstr "Щодня"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2092 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2309
+#: package/contents/ui/FullRepresentation.qml:2159
+#: package/contents/ui/FullRepresentation.qml:2376
 msgid "Every %1"
 msgstr "Щотижня: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2107
+#: package/contents/ui/FullRepresentation.qml:2174
 msgid "Remove this schedule"
 msgstr "Вилучити цей розклад"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2115
+#: package/contents/ui/FullRepresentation.qml:2182
 msgid "No scheduled recordings yet — add one below."
 msgstr "Запланованих записів ще немає — додайте нижче."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2130 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2347
+#: package/contents/ui/FullRepresentation.qml:2197
+#: package/contents/ui/FullRepresentation.qml:2414
 msgid "Station:"
 msgstr "Станція:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2138 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2355
+#: package/contents/ui/FullRepresentation.qml:2205
+#: package/contents/ui/FullRepresentation.qml:2422
 msgid "Station"
 msgstr "Станція"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2142 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2359
+#: package/contents/ui/FullRepresentation.qml:2209
+#: package/contents/ui/FullRepresentation.qml:2426
 msgid "Start:"
 msgstr "Початок:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2153 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2370
+#: package/contents/ui/FullRepresentation.qml:2220
+#: package/contents/ui/FullRepresentation.qml:2437
 msgid "Start hour"
 msgstr "Година початку"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2163 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2380
+#: package/contents/ui/FullRepresentation.qml:2230
+#: package/contents/ui/FullRepresentation.qml:2447
 msgid "Start minute"
 msgstr "Хвилина початку"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2168
+#: package/contents/ui/FullRepresentation.qml:2235
 msgid "Duration:"
 msgstr "Тривалість:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2178
+#: package/contents/ui/FullRepresentation.qml:2245
 msgid "Duration in minutes"
 msgstr "Тривалість у хвилинах"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2182 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2385
+#: package/contents/ui/FullRepresentation.qml:2249
+#: package/contents/ui/FullRepresentation.qml:2452
 msgid "Repeat:"
 msgstr "Повторення:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2189 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2392
+#: package/contents/ui/FullRepresentation.qml:2256
+#: package/contents/ui/FullRepresentation.qml:2459
 msgid "Once"
 msgstr "Одноразово"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2189 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2392
+#: package/contents/ui/FullRepresentation.qml:2256
+#: package/contents/ui/FullRepresentation.qml:2459
 msgid "Weekly"
 msgstr "Щотижня"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2190 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2394
+#: package/contents/ui/FullRepresentation.qml:2257
+#: package/contents/ui/FullRepresentation.qml:2461
 msgid "Repeat"
 msgstr "Повторення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2199 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2403
+#: package/contents/ui/FullRepresentation.qml:2266
+#: package/contents/ui/FullRepresentation.qml:2470
 msgid "Weekday"
 msgstr "День тижня"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2210
+#: package/contents/ui/FullRepresentation.qml:2277
 msgid "Recordings are for personal use only."
 msgstr "Записи призначені лише для особистого користування."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2235 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2436
+#: package/contents/ui/FullRepresentation.qml:2302
+#: package/contents/ui/FullRepresentation.qml:2503
 msgid "Add"
 msgstr "Додати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2324
+#: package/contents/ui/FullRepresentation.qml:2391
 msgid "Remove this alarm"
 msgstr "Вилучити цей будильник"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2332
+#: package/contents/ui/FullRepresentation.qml:2399
 msgid "No alarms yet — add one below."
 msgstr "Будильників ще немає — додайте один нижче."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2408
+#: package/contents/ui/FullRepresentation.qml:2475
 msgid "Volume:"
 msgstr "Гучність:"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2430
+#: package/contents/ui/FullRepresentation.qml:2497
 msgid "Keep the computer awake until the alarm"
 msgstr "Не давати комп'ютеру заснути до будильника"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2491
+#: package/contents/ui/FullRepresentation.qml:2558
 msgid "Stop: %1"
 msgstr "Зупинити: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2491
+#: package/contents/ui/FullRepresentation.qml:2558
 msgid "Play: %1"
 msgstr "Відтворити: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2576
+#: package/contents/ui/FullRepresentation.qml:2643
 msgid "Click again to confirm delete"
 msgstr "Клацніть ще раз, щоб підтвердити вилучення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2576
+#: package/contents/ui/FullRepresentation.qml:2643
 msgid "Delete file"
 msgstr "Вилучити файл"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2632
+#: package/contents/ui/FullRepresentation.qml:2699
 msgid "Nothing here yet"
 msgstr "Тут поки нічого немає"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2643
+#: package/contents/ui/FullRepresentation.qml:2710
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Коли по радіо грає гарна пісня, натисніть ⬇ — її буде збережено тут для прослуховування офлайн"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2797
+#: package/contents/ui/FullRepresentation.qml:2865
 msgid "My Music (downloaded tracks)"
 msgstr "Моя музика (завантажені композиції)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2811
+#: package/contents/ui/FullRepresentation.qml:2879
 msgid "Sleep timer: %1"
 msgstr "Таймер сну: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2812
+#: package/contents/ui/FullRepresentation.qml:2880
 msgid "Sleep timer"
 msgstr "Таймер сну"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2844
+#: package/contents/ui/FullRepresentation.qml:2912
 msgid "Sleep in 15 minutes"
 msgstr "Вимкнути за 15 хвилин"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2845
+#: package/contents/ui/FullRepresentation.qml:2913
 msgid "Sleep in 30 minutes"
 msgstr "Вимкнути за 30 хвилин"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2846
+#: package/contents/ui/FullRepresentation.qml:2914
 msgid "Sleep in 60 minutes"
 msgstr "Вимкнути за 60 хвилин"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2847
+#: package/contents/ui/FullRepresentation.qml:2915
 msgid "Sleep in 90 minutes"
 msgstr "Вимкнути за 90 хвилин"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2850
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "Cancel timer"
 msgstr "Скасувати таймер"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2885
+#: package/contents/ui/FullRepresentation.qml:2953
 msgid "Sleeping in %1"
 msgstr "Засинання через %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2891 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:66
+#: package/contents/ui/FullRepresentation.qml:2959
+#: package/contents/ui/main.qml:66
 msgid "Casting to %1"
 msgstr "Трансляція на %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2894
+#: package/contents/ui/FullRepresentation.qml:2962
 msgid "Check internet connection…"
 msgstr "Перевірте з'єднання з інтернетом…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2904
+#: package/contents/ui/FullRepresentation.qml:2972
 msgid "Bitrate: %1 kb/s"
 msgstr "Бітрейт: %1 кбіт/с"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2909
+#: package/contents/ui/FullRepresentation.qml:2977
 msgid "Playing"
 msgstr "Відтворення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2909 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2912
+#: package/contents/ui/FullRepresentation.qml:2977
+#: package/contents/ui/FullRepresentation.qml:2980
 msgid "Connecting…"
 msgstr "З'єднання…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2914
+#: package/contents/ui/FullRepresentation.qml:2982
 msgid "Choose station and enjoy…"
 msgstr "Оберіть станцію та насолоджуйтеся…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2933
+#: package/contents/ui/FullRepresentation.qml:3001
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Трансляція на %1 — натисніть, щоб вибрати або зупинити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:2934
+#: package/contents/ui/FullRepresentation.qml:3002
 msgid "Play on a device (Chromecast, TV, speaker)"
 msgstr "Відтворити на пристрої (Chromecast, телевізор, колонка)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3018
+#: package/contents/ui/FullRepresentation.qml:3086
 msgid "Play on"
 msgstr "Відтворити на"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3031
+#: package/contents/ui/FullRepresentation.qml:3099
 msgid "This computer"
 msgstr "Цей комп'ютер"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3055
+#: package/contents/ui/FullRepresentation.qml:3123
 msgid "System default output"
 msgstr "Системний вихід за замовчуванням"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3082
+#: package/contents/ui/FullRepresentation.qml:3150
 msgid "All local outputs, in sync"
 msgstr "Усі локальні виходи, синхронно"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3099
+#: package/contents/ui/FullRepresentation.qml:3167
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Грає одночасно на всіх під'єднаних колонках — дротові виходи затримуються, щоб іти в ногу з Bluetooth."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3113 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3120
+#: package/contents/ui/FullRepresentation.qml:3181
+#: package/contents/ui/FullRepresentation.qml:3188
 msgid "Sync fine-tune"
 msgstr "Точне налаштування синхронізації"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3130
+#: package/contents/ui/FullRepresentation.qml:3198
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Якщо Bluetooth-колонка все ще відстає від дротових, збільшуйте це, доки вони не заграють разом."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3142
+#: package/contents/ui/FullRepresentation.qml:3210
 msgid "Sync delay in milliseconds"
 msgstr "Затримка синхронізації в мілісекундах"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3164
+#: package/contents/ui/FullRepresentation.qml:3232
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Введіть точну затримку в мілісекундах — повзунок рухається кроками по десять."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3168
+#: package/contents/ui/FullRepresentation.qml:3236
 msgid "ms"
 msgstr "мс"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3182
+#: package/contents/ui/FullRepresentation.qml:3250
 msgid "Calibrate with the microphone"
 msgstr "Калібрувати мікрофоном"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3187
+#: package/contents/ui/FullRepresentation.qml:3255
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Відтворює кілька гучних клацань через кожну колонку та вимірює мікрофоном, наскільки відстає Bluetooth-колонка — затримка встановлюється автоматично."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3207
+#: package/contents/ui/FullRepresentation.qml:3275
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Раунд 1 із 2 — клацання через кожен динамік…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3208
+#: package/contents/ui/FullRepresentation.qml:3276
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Раунд 2 із 2 — тиша, перевіряю результат…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3246
+#: package/contents/ui/FullRepresentation.qml:3314
 msgid "%1 plays in the group"
 msgstr "%1 грає в групі"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3259
+#: package/contents/ui/FullRepresentation.qml:3327
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Чи грає ця колонка в групі — зніміть позначку, щоб залишити її осторонь, не від'єднуючи. Запам'ятовується для пристрою."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3268
+#: package/contents/ui/FullRepresentation.qml:3336
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (нічого не підключено)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3282
+#: package/contents/ui/FullRepresentation.qml:3350
 msgid "Balance of %1"
 msgstr "Баланс %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3291
+#: package/contents/ui/FullRepresentation.qml:3359
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Частка цього динаміка в гучності — баланс іде за кожним рухом головного регулятора й запам'ятовується для пристрою. Він впливає лише на те, що відтворює цей віджет; гучність пристрою в системних налаштуваннях звуку — окремий, недоторканий шар, тому ті числа відрізняються від цих повзунків."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3308
+#: package/contents/ui/FullRepresentation.qml:3376
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3309
+#: package/contents/ui/FullRepresentation.qml:3377
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3310
+#: package/contents/ui/FullRepresentation.qml:3378
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3311
+#: package/contents/ui/FullRepresentation.qml:3379
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3316
+#: package/contents/ui/FullRepresentation.qml:3384
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Які канали грає ця колонка: стерео, лише лівий, лише правий або моно-мікс обох. Поставте одну колонку на L, а іншу на R — отримаєте справжню стереопару; запам'ятовується для пристрою."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3346
+#: package/contents/ui/FullRepresentation.qml:3414
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3361
+#: package/contents/ui/FullRepresentation.qml:3429
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth вимкнено або адаптер недоступний — перевірте Системні параметри."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3372
+#: package/contents/ui/FullRepresentation.qml:3440
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Немає спарованих Bluetooth-аудіопристроїв — спаруйте колонку один раз у Системних параметрах, і вона з'явиться тут."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3386
+#: package/contents/ui/FullRepresentation.qml:3454
 msgid "%1 — connecting…"
 msgstr "%1 — з'єднання…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3404
+#: package/contents/ui/FullRepresentation.qml:3472
 msgid "%1 — pairing…"
 msgstr "%1 — спарювання…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3405
+#: package/contents/ui/FullRepresentation.qml:3473
 msgid "%1 — new, click to pair"
 msgstr "%1 — новий, натисніть щоб спарувати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3416
+#: package/contents/ui/FullRepresentation.qml:3484
 msgid "Pair a new speaker…"
 msgstr "Спарувати нову колонку…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3432
+#: package/contents/ui/FullRepresentation.qml:3500
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Пошук — переведіть колонку в режим спарювання…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3453
+#: package/contents/ui/FullRepresentation.qml:3521
 msgid "WiFi & network"
 msgstr "WiFi та мережа"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3485
+#: package/contents/ui/FullRepresentation.qml:3553
 msgid "%1 (speaker group)"
 msgstr "%1 (група динаміків)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3513
+#: package/contents/ui/FullRepresentation.qml:3581
 msgid "Balance"
 msgstr "Баланс"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3527
+#: package/contents/ui/FullRepresentation.qml:3595
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Частка цього пристрою в гучності — баланс іде за кожним рухом головного повзунка й запам'ятовується для пристрою."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3549
+#: package/contents/ui/FullRepresentation.qml:3617
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Кожен пристрій буферизує потік самостійно, тому кімнати можуть грати з різницею в кілька секунд. Для ідеально синхронних динаміків згрупуйте їх у застосунку Google Home — група з'явиться тут як один пристрій."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3559
+#: package/contents/ui/FullRepresentation.qml:3627
 msgid "Stop casting everywhere"
 msgstr "Зупинити відтворення на всіх пристроях"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3577
+#: package/contents/ui/FullRepresentation.qml:3645
 msgid "Searching for devices…"
 msgstr "Пошук пристроїв…"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3586
+#: package/contents/ui/FullRepresentation.qml:3654
 msgid "No devices found on your network"
 msgstr "У вашій мережі не знайдено жодного пристрою"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/FullRepresentation.qml⁩:3608
+#: package/contents/ui/FullRepresentation.qml:3676
 msgid "Volume: %1% (scroll to adjust)"
 msgstr "Гучність: %1% (прокрутіть, щоб змінити)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/Heading.qml⁩:37
+#: package/contents/ui/Heading.qml:37
 msgid "Back to stations"
 msgstr "Назад до станцій"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/Heading.qml⁩:126
+#: package/contents/ui/Heading.qml:126
 msgid "Show now playing"
 msgstr "Показати панель відтворення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:533 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:569
+#: package/contents/ui/main.qml:589
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "Станція не відповіла — можливо, вона офлайн або недоступна у вашій країні. Спробуйте інший результат."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1033
+#: package/contents/ui/main.qml:1054
 msgid "Scheduled recording started"
 msgstr "Запланований запис розпочато"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1149
+#: package/contents/ui/main.qml:1170
 msgid "Scheduled recording missed"
 msgstr "Запланований запис пропущено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1155
+#: package/contents/ui/main.qml:1176
 msgid "Scheduled recording skipped"
 msgstr "Запланований запис пропущено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1156
+#: package/contents/ui/main.qml:1177
 msgid "%1 — another recording is already running."
 msgstr "%1 — інший запис уже триває."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1283
+#: package/contents/ui/main.qml:1304
 msgid "Wake-up alarm missed"
 msgstr "Будильник пропущено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1284
+#: package/contents/ui/main.qml:1305
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 було встановлено на %2 — комп'ютер у цей час був вимкнений або спав."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1318 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1383 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1436 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1439
+#: package/contents/ui/main.qml:1339 package/contents/ui/main.qml:1404
+#: package/contents/ui/main.qml:1457 package/contents/ui/main.qml:1460
 msgid "Wake-up alarm"
 msgstr "Будильник"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1319
+#: package/contents/ui/main.qml:1340
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 припав на той самий час — замість нього грає %2."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:1440
+#: package/contents/ui/main.qml:1461
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Станція не змогла запуститися — натомість грає вбудований сигнал."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2003
+#: package/contents/ui/main.qml:2034
 msgid "%1 devices"
 msgstr "%1 пристроїв"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2397
+#: package/contents/ui/main.qml:2428
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-колонка"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2396
+#: package/contents/ui/main.qml:2427
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 підключено, але звук так і не надійшов"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2398
+#: package/contents/ui/main.qml:2429
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Вимкніть і знову ввімкніть колонку, а потім підключіть її ще раз."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2726
+#: package/contents/ui/main.qml:2757
 msgid "Station seems to be off the air"
 msgstr "Схоже, станція не в ефірі"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2727
+#: package/contents/ui/main.qml:2758
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 не відповідає за жодною адресою, відомою каталогу. Вона лишається у вашому списку — спроби тривають у фоні."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2797
+#: package/contents/ui/main.qml:2828
 msgid "Playing from a backup address"
 msgstr "Відтворення з резервної адреси"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2798
+#: package/contents/ui/main.qml:2829
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Збережена адреса станції не відповідає — поки що грає найближчий збіг із каталогу. Вашу збережену адресу збережено."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2827
+#: package/contents/ui/main.qml:2858
 msgid "Station found at a new address"
 msgstr "Станцію знайдено за новою адресою"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:2828
+#: package/contents/ui/main.qml:2859
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 переїхала — нову адресу збережено у вашому списку."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3942
+#: package/contents/ui/main.qml:3973
 msgid "Casting needs python-chromecast"
 msgstr "Трансляція потребує python-chromecast"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3943
+#: package/contents/ui/main.qml:3974
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Встановіть пакунок python-chromecast, щоб транслювати на свої пристрої."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3946
+#: package/contents/ui/main.qml:3977
 msgid "the device"
 msgstr "пристрій"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3946
+#: package/contents/ui/main.qml:3977
 msgid "Could not cast to %1"
 msgstr "Не вдалося транслювати на %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:3947
+#: package/contents/ui/main.qml:3978
 msgid "The device could not play this station."
 msgstr "Пристрій не зміг відтворити цю станцію."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4039 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4133
+#: package/contents/ui/main.qml:4070 package/contents/ui/main.qml:4164
 msgid "the Bluetooth device"
 msgstr "пристроєм Bluetooth"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4038
+#: package/contents/ui/main.qml:4069
 msgid "Could not connect to %1"
 msgstr "Не вдалося з'єднатися з %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4040
+#: package/contents/ui/main.qml:4071
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Переконайтеся, що динамік увімкнено і він у межах досяжності."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4132
+#: package/contents/ui/main.qml:4163
 msgid "Could not pair with %1"
 msgstr "Не вдалося спарувати з %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4134
+#: package/contents/ui/main.qml:4165
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Переведіть колонку в режим спарювання (утримуйте кнопку Bluetooth) і спробуйте ще раз."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4224
+#: package/contents/ui/main.qml:4255
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg не встановлено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4225
+#: package/contents/ui/main.qml:4256
 msgid "Install ffmpeg to record radio."
 msgstr "Встановіть ffmpeg, щоб записувати радіо."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4228
+#: package/contents/ui/main.qml:4259
 msgid "Recording saved ✓ (%1)"
 msgstr "Запис збережено ✓ (%1)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4232
+#: package/contents/ui/main.qml:4263
 msgid "Recording interrupted (%1 captured)"
 msgstr "Запис перервано (записано %1)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4234
+#: package/contents/ui/main.qml:4265
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — файл значно менший, ніж очікувалося."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4238
+#: package/contents/ui/main.qml:4269
 msgid "Recording failed"
 msgstr "Не вдалося записати"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4239
+#: package/contents/ui/main.qml:4270
 msgid "The stream could not be captured."
 msgstr "Не вдалося захопити потік."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4323
+#: package/contents/ui/main.qml:4354
 msgid "Downloading again without the cover"
 msgstr "Завантажую знову без обкладинки"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4324
+#: package/contents/ui/main.qml:4355
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Для вбудовування теґів потрібен пакунок python-mutagen — встановіть його, щоб мати обкладинки у файлах."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4332
+#: package/contents/ui/main.qml:4363
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp не встановлено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4333
+#: package/contents/ui/main.qml:4364
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Встановіть yt-dlp (і ffmpeg), щоб завантажувати композиції."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4336
+#: package/contents/ui/main.qml:4367
 msgid "Track downloaded ✓"
 msgstr "Композицію завантажено ✓"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4337
+#: package/contents/ui/main.qml:4368
 msgid "Saved to: %1"
 msgstr "Збережено до: %1"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4340
+#: package/contents/ui/main.qml:4371
 msgid "Download failed"
 msgstr "Не вдалося завантажити"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4341
+#: package/contents/ui/main.qml:4372
 msgid "Unknown error"
 msgstr "Невідома помилка"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4617
+#: package/contents/ui/main.qml:4648
 msgid "Audio output changed"
 msgstr "Аудіовихід змінено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/main.qml⁩:4618
+#: package/contents/ui/main.qml:4649
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Вибраний пристрій виводу зник — використовується типовий системний вихід."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:261
+#: package/contents/ui/MediaListItem.qml:261
 msgid "Move up"
 msgstr "Пересунути вище"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:285
+#: package/contents/ui/MediaListItem.qml:285
 msgid "Move down"
 msgstr "Пересунути нижче"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:317
+#: package/contents/ui/MediaListItem.qml:317
 msgid "Click again to confirm removal"
 msgstr "Клацніть ще раз, щоб підтвердити вилучення"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/MediaListItem.qml⁩:318
+#: package/contents/ui/MediaListItem.qml:318
 msgid "Remove station from list"
 msgstr "Вилучити станцію зі списку"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:290
+#: package/contents/ui/SyncEngine.qml:290
 msgid "Could not combine the outputs"
 msgstr "Не вдалося об'єднати виходи"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:291
+#: package/contents/ui/SyncEngine.qml:291
 msgid "pactl refused to create the combined output."
 msgstr "pactl відмовився створити об'єднаний вихід."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:557
+#: package/contents/ui/SyncEngine.qml:557
 msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
 msgstr "Bluetooth-колонка відстає на %1 мс, і гучність усіх колонок вирівняно за мікрофоном — усе налаштовано й запам'ятовано."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:558
+#: package/contents/ui/SyncEngine.qml:558
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Bluetooth-колонка відстає на %1 мс — затримку встановлено й запам'ятовано для цього пристрою."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:560
+#: package/contents/ui/SyncEngine.qml:560
 msgid "Balance levels set earlier were replaced by the measured ones."
 msgstr "Раніше встановлені рівні балансу замінено виміряними."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:568
+#: package/contents/ui/SyncEngine.qml:568
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
 msgstr "Мікрофон перевантажився на %1 — цей баланс залишено без змін; зменште гучність колонки та відкалібруйте знову."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:574
+#: package/contents/ui/SyncEngine.qml:574
 msgid "Measured with %1 — the default microphone stayed silent."
 msgstr "Виміряно мікрофоном %1 — типовий мікрофон мовчав."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:575
+#: package/contents/ui/SyncEngine.qml:575
 msgid "Speakers calibrated"
 msgstr "Колонки відкалібровано"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:584 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:620
+#: package/contents/ui/SyncEngine.qml:584
+#: package/contents/ui/SyncEngine.qml:620
 msgid "Calibration did not succeed"
 msgstr "Калібрування не вдалося"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:585 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:732
+#: package/contents/ui/SyncEngine.qml:585
+#: package/contents/ui/SyncEngine.qml:732
 msgid "Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."
 msgstr "Кожен мікрофон видав чисту тишу. Кнопка вимкнення звуку на самому мікрофоні невидима для системи — перевірте індикатор на мікрофоні або зробіть типовим робочий мікрофон."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:607
+#: package/contents/ui/SyncEngine.qml:607
 msgid "Calibration"
 msgstr "Калібрування"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:608
+#: package/contents/ui/SyncEngine.qml:608
 msgid "The clicks were too quiet for this room — trying once more, louder."
 msgstr "Клацання були надто тихими для цієї кімнати — ще одна спроба, гучніше."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:621
+#: package/contents/ui/SyncEngine.qml:621
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Переконайтеся, що мікрофон не закритий і чути обидві колонки, потім спробуйте ще раз."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:677
+#: package/contents/ui/SyncEngine.qml:677
 msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
 msgstr "Колонки розходилися на %1 мс — скориговано за виміром, перевіряю ще раз."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:692
+#: package/contents/ui/SyncEngine.qml:692
 msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
 msgstr "Маршрут однієї колонки застряг на %1 мс — очищено, перевіряю ще раз."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:702 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:722 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:731 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:759 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:764 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:771 ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:784
+#: package/contents/ui/SyncEngine.qml:702
+#: package/contents/ui/SyncEngine.qml:722
+#: package/contents/ui/SyncEngine.qml:731
+#: package/contents/ui/SyncEngine.qml:759
+#: package/contents/ui/SyncEngine.qml:764
+#: package/contents/ui/SyncEngine.qml:771
+#: package/contents/ui/SyncEngine.qml:784
 msgid "Sync check"
 msgstr "Перевірка синхронізації"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:723
+#: package/contents/ui/SyncEngine.qml:723
 msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
 msgstr "У кімнаті було недостатньо тихо для перевірки — призупиніть інше аудіо та відкалібруйте ще раз."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:760
+#: package/contents/ui/SyncEngine.qml:760
 msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
 msgstr "%1 мовчав в обох раундах — його виключено з групи. Позначте його у списку динаміків будь-коли."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:765
+#: package/contents/ui/SyncEngine.qml:765
 msgid "%1 made no sound the microphone could hear. If it stays silent on the next calibration too, it will be left out of the group."
 msgstr "%1 не видав жодного звуку, який міг би почути мікрофон. Якщо він мовчатиме й під час наступного калібрування, його буде виключено з групи."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:772
+#: package/contents/ui/SyncEngine.qml:772
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "Під час перевірки %1 не було чути — колонка може бути вимкнена або приглушена. Калібрування збережено."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:780
+#: package/contents/ui/SyncEngine.qml:780
 msgid "Sync verified"
 msgstr "Синхронізацію підтверджено"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:781
+#: package/contents/ui/SyncEngine.qml:781
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Кожна колонка досягає мікрофона в межах %1 мс — для вуха в одному такті."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:785
+#: package/contents/ui/SyncEngine.qml:785
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Колонки все ще розходяться на %1 мс. Відкалібруйте ще раз або підправте повзунок затримки."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1412
+#: package/contents/ui/SyncEngine.qml:1412
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Два раунди клацань із тихою перевіркою між ними — загалом близько двох хвилин. Музика мовчить, доки перевірка не завершиться."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1414
+#: package/contents/ui/SyncEngine.qml:1414
 msgid "Skipped (empty jack): %1."
 msgstr "Пропущено (порожнє гніздо): %1."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1415
+#: package/contents/ui/SyncEngine.qml:1415
 msgid "Calibration started"
 msgstr "Калібрування розпочато"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:1476
+#: package/contents/ui/SyncEngine.qml:1476
 msgid "All local outputs (On Air)"
 msgstr "Усі локальні виходи (On Air)"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:2121
+#: package/contents/ui/SyncEngine.qml:2121
 msgid "%1 did not join the sync"
 msgstr "%1 не приєднався до синхронізації"
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:2123
+#: package/contents/ui/SyncEngine.qml:2123
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Колонка під'єднана, але її не вдалося додати до групи — вимкніть і знову ввімкніть синхронізацію."
 
-#: ⁨/home/egon/minu projektid/onair-plasmoid/package/contents/ui/SyncEngine.qml⁩:2124
+#: package/contents/ui/SyncEngine.qml:2124
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Колонка під'єднана, але її аудіовихід так і не з'явився — вимкніть і ввімкніть колонку, а потім під'єднайте її знову."
 
