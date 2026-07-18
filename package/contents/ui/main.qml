@@ -365,7 +365,10 @@ PlasmoidItem {
             // give-up toast on every round.
             if (userInitiated !== false) root._healRetryAttempts = 0;
             root.currentStationFavicon = station.favicon || "";
-            _playStation(station);
+            // Thread the automated-recovery flag: a network-return or heal
+            // retry replaying a ringing alarm's station must not clear the
+            // alarm's volume floor or disarm its fallback tone.
+            _playStation(station, false, userInitiated === false);
         }
     }
 
@@ -983,8 +986,14 @@ PlasmoidItem {
         if (!recording) return;
         _recStopRequested = true;
         var safePid = _recPidFile.replace(/'/g, "'\\''");
-        // SIGINT (not KILL) lets ffmpeg finish the container properly.
-        executable.exec(": REC_STOP; [ -f '" + safePid + "' ] && kill -INT $(cat '" + safePid + "') 2>/dev/null; true");
+        // SIGINT (not KILL) lets ffmpeg finish the container properly. Verify
+        // the pid is actually OUR ffmpeg before signalling: a hard-killed
+        // wrapper can leave a stale pid file, and after pid reuse a blind
+        // kill would SIGINT an unrelated process (same guard the alarm
+        // inhibitor uses).
+        executable.exec(": REC_STOP; p=$(cat '" + safePid + "' 2>/dev/null);"
+            + " [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*-rw_timeout'"
+            + " && kill -INT \"$p\" 2>/dev/null; true");
     }
 
     function _recStart(stationName, url, durationSec, scheduled) {
@@ -1158,6 +1167,10 @@ PlasmoidItem {
     function _recScheduleTick() {
         if (recSchedules.length === 0) return;
         var now = Date.now();
+        // Same zone watch the alarm tick runs — a recording schedule used to
+        // go an hour wrong at a DST flip while the machine was running,
+        // because only alarms watched the offset.
+        _schedApplyTzChange(now);
         // Snapshot: _recSchedAdvance below replaces recSchedules itself.
         var due = recSchedules.slice();
         for (var i = 0; i < due.length; i++) {
@@ -1279,31 +1292,53 @@ PlasmoidItem {
     }
 
     // Watches for the system time zone moving under the scheduler (travel,
-    // a VPN-driven tzdata change): stored nextRun instants belong to the
-    // OLD zone's wall clock, and an alarm's promise is the wall clock.
-    property int _alarmTzOffset: new Date().getTimezoneOffset()
+    // a VPN-driven tzdata change, a DST flip): stored nextRun instants belong
+    // to the OLD zone's wall clock, and an alarm's promise is the wall clock.
+    // Persisted so a change that happened while the widget was NOT running is
+    // caught at the next load, not only changes seen live. 9999 = never
+    // stored (a fresh install just stamps the current offset, nothing to fix).
+    property int _schedTzOffset: 9999
+
+    // Re-express EVERY schedule — alarms AND recordings — in the current zone
+    // when the system offset has moved since we last looked. Both lists share
+    // this: previously only the alarm tick watched the offset, so a recording
+    // schedule went an hour wrong at every DST flip. Returns true when it
+    // acted (the alarm tick skips its own recompute then).
+    function _schedApplyTzChange(now) {
+        var tz = new Date(now).getTimezoneOffset();
+        if (tz === _schedTzOffset) return false;
+        var first = _schedTzOffset === 9999;
+        _schedTzOffset = tz;
+        Plasmoid.configuration.schedTzOffset = tz;
+        // A first-ever stamp has nothing to correct — sanitize just built
+        // every nextRun at this very offset.
+        if (first) return true;
+        if (alarms.length > 0) {
+            var al = alarms.slice();
+            for (var a = 0; a < al.length; a++)
+                al[a].nextRun = AlarmLogic.retimeForZone(al[a], now);
+            alarms = al;
+            _saveAlarms();
+            _alarmArmInhibit();
+        }
+        if (recSchedules.length > 0) {
+            var rl = recSchedules.slice();
+            for (var r = 0; r < rl.length; r++)
+                rl[r].nextRun = AlarmLogic.retimeForZone(rl[r], now);
+            recSchedules = rl;
+            _saveRecSchedules();
+        }
+        return true;
+    }
 
     function _alarmTick() {
         var now = Date.now();
+        // Zone check first, on the shared path — the fire scan below then
+        // reads the corrected instants.
+        _schedApplyTzChange(now);
         var list = alarms.slice();
         var changed = false;
         var due = [];
-        var tz = new Date(now).getTimezoneOffset();
-        if (tz !== _alarmTzOffset) {
-            _alarmTzOffset = tz;
-            // Recompute every schedule from its hh:mm fields — 07:00 must
-            // mean 07:00 where the machine now lives. Idempotent across DST
-            // flips (nextOccurrence already builds zone-correct instants).
-            // Anchored at now - GRACE, not now: a machine woken at 07:10 to
-            // a 07:00 alarm across a DST flip must still see 07:00 as a
-            // just-passed occurrence the fire scan below catches, not get it
-            // recomputed forward to tomorrow and silently skipped.
-            for (var r = 0; r < list.length; r++)
-                list[r].nextRun = AlarmLogic.nextOccurrence(
-                    list[r].hh, list[r].mm, list[r].repeat, list[r].weekday,
-                    now - AlarmLogic.GRACE_MS);
-            changed = true;
-        }
         for (var i = list.length - 1; i >= 0; i--) {
             var a = list[i];
             var dec = AlarmLogic.fireDecision(a.nextRun, now, AlarmLogic.GRACE_MS);
@@ -3078,13 +3113,18 @@ PlasmoidItem {
         _saveLiked();
     }
 
-    function _playStation(station, noUpgrade) {
-        // A user-initiated play always outranks a heal audition in flight —
-        // and someone picking a station is awake: the wake tone stands down
-        // and the alarm's volume override hands control back.
-        _alarmFallbackArmed = false;
-        alarmFallbackTimer.stop();
-        _volumeOverridePct = -1;
+    function _playStation(station, noUpgrade, automated) {
+        // A user-initiated play means the listener is awake: the wake tone
+        // stands down and the alarm's volume override hands control back. An
+        // AUTOMATED resume (network came back, heal retry) replaying a
+        // ringing alarm's station must NOT — clearing these would drop the
+        // wake-up to the bedtime volume and disarm the fallback tone, so the
+        // alarm would continue near-silent with no safety net.
+        if (!automated) {
+            _alarmFallbackArmed = false;
+            alarmFallbackTimer.stop();
+            _volumeOverridePct = -1;
+        }
         _healClearPending();
         _healSeq++;
         healTimer.stop();
@@ -3793,6 +3833,13 @@ PlasmoidItem {
         // Alarms re-arm their keep-awake holder every start: the pid file
         // kill-and-rearm cycle also cleans up after a crashed session.
         _loadAlarms();
+        // A time-zone change that happened while the widget was NOT running
+        // (reboot after a DST flip, a laptop opened in a new zone) is caught
+        // here, once both lists are loaded — the live ticks only see changes
+        // while running. Persisted offset seeds _schedTzOffset first.
+        var storedTz = Plasmoid.configuration.schedTzOffset;
+        _schedTzOffset = (typeof storedTz === "number") ? storedTz : 9999;
+        _schedApplyTzChange(Date.now());
         _alarmArmInhibit();
         syncFavicons();
         playMusicOutput.volume = targetVolume();
@@ -3811,7 +3858,12 @@ PlasmoidItem {
         // survives, so stop the orphan on the next start. ("-t" already caps
         // how long it could have kept running.)
         var safePid = _recPidFile.replace(/'/g, "'\\''");
-        executable.exec(": REC_CLEAN; [ -f '" + safePid + "' ] && { kill -INT $(cat '" + safePid + "') 2>/dev/null; rm -f '" + safePid + "'; }; true");
+        // Signal only if the pid is still OUR ffmpeg — a stale pid file plus
+        // pid reuse would otherwise SIGINT an innocent process on startup.
+        // The file is removed either way (it is this session's to clean).
+        executable.exec(": REC_CLEAN; p=$(cat '" + safePid + "' 2>/dev/null);"
+            + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*-rw_timeout'; then"
+            + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "'; true");
         // Catch a schedule that came due while the shell was down/starting.
         Qt.callLater(_recScheduleTick);
     }

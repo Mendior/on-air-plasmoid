@@ -97,6 +97,39 @@ TestCase {
                 ms(2026, 7, 21, 9, 0))
     }
 
+    // ── retimeForZone: the tz-change recompute ────────────────────────────
+
+    function test_retime_catches_an_entry_missed_across_the_change() {
+        // 07:00 daily whose stored instant is already in the past (machine
+        // was asleep/off across its moment); now is 07:10. Anchored a grace
+        // window back, it recomputes to today 07:00 so the fire scan still
+        // catches it — not forward to tomorrow.
+        var now = ms(2026, 7, 14, 7, 10)
+        var entry = { hh: 7, mm: 0, repeat: "daily", weekday: 0,
+                      nextRun: ms(2026, 7, 14, 7, 0) }
+        compare(AL.retimeForZone(entry, now), ms(2026, 7, 14, 7, 0))
+    }
+
+    function test_retime_never_pulls_an_already_advanced_entry_back() {
+        // The double-fire guard: an alarm that fired at 07:00 has nextRun
+        // advanced to tomorrow. A tz change at 07:30 must NOT recompute it
+        // back onto today 07:00 (which the fire scan would ring a second
+        // time) — a future entry anchors at now and stays in the future.
+        var now = ms(2026, 7, 14, 7, 30)
+        var entry = { hh: 7, mm: 0, repeat: "daily", weekday: 0,
+                      nextRun: ms(2026, 7, 15, 7, 0) }
+        compare(AL.retimeForZone(entry, now), ms(2026, 7, 15, 7, 0))
+    }
+
+    function test_retime_moves_a_future_entry_to_the_new_wall_clock() {
+        // 08:00 alarm, now 07:00, still ahead today: recompute keeps it at
+        // today 08:00 (the wall-clock promise), never earlier.
+        var now = ms(2026, 7, 14, 7, 0)
+        var entry = { hh: 8, mm: 0, repeat: "daily", weekday: 0,
+                      nextRun: ms(2026, 7, 14, 8, 0) }
+        compare(AL.retimeForZone(entry, now), ms(2026, 7, 14, 8, 0))
+    }
+
     // ── sanitizeAlarms ────────────────────────────────────────────────────
 
     function test_sanitize_rejects_garbage() {

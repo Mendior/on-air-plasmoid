@@ -173,6 +173,10 @@
             <label>Wake-up alarms (JSON array)</label>
             <default>[]</default>
         </entry>
+        <entry name="schedTzOffset" type="Int">
+            <label>Last-seen timezone offset (minutes) for the schedulers; 9999 = unknown</label>
+            <default>9999</default>
+        </entry>
         <entry name="audioOutputDevice" type="String">
             <label>Audio output device id for local playback (empty = system default)</label>
             <default></default>

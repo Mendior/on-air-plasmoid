@@ -135,6 +135,26 @@ function advance(alarm, nowMs) {
     return nextOccurrence(alarm.hh, alarm.mm, alarm.repeat, alarm.weekday, nowMs);
 }
 
+// Re-express one schedule entry's nextRun in the CURRENT time zone after the
+// system offset moved (travel, VPN, DST, a tzdata update mid-session or
+// across downtime). Stored instants belong to the OLD zone's wall clock; an
+// alarm's promise is the wall clock, so 07:00 must stay 07:00 where the
+// machine now lives.
+//
+// The anchor is per-entry, and this is the whole subtlety:
+//   * An entry already WAITING to fire (nextRun <= now — the machine was
+//     asleep or off across its moment) is anchored a grace window into the
+//     past, so the recomputed instant still lands at-or-before now and the
+//     fire scan catches it exactly once instead of skipping it to tomorrow.
+//   * An entry NOT yet due (already advanced past its last fire, or simply
+//     in the future) is anchored at now, so a backward offset shift can
+//     never pull it into the past and make it fire a second time.
+// Idempotent: re-running with an unchanged offset returns the same instants.
+function retimeForZone(entry, nowMs) {
+    var anchor = (entry.nextRun <= nowMs) ? nowMs - GRACE_MS : nowMs;
+    return nextOccurrence(entry.hh, entry.mm, entry.repeat, entry.weekday, anchor);
+}
+
 // Whether the casting route is proven well enough for the wake tone to
 // stand down. `casting` alone is an optimistic flag set the moment the play
 // command LEAVES — a speaker unplugged overnight still looks "casting".
