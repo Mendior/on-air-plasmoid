@@ -44,6 +44,7 @@ Item {
             property int btListed: 0
             property var castApplied: []
             property bool playing: false
+            property bool anythingPlaying: false
             property var mediaDevs: ({ audioOutputs: [] })
             property var playerOutput: ({ volume: 0.5, device: null })
             property string instanceId: "7"
@@ -1112,6 +1113,36 @@ Item {
             r.mock._btConnectingMac = btMac;
             r.e._btJoinWatchTick();
             compare(r.e._btJoinWatchTicks, 0); // held, not counted
+        }
+
+        // ── idle teardown ─────────────────────────────────────────────────
+
+        function test_idle_teardown_parks_and_sound_wakes_the_graph() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._idleTeardownTick();
+            verify(!r.e._combineActive);            // parked...
+            compare(r.cfg.combineWanted, true);     // ...but still wanted
+            verify(r.e._combineIdleParked);
+            var lenBefore = r.mock.execLog.length;
+            r.mock.anythingPlaying = true;          // sound comes back
+            verify(!r.e._combineIdleParked);
+            // The normal enable road was taken again.
+            var fresh = r.mock.execLog.slice(lenBefore).join("\n");
+            verify(fresh.indexOf(": PW_COMBINE") !== -1);
+        }
+
+        function test_idle_teardown_waits_out_a_measurement() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._calibrating = true;
+            r.e._idleTeardownTick();
+            verify(r.e._combineActive);             // never parked mid-run
+            r.e._calibrating = false;
+            r.mock.anythingPlaying = true;
+            r.mock.anythingPlaying = false;
+            r.e._idleTeardownTick();
+            verify(!r.e._combineActive);
         }
 
         // ── the silent Bluetooth recompensation ───────────────────────────

@@ -207,6 +207,12 @@ PlasmoidItem {
         return playMusic.playbackState === MediaPlayer.PlayingState;
     }
 
+    // One notifiable word for "is any sound job alive": local playback,
+    // casting, a running recording, or a standing order mid-recovery. The
+    // sync engine's idle teardown watches this — the combined graph must
+    // never be parked out from under something that still owes sound.
+    readonly property bool anythingPlaying: isPlaying() || _casting || recording || _wantsPlaying
+
     function parseFavorites(s) {
         try {
             const arr = JSON.parse(s || "[]");

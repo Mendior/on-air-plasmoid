@@ -29,6 +29,8 @@ KCM.ScrollViewKCM {
     property int _logoTotal: 0
     property int _logoDone: 0
     property int _logoFound: 0
+    property int _logoUpgradeTotal: 0
+    property int _logoUpgradeFound: 0
     property bool _logoFetching: false
     property var _activeLogoXhr: null
 
@@ -150,6 +152,10 @@ KCM.ScrollViewKCM {
         _logoTotal = _logoQueue.length;
         _logoDone = 0;
         _logoFound = 0;
+        _logoUpgradeTotal = 0;
+        _logoUpgradeFound = 0;
+        for (var q = 0; q < _logoQueue.length; q++)
+            if (_logoQueue[q].upgrade === true) _logoUpgradeTotal++;
         if (_logoTotal === 0) {
             showMessage(true, i18n("All stations already have a logo."));
             return;
@@ -163,7 +169,11 @@ KCM.ScrollViewKCM {
         if (_logoQueue.length === 0) {
             _logoFetching = false;
             cfg_servers = JSON.stringify(getServersArray());
-            const missed = _logoTotal - _logoFound;
+            // An upgrade job that found nothing better KEPT its working
+            // logo — counting it "could not be found" would report a
+            // healthy station as a failure.
+            const missed = (_logoTotal - _logoUpgradeTotal)
+                           - (_logoFound - _logoUpgradeFound);
             if (missed === 0) {
                 showMessage(true, i18n("Logo fetch complete: %1 / %2 stations updated. Click Apply to save.", _logoFound, _logoTotal));
             } else {
@@ -337,6 +347,7 @@ KCM.ScrollViewKCM {
         if (cur && cur.name === job.name) {
             stationsModel.setProperty(job.index, "favicon", faviconUrl);
             _logoFound++;
+            if (job.upgrade === true) _logoUpgradeFound++;
             return true;
         }
         return false;

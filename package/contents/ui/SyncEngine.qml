@@ -1167,6 +1167,60 @@ Item {
     // stayed on against an unchecked box.
     property bool _combineWantActive: false
     property bool _combineActive: false
+
+    // ── Idle teardown ────────────────────────────────────────────────────
+    // The combined graph (null-sink, loopback resamplers, a held Bluetooth
+    // link) costs real CPU and battery on an old laptop even while nothing
+    // plays — per-quantum wakeups that round to zero on a desktop are a
+    // constant 1-3% there, and the audio devices never suspend. After long
+    // idleness the graph is taken down THROUGH the normal disable road
+    // (fromTeardown=true keeps combineWanted); the next play — a click, a
+    // heal replay, a wake-up alarm — brings it back through the normal
+    // enable road, sound flowing on the restored default sink meanwhile.
+    property bool _combineIdleParked: false
+    readonly property bool _appPlaying: app.anythingPlaying === true
+
+    Timer {
+        id: idleTeardownTimer
+        interval: 15 * 60 * 1000
+        repeat: false
+        onTriggered: _idleTeardownTick()
+    }
+
+    function _idleTeardownTick() {
+        if (!_combineActive || cfg.combineWanted !== true) return;
+        if (_appPlaying) return;
+        // Never park under a measurement, a mid-cure watchdog or a kick —
+        // each owns audio state the disable road would fight over.
+        if (_calibrating || _verifyPending || _btKickInFlight
+            || _btJoinWatchMac !== "") { idleTeardownTimer.restart(); return; }
+        console.log("[ARP] sync: idle — parking the combined graph");
+        _combineIdleParked = true;
+        combineOutputsDisable(true);
+    }
+
+    on_AppPlayingChanged: {
+        if (_appPlaying) {
+            idleTeardownTimer.stop();
+            if (_combineIdleParked && cfg.combineWanted === true && !_combineActive
+                && !_combineWantActive) {
+                _combineIdleParked = false;
+                console.log("[ARP] sync: sound is back — waking the combined graph");
+                combineOutputsEnable();
+            }
+        } else if (_combineActive && cfg.combineWanted === true) {
+            idleTeardownTimer.restart();
+        }
+    }
+
+    on_CombineActiveChanged: {
+        if (_combineActive) {
+            _combineIdleParked = false;
+            if (!_appPlaying) idleTeardownTimer.restart();
+        } else {
+            idleTeardownTimer.stop();
+        }
+    }
     property string _combineNullId: ""
     property var _combineLoopbackIds: []
     property string _combineSinksSnapshot: ""
