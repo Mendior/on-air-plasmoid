@@ -28,11 +28,13 @@ var GRACE_MS = 60 * 60 * 1000;
 // fell into the hole — push one hour forward, which lands on the first
 // instant that actually exists (03:30 → 04:30 new time).
 function _resolveGap(d, hh) {
-    if (d.getHours() !== hh) {
-        var fixed = new Date(d.getTime() + 3600 * 1000);
-        // Only accept the push when it lands sanely past the hole — a
-        // double-shift zone oddity must not loop or overshoot silently.
-        if (fixed.getDate() === d.getDate() || fixed.getHours() >= hh) return fixed;
+    // Shift ONLY the backward case — the resolved hour reading exactly one
+    // less than asked (modulo midnight). An engine that already resolved
+    // the hole FORWARD (the spec-conformant direction) is past the gap and
+    // correct; shifting that too would ring an hour late, the exact mirror
+    // of the bug this cures.
+    if (d.getHours() === (hh + 23) % 24) {
+        return new Date(d.getTime() + 3600 * 1000);
     }
     return d;
 }

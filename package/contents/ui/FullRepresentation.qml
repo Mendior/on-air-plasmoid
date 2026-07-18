@@ -3293,13 +3293,25 @@ PlasmaExtras.Representation {
                                 // audible ~1-2 s gap on every speaker — a
                                 // drag across the scale used to stutter the
                                 // room once per notch. One drag, one gap.
+                                // The WHEEL has no press cycle at all (the
+                                // PC3 slider scrolls via its own internal
+                                // MouseArea), so wheel moves settle through
+                                // a short debounce instead — one flurry of
+                                // notches, one apply.
                                 onPressedChanged: {
-                                    if (!pressed) root.sync.setSyncOffset(value)
-                                }
-                                Keys.onReleased: (event) => {
-                                    // Arrow-key nudges have no press cycle.
-                                    if (event.key === Qt.Key_Left || event.key === Qt.Key_Right)
+                                    if (!pressed) {
+                                        syncWheelSettle.stop()
                                         root.sync.setSyncOffset(value)
+                                    }
+                                }
+                                onMoved: {
+                                    if (!pressed) syncWheelSettle.restart()
+                                }
+                                Timer {
+                                    id: syncWheelSettle
+                                    interval: 600
+                                    repeat: false
+                                    onTriggered: root.sync.setSyncOffset(syncSlider.value)
                                 }
 
                                 PlasmaComponents3.ToolTip {

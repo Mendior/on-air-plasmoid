@@ -971,7 +971,8 @@ PlasmoidItem {
         // without being asked. The settle delay covers DNS and the captive
         // little moments a link needs after it claims to be up.
         if (_wantsPlaying && !isPlaying() && !_casting
-            && lastPlay >= 0 && lastPlay < stationsModel.count)
+            && ((lastPlay >= 0 && lastPlay < stationsModel.count)
+                || _standingOrderUrl !== ""))
             netResumeTimer.restart();
     }
 
