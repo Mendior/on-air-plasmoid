@@ -123,6 +123,12 @@ PlasmaExtras.Representation {
     // itself can never work a host up to that point.
     property var _probeVerdicts: ({})
     readonly property int _probeVerdictTtlMs: 15 * 60 * 1000
+    // URLs with a probe in flight right now. _probeSpent is cleared on every
+    // new search, but an in-flight probe from the previous generation has no
+    // cached verdict yet — without this, a retype whose rows overlap would
+    // open a SECOND GET to a host already being probed (the very per-host
+    // double-knock the verdict cache exists to prevent).
+    property var _probeInFlight: ({})
 
     function _probeKick(seq) {
         if (seq !== fullRepresentation._webSearchSeq) return
@@ -136,11 +142,22 @@ PlasmaExtras.Representation {
                 if (hit.v !== -1) _webSetAlive(row.url, hit.v)
                 continue
             }
+            if (fullRepresentation._probeInFlight[row.url]) continue
             if (fullRepresentation._probeActive >= 6) continue
             fullRepresentation._probeSpent[row.url] = true
+            fullRepresentation._probeInFlight[row.url] = true
             fullRepresentation._probeActive++
             _probeOne(row.url, seq)
         }
+    }
+
+    // Drop expired verdicts so the map cannot grow for the whole session —
+    // plasmashell runs for weeks and every probed URL would otherwise stay.
+    function _probeVerdictsPrune(now) {
+        var v = fullRepresentation._probeVerdicts
+        for (var k in v)
+            if (now - v[k].t >= fullRepresentation._probeVerdictTtlMs)
+                delete v[k]
     }
 
     function _probeOne(url, seq) {
@@ -152,14 +169,20 @@ PlasmaExtras.Representation {
             settled = true
             root._clearXhrTimeout(guard)
             fullRepresentation._probeActive = Math.max(0, fullRepresentation._probeActive - 1)
+            delete fullRepresentation._probeInFlight[url]
+            var now = Date.now()
+            _probeVerdictsPrune(now)
             // Unknowns are cached too: a host that just timed out does not
             // deserve a knock from every retyped query either.
-            fullRepresentation._probeVerdicts[url] = { "v": verdict, "t": Date.now() }
+            fullRepresentation._probeVerdicts[url] = { "v": verdict, "t": now }
             if (seq === fullRepresentation._webSearchSeq && verdict !== -1)
                 _webSetAlive(url, verdict)
-            // The next probe starts on a fresh tick, never from inside a
-            // network signal handler.
-            Qt.callLater(function() { _probeKick(seq) })
+            // Kick the CURRENT generation, not this probe's: a freed slot must
+            // serve the search now on screen. If the user retyped while these
+            // probes were slow, the old seq would fail _probeKick's guard and
+            // the new rows would never be probed at all. Verdict application
+            // above stays guarded by this probe's own seq.
+            Qt.callLater(function() { _probeKick(fullRepresentation._webSearchSeq) })
         }
         xhr.onreadystatechange = function() {
             if (settled) return
@@ -217,13 +240,22 @@ PlasmaExtras.Representation {
             fullRepresentation.webSearching = false
             return
         }
-        root._rbFetch("/json/stations/search?name="
-                      + encodeURIComponent(stems[idx]) + tail, 4000, function(xhr) {
+        // A shaved stem can itself be an exact country key — "Soomet"/"Soomee"
+        // stem to "Soome", which means Finland, not a station name. Route it
+        // the way the full query would have gone.
+        var stem = stems[idx]
+        var cc = _countryCodeOf(stem)
+        var qs = cc !== "" ? "/json/stations/search?countrycode=" + cc
+                           : "/json/stations/search?name=" + encodeURIComponent(stem)
+        root._rbFetch(qs + tail, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             _webAppendResults(xhr)
             if (webResultsModel.count > 0) {
                 _webRememberQuery(q)
-                _webBoostRelevance(stems[idx])
+                if (cc === "") _webBoostRelevance(stem)
+                // "Show more" must page the query that actually filled the
+                // list, not the original name query that returned nothing.
+                fullRepresentation._webLastQs = qs + tail
                 _probeKick(seq)
                 fullRepresentation.webSearchFailed = false
                 fullRepresentation.webSearching = false
@@ -337,9 +369,10 @@ PlasmaExtras.Representation {
             if (gotAnswer && mode === "all" && cc === ""
                 && webResultsModel.count < fullRepresentation.webResultCap
                 && /^\S+$/.test(q)) {
-                root._rbFetch("/json/stations/search?tag="
-                              + encodeURIComponent(q.toLowerCase()) + tail,
-                              4000, function(xhr2) {
+                var tagQs = "/json/stations/search?tag="
+                            + encodeURIComponent(q.toLowerCase())
+                var beforeTag = webResultsModel.count
+                root._rbFetch(tagQs + tail, 4000, function(xhr2) {
                     if (seq !== fullRepresentation._webSearchSeq) return
                     _webAppendResults(xhr2)
                     // "jazz" can be a genre with zero NAME matches — a query
@@ -347,6 +380,10 @@ PlasmaExtras.Representation {
                     // query, and history exists for successful queries.
                     if (webResultsModel.count > 0)
                         _webRememberQuery(q)
+                    // If the tag pass is what filled the list, "Show more"
+                    // must page IT, not the name query that ran short.
+                    if (webResultsModel.count > beforeTag)
+                        fullRepresentation._webLastQs = tagQs + tail
                     _probeKick(seq)
                     _webFinish(q, seq, tail, true)
                 })
@@ -360,6 +397,10 @@ PlasmaExtras.Representation {
                 && webResultsModel.count < fullRepresentation.webResultCap
                 && SearchLogic.words(q).length >= 2) {
                 const ws = SearchLogic.words(q)
+                // "Show more" can't re-run a client-side word filter, and the
+                // longest-word query alone would page in unrelated stations —
+                // so the word pass is a one-shot: freeze the cap at what it
+                // found and let the button hide rather than mislead.
                 root._rbFetch("/json/stations/search?name="
                               + encodeURIComponent(SearchLogic.longestWord(q)) + tail,
                               4000, function(xhr2) {
@@ -369,6 +410,9 @@ PlasmaExtras.Representation {
                     })
                     if (webResultsModel.count > 0)
                         _webRememberQuery(q)
+                    // count < cap hides "Show more" (visible needs count >=
+                    // cap) — this pass has no honest next page to offer.
+                    fullRepresentation.webResultCap = webResultsModel.count + 1
                     _probeKick(seq)
                     _webFinish(q, seq, tail, true)
                 })
@@ -381,6 +425,10 @@ PlasmaExtras.Representation {
     // Trending: what the world tunes into right now — a discovery rail for
     // the empty query, one tap away.
     function runWebTrending() {
+        // A debounce still pending from just-cleared search text would fire
+        // runWebSearch("") a beat later, bump the seq and wipe these results
+        // — the same stop() runWebSearch does for the same reason.
+        webSearchDebounce.stop()
         webResultsModel.clear()
         fullRepresentation._probeSpent = ({})
         const seq = ++fullRepresentation._webSearchSeq
@@ -467,7 +515,15 @@ PlasmaExtras.Representation {
                 // reach playMusic.source, the config and ffmpeg (same rule
                 // as _favUrls in main.qml).
                 if (!u || !/^https?:\/\//i.test(u) || existing[u] || seen[u]) continue
+                // A station the user already has, saved under its RAW url
+                // while the directory now reports a different url_resolved
+                // (or vice versa), would slip past the check above and show
+                // as a web result that ⭐ then duplicates. Dedup on the raw
+                // url too — the shipped MANGORADIO default is exactly this.
+                var rawU = (r.url || "").toString()
+                if (rawU && (existing[rawU] || seen[rawU])) continue
                 seen[u] = true
+                if (rawU) seen[rawU] = true
                 var br = parseInt(r.bitrate) || 0
                 // kbps is the directory's unit; only clearly-bps values are
                 // scaled down. The old >1000 cutoff mangled honest high-rate
@@ -477,9 +533,6 @@ PlasmaExtras.Representation {
                 // the stream url gets, or a file:///data: favicon from the
                 // catalogue would probe local files behind the row.
                 var fav = (r.favicon || "").toString()
-                // The raw submitted url rides along as the preview retry
-                // ladder's last rung — same http(s) gate as the resolved one.
-                var rawU = (r.url || "").toString()
                 webResultsModel.append({
                     "name": (r.name || "").replace(/\s+/g, " ").trim() || u,
                     "url": u,
@@ -592,6 +645,12 @@ PlasmaExtras.Representation {
         anchors.fill: parent
         source: fullRepresentation._bestArtUrl
         fillMode: Image.PreserveAspectCrop
+        // The source can be a catalog-controlled station favicon, and the
+        // catalog is publicly writable — a pixel-flood image (30000×30000)
+        // would otherwise decode full-res into plasmashell and exhaust
+        // memory. It only feeds a blurred backdrop; 512² is plenty.
+        sourceSize.width: 512
+        sourceSize.height: 512
         asynchronous: true
         visible: false
     }
@@ -1206,6 +1265,11 @@ PlasmaExtras.Representation {
                             anchors.margins: 1
                             source: fullRepresentation._bestArtUrl
                             fillMode: Image.PreserveAspectCrop
+                            // Catalog-controlled favicon can be a pixel-flood
+                            // image — cap the decode. The cover art panel is
+                            // never larger than a few hundred px.
+                            sourceSize.width: 600
+                            sourceSize.height: 600
                             asynchronous: true
                             visible: status === Image.Ready
                             smooth: true
@@ -2819,7 +2883,13 @@ PlasmaExtras.Representation {
                 event.accepted = true
             }
         } else if (event.key === Qt.Key_Space && !_inputFocused()) {
-            if (stationsModel.count > 0) {
+            // A true play/stop toggle: anything audible right now — a station,
+            // a preview, a local file, a cast session — stops. Without the
+            // stop branch, Space during a preview (lastPlay === -1) started
+            // station 0 over it instead of stopping.
+            if (isPlaying() || root._casting) {
+                stopWithFade()
+            } else if (stationsModel.count > 0) {
                 const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
                 refreshServer(idx)
             }
@@ -3020,7 +3090,13 @@ PlasmaExtras.Representation {
                 // disconnect of a corpse. BT_LIST is serialized and seq'd —
                 // a 5 s heartbeat costs nothing and only runs while looking.
                 Timer {
-                    running: castMenu.opened
+                    // ...and only while the popup is actually on screen. The
+                    // menu can stay "opened" inside a hidden popup (a click on
+                    // the desktop hides the applet without closing the menu),
+                    // and an unguarded heartbeat then spawned a bluetoothctl
+                    // pipeline every 5 s forever — the same !expanded pause
+                    // every other timer here honours.
+                    running: castMenu.opened && root.expanded
                     interval: 5000
                     repeat: true
                     onTriggered: root.btList()
