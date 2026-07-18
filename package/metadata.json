@@ -25,7 +25,7 @@
         "License": "LGPL-2.0+",
         "Name": "On Air",
         "Website": "https://github.com/Mendior/on-air-plasmoid",
-        "Version": "2026.19"
+        "Version": "2026.20"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
     "X-Plasma-Provides": [

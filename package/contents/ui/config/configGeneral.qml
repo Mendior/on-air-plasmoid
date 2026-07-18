@@ -195,7 +195,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.20");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -246,7 +246,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.20");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -412,7 +412,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.19)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.20)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
@@ -581,7 +581,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.20");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
