@@ -644,31 +644,51 @@ def cmd_verify(argv):
             # would shift the first speaker's clock against the others.
             measure_once(sink, click, mic, tpl)
             arrivals = {}
-            for member in sinks:
+            # Bluetooth members are measured FIRST, and with a longer
+            # settle: a real JBL Flip 7 was measured to drop its first
+            # burst(s) for ~1 s after the OTHER member's hardware
+            # mute/unmute cycle — with BT measured last and a 0.3 s
+            # settle, 2 of 3 verify runs ended in a false PARTIAL on a
+            # perfectly healthy leg.
+            ordered = sorted(sinks,
+                             key=lambda s: (0 if s.startswith("bluez_") else 1, s))
+            for member in ordered:
                 others = [s for s in sinks if s != member]
-                _set_mutes(others, True)
-                try:
-                    time.sleep(0.3)  # let the mutes land before the click
-                    # A burst that rode a Bluetooth codec and a speaker DSP
-                    # arrives SMEARED — the template-match gate that guards
-                    # the direct clicks would call it noise (measured 0.02
-                    # against the direct clicks' 0.6). Through the deployed
-                    # path the discriminator is AGREEMENT instead: a real
-                    # buffered arrival repeats at the same offset click
-                    # after click (measured twice within 50 ms); room noise
-                    # does not repeat. Raw loudest-moment per capture, up
-                    # to three tries for two that agree.
-                    times = []
-                    for _ in range(3):
-                        t = _raw_arrival(sink, click, mic)
-                        if t is not None:
-                            times.append(t)
-                        agreed = _two_that_agree(times)
-                        if agreed is not None:
-                            break
-                finally:
-                    _set_mutes(others, False)
-                agreed = _two_that_agree(times)
+                agreed = None
+                for round_no in range(2):
+                    _set_mutes(others, True)
+                    try:
+                        # let the mutes land — and give a Bluetooth chain
+                        # its post-mute wake-up time (longer on the retry).
+                        time.sleep((0.9 + 0.5 * round_no)
+                                   if member.startswith("bluez_") else 0.3)
+                        # A burst that rode a Bluetooth codec and a speaker
+                        # DSP arrives SMEARED — the template-match gate that
+                        # guards the direct clicks would call it noise
+                        # (measured 0.02 against the direct clicks' 0.6).
+                        # Through the deployed path the discriminator is
+                        # AGREEMENT instead: a real buffered arrival repeats
+                        # at the same offset click after click (measured
+                        # twice within 50 ms); room noise does not repeat.
+                        # Raw loudest-moment per capture, up to three tries
+                        # for two that agree.
+                        times = []
+                        for _ in range(3):
+                            t = _raw_arrival(sink, click, mic)
+                            if t is not None:
+                                times.append(t)
+                            agreed = _two_that_agree(times)
+                            if agreed is not None:
+                                break
+                    finally:
+                        _set_mutes(others, False)
+                    agreed = _two_that_agree(times)
+                    if agreed is not None:
+                        break
+                    # One more round for a speaker that slept through the
+                    # first — a missed arrival is usually the device waking
+                    # up, not a dead leg.
+                    time.sleep(0.4)
                 if agreed is None:
                     print("VERIFY_PARTIAL %s" % member)
                     return

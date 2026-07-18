@@ -201,7 +201,7 @@ KCM.ScrollViewKCM {
     // name. Falls through to the name search only when the row has neither.
     function _queryByUuid(job, cleanName, retryCount) {
         const url = "https://" + _apiServer + ".api.radio-browser.info/json/stations/byuuid/"
-                  + job.uuid;
+                  + encodeURIComponent(job.uuid);
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);

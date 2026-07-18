@@ -331,6 +331,11 @@ Item {
             }
             _combineActive = true;
             _resurrectTries = 0;
+            // Graph bring-up is a fresh Bluetooth operating point — read
+            // every member's reported latency once the transport settles,
+            // so a link that came back off its calibration recompensates
+            // before the listener ever hears it.
+            refLatProbeTimer.restart();
             // The sighting is recorded HERE too: the sink usually registers
             // before this ack (the same shell created it), so the death
             // check's "seen alive" precondition would otherwise wait for a
@@ -919,6 +924,16 @@ Item {
             _refLatShiftByMac = m1;
             console.log("[ARP] sync: " + rlM[2] + " transport latency moved "
                         + shift + " ms vs calibration — recompensating");
+            // A LARGE drift gets one quiet word per session: the automatic
+            // trim covers the REPORTED share of the move, but 50+ ms means
+            // the link is far from where the mic last measured it, and only
+            // a fresh calibration sees the whole chain.
+            if (Math.abs(shift) >= 50 && !_refLatHintShown) {
+                _refLatHintShown = true;
+                app.notify(i18n("Speaker timing drifted"),
+                           i18n("A Bluetooth speaker came back noticeably off its calibration — the sync compensated automatically. Recalibrate when convenient for exact ears."),
+                           "audio-speakers");
+            }
             if (_combineActive && !_combineReloopBusy && !syncOffsetDebounce.running)
                 syncOffsetDebounce.restart();
             return true;
@@ -1375,6 +1390,8 @@ Item {
     property var _refLatShiftByMac: ({})
     // A large reading waiting for its confirming twin (mac → ms).
     property var _refLatPending: ({})
+    // One drift hint per session — a wandering link must not nag.
+    property bool _refLatHintShown: false
 
     function _lagForSink(sinkId) {
         var mac = _btMacOfSink(sinkId);
@@ -1405,10 +1422,22 @@ Item {
     function _refLatProbe(mac, forCalib) {
         if (!app._btValidMac(mac)) return;
         var macU = mac.replace(/:/g, "_");
+        // pactl shows "Latency: 0" for a RUNNING bluez sink (measured live
+        // on this very hardware — the whole mechanism was silently inert on
+        // it). The truth lives in the NODE's SPA Latency param (minNs),
+        // which only pw-dump serves; printed in µs so the ack's µs→ms
+        // handler stays as it is. Plain-PulseAudio systems have no pw-dump:
+        // no REFLAT line, and the recompensation stays politely inert.
+        var py = 'import json,sys;'
+               + 'd=json.load(sys.stdin);'
+               + 'o=[x for x in d if ((x.get("info") or {}).get("props") or {})'
+               + '.get("node.name","").startswith("bluez_output.' + macU + '")];'
+               + 'i=(o[0].get("info") or {}) if o else {};'
+               + 'L=((i.get("params") or {}).get("Latency") or []);'
+               + 'ns=(L[0].get("minNs") if L else 0) or 0;'
+               + 'print("REFLAT",int(ns/1000)) if ns else None';
         app.exec(": PW_REFLAT " + (forCalib ? "C" : "S") + " " + mac + "; "
-                 + "pactl list sinks | awk '/^Sink #/{f=0} "
-                 + "/Name: bluez_output." + macU + "/{f=1} "
-                 + "f && /Latency:/{print \"REFLAT \" $2; exit}'; true # " + app.nextSeq());
+                 + "pw-dump 2>/dev/null | python3 -c '" + py + "' 2>/dev/null; true # " + app.nextSeq());
     }
 
     // A beat after a rebuild/transport event, ask every Bluetooth member
@@ -1762,11 +1791,17 @@ Item {
         // microphone, live to the room.
         app.exec(": PW_COMBINE " + (++_combineLoadSeq) + ";"
                         + " d=$(pactl get-default-sink); echo \"PREVDEF $d\";"
+                        // Pin the null sink to the graph's clock rate: the
+                        // common-mode-resample guarantee (any station rate
+                        // resamples UPSTREAM of the split) must not depend
+                        // on the machine's clock.allowed-rates config.
+                        + " r=$(pw-metadata -n settings 2>/dev/null"
+                        + " | awk -F\"'\" '/clock.rate/{print $4; exit}');"
                         + " for sw in $(pactl list short modules 2>/dev/null"
                         + " | awk '/" + _combineSinkName + "([^0-9]|$)/ {print $1}'); do"
                         + " pactl unload-module \"$sw\" 2>/dev/null; done;"
                         + " m=$(pactl load-module module-null-sink"
-                        + " sink_name=" + _combineSinkName + " channels=2"
+                        + " sink_name=" + _combineSinkName + " channels=2 ${r:+rate=$r}"
                         + " sink_properties='device.description=\"" + desc + "\"')"
                         + " && { echo \"NULL $m\";"
                         + " pactl set-sink-volume " + _combineSinkName + " 20% 2>/dev/null;"
