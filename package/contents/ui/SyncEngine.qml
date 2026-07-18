@@ -491,7 +491,7 @@ Item {
                     // USB DAC or an HDMI TV stops being assumed zero. Same
                     // map, keyed by sink name (names cannot collide with
                     // MACs); negative = faster than the reference.
-                    var xRe = /CALIB_XLAG (\S+) (-?\d+)/g, xM;
+                    var xRe = /^CALIB_XLAG (\S+) (-?\d+)/gm, xM;
                     while ((xM = xRe.exec(stdout || "")) !== null)
                         calMap[xM[1]] = Math.max(-100, Math.min(900, parseInt(xM[2], 10)));
                     cfg.syncOffsetMap = JSON.stringify(calMap);
@@ -506,7 +506,7 @@ Item {
                 // Each sink's REAL (restored) volume, echoed by the same
                 // run before it parked everything at 55%.
                 var volBySink = {};
-                var cvRe = /CALIBVOL (\S+) (\d+)%/g, cvM;
+                var cvRe = /^CALIBVOL (\S+) (\d+)%/gm, cvM;
                 while ((cvM = cvRe.exec(stdout || "")) !== null)
                     volBySink[cvM[1]] = Math.max(1, parseInt(cvM[2], 10));
                 // Who actually made a sound this run: every CALIB_LVL line
@@ -527,11 +527,11 @@ Item {
                 // speaker was heard, so they count for the heard-map too;
                 // without them the verify's eviction kicked the loudest
                 // speaker in the room out as "silent through both rounds".
-                var hxRe = /CALIB_XLAG (\S+) -?\d+/g, hxM;
+                var hxRe = /^CALIB_XLAG (\S+) -?\d+/gm, hxM;
                 while ((hxM = hxRe.exec(stdout || "")) !== null) heard[hxM[1]] = true;
-                var hcRe = /CALIB_CLIP (\S+)/g, hcM;
+                var hcRe = /^CALIB_CLIP (\S+)/gm, hcM;
                 while ((hcM = hcRe.exec(stdout || "")) !== null) heard[hcM[1]] = true;
-                var lvls = [], lvlRe = /CALIB_LVL (\S+) (\d+)/g, lvlM;
+                var lvls = [], lvlRe = /^CALIB_LVL (\S+) (\d+)/gm, lvlM;
                 while ((lvlM = lvlRe.exec(stdout || "")) !== null) {
                     heard[lvlM[1]] = true;
                     var lvlAmp = parseInt(lvlM[2], 10);
@@ -596,14 +596,14 @@ Item {
                 // speakers kept their old balance, and the user should know
                 // why (and how to fix it) instead of wondering.
                 var clipped = [];
-                var clRe = /CALIB_CLIP (\S+)/g, clM;
+                var clRe = /^CALIB_CLIP (\S+)/gm, clM;
                 while ((clM = clRe.exec(stdout || "")) !== null) clipped.push(clM[1]);
                 if (clipped.length > 0)
                     calText += " " + i18n("The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again.", clipped.join(", "));
                 // The default mic delivered exact zeros (a hardware mute the
                 // system cannot see) and another one stepped in — say which,
                 // or the user wonders why their good mic was "ignored".
-                var micM = (stdout || "").match(/CALIB_MIC (.+)/);
+                var micM = (stdout || "").match(/^CALIB_MIC (.+)/m);
                 if (micM)
                     calText += " " + i18n("Measured with %1 — the default microphone stayed silent.", micM[1].trim());
                 app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");

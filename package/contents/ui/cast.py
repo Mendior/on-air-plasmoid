@@ -35,6 +35,7 @@ Commands (argv[1]):
 Every command prints a sentinel the QML side matches on and always exits 0, so
 a missing optional dependency is a clean "feature unavailable", never a crash.
 """
+import hashlib
 import http.client
 import json
 import os
@@ -389,6 +390,22 @@ def _msearch(st, wait, target=None):
     return locations
 
 
+class _HttpOnlyRedirects(urllib.request.HTTPRedirectHandler):
+    # The stdlib handler follows redirects to http, https AND ftp — a
+    # hostile LAN device answering 302 ftp://10.0.0.5:2121/ would turn the
+    # description fetch into an FTP probe of the attacker's choosing. The
+    # declared http(s)-only invariant holds at every hop, not just the first.
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urllib.parse.urlsplit(newurl).scheme.lower() not in ("http", "https"):
+            raise urllib.error.HTTPError(newurl, code,
+                                         "redirect to non-http scheme refused",
+                                         headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_HTTP_OPENER = urllib.request.build_opener(_HttpOnlyRedirects)
+
+
 def _http_get(url, timeout=3.0, max_bytes=512 * 1024):
     # http(s) only: LOCATION comes from an unauthenticated SSDP reply, and
     # urllib's default opener would happily serve file:// or ftp:// — a
@@ -398,7 +415,7 @@ def _http_get(url, timeout=3.0, max_bytes=512 * 1024):
     if scheme not in ("http", "https"):
         raise ValueError("unsupported scheme %r" % scheme)
     req = urllib.request.Request(url, headers={"User-Agent": "OnAir"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _HTTP_OPENER.open(req, timeout=timeout) as resp:
         # Capped read: the socket timeout bounds each recv, not the total —
         # an endless body would otherwise buffer wholesale into RAM. No
         # device description has business being half a megabyte.
@@ -629,7 +646,10 @@ def _discover_dlna(seconds):
         # A renderer without a UDN (bare-bones firmware) falls back to its
         # descriptor URL as identity — the empty string used to collide
         # every such device into one cache slot and one menu row.
-        key = dev["udn"] or loc
+        # No UDN: derive a stable key the QML allowlist accepts — the
+        # descriptor URL itself contains '/' and was rejected wholesale,
+        # so UDN-less renderers never appeared in the menu at all.
+        key = dev["udn"] or ("loc-%s" % hashlib.sha1(loc.encode()).hexdigest()[:16])
         with fresh_lock:
             if key in fresh:
                 return
@@ -874,8 +894,14 @@ def cmd_discover(seconds):
 
 
 def _alarm_bail(signum, frame):
-    _out("%s helper timed out" % FAIL)
-    sys.exit(1)
+    # No _out here: it takes _out_lock, and the interrupted main thread may
+    # be holding it — the one mechanism meant to end a wedged helper must
+    # not be able to wedge with it. Raw write, hard exit.
+    try:
+        os.write(1, ("%s helper timed out\n" % FAIL).encode())
+    except OSError:
+        pass
+    os._exit(1)
 
 
 def main():

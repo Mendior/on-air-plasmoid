@@ -87,7 +87,11 @@ def main():
             # Sentinel only on DEFINITIVE failures (4xx: UA filter, 404...) —
             # a transient server error (5xx) must not pin __NO_ICY__ for the
             # whole listening session; exiting silently lets the poll retry.
-            if 400 <= response.status_code < 500:
+            # 429/408 are transient BY DEFINITION: connection-capped Icecast
+            # answers 429 to the metadata poll's second connection, and one
+            # busy moment must not erase titles for the whole session.
+            if 400 <= response.status_code < 500 \
+                    and response.status_code not in (408, 429):
                 print("__NO_ICY__")
             return
 

@@ -368,10 +368,16 @@ def _capture_alive(mic, seconds=0.7):
             pass
 
 
+# pactl's output is gettext-translated ("Name:" becomes "Nom :" on a French
+# desktop) and every parser below matches the English prefixes — the C locale
+# is pinned or the mic handover would be silently inert outside English.
+_C_ENV = dict(os.environ, LC_ALL="C")
+
+
 def _default_source_name():
     try:
         return subprocess.run(["pactl", "get-default-source"],
-                              capture_output=True, text=True,
+                              capture_output=True, text=True, env=_C_ENV,
                               timeout=3).stdout.strip()
     except Exception:
         return ""
@@ -381,7 +387,7 @@ def _alternative_mics(skip):
     """(name, description) of candidate microphones, monitors excluded."""
     try:
         out = subprocess.run(["pactl", "list", "sources"], capture_output=True,
-                             text=True, timeout=5).stdout
+                             text=True, env=_C_ENV, timeout=5).stdout
     except Exception:
         return []
     mics = []
@@ -706,7 +712,13 @@ def main():
             print("CALIB_FAIL microphone silent")
             return
         if mic_desc:
-            print("CALIB_MIC %s" % mic_desc)
+            # The description is a DEVICE's own words (a Bluetooth mic
+            # advertises any name it likes) — strip it to an inert charset
+            # and one line so it cannot smuggle CALIB_* tokens into the
+            # stdout parsing or markup into the notification.
+            safe_desc = "".join(c if c.isalnum() or c in " ._()-" else " "
+                                for c in str(mic_desc))[:60].strip()
+            print("CALIB_MIC %s" % (safe_desc or "another microphone"))
         make_click(click)
         tpl = click_template()
         wired_times, bt_times = [], []
