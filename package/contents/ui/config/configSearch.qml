@@ -34,6 +34,25 @@ KCM.ScrollViewKCM {
     property var _activeLoadMoreXhr: null
     property int _httpTimeout: 15000
 
+    // The catalog is publicly writable, so a row's favicon and stream URL are
+    // untrusted: a file:// or data: favicon would probe local files behind
+    // the Icon, and a file:// url_resolved would point the preview player (or
+    // a saved station) at a local path. Every row is gated to http(s) as it
+    // enters the model — the same rule the popup's own search enforces.
+    function _webUrlOrEmpty(v) {
+        const s = v && v !== "null" ? String(v).trim() : ""
+        return /^https?:\/\//i.test(s) ? s : ""
+    }
+
+    function _appendRow(srv) {
+        srv.name = (srv.name || "").replace(/\n/g, ' ').trim()
+        srv.favicon = _webUrlOrEmpty(srv.favicon)
+        srv.url_resolved = _webUrlOrEmpty(srv.url_resolved || srv.url)
+        srv.homepage = _webUrlOrEmpty(srv.homepage)
+        srv.added = false
+        searchModel.append(srv)
+    }
+
     ListModel {
         id: searchModel
         dynamicRoles: true
@@ -179,13 +198,8 @@ KCM.ScrollViewKCM {
                     _retryCount = 0
                     currentUrl = url.split("?")[0]
                     searchModel.clear()
-                    for (var i = 0; i < servers.length; i++) {
-                        searchModel.append(servers[i])
-                        searchModel.setProperty(i, "name",
-                                                servers[i].name.replace(
-                                                    /\n/g, ' ').trim())
-                        searchModel.setProperty(i, "added", false)
-                    }
+                    for (var i = 0; i < servers.length; i++)
+                        _appendRow(servers[i])
                     busy.running = false
                     busy.visible = false
                     gettext.visible = servers.length === 0
@@ -260,11 +274,8 @@ KCM.ScrollViewKCM {
                     currentUrl = url
                     offset = nextOffset
                     if (servers.length > 0) {
-                        for (const srv of servers) {
-                            srv.name = srv.name.replace(/\n/g, ' ').trim()
-                            srv.added = false
-                            searchModel.append(srv)
-                        }
+                        for (const srv of servers)
+                            _appendRow(srv)
                         stat = 1
                     }
                 } catch (e) {
@@ -456,13 +467,14 @@ KCM.ScrollViewKCM {
                     }
 
                     Kirigami.Chip {
-                        text: listItem.model.codec ? listItem.model.codec : ""
-                        // Directory field — never interpret as rich text, or
-                        // an <img> in a station's codec/name fires a request.
-                        textFormat: Text.PlainText
+                        // Directory field, untrusted — Chip has no textFormat,
+                        // so the value itself is reduced to the codec charset:
+                        // an <img>/markup in a station's codec cannot survive
+                        // to be interpreted as rich text.
+                        text: (listItem.model.codec || "").replace(/[^A-Za-z0-9+.\/-]/g, "")
                         closable: false
                         enabled: false
-                        visible: listItem.model.codec !== "UNKNOWN"
+                        visible: text !== "" && text !== "UNKNOWN"
                         implicitWidth: implicitContentWidth
                     }
 
@@ -498,7 +510,9 @@ KCM.ScrollViewKCM {
                     QQC2.ToolButton {
                         display: QQC2.AbstractButton.IconOnly
                         icon.name: listItem.model.added ? "checkbox" : "list-add"
-                        enabled: !listItem.model.added
+                        // A row whose stream URL failed the http(s) gate has
+                        // an empty url_resolved — there is nothing to add.
+                        enabled: !listItem.model.added && listItem.model.url_resolved !== ""
                         QQC2.ToolTip.text: i18n("Add Station")
                         QQC2.ToolTip.visible: hovered
                         QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
@@ -510,12 +524,12 @@ KCM.ScrollViewKCM {
                             searchModel.setProperty(listItem.index,
                                                     "added", true)
                             const src = searchModel.get(listItem.index)
-                            const favicon = src.favicon && src.favicon !== "null"
-                                            ? src.favicon : ""
+                            // favicon and url_resolved were gated to http(s)
+                            // as the row entered the model (_appendRow).
                             const itemObject = {
                                 "name": src.name,
                                 "hostname": src.url_resolved,
-                                "favicon": favicon,
+                                "favicon": src.favicon || "",
                                 "country": src.country || "",
                                 "active": true
                             }
@@ -538,7 +552,9 @@ KCM.ScrollViewKCM {
                         icon.name: playingThis ? "media-playback-stop" : "media-playback-start"
                         // Per-ROW check — the old binding looked at the SELECTED
                         // row's lastcheckok, so buttons enabled/disabled wrongly.
-                        enabled: listItem.model.lastcheckok == 1
+                        // An empty url_resolved (failed the http(s) gate) is
+                        // not playable.
+                        enabled: listItem.model.lastcheckok == 1 && listItem.model.url_resolved !== ""
                         QQC2.ToolTip.text: playingThis ? i18n("Stop") : i18n("Play")
                         QQC2.ToolTip.visible: hovered
                         QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
@@ -786,7 +802,7 @@ KCM.ScrollViewKCM {
                     if (mainList.currentIndex !== -1) {
                         const bitrate = searchModel.get(
                                           mainList.currentIndex).bitrate
-                        return bitrate.toString() + i18n("kBit/s")
+                        return i18n("%1 kBit/s", bitrate)
                     } else {
                         return ""
                     }
@@ -833,8 +849,10 @@ KCM.ScrollViewKCM {
                     delegate: Kirigami.Chip {
                         closable: false
                         checkable: false
-                        text: modelData
-                        textFormat: Text.PlainText
+                        // Untrusted tag string — Chip has no textFormat, so
+                        // strip anything that could read as markup rather
+                        // than let it be interpreted as rich text.
+                        text: (modelData || "").replace(/[<>&]/g, "")
                     }
                 }
             }

@@ -2158,7 +2158,7 @@ PlasmaExtras.Representation {
                                     var rep = s.repeat === "daily" ? i18n("Daily")
                                             : s.repeat === "weekly" ? i18n("Every %1", days[s.weekday])
                                             : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
-                                    return "⏺ " + rep + " " + when + " · " + s.durationMin + " min · " + s.station
+                                    return "⏺ " + rep + " " + when + " · " + i18n("%1 min", s.durationMin) + " · " + s.station
                                 }
                                 textFormat: Text.PlainText
                                 elide: Text.ElideRight

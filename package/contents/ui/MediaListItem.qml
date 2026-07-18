@@ -39,6 +39,27 @@ PlasmaComponents3.ItemDelegate {
     // NOT text: — AbstractButton would parse '&' in station names ("R&B FM")
     // into stray Alt-mnemonic shortcuts; Accessible.name has no side effects.
     Accessible.name: model.name
+    Accessible.role: Accessible.Button
+
+    // Play THIS row. The pointer reaches it through the TapHandler below;
+    // the keyboard and screen readers reach it here — without this, Space
+    // was swallowed by the button with no handler (so the global Space
+    // toggle never fired either) and Return bubbled to the ListView, which
+    // played currentIndex rather than the focused row.
+    function _activate() {
+        isError = false
+        errorTimer.stop()
+        lastPlay = listItem.targetIndex
+        refreshServer(listItem.targetIndex)
+    }
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+            || event.key === Qt.Key_Space) {
+            listItem._activate()
+            event.accepted = true
+        }
+    }
+    Accessible.onPressAction: listItem._activate()
 
     background: Item {
         anchors.fill: parent
@@ -376,11 +397,6 @@ PlasmaComponents3.ItemDelegate {
     }
 
     TapHandler {
-        onTapped: {
-            isError = false
-            errorTimer.stop()
-            lastPlay = listItem.targetIndex
-            refreshServer(listItem.targetIndex)
-        }
+        onTapped: listItem._activate()
     }
 }
