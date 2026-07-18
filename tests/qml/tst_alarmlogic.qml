@@ -130,6 +130,28 @@ TestCase {
         compare(AL.retimeForZone(entry, now), ms(2026, 7, 14, 8, 0))
     }
 
+    function test_retime_gate_skips_an_entry_missed_under_every_zone() {
+        // A once-alarm four days past its moment is missed no matter which
+        // zone's wall clock tells the story — retiming would resurrect it
+        // on whatever day the offset happened to move (a Saturday alarm
+        // ringing on Wednesday). The fire scan's missed road owns it.
+        var now = ms(2026, 7, 18, 12, 0)
+        verify(!AL.shouldRetime({ nextRun: ms(2026, 7, 14, 7, 0) }, now))
+    }
+
+    function test_retime_gate_keeps_an_entry_a_zone_shift_could_save() {
+        // 90 min stale in the old zone: westward travel of two hours means
+        // the wall-clock promise is still genuinely ahead where the machine
+        // now lives — this entry must stay retimeable.
+        verify(AL.shouldRetime({ nextRun: ms(2026, 7, 14, 7, 0) },
+                               ms(2026, 7, 14, 8, 30)))
+        // A future entry is always retimeable.
+        verify(AL.shouldRetime({ nextRun: ms(2026, 7, 15, 7, 0) },
+                               ms(2026, 7, 14, 7, 0)))
+        // A malformed instant keeps the old road: sanitize revives it.
+        verify(AL.shouldRetime({ nextRun: 0 }, ms(2026, 7, 14, 7, 0)))
+    }
+
     // ── sanitizeAlarms ────────────────────────────────────────────────────
 
     function test_sanitize_rejects_garbage() {

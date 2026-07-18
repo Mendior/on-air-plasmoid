@@ -178,6 +178,24 @@ function retimeForZone(entry, nowMs) {
     return nextOccurrence(entry.hh, entry.mm, entry.repeat, entry.weekday, anchor);
 }
 
+// The widest wall-clock swing a real zone change can produce (UTC-12 to
+// UTC+14). Staleness beyond GRACE plus this bound is missed under EVERY
+// possible zone's expression of the promise.
+var MAX_TZ_SHIFT_MS = 26 * 3600 * 1000;
+
+// Whether a zone change should re-express this entry at all. Retiming
+// anchors a waiting entry one grace window back, which destroys the
+// knowledge that its moment passed DAYS ago — a "once" alarm from last
+// Saturday would resurrect and ring on whatever day the offset moved.
+// An entry no zone shift could still save keeps its stale instant, so
+// the fire scan's "missed" road reports and retires it honestly. An
+// entry only slightly past stays retimeable: westward travel can put
+// its wall-clock moment genuinely back into the future.
+function shouldRetime(entry, nowMs) {
+    if (!(entry.nextRun > 0)) return true;
+    return nowMs - entry.nextRun <= GRACE_MS + MAX_TZ_SHIFT_MS;
+}
+
 // Whether the casting route is proven well enough for the wake tone to
 // stand down. `casting` alone is an optimistic flag set the moment the play
 // command LEAVES — a speaker unplugged overnight still looks "casting".

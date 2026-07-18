@@ -1407,8 +1407,12 @@ PlasmoidItem {
         if (first) return true;
         if (alarms.length > 0) {
             var al = alarms.slice();
+            // shouldRetime: an entry missed under every possible zone keeps
+            // its stale instant so the fire scan's "missed" road reports and
+            // retires it — retiming would resurrect it on the wrong day.
             for (var a = 0; a < al.length; a++)
-                al[a].nextRun = AlarmLogic.retimeForZone(al[a], now);
+                if (AlarmLogic.shouldRetime(al[a], now))
+                    al[a].nextRun = AlarmLogic.retimeForZone(al[a], now);
             alarms = al;
             _saveAlarms();
             _alarmArmInhibit();
@@ -1416,6 +1420,12 @@ PlasmoidItem {
         if (recSchedules.length > 0) {
             var rl = recSchedules.slice();
             for (var r = 0; r < rl.length; r++) {
+                // shouldRetime first: an entry missed under every possible
+                // zone keeps its stale instant so the fire scan's "missed"
+                // road reports and retires it. (An ACTIVE recording can
+                // never be that stale, so the gate cannot strand the key
+                // follow below.)
+                if (!AlarmLogic.shouldRetime(rl[r], now)) continue;
                 // The ACTIVE recording's entry is keyed url@nextRun, and
                 // the running ffmpeg was started under the OLD instant —
                 // retiming it out from under the key orphans the guards:
