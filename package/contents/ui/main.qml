@@ -2364,6 +2364,10 @@ PlasmoidItem {
             _btConnectAfterDisconnect = { "mac": mac, "name": name || "" };
             return;
         }
+        // The user's LAST word wins: a kick-abort armed by an earlier
+        // untick must not fire its disconnect into a device the user just
+        // asked to connect again — the abort's whole reason is gone.
+        if (sync._btKickMac === mac) sync._btKickAbort = false;
         _btConnectingMac = mac;
         _btClickedName = name || "";
         _btPendingSinkName = name || "";
@@ -2434,6 +2438,20 @@ PlasmoidItem {
     // wish parked behind it — see btConnect's guard.
     property string _btDisconnectingMac: ""
     property var _btConnectAfterDisconnect: null
+
+    // The parked wish runs the moment the road is actually clear — checked
+    // from EVERY relevant ack, not consumed blindly at the first one:
+    // btConnect's own guard rejects silently while another connect/pair is
+    // in flight, and a wish consumed into that rejection was simply gone —
+    // the speaker the user re-ticked never connected and nothing said why.
+    function _btRunParkedWish() {
+        var wish = _btConnectAfterDisconnect;
+        if (!wish || !wish.mac) return;
+        if (_btDisconnectingMac !== "" || _btConnectingMac !== "" || _btPairingMac !== "")
+            return;                          // still busy — a later ack retries
+        _btConnectAfterDisconnect = null;
+        btConnect(wish.mac, wish.name);
+    }
     // The one free repair a solo connect gets when the sink never appears.
     property string _btSoloKicked: ""
 
@@ -2448,6 +2466,17 @@ PlasmoidItem {
         interval: 60000
         repeat: false
         onTriggered: {
+            // A verdict is still on its way — the connect/pair shell can
+            // legitimately outlive this window (pairing worst case ~66 s),
+            // and its OK ack re-stashes the pending pair and re-arms the
+            // full window. Kicking NOW would disconnect a device mid-page
+            // and burn the one free repair on a fight with our own shell;
+            // wait another beat instead.
+            if (root._btConnectingMac !== "" || root._btPairingMac !== "") {
+                btRouteTimeout.interval = 30000;
+                btRouteTimeout.restart();
+                return;
+            }
             // Connected but its audio never appeared — the A2DP profile is
             // wedged (JBLs, notoriously; the sync road has a watchdog for
             // this, the solo road had NOTHING: it swept the pending pair in
@@ -4175,6 +4204,7 @@ PlasmoidItem {
                     // the watchdog sees the speaker all the way into the group.
                     root.sync._btJoinWatchArm(connMac, connName || root._btClickedName);
                 }
+                root._btRunParkedWish();
                 btList();
                 return;
             }
@@ -4182,9 +4212,7 @@ PlasmoidItem {
                 root._btDisconnectingMac = "";
                 // A connect wish parked behind this disconnect runs now —
                 // in order, not in a race the disconnect would win.
-                var wish = root._btConnectAfterDisconnect;
-                root._btConnectAfterDisconnect = null;
-                if (wish && wish.mac) btConnect(wish.mac, wish.name);
+                root._btRunParkedWish();
                 btList();
                 return;
             }
@@ -4221,8 +4249,17 @@ PlasmoidItem {
                         // already be swept. Re-arm it from the MAC this very
                         // command paired and give the sink the FULL wait
                         // window from now, like the plain-connect path does.
-                        if (root._btPendingSinkMac === "" && pairedMac !== "")
+                        if (root._btPendingSinkMac === "") {
                             root._btPendingSinkMac = pairedMac;
+                            root._btPendingSinkName = root._btClickedName;
+                        }
+                        // The FULL window, restated: a mid-flight kick may
+                        // have left the interval at its short 30 s — restart
+                        // alone would hand the pairing road half the wait
+                        // the connect road gets, and a slow sink would be
+                        // swept with 'sound never arrived' while it was
+                        // still standing up.
+                        btRouteTimeout.interval = 60000;
                         btRouteTimeout.restart();
                         // Armed before the route pass — that pass clears the
                         // pending name the watchdog wants for its messages.
@@ -4245,6 +4282,7 @@ PlasmoidItem {
                     root._btPendingSinkName = "";
                     root._btPendingSinkMac = "";
                 }
+                root._btRunParkedWish();
                 btList();
                 return;
             }
