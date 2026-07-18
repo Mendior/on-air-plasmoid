@@ -287,6 +287,12 @@ def _record_one(sink, click, mic, rec, seconds=None):
             rp.wait(timeout=2)
         except subprocess.TimeoutExpired:
             rp.kill()
+            # Reap the corpse: an unreaped kill leaves a zombie for the
+            # rest of a forty-second run, one per wedged capture.
+            try:
+                rp.wait(timeout=1)
+            except Exception:
+                pass
 
 
 def measure_once(sink, click, mic, tpl=None, seconds=None):
@@ -344,6 +350,12 @@ def _capture_alive(mic, seconds=0.7):
             rp.wait(timeout=2)
         except subprocess.TimeoutExpired:
             rp.kill()
+            # Reap the corpse: an unreaped kill leaves a zombie for the
+            # rest of a forty-second run, one per wedged capture.
+            try:
+                rp.wait(timeout=1)
+            except Exception:
+                pass
         try:
             samples, _rate = read_mono(rec)
         except Exception:
@@ -497,6 +509,50 @@ def _raw_arrival(sink, click, mic):
             pass
 
 
+def _room_is_loud(mic, seconds=1.5):
+    """One stimulus-free capture: True when the SILENT room already carries
+    an impulse that would pass the arrival gate. The verify measures each
+    speaker by its loudest moment, so a room with its own loud transients
+    (music left playing, a conversation) can hand a fabricated arrival to
+    the agreement check — this catches that before a single click is played
+    and lets the caller ask for a quiet room instead of storing noise."""
+    rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+        time.sleep(seconds)
+        rp.terminate()
+        try:
+            rp.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            rp.kill()
+            try:
+                rp.wait(timeout=1)
+            except Exception:
+                pass
+        try:
+            samples, rate = read_mono(rec)
+        except Exception:
+            return False  # can't tell — don't block the check on a read error
+        if not samples:
+            return False
+        start = int(ANALYSIS_SKIP * rate)
+        window = samples[start:] if start < len(samples) else samples
+        if not window:
+            return False
+        best = max(abs(s) for s in window)
+        med = sorted(abs(s) for s in window)[len(window) // 2]
+        # The same shape a real arrival must clear (max(200, 4*med)), but
+        # asked of a room with NO click in it: if silence already spikes
+        # that high, a click cannot be told apart from the noise.
+        return best >= max(200, 4 * med)
+    finally:
+        try:
+            os.unlink(rec)
+        except OSError:
+            pass
+
+
 def _two_that_agree(times, tol=0.06):
     """The mean of the first pair within `tol` of each other, else None."""
     for i in range(len(times)):
@@ -561,6 +617,15 @@ def cmd_verify(argv):
         mic, _vdesc = _resolve_mic(mic)
         if mic is None:
             print("VERIFY_FAIL microphone silent")
+            return
+        # Two stimulus-free captures BEFORE any click: the verify grades a
+        # speaker by its loudest moment, so a room already full of loud
+        # transients (music left playing, a TV) would let noise pose as an
+        # arrival and store a fabricated residual. Require BOTH to be loud
+        # so a single stray thump never fails an honest quiet room; the
+        # widget turns this verdict into "pause other audio and try again".
+        if _room_is_loud(mic) and _room_is_loud(mic):
+            print("VERIFY_FAIL room not quiet")
             return
         click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
         try:

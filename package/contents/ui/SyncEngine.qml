@@ -39,8 +39,13 @@ Item {
         // A session that died mid-measurement left its park levels (and the
         // verify's hardware mutes) behind — the restore file it never got
         // to delete puts the room back the way the user had it.
-        app.exec(": PW_PARKREST; f=\"${XDG_RUNTIME_DIR:-/tmp}/onair_park_" + app.instanceId + ".sh\";"
-                 + " [ -f \"$f\" ] && { sh \"$f\" 2>/dev/null; rm -f \"$f\"; }; true");
+        // XDG_RUNTIME_DIR only — never a world-writable /tmp fallback: this
+        // file is REPLAYED with sh at startup, so a predictable shared path
+        // would let another local user pre-plant commands (or a symlink to
+        // redirect the park writes). /run/user/<uid> is 0700 and ours; with
+        // no runtime dir the park recovery is simply skipped.
+        app.exec(": PW_PARKREST; d=\"$XDG_RUNTIME_DIR\"; f=\"$d/onair_park_" + app.instanceId + ".sh\";"
+                 + " [ -n \"$d\" ] && [ -f \"$f\" ] && { sh \"$f\" 2>/dev/null; rm -f \"$f\"; }; true");
         refreshPortStates();
         // A crashed session can orphan the combined-output module — PipeWire
         // keeps it loaded forever. Sweep THIS instance's modules at startup
@@ -1390,8 +1395,12 @@ Item {
         // park. The saved levels are written to a runtime file the moment
         // they are read; the same shell deletes it after restoring, and
         // startup() replays whatever a dead session left behind.
-        var parkFile = "\"${XDG_RUNTIME_DIR:-/tmp}/onair_park_" + app.instanceId + ".sh\"";
-        var parkSave = " : > " + parkFile + ";";
+        // XDG_RUNTIME_DIR only (0700, ours): the twin of this file is
+        // replayed with sh at startup, so it must never live in a shared,
+        // predictable /tmp path. No runtime dir → the save is skipped and
+        // the calibration's own restore commands still put levels back.
+        var parkFile = "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\"";
+        var parkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + parkFile + ";";
         for (var pf = 0; pf < calSinks.length; pf++)
             parkSave += " printf 'pactl set-sink-volume \"%s\" %s\\n'"
                       + " \"$s" + pf + "\" \"${v" + pf + ":-" + park + "%}\" >> " + parkFile + ";";
@@ -1704,7 +1713,19 @@ Item {
         interval: 60000
         repeat: false
         onTriggered: {
+            // Bump the generation FIRST: a setup/restore pactl can hang past
+            // this guard (outside python's own timeout), and its very late
+            // ack would otherwise still carry the current _calibRunSeq, pass
+            // the PW_CALIB/PW_VERIFY gate, and act on a run already declared
+            // lost — arming a verify that blasts the master at 100% over
+            // live music, or launching an unasked 85% click run. Disable and
+            // resurrect bump the seq for exactly this reason; the guard must
+            // be a generation boundary too.
+            _calibRunSeq++;
             _calibrating = false;
+            _verifyPending = false;
+            verifyGuardTimer.stop();
+            verifySettleTimer.stop();
             _calibRestoreVolume();
             // Same as the failure branch: a rebuild held during the lost run
             // must not be stranded for the session.
@@ -1866,8 +1887,9 @@ Item {
         // the isolation's hardware mutes all land in a runtime file that
         // only a completed restore deletes — startup() replays a dead
         // session's leftovers.
-        var vParkFile = "\"${XDG_RUNTIME_DIR:-/tmp}/onair_park_" + app.instanceId + ".sh\"";
-        var vParkSave = " : > " + vParkFile + ";"
+        // XDG_RUNTIME_DIR only, same reason as the calibration's park file.
+        var vParkFile = "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\"";
+        var vParkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + vParkFile + ";"
                       + " printf 'pactl set-sink-volume \"%s\" %s\\n' "
                       + _combineSinkName + " \"${cm:-100%}\" >> " + vParkFile + ";";
         for (var vf = 0; vf < sinks.length && vf < 8; vf++)

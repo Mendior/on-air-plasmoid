@@ -232,7 +232,9 @@ Item {
             var cal = r.mock.execLog[r.mock.execLog.length - 1];
             verify(cal.indexOf("onair_park_7.sh") !== -1);
             verify(cal.indexOf("printf 'pactl set-sink-volume \"%s\" %s\\n' \"$s0\"") !== -1);
-            verify(cal.indexOf("rm -f \"${XDG_RUNTIME_DIR:-/tmp}/onair_park_7.sh\"") !== -1);
+            // XDG_RUNTIME_DIR only — the /tmp fallback was a world-writable
+            // path that startup() then replays with sh (security fix).
+            verify(cal.indexOf("rm -f \"$XDG_RUNTIME_DIR/onair_park_7.sh\"") !== -1);
             r.e._verifyPending = true;
             r.e._verifyArmTimers();
             r.e._verifyLaunch();

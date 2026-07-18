@@ -21,8 +21,16 @@ import pytest
 
 UI_DIR = pathlib.Path(__file__).resolve().parent.parent / "package" / "contents" / "ui"
 
+# A physically faithful microphone: it ALWAYS carries a small noise floor
+# (a real mic is never bit-exact silent — that is how the liveness probe
+# tells a live mic from a hardware-muted one), and it carries a loud CLICK
+# only when a paplay actually played one DURING this capture. The stub
+# writes its WAV on SIGTERM (as pw-record finalizes on real hardware), so
+# it can look back and see whether the click was truly played — letting a
+# stimulus-free capture (the room-quiet pre-check, mic-liveness) correctly
+# read as quiet-but-alive instead of forging a click nobody played.
 PW_RECORD_STUB = """#!/usr/bin/env python3
-import math, os, struct, sys, time, wave
+import math, os, signal, struct, sys, time, wave
 rate = 48000
 out = sys.argv[-1]
 target = ""
@@ -30,36 +38,57 @@ if "--target" in sys.argv:
     target = sys.argv[sys.argv.index("--target") + 1]
 dead = [d for d in os.environ.get("ONAIR_TEST_DEAD", "").split(",") if d]
 is_dead = ("DEFAULT" in dead and target == "") or (target in dead)
-if is_dead:
+mark = os.environ.get("ONAIR_TEST_PLAYMARK", "")
+start = time.time()
+def click_played():
+    try:
+        return float(open(mark).read()) >= start - 0.05
+    except Exception:
+        return False
+def finish(*_a):
+    n = int(rate * 1.2)
+    click_at = int(rate * 0.75)  # past ANALYSIS_SKIP and the early-noise filter
+    with_click = (not is_dead) and click_played()
+    # A room with its own loud impulse in EVERY capture, click or not — a
+    # TV left playing. Sits at a fixed spot so it looks arrival-like.
+    loud_room = os.environ.get("ONAIR_TEST_ROOMLOUD", "") == "1"
+    room_at = int(rate * 0.9)
+    frames = bytearray()
+    for i in range(n):
+        # Dead mic = bit-exact zero; a live mic idles at a low floor.
+        v = 0 if is_dead else (40 if (i % 2) else -40)
+        if loud_room and not is_dead:
+            k = i - room_at
+            if 0 <= k < int(rate * 0.01):
+                v = int(15000 * math.sin(2.0 * math.pi * 900.0 * k / rate))
+        if with_click:
+            j = i - click_at
+            if 0 <= j < int(rate * 0.01):
+                env = 0.5 * (1.0 - math.cos(2.0 * math.pi * j / int(rate * 0.01)))
+                v = int(20000 * env * math.sin(2.0 * math.pi * 2200.0 * j / rate))
+        frames += struct.pack("<h", v)
     with wave.open(out, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(rate)
-        w.writeframes(b"\\x00\\x00" * int(rate * 1.2))
-    time.sleep(60)
+        w.writeframes(bytes(frames))
     sys.exit(0)
-n = int(rate * 1.2)
-click_at = int(rate * 0.75)  # past ANALYSIS_SKIP and the impossible-early noise filter
-frames = bytearray()
-for i in range(n):
-    v = 0
-    j = i - click_at
-    if 0 <= j < int(rate * 0.01):
-        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * j / int(rate * 0.01)))
-        v = int(20000 * env * math.sin(2.0 * math.pi * 2200.0 * j / rate))
-    frames += struct.pack("<h", v)
-with wave.open(out, "wb") as w:
-    w.setnchannels(1)
-    w.setsampwidth(2)
-    w.setframerate(rate)
-    w.writeframes(bytes(frames))
-time.sleep(60)   # calibrate.py terminates us; the file is already complete
+signal.signal(signal.SIGTERM, finish)
+time.sleep(60)   # calibrate.py terminates us; finish() writes the WAV then
+finish()         # (unreached in practice) belt-and-braces if never signalled
 """
 
 PAPLAY_STUB = """#!/usr/bin/env python3
-import sys, time
+import os, sys, time
 if any("wedge" in a for a in sys.argv):
-    time.sleep(30)   # a dying sink holding paplay hostage
+    time.sleep(30)   # a dying sink holding paplay hostage — no click reaches air
+else:
+    mark = os.environ.get("ONAIR_TEST_PLAYMARK", "")
+    if mark:
+        try:
+            open(mark, "w").write(str(time.time()))   # a click really played
+        except Exception:
+            pass
 """
 
 
@@ -114,6 +143,14 @@ def run_calibrate(fast_calibrate, argv, extra_env=None):
     script, bindir = fast_calibrate
     env = dict(os.environ)
     env["PATH"] = str(bindir) + os.pathsep + env.get("PATH", "")
+    # A per-run "a click was just played" marker shared by the paplay and
+    # pw-record stubs — cleared first so a previous run's clicks can't leak.
+    mark = bindir.parent / "playmark"
+    try:
+        mark.unlink()
+    except FileNotFoundError:
+        pass
+    env["ONAIR_TEST_PLAYMARK"] = str(mark)
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run([sys.executable, str(script)] + argv,
@@ -168,9 +205,8 @@ def test_extras_get_their_own_lag_line(fast_calibrate):
 
 
 def test_verify_reports_the_room_spread(fast_calibrate):
-    # Presence clicks hear every member (the stub always records a click),
-    # then one fused arrival in the combined pass = everyone together —
-    # the verify must call that a spread of (near) zero.
+    # Each member's click is heard through the isolated combined pass, all at
+    # the same stub arrival — the verify must call that a spread of near zero.
     proc = run_calibrate(fast_calibrate,
                          ["verify", "combined_sink", "", "wired_sink", "bt_sink"])
     assert proc.returncode == 0
@@ -178,6 +214,17 @@ def test_verify_reports_the_room_spread(fast_calibrate):
     ok = [ln for ln in proc.stdout.splitlines() if ln.startswith("VERIFY_OK ")]
     assert len(ok) == 1
     assert int(ok[0].split()[1]) <= 10
+
+
+def test_verify_refuses_a_loud_room(fast_calibrate):
+    # A room with its own loud transient in every capture would let noise
+    # pose as an arrival and store a fabricated residual — the verify must
+    # bail with the honest verdict before a single click is measured.
+    proc = run_calibrate(fast_calibrate,
+                         ["verify", "combined_sink", "", "wired_sink", "bt_sink"],
+                         extra_env={"ONAIR_TEST_ROOMLOUD": "1"})
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == "VERIFY_FAIL room not quiet"
 
 
 def test_verify_usage_is_a_sentinel(fast_calibrate):
