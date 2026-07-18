@@ -850,6 +850,68 @@ PlasmoidItem {
         return _favMap[u] || u;
     }
 
+    // A stored logo that no longer renders fixes ITSELF: the row's Image
+    // reports the error, one byuuid lookup per station per session asks the
+    // directory for the station's current logo, and a fresh answer lands in
+    // the model AND the config without stopping playback. The settings
+    // page's full ladder (homepage scrape, well-known paths) stays the deep
+    // tool; this is the everyday road, and it needs no clicks.
+    property var _favHealTried: ({})
+
+    function faviconSelfHeal(hostname) {
+        var host = (hostname || "").toString();
+        if (host === "" || _favHealTried[host]) return;
+        _favHealTried[host] = true;
+        var uuid = "";
+        for (var i = 0; i < stationsModel.count; i++) {
+            var st = stationsModel.get(i);
+            if ((st.hostname || "").toString() === host) {
+                uuid = (st.uuid || "").toString();
+                break;
+            }
+        }
+        if (uuid === "") return;      // the settings page's ladder covers these
+        _rbFetch("/json/stations/byuuid/" + uuid, 5000, function(xhr) {
+            if (!xhr || xhr.status !== 200) return;
+            var fav = "";
+            try {
+                var row = (JSON.parse(xhr.responseText) || [])[0] || {};
+                fav = (row.favicon || "").toString();
+            } catch (e) {}
+            // Same http(s) gate every favicon passes — catalog data is
+            // untrusted and this lands in an Image.source and the config.
+            if (!/^https?:\/\//i.test(fav)) return;
+            for (var k = 0; k < stationsModel.count; k++) {
+                var sk = stationsModel.get(k);
+                if ((sk.hostname || "").toString() !== host) continue;
+                if ((sk.favicon || "").toString() === fav) return; // same dead one
+                stationsModel.setProperty(k, "favicon", fav);
+                if (root._currentOrigUrl === host) root.currentStationFavicon = fav;
+                _faviconStore(host, fav);
+                return;
+            }
+        });
+    }
+
+    // Persist one station's fresh favicon — same identity-write pattern as
+    // _rbStoreUuid: value-identical writes bail early, and a real write
+    // must not read as an add/remove that stops playback.
+    function _faviconStore(orig, fav) {
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            for (var i = 0; i < servers.length; i++) {
+                if ((servers[i].hostname || "") !== orig) continue;
+                if ((servers[i].favicon || "") === fav) return;
+                servers[i].favicon = fav;
+                var out = JSON.stringify(servers);
+                if (out === Plasmoid.configuration.servers) return;
+                _reorderKeepPlaying = true;
+                Plasmoid.configuration.servers = out;
+                return;
+            }
+        } catch (e) {}
+    }
+
     function _favUrls() {
         const seen = {};
         const urls = [];

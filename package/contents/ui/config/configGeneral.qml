@@ -125,7 +125,8 @@ KCM.ScrollViewKCM {
             const it = stationsModel.get(i);
             const fav = it.favicon ? String(it.favicon).trim() : "";
             if (fav === "" || fav === "null") {
-                _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname });
+                _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
+                                  "uuid": (it.uuid || "").toString() });
             }
         }
         _logoTotal = _logoQueue.length;
@@ -160,7 +161,63 @@ KCM.ScrollViewKCM {
             _fetchNextLogo();
             return;
         }
+        if (job.uuid && /^[0-9a-fA-F-]{36}$/.test(job.uuid)) {
+            _queryByUuid(job, cleanName, 0);
+            return;
+        }
         _queryRadioBrowser(job, cleanName, 0);
+    }
+
+    // The identity road: byuuid answers with THE station's row — its logo
+    // and homepage are the right ones even when five broadcasters share the
+    // name. Falls through to the name search only when the row has neither.
+    function _queryByUuid(job, cleanName, retryCount) {
+        const url = "https://" + _apiServer + ".api.radio-browser.info/json/stations/byuuid/"
+                  + job.uuid;
+        const xhr = new XMLHttpRequest();
+        var guard = null;
+        xhr.open("GET", url);
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.19");
+        _activeLogoXhr = xhr;
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState !== xhr.DONE)
+                return;
+            _clearXhrTimeout(guard);
+            if (_activeLogoXhr === xhr)
+                _activeLogoXhr = null;
+            let fav = "";
+            let home = "";
+            let ok = false;
+            if (xhr.status === 200) {
+                try {
+                    const row = (JSON.parse(xhr.responseText) || [])[0] || {};
+                    ok = true;
+                    fav = _webUrlOrEmpty(row.favicon);
+                    home = _webUrlOrEmpty(row.homepage);
+                } catch (e) { ok = false; }
+            }
+            if (!ok && retryCount < _apiServers.length - 1) {
+                _pickApiServer();
+                _queryByUuid(job, cleanName, retryCount + 1);
+                return;
+            }
+            if (fav === "" && home === "") {
+                _queryRadioBrowser(job, cleanName, 0);
+                return;
+            }
+            if (home !== "") {
+                _scrapeHomepageAndProbe(job, fav, home);
+            } else {
+                const candidates = [fav];
+                for (const u of _hostnameStdCandidates(job.hostname))
+                    if (candidates.indexOf(u) === -1) candidates.push(u);
+                for (const u of _googleFaviconCandidates(job.hostname))
+                    if (candidates.indexOf(u) === -1) candidates.push(u);
+                _probeNextCandidate(job, candidates, 0);
+            }
+        };
+        guard = _armXhrTimeout(xhr, 8000);
+        xhr.send();
     }
 
     function _queryRadioBrowser(job, cleanName, retryCount) {
@@ -538,7 +595,8 @@ KCM.ScrollViewKCM {
             // Do NOT clear the current favicon up front: _saveLogo only writes
             // on a validated success, so a failed lookup keeps the previous
             // (possibly hand-entered) URL instead of wiping it from the config.
-            _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname });
+            _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
+                              "uuid": (it.uuid || "").toString() });
         }
         _logoTotal = _logoQueue.length;
         _logoDone = 0;

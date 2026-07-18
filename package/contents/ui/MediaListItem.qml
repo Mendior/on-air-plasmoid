@@ -155,12 +155,18 @@ PlasmaComponents3.ItemDelegate {
                     asynchronous: true
                     smooth: true
                     visible: status === Image.Ready && !listItem.hovered && !listItem.isCurrent
-                    // Self-healing: a corrupted cache file must not kill the
-                    // logo forever — fall back to the remote URL once.
+                    // Self-healing, two rungs: a corrupted cache file falls
+                    // back to the remote URL once — and a REMOTE that errors
+                    // too (dead host, moved file, a format nothing decodes)
+                    // asks the directory for the station's current logo by
+                    // identity, once per session, updating model and config.
                     onStatusChanged: {
-                        if (status === Image.Error && model.favicon
+                        if (status !== Image.Error) return
+                        if (model.favicon
                             && source.toString().indexOf("file://") === 0) {
                             source = model.favicon
+                        } else if (source.toString().indexOf("http") === 0) {
+                            root.faviconSelfHeal(model.hostname)
                         }
                     }
                 }
