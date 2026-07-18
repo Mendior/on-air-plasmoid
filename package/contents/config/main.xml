@@ -85,6 +85,10 @@
             <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
             <default>{}</default>
         </entry>
+        <entry name="syncRefLatMap" type="String">
+            <label>Bluetooth sink's PipeWire-reported latency in ms at calibration time, keyed by MAC (JSON) — the reference the silent recompensation shifts against</label>
+            <default>{}</default>
+        </entry>
         <entry name="searchHistory" type="String">
             <label>Recent successful web searches, newest first (JSON array)</label>
             <default>[]</default>

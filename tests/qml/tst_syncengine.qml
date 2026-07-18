@@ -75,6 +75,7 @@ Item {
             property int syncOffsetMs: 0
             property int syncVerifiedMs: -1
             property string syncOffsetMap: "{}"
+            property string syncRefLatMap: "{}"
             property string deviceTrims: "{}"
             property string deviceChannels: "{}"
             property string syncExcluded: "{}"
@@ -1072,7 +1073,11 @@ Item {
             verify(r.e._btKickInFlight);
             var kick = r.mock.execLog[r.mock.execLog.length - 1];
             verify(kick.indexOf(": BT_KICK " + btMac + ";") === 0);   // MAC in sentinel
-            verify(kick.indexOf("bluetoothctl connect " + btMac) !== -1);
+            // The kick is a PROFILE bounce now — measured on a real JBL
+            // Flip 7, a software bluetoothctl disconnect can destroy the
+            // pairing outright, so the link must never be touched.
+            verify(kick.indexOf("set-card-profile") !== -1);
+            verify(kick.indexOf("bluetoothctl disconnect") === -1);
             // Held while the kick is in flight — the countdown must not
             // starve the cure it started itself.
             r.e._btJoinWatchTick();
@@ -1107,6 +1112,46 @@ Item {
             r.mock._btConnectingMac = btMac;
             r.e._btJoinWatchTick();
             compare(r.e._btJoinWatchTicks, 0); // held, not counted
+        }
+
+        // ── the silent Bluetooth recompensation ───────────────────────────
+        // A2DP buffering re-rolls on every transport (re)establishment;
+        // the reported-latency probe shifts the applied lag against the
+        // calibration-time reference — no clicks, no user, no staleness.
+
+        function test_reflat_shift_recompensates_a_rerolled_transport() {
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 300 }),
+                          syncRefLatMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 250 }) });
+            activate(r);
+            compare(r.e._lagForSink(btSink), 300);
+            // The transport came back 150 ms deeper than at calibration.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 400000\n", "");
+            compare(r.e._lagForSink(btSink), 450);
+            // Inside the ±25 ms dead zone nothing moves — that band is the
+            // transport's own measured jitter, not a re-roll.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 410000\n", "");
+            compare(r.e._lagForSink(btSink), 450);
+            // A fresh calibration snapshot retires the session shift and
+            // becomes the new reference.
+            r.e.handleExec(": PW_REFLAT C " + btMac + "; x", "REFLAT 400000\n", "");
+            compare(r.e._lagForSink(btSink), 300);
+            compare(JSON.parse(r.cfg.syncRefLatMap)["AA:BB:CC:DD:EE:FF"], 400);
+        }
+
+        function test_reflat_without_reference_adopts_and_stays_put() {
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 300 }) });
+            activate(r);
+            // Calibrated before the mechanism existed: the first reading
+            // becomes the reference, no shift is invented from thin air.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 500000\n", "");
+            compare(r.e._lagForSink(btSink), 300);
+            compare(JSON.parse(r.cfg.syncRefLatMap)["AA:BB:CC:DD:EE:FF"], 500);
+            // An absent or suspended (0) reading changes nothing.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "", "");
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 0\n", "");
+            compare(r.e._lagForSink(btSink), 300);
         }
 
         // ── the steal watch ───────────────────────────────────────────────

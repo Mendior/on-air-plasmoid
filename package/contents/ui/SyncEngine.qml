@@ -496,6 +496,10 @@ Item {
                         calMap[xM[1]] = Math.max(-100, Math.min(900, parseInt(xM[2], 10)));
                     cfg.syncOffsetMap = JSON.stringify(calMap);
                 } catch (e) {}
+                // Snapshot the transport's reported latency as the
+                // reference this fresh number was measured under — the
+                // silent recompensation shifts against it from now on.
+                if (macM) _refLatProbe(macM[1], true);
                 // Loudness matching, from the same run: each level line is
                 // one speaker's click peak at the microphone, all taken at
                 // the same sink volume. The QUIETEST speaker becomes the
@@ -826,6 +830,60 @@ Item {
         // only the menu's Connected states need refreshing here. Unless
         // the user clicked Disconnect while the cycle was mid-flight:
         // its reconnect phase just reverted their choice — undo that.
+        if (cmd.indexOf(": PW_REFLAT ") === 0) {
+            var rlM = cmd.match(/^: PW_REFLAT ([CS]) ([0-9A-F:]{17})/);
+            if (!rlM) return true;
+            var rlUs = (stdout || "").match(/REFLAT (\d+)/);
+            if (!rlUs) return true;              // sink absent: nothing to read
+            var rlMs = Math.round(parseInt(rlUs[1], 10) / 1000);
+            // A suspended sink reports 0; anything past 3 s is not a report.
+            if (rlMs <= 0 || rlMs > 3000) return true;
+            if (rlM[1] === "C") {
+                // Calibration context: this reading IS the reference the
+                // stored lag was measured under — and a fresh calibration
+                // retires any session shift for the device.
+                try {
+                    var refC = JSON.parse(cfg.syncRefLatMap || "{}");
+                    refC[rlM[2]] = rlMs;
+                    cfg.syncRefLatMap = JSON.stringify(refC);
+                } catch (e) {}
+                if (_refLatShiftByMac[rlM[2]] !== undefined) {
+                    var m0 = {};
+                    for (var k0 in _refLatShiftByMac)
+                        if (k0 !== rlM[2]) m0[k0] = _refLatShiftByMac[k0];
+                    _refLatShiftByMac = m0;
+                }
+                return true;
+            }
+            var refV;
+            try { refV = JSON.parse(cfg.syncRefLatMap || "{}")[rlM[2]]; } catch (e) {}
+            if (refV === undefined) {
+                // Calibrated before this mechanism existed: adopt the
+                // current reading as the reference — future re-rolls
+                // correct relative to here.
+                try {
+                    var refA = JSON.parse(cfg.syncRefLatMap || "{}");
+                    refA[rlM[2]] = rlMs;
+                    cfg.syncRefLatMap = JSON.stringify(refA);
+                } catch (e) {}
+                return true;
+            }
+            var shift = Math.max(-1500, Math.min(1500, rlMs - refV));
+            // Inside the transport's own ±20 ms wander (measured): not
+            // actionable — a rebuild would re-roll more than it fixes.
+            if (Math.abs(shift) < 25) shift = 0;
+            var prevShift = _refLatShiftByMac[rlM[2]] || 0;
+            if (Math.abs(shift - prevShift) < 25) return true;
+            var m1 = {};
+            for (var k1 in _refLatShiftByMac) m1[k1] = _refLatShiftByMac[k1];
+            m1[rlM[2]] = shift;
+            _refLatShiftByMac = m1;
+            console.log("[ARP] sync: " + rlM[2] + " transport latency moved "
+                        + shift + " ms vs calibration — recompensating");
+            if (_combineActive && !_combineReloopBusy && !syncOffsetDebounce.running)
+                syncOffsetDebounce.restart();
+            return true;
+        }
         if (cmd.indexOf(": BT_KICK ") === 0) {
             // The MAC is in the sentinel: an EARLIER kick's ack (speaker A)
             // landing after the watchdog moved on to speaker B must not clear
@@ -835,19 +893,13 @@ Item {
             var ackMac = kickM ? kickM[1] : "";
             if (ackMac !== _btKickMac) return true;    // stale kick's ack
             _btKickInFlight = false;
-            if (_btKickAbort && app._btValidMac(_btKickMac))
-                // Uniquified: an identical disconnect for the same MAC may
-                // already be in flight from the user's own click, and the
-                // exec dedup would silently swallow this one. OWN sentinel,
-                // not BT_DISCONNECT: that ack's handler belongs to the
-                // USER's click — it clears the in-flight disconnect state
-                // and launches any parked connect wish, and this engine-made
-                // disconnect must not be able to fire either for a device
-                // the user never touched.
-                app.exec(": BT_KICK_ABORT; timeout 12 bluetoothctl disconnect "
-                                + _btKickMac + "; true # " + app.nextSeq());
-            else if (_btJoinWatchMac !== "" && _btJoinWatchMac === _btKickMac)
-                _btJoinWatchTicks = 0; // fresh window for the reconnect
+            // An aborted kick needs NO undo anymore: the profile bounce
+            // never connects anything — the device was connected before the
+            // kick and still is, with its audio profile back on. The old
+            // abort-disconnect is gone with the cycle it undid (and could
+            // itself destroy a pairing, same as the cycle).
+            if (!_btKickAbort && _btJoinWatchMac !== "" && _btJoinWatchMac === _btKickMac)
+                _btJoinWatchTicks = 0; // fresh window for the renegotiation
             _btKickMac = "";
             _btKickAbort = false;
             app.btList();
@@ -1192,13 +1244,24 @@ Item {
     // calibration heard it (keyed by sink name; may be negative when the
     // sink runs AHEAD of the reference), zero otherwise — the pre-XLAG
     // behaviour.
+    // Session-scoped correction on top of the stored calibration: how far
+    // the Bluetooth transport's PipeWire-reported latency has moved since
+    // the calibration that produced the stored number. A2DP buffering is
+    // re-rolled on every transport (re)establishment — measured live: the
+    // same speaker 213 ms one session, 2.3 s after a codec switch — and
+    // the stored lag is only the opening bid. The probe below reads the
+    // report silently (no clicks, no interruption) and the rebuild applies
+    // the shift, so "fine yesterday, doubled today" corrects itself.
+    property var _refLatShiftByMac: ({})
+
     function _lagForSink(sinkId) {
         var mac = _btMacOfSink(sinkId);
         try {
             var map = JSON.parse(cfg.syncOffsetMap || "{}");
             if (mac !== "") {
                 if (map[mac] !== undefined)
-                    return Math.max(0, Math.min(2000, parseInt(map[mac], 10) || 0));
+                    return Math.max(0, Math.min(2000, (parseInt(map[mac], 10) || 0)
+                                                      + (_refLatShiftByMac[mac] || 0)));
             } else if (map[sinkId] !== undefined) {
                 var w = parseInt(map[sinkId], 10);
                 // The verify loop's corrections may push past the direct
@@ -1207,7 +1270,40 @@ Item {
                 if (isFinite(w)) return Math.max(-100, Math.min(2000, w));
             }
         } catch (e) {}
-        return mac !== "" ? Math.max(0, Math.min(900, cfg.syncOffsetMs || 0)) : 0;
+        return mac !== ""
+               ? Math.max(0, Math.min(2000, (cfg.syncOffsetMs || 0)
+                                            + (_refLatShiftByMac[mac] || 0)))
+               : 0;
+    }
+
+    // Read one Bluetooth sink's PipeWire-reported latency. forCalib stores
+    // it as the calibration-time REFERENCE; otherwise the ack compares the
+    // reading against the reference and arms a corrective rebuild when the
+    // transport has genuinely moved. Silent — no clicks, no interruption.
+    function _refLatProbe(mac, forCalib) {
+        if (!app._btValidMac(mac)) return;
+        var macU = mac.replace(/:/g, "_");
+        app.exec(": PW_REFLAT " + (forCalib ? "C" : "S") + " " + mac + "; "
+                 + "pactl list sinks | awk '/^Sink #/{f=0} "
+                 + "/Name: bluez_output." + macU + "/{f=1} "
+                 + "f && /Latency:/{print \"REFLAT \" $2; exit}'; true # " + app.nextSeq());
+    }
+
+    // A beat after a rebuild/transport event, ask every Bluetooth member
+    // for its current report — immediately after the event the transport
+    // may not be up yet and the reading would simply be absent.
+    Timer {
+        id: refLatProbeTimer
+        interval: 3000
+        repeat: false
+        onTriggered: {
+            if (!_combineActive) return;
+            var rs = _combineRealSinks();
+            for (var i = 0; i < rs.length; i++) {
+                var m = _btMacOfSink(rs[i]);
+                if (m !== "") _refLatProbe(m, false);
+            }
+        }
     }
 
     // One loopback per hardware sink, each with a REAL buffer delay
@@ -1714,6 +1810,11 @@ Item {
         app.exec(": PW_RELOOP " + _combineLoadSeq + "; " + un + _combineLoopbackCmds(sinks)
                         + reclaim + " true"
                         + " # " + app.nextSeq());
+        // Fresh loopbacks mean a fresh A2DP operating point — read every
+        // Bluetooth member's reported latency once the dust settles. The
+        // shift dead-zone keeps this from ping-ponging: a rebuild whose
+        // report matches what it was built with arms nothing.
+        refLatProbeTimer.restart();
     }
 
     function setSyncOffset(ms) {
@@ -2156,6 +2257,9 @@ Item {
                     app.exec(": PW_FLUSH; pactl suspend-sink '" + okSink + "' 1;"
                              + " pactl suspend-sink '" + okSink + "' 0; true # " + app.nextSeq());
                     _btJoinWatchStop();
+                    // The flush just re-rolled the A2DP buffer — read the
+                    // fresh report and recompensate if it moved.
+                    refLatProbeTimer.restart();
                     return;
                 }
             }
@@ -2168,18 +2272,22 @@ Item {
                 && !syncOffsetDebounce.running && !combineLbRetry.running)
                 syncOffsetDebounce.restart();
         } else if (_btJoinWatchTicks >= 4 && !_btJoinKicked) {
-            // ~8 s connected with no sink: the audio profile did not come up.
-            // Cycle the connection once — re-paging renegotiates A2DP.
+            // ~8 s connected with no sink: the audio profile did not come
+            // up. Bounce the card's A2DP PROFILE — that renegotiates the
+            // transport without ever touching the link. The old full
+            // disconnect/reconnect cycle is gone for cause: measured on a
+            // JBL Flip 7, a software disconnect can DESTROY the pairing
+            // outright (Paired: no, AuthenticationCanceled on re-pair) —
+            // a missing speaker with an honest toast beats an unpaired one.
             _btJoinKicked = true;
             _btKickMac = _btJoinWatchMac;
             _btKickAbort = false;
             _btKickInFlight = true;
-            app.exec(": BT_KICK " + _btJoinWatchMac + "; timeout 5 bluetoothctl disconnect " + _btJoinWatchMac
-                + " >/dev/null 2>&1; sleep 1;"
-                // Wake the speaker's radio with an inquiry before re-paging —
-                // the page itself is what sleeping speakers ignore.
-                + " timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
-                + " timeout 15 bluetoothctl connect " + _btJoinWatchMac + " >/dev/null 2>&1; true"
+            app.exec(": BT_KICK " + _btJoinWatchMac
+                + "; c=bluez_card." + _btJoinWatchMac.replace(/:/g, "_")
+                + "; timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
+                + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
+                + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1; true"
                 + " # " + app.nextSeq());
         }
         if (_btJoinWatchTicks >= 15) {
