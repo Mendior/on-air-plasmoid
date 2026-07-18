@@ -484,6 +484,18 @@ PlasmoidItem {
         // previewing the NEXT result; the old retry must not hijack
         // that with yesterday's station.
         var pvKey = root._previewUrl;
+        // The retry rungs play a FRESH address via startWithFade, which does
+        // not touch the resolved-URL trio (only _playStation/heal do). Left
+        // stale, _castStreamUrl would hand a cast device the dead pre-retry
+        // URL — total silence a second after a live stream was playing. This
+        // keeps the trio pointing at whatever is actually on the speakers.
+        var pvPlay = function(playUrl) {
+            if (root._previewUrl !== pvKey) return;
+            root._currentUnwrappedUrl = playUrl;
+            root._currentResolvedUrl = playUrl;
+            startWithFade({ "name": pvName, "hostname": playUrl,
+                            "favicon": pvIcon, "active": true });
+        };
         // The raw rung, and after it the name rescue and the honest word:
         // a station that is gone (or answers only its own country — a
         // geo-blocked stream reads 404 here while the directory's checker
@@ -494,11 +506,7 @@ PlasmoidItem {
             var raw = root._previewRawUrl;
             root._previewRawUrl = "";
             if (raw !== "" && raw !== pvKey) {
-                _unwrapPlaylist(raw, function(playUrl) {
-                    if (root._previewUrl !== pvKey) return;
-                    startWithFade({ "name": pvName, "hostname": playUrl,
-                                    "favicon": pvIcon, "active": true });
-                });
+                _unwrapPlaylist(raw, pvPlay);
                 return;
             }
             _previewNameRescue(pvKey, pvName, pvIcon);
@@ -516,11 +524,7 @@ PlasmoidItem {
             } catch (e) {}
             if (fresh !== "" && /^https?:\/\//i.test(fresh)
                 && fresh !== pvKey) {
-                _unwrapPlaylist(fresh, function(playUrl) {
-                    if (root._previewUrl !== pvKey) return;
-                    startWithFade({ "name": pvName, "hostname": playUrl,
-                                    "favicon": pvIcon, "active": true });
-                });
+                _unwrapPlaylist(fresh, pvPlay);
             } else {
                 tryRaw();
             }
@@ -594,6 +598,10 @@ PlasmoidItem {
         console.log("[ARP] preview rescue: auditioning " + next + " for dead " + pvKey);
         _unwrapPlaylist(next, function(playUrl) {
             if (root._previewUrl !== pvKey) return;
+            // Keep the resolved-URL trio on the live rescue address, so a
+            // cast started during the rescue pushes what is actually playing.
+            root._currentUnwrappedUrl = playUrl;
+            root._currentResolvedUrl = playUrl;
             startWithFade({ "name": pvName, "hostname": playUrl,
                             "favicon": pvIcon, "active": true });
         });
@@ -1805,7 +1813,8 @@ PlasmoidItem {
                  + "&hidebroken=true&order=bitrate&reverse=true&limit=30",
                  4000, function(xhr) {
             let pickedUrl = origUrl;
-            if (xhr && xhr.status === 200) {
+            const answered = !!(xhr && xhr.status === 200);
+            if (answered) {
                 try {
                     const results = JSON.parse(xhr.responseText) || [];
                     const nameLower = stationName.toLowerCase();
@@ -1868,7 +1877,13 @@ PlasmoidItem {
                     console.log("[ARP] auto-bitrate parse error: " + e);
                 }
             }
-            _bitrateCachePut(origUrl, pickedUrl);
+            // Cache only a REAL directory answer. A transient failure (all
+            // mirrors down → xhr null, or a non-200) must not pin "no
+            // upgrade" for the session — a momentary blip at first play would
+            // otherwise disable the bitrate upgrade for that station until a
+            // plasmashell restart. The art cache refuses transient failures
+            // for the same reason.
+            if (answered) _bitrateCachePut(origUrl, pickedUrl);
             if (pickedUrl !== origUrl) {
                 console.log("[ARP] auto-bitrate upgrade: " + stationName + " => " + pickedUrl);
             }
@@ -2638,13 +2653,20 @@ PlasmoidItem {
     }
 
     function _tryHealStation() {
-        if (!Plasmoid.configuration.autoHeal) return;
         if (isPlaying() || _casting) return;
         if (root._previewUrl !== "" || lastPlay < 0 || lastPlay >= stationsModel.count) return;
         var st = stationsModel.get(lastPlay);
         var orig = (st.hostname || "").toString();
         // Only heal the station we actually failed on.
         if (orig === "" || orig.indexOf("file://") === 0 || orig !== root._currentOrigUrl) return;
+        // autoHeal off = no directory lookup, but the standing order still
+        // owes a heartbeat: the user asked for music, so the backoff keeps
+        // replaying the saved address until it returns or they say stop.
+        // Without this, unchecking autoHeal made a single stream death end
+        // playback for good (only a network-reachability edge could revive
+        // it, and many setups never report one). Placed AFTER the state
+        // guards so a preview or a recovered stream never arms it.
+        if (!Plasmoid.configuration.autoHeal) { _healArmRetry(); return; }
         var now = Date.now();
         // Every early return past this point still owes the standing order a
         // heartbeat: the 10-minute lookup lock (a station simply offline),
@@ -2717,7 +2739,11 @@ PlasmoidItem {
                         // URL on its latest sweep — the point of asking them.
                         if (String(r.lastcheckok) !== "1") continue;
                         var cand = (r.url_resolved || r.url || "").toString();
-                        if (!cand || cand === run.orig) continue;
+                        // http(s) only — the catalog is publicly writable and
+                        // this address is auditioned straight into the player.
+                        // The byuuid rung gates the same way; a file:///data:
+                        // row must never become playMusic.source.
+                        if (!cand || !/^https?:\/\//i.test(cand) || cand === run.orig) continue;
                         var fmt = _streamFormat(cand);
                         if (fmt === "playlist") continue;
                         var score = HealLogic.scoreRow(_healNormName(r.name), run.norm,
@@ -4536,9 +4562,18 @@ PlasmoidItem {
                 && playMusic.source.toString() === root._healPendingUrl) {
                 _healCommit();
             }
-            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying() && !isError && !root._qtMetaWorks
+            // A real buffer clears the stall count on EVERY stream, not just
+            // the ICY-reader ones: a stream whose titles arrive via Qt
+            // metadata used to keep its stall count across fully recovered
+            // stall episodes, and on the fourth independent hiccup of the
+            // session a perfectly healthy stream was declared dead and shipped
+            // to the heal road (which can even repoint the saved address).
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying()
                 && playMusic.source.toString().indexOf("file://") !== 0) {
                 root._stallAttempts = 0;
+            }
+            if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying() && !isError && !root._qtMetaWorks
+                && playMusic.source.toString().indexOf("file://") !== 0) {
                 getStreamInfo(playMusic.source, root.metadata);
                 // NB: compare the URL, not truthiness — the bitrate fallback swaps
                 // the source without startWithFade, and the old pin must not
@@ -4845,9 +4880,17 @@ PlasmoidItem {
                     playMusic.stop();
                     isError = true;
                     errorTimer.restart();
+                    // Same three-way routing the connect watchdog uses: a
+                    // hung audition advances the ladder, a starving PREVIEW
+                    // takes the identity road (healTimer would bounce off
+                    // _tryHealStation's preview guard — a silent dead end,
+                    // the listener left staring at stopped audio), everything
+                    // else heals the list station.
                     if (starvedAudition) {
                         root._healClearPending();
                         root._healAdvance();
+                    } else if (root._previewUrl !== "") {
+                        _previewRetryByIdentity();
                     } else {
                         healTimer.restart();
                     }
