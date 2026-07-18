@@ -128,9 +128,19 @@ PlasmaComponents3.ItemDelegate {
                 anchors.fill: parent
                 // 2026: squircle ring — not a full circle
                 radius: width * 0.32
+                readonly property bool darkTheme: Kirigami.Theme.backgroundColor.hslLightness < 0.5
+                readonly property string mono: root.monogramText(model.name)
+                // Monogram mode: no decoded logo to show and the name gave
+                // usable initials — the avatar wears the station's own
+                // deterministic tint instead of the neutral gray.
+                readonly property bool monogrammed: !listItem.isCurrent && mono !== ""
+                                                    && faviconImage.status !== Image.Ready
                 color: listItem.isCurrent
                        ? root.accent
-                       : Qt.alpha(Kirigami.Theme.textColor, 0.1)
+                       : avatar.monogrammed
+                         ? Qt.hsla(root.monogramHue(model.name) / 360, 0.45,
+                                   avatar.darkTheme ? 0.28 : 0.85, 1)
+                         : Qt.alpha(Kirigami.Theme.textColor, 0.1)
                 border.width: 1
                 border.color: listItem.isCurrent
                               ? Qt.alpha(root.accentBright, 0.6)
@@ -155,29 +165,56 @@ PlasmaComponents3.ItemDelegate {
                     asynchronous: true
                     smooth: true
                     visible: status === Image.Ready && !listItem.hovered && !listItem.isCurrent
-                    // Self-healing, two rungs: a corrupted cache file falls
-                    // back to the remote URL once — and a REMOTE that errors
-                    // too (dead host, moved file, a format nothing decodes)
-                    // asks the directory for the station's current logo by
-                    // identity, once per session, updating model and config.
+                    // Self-healing, two rungs. A corrupted CACHE file goes
+                    // through the central _favBroken map, which flips every
+                    // faviconSrc binding to the remote URL — an imperative
+                    // `source =` here would DESTROY the binding and pin this
+                    // delegate off the disk cache for good. A REMOTE that
+                    // errors too (dead host, moved file, a format nothing
+                    // decodes) asks the directory for the station's current
+                    // logo by identity, once per session.
                     onStatusChanged: {
                         if (status !== Image.Error) return
                         if (model.favicon
                             && source.toString().indexOf("file://") === 0) {
-                            source = model.favicon
+                            root.faviconCacheBroken(model.favicon)
                         } else if (source.toString().indexOf("http") === 0) {
                             root.faviconSelfHeal(model.hostname)
                         }
                     }
                 }
 
+                // The empty-state face: the station's initials in its own
+                // deterministic tint. The row number this replaced only ever
+                // appeared on logo-less rows and was already hidden on hover
+                // — but while a reorder arrow is hovered the number
+                // RESURFACES, because that is the one moment position
+                // genuinely matters.
                 PlasmaComponents3.Label {
                     anchors.centerIn: parent
-                    text: listItem.targetIndex + 1
-                    color: Kirigami.Theme.textColor
-                    opacity: 0.7
-                    font.pixelSize: Kirigami.Units.gridUnit * 0.75
-                    visible: !listItem.hovered && !listItem.isCurrent && !faviconImage.visible
+                    readonly property bool reorderHover: moveUpButton.hovered || moveDownButton.hovered
+                    text: (reorderHover || avatar.mono === "")
+                          ? (listItem.targetIndex + 1) : avatar.mono
+                    // Monogram ink serves the number during arrow-hover too —
+                    // on-palette and higher-contrast than dimmed textColor
+                    // over the tint. On the current row's accent flood the
+                    // accent's own text color is the only honest choice.
+                    color: listItem.isCurrent ? root.accentTextOn
+                           : avatar.monogrammed
+                             ? Qt.hsla(root.monogramHue(model.name) / 360,
+                                       avatar.darkTheme ? 0.55 : 0.65,
+                                       avatar.darkTheme ? 0.82 : 0.25, 1)
+                             : Kirigami.Theme.textColor
+                    opacity: (avatar.monogrammed || listItem.isCurrent) ? 1.0 : 0.7
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 0.5
+                    // Only a single-letter MONOGRAM gets the big size — the
+                    // position numbers stay one size across all rows.
+                    font.pixelSize: avatar.height
+                                    * (!reorderHover && avatar.mono.length === 1 ? 0.48 : 0.40)
+                    visible: reorderHover
+                             || (!listItem.isCurrent && !listItem.hovered
+                                 && !faviconImage.visible)
                 }
 
                 EqBars {
@@ -204,6 +241,11 @@ PlasmaComponents3.ItemDelegate {
                            ? root.accentTextOn
                            : Kirigami.Theme.textColor
                     visible: {
+                        // While a reorder arrow is hovered the position
+                        // number takes this slot — not the play/stop
+                        // affordance, on the current row included: the row
+                        // being MOVED is the one whose position matters most.
+                        if (moveUpButton.hovered || moveDownButton.hovered) return false
                         if (listItem.isCurrent && listItem.hovered) return true
                         if (listItem.isCurrent) return false
                         return listItem.hovered && !listItem.isLoading

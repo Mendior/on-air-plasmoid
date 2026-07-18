@@ -16,6 +16,7 @@ import org.kde.plasma.plasma5support 2.0 as P5Support
 import org.kde.plasma.plasmoid
 
 import "AlarmLogic.js" as AlarmLogic
+import "FaviconLogic.js" as FaviconLogic
 import "HealLogic.js" as HealLogic
 import "PlaylistLogic.js" as PlaylistLogic
 
@@ -847,10 +848,17 @@ PlasmoidItem {
     // finishing late must not clobber entries added by a newer one.
     property var _favMap: ({})
     property var _favHashToUrl: ({})
+    // Favicon URLs whose CACHED file failed to decode this session. While
+    // marked, faviconSrc serves the remote URL instead — every consumer
+    // (list rows, the big art, the backdrop, the vinyl center) self-heals
+    // through this one map instead of each keeping its own broken-flag.
+    // Replaced as a whole object, same contract as _favMap.
+    property var _favBroken: ({})
 
     function faviconSrc(url) {
         var u = (url || "").toString();
         if (u === "") return "";
+        if (_favBroken[u]) return u;
         return _favMap[u] || u;
     }
 
@@ -875,16 +883,18 @@ PlasmoidItem {
             }
         }
         if (uuid === "") return;      // the settings page's ladder covers these
-        _rbFetch("/json/stations/byuuid/" + uuid, 5000, function(xhr) {
+        // encodeURIComponent: a hand-edited config uuid must stay a path
+        // SEGMENT, never reshape the path.
+        _rbFetch("/json/stations/byuuid/" + encodeURIComponent(uuid), 5000, function(xhr) {
             if (!xhr || xhr.status !== 200) return;
             var fav = "";
             try {
                 var row = (JSON.parse(xhr.responseText) || [])[0] || {};
-                fav = (row.favicon || "").toString();
+                // The one gate every favicon passes — catalog data is
+                // untrusted and this lands in Image.source and the config.
+                fav = FaviconLogic.webUrlOrEmpty(row.favicon);
             } catch (e) {}
-            // Same http(s) gate every favicon passes — catalog data is
-            // untrusted and this lands in an Image.source and the config.
-            if (!/^https?:\/\//i.test(fav)) return;
+            if (fav === "") return;
             for (var k = 0; k < stationsModel.count; k++) {
                 var sk = stationsModel.get(k);
                 if ((sk.hostname || "").toString() !== host) continue;
@@ -915,6 +925,27 @@ PlasmoidItem {
             }
         } catch (e) {}
     }
+    // A consumer decoded the CACHED copy and it errored: mark the URL so
+    // every faviconSrc binding falls back to the remote, and quarantine
+    // the corrupt file with the established negative-cache pattern (a
+    // fresh download becomes possible after the .fail window). Callers
+    // gate on "source was file://" — a failing REMOTE must not evict a
+    // possibly fine cached copy.
+    function faviconCacheBroken(url) {
+        var u = (url || "").toString();
+        if (u === "" || _favBroken[u]) return;
+        var local = _favMap[u];
+        if (local === undefined) return;
+        var m = {};
+        for (var k in _favBroken) m[k] = _favBroken[k];
+        m[u] = true;
+        _favBroken = m;
+        var p = local.toString().replace(/^file:\/\//, "").replace(/'/g, "'\\''");
+        executable.exec(": FAV_DROP; rm -f '" + p + "'; touch '" + p + ".fail'");
+    }
+
+    function monogramText(name) { return FaviconLogic.monogramText(name); }
+    function monogramHue(name) { return FaviconLogic.monogramHue(name); }
 
     function _favUrls() {
         const seen = {};
@@ -944,25 +975,155 @@ PlasmoidItem {
                         + 'for h in ' + Object.keys(hashToUrl).join(" ") + '; do [ -s "$d/$h" ] && echo "OK $h"; done; true');
         // Phase 2 — background: download the missing ones sequentially with an
         // atomic tmp+mv write (safe against two widget instances) and a
-        // file(1) mime check (an HTML error page must never be cached).
+        // file(1) mime check. The per-URL logic is ONE shell function —
+        // defined once, called per URL — so the quoting surface stays small.
+        // Two deliberate asymmetries in the failure handling:
+        //   * curl exit 6/7/28/35 (DNS, connect, timeout, TLS connect) does
+        //     NOT touch .fail — those are the machine's network, not the
+        //     host's answer, and a 24 h marker laid during an offline boot
+        //     used to defeat the network-up resync written for exactly that.
+        //   * the mime gate is a WHITELIST of formats Qt actually decodes:
+        //     "image/*" happily cached AVIF/HEIC that every consumer then
+        //     failed on, which read as "logo randomly missing".
         const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
         var cmd = ': FAV_SYNC; command -v curl >/dev/null 2>&1 || { echo __NO_CURL__; exit 0; }; '
                 + 'command -v file >/dev/null 2>&1 || { echo __NO_FILE__; exit 0; }; '
                 + 'd="${XDG_CACHE_HOME:-$HOME/.cache}/onair-favicons"; mkdir -p "$d" || exit 0; echo "DIR $d"; '
-                + 'find "$d" -type f -mtime +180 -delete 2>/dev/null; ';
+                + 'find "$d" -type f -mtime +180 -delete 2>/dev/null; '
+                + 'fetch() { f="$d/$1"; if [ -s "$f" ]; then echo "OK $1"; return; fi; '
+                + '[ -n "$(find "$f.fail" -mmin -1440 2>/dev/null)" ] && return; '
+                + 'if curl -sS --fail --proto \'=http,https\' -L --max-redirs 5 --connect-timeout 3 -m 10 --max-filesize 2097152 '
+                + '-A \'' + UA + '\' -o "$f.tmp.$$" --url "$2"; then '
+                + 'case "$(file -b --mime-type "$f.tmp.$$")" in '
+                + 'image/png|image/jpeg|image/gif|image/webp|image/bmp|image/x-ms-bmp|image/vnd.microsoft.icon|image/x-icon|image/svg+xml) '
+                + 'mv -f "$f.tmp.$$" "$f" && rm -f "$f.fail";; '
+                + '*) rm -f "$f.tmp.$$"; touch "$f.fail";; esac; '
+                + 'else rc=$?; rm -f "$f.tmp.$$"; case "$rc" in 6|7|28|35) ;; *) touch "$f.fail";; esac; fi; '
+                + '[ -s "$f" ] && echo "OK $1"; }; ';
         for (const u of urls) {
             const h = Qt.md5(u);
             const safeU = u.replace(/'/g, "'\\''");
-            cmd += 'f="$d/' + h + '"; if [ -s "$f" ]; then echo "OK ' + h + '"; else '
-                 + 'if [ -z "$(find "$f.fail" -mmin -1440 2>/dev/null)" ]; then '
-                 + 'curl -sS --fail --proto \'=http,https\' -L --max-redirs 5 --connect-timeout 3 -m 10 --max-filesize 2097152 '
-                 + '-A \'' + UA + '\' -o "$f.tmp.$$" --url \'' + safeU + '\' '
-                 + '&& [ "$(file -b --mime-type "$f.tmp.$$" | cut -d/ -f1)" = image ] '
-                 + '&& mv -f "$f.tmp.$$" "$f" && rm -f "$f.fail" '
-                 + '|| { rm -f "$f.tmp.$$"; touch "$f.fail"; }; fi; '
-                 + '[ -s "$f" ] && echo "OK ' + h + '"; fi; ';
+            cmd += "fetch " + h + " '" + safeU + "'; ";
         }
         executable.exec(cmd + 'true');
+    }
+
+    // ── Favicon backfill ─────────────────────────────────────────────────
+    // A station whose favicon field is EMPTY (the shipped defaults, a ⭐
+    // add from a catalog row without one, a hand-added entry) used to stay
+    // logo-less forever unless the user found the settings button. Ask the
+    // directory once per station per session — identity lookups only
+    // (byuuid, or a name search accepting an EXACT normalized match), the
+    // same class of request the heal ladder already declares is not a
+    // listen. All finds land in ONE config write; onServersChanged then
+    // runs syncFavicons, which caches the new logos as usual.
+    property var _favBackfillTried: ({})    // hostname → true, session-scoped
+    property var _favBackfillQueue: []
+    property bool _favBackfillBusy: false
+    property var _favBackfillFound: ({})    // hostname → gated favicon URL
+
+    Timer {
+        id: favBackfillTimer
+        // A beat after startup/config churn so the popup, the favicon sync
+        // and a possible settings session get the bus first.
+        interval: 12000
+        repeat: false
+        onTriggered: root._favBackfillStart()
+    }
+
+    function _favBackfillStart() {
+        if (_favBackfillBusy || !isConnected) return;
+        var rows;
+        try { rows = JSON.parse(Plasmoid.configuration.servers); } catch (e) { return; }
+        if (!Array.isArray(rows)) return;
+        var q = [];
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i] || {};
+            var host = (r.hostname || "").toString();
+            if (host === "" || _favBackfillTried[host]) continue;
+            if (FaviconLogic.webUrlOrEmpty(r.favicon) !== "") continue;
+            // Marked BEFORE any lookup fires — the tried-map is the only
+            // thing standing between onServersChanged and a lookup loop.
+            _favBackfillTried[host] = true;
+            q.push({ host: host, name: (r.name || "").toString(),
+                     uuid: (r.uuid || "").toString() });
+        }
+        if (q.length === 0) return;
+        _favBackfillQueue = q;
+        _favBackfillFound = {};
+        _favBackfillBusy = true;
+        _favBackfillNext();
+    }
+
+    function _favBackfillNext() {
+        var q = _favBackfillQueue;
+        if (q.length === 0) { _favBackfillCommit(); return; }
+        var st = q.shift();
+        var done = function(fav) {
+            if (fav !== "") {
+                var m = {};
+                for (var k in root._favBackfillFound) m[k] = root._favBackfillFound[k];
+                m[st.host] = fav;
+                root._favBackfillFound = m;
+            }
+            root._favBackfillNext();
+        };
+        if (st.uuid !== "") {
+            // Identity road: the catalog's own record for THIS station.
+            // encodeURIComponent: a hand-edited config uuid must stay a
+            // path SEGMENT, never reshape the path.
+            _rbFetch("/json/stations/byuuid/" + encodeURIComponent(st.uuid), 5000, function(xhr) {
+                var fav = "";
+                try {
+                    var row = (JSON.parse(xhr.responseText) || [])[0] || {};
+                    fav = FaviconLogic.webUrlOrEmpty(row.favicon);
+                } catch (e) {}
+                done(fav);
+            });
+            return;
+        }
+        var norm = HealLogic.normName(st.name);
+        if (norm === "") { done(""); return; }
+        _rbFetch("/json/stations/search?name=" + encodeURIComponent(st.name)
+                 + "&limit=10&order=votes&reverse=true", 5000, function(xhr) {
+            var fav = "";
+            try {
+                var rows = JSON.parse(xhr.responseText) || [];
+                fav = FaviconLogic.pickFavicon(rows, norm, HealLogic.normName);
+            } catch (e) {}
+            done(fav);
+        });
+    }
+
+    function _favBackfillCommit() {
+        _favBackfillBusy = false;
+        var found = _favBackfillFound;
+        var any = false;
+        for (var k in found) { any = true; break; }
+        if (!any) return;
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            var changed = false;
+            for (var i = 0; i < servers.length; i++) {
+                var host = (servers[i].hostname || "").toString();
+                var fav = found[host];
+                if (fav === undefined) continue;
+                // Fill EMPTY only — a favicon the user (or a heal) set in
+                // the meantime outranks the directory's suggestion.
+                if (FaviconLogic.webUrlOrEmpty(servers[i].favicon) !== "") continue;
+                servers[i].favicon = fav;
+                changed = true;
+            }
+            if (!changed) return;
+            var out = JSON.stringify(servers);
+            // Value-identical bail BEFORE arming the flag: a skipped config
+            // write never fires serversChanged, and an armed keep-playing
+            // flag would eat the stop of the next real add/remove (the
+            // _rbStoreUuid trap, documented there).
+            if (out === Plasmoid.configuration.servers) return;
+            _reorderKeepPlaying = true;
+            Plasmoid.configuration.servers = out;
+        } catch (e) {}
     }
 
     // The cold-boot race is the root cause of "logos gone after login": the
@@ -971,6 +1132,7 @@ PlasmoidItem {
     onIsConnectedChanged: {
         if (!isConnected) return;
         syncFavicons();
+        favBackfillTimer.restart();
         // The network came back while the standing order holds — resume
         // without being asked. The settle delay covers DNS and the captive
         // little moments a link needs after it claims to be up.
@@ -1954,8 +2116,11 @@ PlasmoidItem {
             const stName = (name || url).toString();
             // The radio-browser uuid rides along from the search result — it
             // is the station's identity for clicks/votes, free at add time.
+            // The one gate every persisted favicon passes: file://, data:
+            // and scheme-less strings become "" (the backfill then fills).
             servers.push({ "active": true, "hostname": url, "name": stName,
-                           "favicon": favicon || "", "uuid": rbUuid || "" });
+                           "favicon": FaviconLogic.webUrlOrEmpty(favicon),
+                           "uuid": rbUuid || "" });
             // This triggers onServersChanged → reloadStationsModel (stop + reload),
             // so we continue only after an event-loop cycle.
             Plasmoid.configuration.servers = JSON.stringify(servers);
@@ -2936,7 +3101,14 @@ PlasmoidItem {
         _healPendingUrl = "";
         _healOrigUrl = "";
         _healByUuid = false;
+        _healPendingFavicon = "";
     }
+
+    // The favicon the byuuid heal answer carried, gated — travels with the
+    // audition so a successful commit can refresh a stale logo alongside
+    // the address. Identity-proven rung only: a name-search candidate's
+    // logo never overwrites anything.
+    property string _healPendingFavicon: ""
 
     Timer {
         id: healTimer
@@ -3003,7 +3175,8 @@ PlasmoidItem {
                 if (root._healRun && root._healRun.seq === mySeq
                     && cand !== "" && /^https?:\/\//i.test(cand)
                     && cand !== orig && ok)
-                    root._healRun.candidates.push({ url: cand, byUuid: true });
+                    root._healRun.candidates.push({ url: cand, byUuid: true,
+                        favicon: FaviconLogic.webUrlOrEmpty(row.favicon) });
                 _healAdvance();
             });
             return;
@@ -3089,6 +3262,7 @@ PlasmoidItem {
             root._healOrigUrl = run.orig;
             root._healPendingUrl = playUrl;
             root._healByUuid = next.byUuid === true;
+            root._healPendingFavicon = (next.favicon || "").toString();
             root._currentOrigUrl = run.orig;
             root._currentUnwrappedUrl = playUrl;
             root._currentResolvedUrl = playUrl;
@@ -3133,6 +3307,7 @@ PlasmoidItem {
         var newUrl = _healPendingUrl;
         var oldUrl = _healOrigUrl;
         var byUuid = _healByUuid;
+        var newFav = _healPendingFavicon;
         _healClearPending();
         // The generation found its door — the ladder and the backoff die.
         root._healRun = null;
@@ -3165,6 +3340,17 @@ PlasmoidItem {
                 root._currentOrigUrl = newUrl;
                 root._currentUnwrappedUrl = newUrl;
                 root._currentResolvedUrl = newUrl;
+                // A station that moved usually leaves its old logo host
+                // behind too. Refresh the favicon in the SAME write — but
+                // only from the identity-proven rung, and only over a logo
+                // that is empty or lived on the dead old domain; a working
+                // hand-picked logo is never clobbered.
+                if (newFav !== "" && byUuid
+                    && (FaviconLogic.webUrlOrEmpty(servers[i].favicon) === ""
+                        || _baseDomain(_hostOf(servers[i].favicon)) === oldBase)) {
+                    servers[i].favicon = newFav;
+                    root.currentStationFavicon = newFav;
+                }
                 var stName = servers[i].name || "";
                 // A pure address swap — the reload must not stop playback.
                 _reorderKeepPlaying = true;
@@ -3197,6 +3383,11 @@ PlasmoidItem {
             root._currentOrigUrl = newUrl;
             root._currentUnwrappedUrl = newUrl;
             root._currentResolvedUrl = newUrl;
+            // Same favicon courtesy as the saved list, same identity bar.
+            if (newFav !== "" && byUuid) {
+                root._orphanOrder.favicon = newFav;
+                root.currentStationFavicon = newFav;
+            }
         }
     }
 
@@ -4016,7 +4207,8 @@ PlasmoidItem {
             station: root.currentStation,
             artist: root.trackArtist,
             title: root.trackTitle,
-            art: root.albumArtUrl || root.imageurl || "",
+            art: root.albumArtUrl || root.imageurl
+                 || root.faviconSrc(root.currentStationFavicon) || "",
             volume: playMusicOutput.volume,
             canGoNext: stationsModel.count > 1,
             canGoPrevious: stationsModel.count > 1,
@@ -4147,6 +4339,7 @@ PlasmoidItem {
         _schedApplyTzChange(Date.now());
         _alarmArmInhibit();
         syncFavicons();
+        favBackfillTimer.restart();
         playMusicOutput.volume = targetVolume();
         _mprisStart();
         castProbe();
@@ -4213,6 +4406,10 @@ PlasmoidItem {
                 reloadStationsModel();
             }
             syncFavicons();
+            // A just-added station may have arrived without a favicon —
+            // give the backfill a look. Loop-safe: the backfill's own
+            // write finds every hostname already in the tried-map.
+            favBackfillTimer.restart();
         }
         function onFavoritesChanged() {
             favoriteNames = parseFavorites(Plasmoid.configuration.favorites);

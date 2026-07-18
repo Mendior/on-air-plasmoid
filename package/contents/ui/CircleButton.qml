@@ -28,6 +28,9 @@ Item {
     property string tooltipText: ""
     // 2026: soft pulsing ring (e.g. the play button while playback is active)
     property bool glowPulse: false
+    // Read-only hover state for callers (e.g. the station row resurfaces
+    // its position number while a reorder arrow is hovered).
+    readonly property bool hovered: pressArea.containsMouse
 
     signal clicked()
 

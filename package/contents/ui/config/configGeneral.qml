@@ -117,6 +117,15 @@ KCM.ScrollViewKCM {
         try { t.stop(); t.destroy() } catch(e) {}
     }
 
+    // A logo source that is small by construction: bare /favicon.ico, an
+    // explicit 16/32-pixel variant, or the Google s2 service (64 px). Worth
+    // one upgrade attempt when the user asks for logos — a 16 px icon
+    // upscaled into the popup's cover panel reads as "broken logo".
+    function _tinyLogoUrl(u) {
+        return /(?:^|\/)favicon\.ico(?:$|\?)|favicon-(?:16|32)x(?:16|32)|google\.com\/s2\/favicons/i
+               .test(String(u || ""));
+    }
+
     function fetchMissingLogos() {
         if (_logoFetching)
             return;
@@ -127,6 +136,15 @@ KCM.ScrollViewKCM {
             if (fav === "" || fav === "null") {
                 _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
                                   "uuid": (it.uuid || "").toString() });
+            } else if (_tinyLogoUrl(fav)) {
+                // Upgrade job: hunt for a bigger variant, but never replace
+                // the working tiny logo with another tiny one or with itself
+                // (_probeNextCandidate filters those), and keep it whole
+                // when nothing better answers (_saveLogo only writes wins).
+                // The uuid rides along so upgrades take the identity road.
+                _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
+                                  "uuid": (it.uuid || "").toString(),
+                                  "upgrade": true, "oldFavicon": fav });
             }
         }
         _logoTotal = _logoQueue.length;
@@ -547,6 +565,12 @@ KCM.ScrollViewKCM {
     }
 
     function _probeNextCandidate(job, candidates, idx) {
+        // An upgrade hunt only considers candidates that would actually be
+        // an upgrade: the current tiny URL itself and the tiny-class
+        // sources (bare favicon.ico, 16/32 px variants, Google s2) are
+        // filtered out once, before the first probe.
+        if (job.upgrade === true && idx === 0)
+            candidates = candidates.filter(c => !_tinyLogoUrl(c) && c !== job.oldFavicon);
         if (idx >= candidates.length) {
             _logoDone++;
             _fetchNextLogo();
@@ -841,7 +865,16 @@ KCM.ScrollViewKCM {
         onAccepted: {
             const nameClean = serverName.text.trim();
             const hostClean = serverHostname.text.trim();
-            const faviconClean = serverFavicon.text.trim();
+            // Normalize the logo field: a scheme-less "host.tld/path" gets
+            // the courtesy https://, then everything passes the same
+            // http(s)-or-empty gate every other favicon road uses — file://,
+            // data: and "null" persist as "" (which the runtime backfill
+            // and the auto-lookup below then fill).
+            let faviconClean = serverFavicon.text.trim();
+            if (faviconClean !== "" && !/^[a-z][a-z0-9+.-]*:/i.test(faviconClean)
+                && /^[^\/\s]+\.[^\s]+/.test(faviconClean))
+                faviconClean = "https://" + faviconClean;
+            faviconClean = _webUrlOrEmpty(faviconClean);
             if (hostClean === "") return;
             let itemObject;
             if (dialogMode === -1) {
@@ -865,6 +898,21 @@ KCM.ScrollViewKCM {
                 stationsModel.set(dialogMode, itemObject);
             }
             cfg_servers = JSON.stringify(getServersArray());
+            // A station saved without a logo gets one looked up right away —
+            // the same ladder as "Fetch missing logos", one row only. The
+            // user is present (they just pressed OK), so the deep road
+            // including the homepage scrape is appropriate here.
+            if (itemObject.favicon === "" && !_logoFetching) {
+                const rowIdx = dialogMode === -1 ? stationsModel.count - 1 : dialogMode;
+                _logoQueue = [{ "index": rowIdx, "name": itemObject.name,
+                                "hostname": itemObject.hostname }];
+                _logoTotal = 1;
+                _logoDone = 0;
+                _logoFound = 0;
+                _logoFetching = true;
+                _pickApiServer();
+                _fetchNextLogo();
+            }
         }
 
         ColumnLayout {
@@ -967,6 +1015,11 @@ KCM.ScrollViewKCM {
                     const servers = JSON.parse(formattedText);
                     stationsModel.clear();
                     for (const srv of servers) {
+                        // Imports were the last road into the config without
+                        // the favicon gate — an .arp written by hand (or by
+                        // an older version) could carry file://, data: or
+                        // "null" straight into Image.source and the shell.
+                        srv.favicon = _webUrlOrEmpty(srv.favicon);
                         stationsModel.append(srv);
                     }
                     cfg_servers = JSON.stringify(getServersArray());

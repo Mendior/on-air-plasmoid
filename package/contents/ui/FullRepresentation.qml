@@ -1297,6 +1297,17 @@ PlasmaExtras.Representation {
                                         m[k] = true
                                     m[source.toString()] = true
                                     fullRepresentation._brokenArtUrls = m
+                                    // A corrupt CACHED favicon: mark it in the
+                                    // central map too, so _bestArtUrl gets one
+                                    // more try at the REMOTE favicon instead of
+                                    // dead-ending on the same broken file. The
+                                    // identity check matters: albumArtUrl can be
+                                    // a file:// sidecar cover — a stale one
+                                    // failing here must not get the STATION's
+                                    // healthy cache file deleted in its name.
+                                    if (source.toString().indexOf("file://") === 0
+                                        && source.toString() === root.faviconSrc(root.currentStationFavicon))
+                                        root.faviconCacheBroken(root.currentStationFavicon)
                                 }
                             }
 
@@ -1371,26 +1382,21 @@ PlasmaExtras.Representation {
                                 color: "transparent"
                                 clip: true
                                 Image {
+                                    id: vinylCenterLogo
                                     anchors.fill: parent
-                                    // Disk-cached copy when available. The self-heal must not
-                                    // assign source imperatively — that destroys the binding
-                                    // and pins this logo until the popup is rebuilt.
-                                    property string brokenCacheFor: ""
-                                    source: {
-                                        var fav = root.currentStationFavicon
-                                        return (fav && fav === brokenCacheFor) ? fav : root.faviconSrc(fav)
-                                    }
+                                    // Disk-cached copy when available. Self-heal goes
+                                    // through the central _favBroken map (faviconSrc
+                                    // then serves the remote), so the binding stays
+                                    // declarative and station changes keep working.
+                                    source: root.faviconSrc(root.currentStationFavicon)
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
                                     smooth: true
                                     visible: status === Image.Ready
-                                    // Self-healing: corrupted cache → retry remote once
-                                    // (flag flips the binding to the remote URL, so it
-                                    // stays declarative and station changes keep working)
                                     onStatusChanged: {
                                         if (status === Image.Error && root.currentStationFavicon
                                             && source.toString().indexOf("file://") === 0) {
-                                            brokenCacheFor = root.currentStationFavicon
+                                            root.faviconCacheBroken(root.currentStationFavicon)
                                         }
                                     }
                                     layer.enabled: true
@@ -1402,6 +1408,23 @@ PlasmaExtras.Representation {
                                             }
                                         }
                                     }
+                                }
+
+                                // Record-label monogram: a station with no
+                                // obtainable logo still gets a face in the most
+                                // looked-at spot. The vinyl center is always
+                                // dark (#1f1f1f), so the ink uses the dark-side
+                                // pair regardless of the desktop theme.
+                                PlasmaComponents3.Label {
+                                    anchors.centerIn: parent
+                                    readonly property string mono: root.monogramText(root.currentStation)
+                                    text: mono
+                                    visible: mono !== "" && vinylCenterLogo.status !== Image.Ready
+                                    color: Qt.hsla(root.monogramHue(root.currentStation) / 360,
+                                                   0.55, 0.82, 1)
+                                    font.weight: Font.DemiBold
+                                    font.letterSpacing: 1
+                                    font.pixelSize: parent.width * (mono.length > 1 ? 0.30 : 0.38)
                                 }
                             }
                         }
