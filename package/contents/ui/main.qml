@@ -3163,7 +3163,9 @@ PlasmoidItem {
         // entries and as the uuid road's fallback.
         var stUuid = (st.uuid || "").toString();
         if (stUuid !== "") {
-            _rbFetch("/json/stations/byuuid/" + stUuid, 5000, function(uxhr) {
+            // encodeURIComponent: same invariant as the backfill and the
+            // self-heal — a hand-edited uuid stays a path SEGMENT.
+            _rbFetch("/json/stations/byuuid/" + encodeURIComponent(stUuid), 5000, function(uxhr) {
                 if (mySeq !== _healSeq) return;
                 if (isPlaying() || _orderSubject() === null) return;
                 var cand = "", ok = false;
@@ -3631,6 +3633,9 @@ PlasmoidItem {
     function stopWithFade() {
         infoTimer.stop();
         connectWatchdog.stop();
+        // A stop DURING a stall must retire the stall clock too — its
+        // pending retry would restart the stream the user just silenced.
+        stallTimer.stop();
         // An explicit stop cancels the standing order — every automatic
         // recovery road (retry backoff, network-back resume) dies with it.
         root._wantsPlaying = false;
@@ -4524,9 +4529,16 @@ PlasmoidItem {
                         continue;
                     }
                     var prt = parseInt(p[5], 10);
+                    // Name and model are LAN-supplied display text: strip
+                    // markup metacharacters at the door (same rule the
+                    // search chips apply) so a hostile beacon's name can
+                    // never read as rich text anywhere it is shown.
                     var dev = {
-                        "kind": p[1], "uuid": p[2], "name": p[3], "host": p[4],
-                        "port": isNaN(prt) ? 8009 : prt, "deviceModel": p[6],
+                        "kind": p[1], "uuid": p[2],
+                        "name": (p[3] || "").replace(/[<>&]/g, ""),
+                        "host": p[4],
+                        "port": isNaN(prt) ? 8009 : prt,
+                        "deviceModel": (p[6] || "").replace(/[<>&]/g, ""),
                         "location": p.length > 7 ? p[7] : ""
                     };
                     seenUuids[dev.uuid] = true;
@@ -4621,7 +4633,9 @@ PlasmoidItem {
                         "mac": btp[1], "connected": btp[2] === "yes",
                         // A tab INSIDE the alias splits into extra fields —
                         // rejoin them so the name survives (tabs as spaces).
-                        "name": btp.slice(3).join(" ").trim() || btp[1]
+                        // Markup metacharacters stripped: the alias is
+                        // device-supplied display text.
+                        "name": btp.slice(3).join(" ").trim().replace(/[<>&]/g, "") || btp[1]
                     });
                 }
                 if (root._btListAgain) {
@@ -4705,7 +4719,7 @@ PlasmoidItem {
                     var fp = fLines[fi].split("\t");
                     if (fp.length < 3 || !_btValidMac(fp[1])) continue;
                     btFoundModel.append({ "mac": fp[1],
-                        "name": fp.slice(2).join(" ").trim() || fp[1] });
+                        "name": fp.slice(2).join(" ").trim().replace(/[<>&]/g, "") || fp[1] });
                 }
                 return;
             }

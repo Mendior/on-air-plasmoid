@@ -857,6 +857,30 @@ Item {
             }
             var refV;
             try { refV = JSON.parse(cfg.syncRefLatMap || "{}")[rlM[2]]; } catch (e) {}
+            if (refV !== undefined && Math.abs(rlMs - refV) > 300) {
+                // A LARGE move needs a second opinion: a codec switch can
+                // read seconds-deep for a beat before the transport settles,
+                // and acting on that transient would have the corrector
+                // itself throw the room audibly out for a rebuild cycle.
+                // Two consecutive readings within 100 ms of each other make
+                // it real; the retry probe is armed only on FIRST sight, so
+                // an oscillating transport cannot turn this into a drumbeat.
+                var pend = _refLatPending[rlM[2]];
+                if (pend === undefined || Math.abs(pend - rlMs) > 100) {
+                    var mp = {};
+                    for (var kp in _refLatPending) mp[kp] = _refLatPending[kp];
+                    mp[rlM[2]] = rlMs;
+                    _refLatPending = mp;
+                    if (pend === undefined) refLatProbeTimer.restart();
+                    return true;
+                }
+            }
+            if (_refLatPending[rlM[2]] !== undefined) {
+                var mc = {};
+                for (var kc in _refLatPending)
+                    if (kc !== rlM[2]) mc[kc] = _refLatPending[kc];
+                _refLatPending = mc;
+            }
             if (refV === undefined) {
                 // Calibrated before this mechanism existed: adopt the
                 // current reading as the reference — future re-rolls
@@ -1253,6 +1277,8 @@ Item {
     // report silently (no clicks, no interruption) and the rebuild applies
     // the shift, so "fine yesterday, doubled today" corrects itself.
     property var _refLatShiftByMac: ({})
+    // A large reading waiting for its confirming twin (mac → ms).
+    property var _refLatPending: ({})
 
     function _lagForSink(sinkId) {
         var mac = _btMacOfSink(sinkId);
@@ -2283,11 +2309,18 @@ Item {
             _btKickMac = _btJoinWatchMac;
             _btKickAbort = false;
             _btKickInFlight = true;
+            var kickMacU = _btJoinWatchMac.replace(/:/g, "_");
             app.exec(": BT_KICK " + _btJoinWatchMac
-                + "; c=bluez_card." + _btJoinWatchMac.replace(/:/g, "_")
+                + "; c=bluez_card." + kickMacU
+                // Remember the profile that was active — if BOTH standard
+                // A2DP names fail after the off, restoring it is the last
+                // resort that keeps the card from being left dead on "off".
+                + "; p=$(pactl list cards | awk '/Name: bluez_card." + kickMacU + "/{f=1}"
+                + " f && /Active Profile:/{print $3; exit}')"
                 + "; timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
                 + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
-                + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1; true"
+                + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
+                + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true"
                 + " # " + app.nextSeq());
         }
         if (_btJoinWatchTicks >= 15) {

@@ -1139,6 +1139,23 @@ Item {
             compare(JSON.parse(r.cfg.syncRefLatMap)["AA:BB:CC:DD:EE:FF"], 400);
         }
 
+        function test_reflat_large_shift_needs_a_confirming_twin() {
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 300 }),
+                          syncRefLatMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 250 }) });
+            activate(r);
+            // A codec-switch transient reads seconds-deep ONCE — a single
+            // large reading must never move the room.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 2300000\n", "");
+            compare(r.e._lagForSink(btSink), 300);
+            // A contradicting follow-up replaces the pending one; still hold.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 900000\n", "");
+            compare(r.e._lagForSink(btSink), 300);
+            // The confirming twin (within 100 ms) makes it real.
+            r.e.handleExec(": PW_REFLAT S " + btMac + "; x", "REFLAT 910000\n", "");
+            compare(r.e._lagForSink(btSink), 960);   // 300 + (910 − 250)
+        }
+
         function test_reflat_without_reference_adopts_and_stays_put() {
             var r = rig([dev(wired), dev(btSink)],
                         { syncOffsetMap: JSON.stringify({ "AA:BB:CC:DD:EE:FF": 300 }) });

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Review round on 2026.20, all four nits closed.** Device names arriving from the LAN or over Bluetooth are stripped of markup metacharacters before they reach any list (a hostile beacon's name can never read as rich text); the deleted-station heal's identity lookup encodes its uuid like its two siblings already did; a stop pressed during a stall retires the stall clock too, so its pending retry cannot restart the silenced stream; and a single seconds-deep Bluetooth latency reading (a codec-switch transient) can no longer move the room — a large shift now needs two concordant readings before the sync recompensates. Also: the watchdog's profile bounce restores the previous profile if both standard A2DP names fail (the card can never be left dead on "off"), and monogram initials now speak Greek, Cyrillic, Hebrew, Arabic, kana, CJK and Hangul.
+
 ## 2026.20
 
 The morning-after release: the sync corrects itself silently, a stubborn speaker can no longer lose its pairing, every station wears a face, and the two alarm edges the audit deferred are closed for real. Root-caused with a microphone, not a hunch — the measurements are in the commit messages.

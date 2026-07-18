@@ -52,7 +52,11 @@ function monogramText(name) {
     var toks = s.split(/\s+/);
     var cleaned = [];
     for (var i = 0; i < toks.length; i++) {
-        var t = toks[i].replace(/^[^0-9A-Za-zÀ-ɏЀ-ӿ]+/, "");
+        // Letters of the scripts station names actually come in: Latin
+        // (with its extensions), Cyrillic, Greek, Hebrew, Arabic, kana,
+        // CJK, Hangul — a Greek or Japanese station deserves its initials
+        // exactly as much as an Estonian one.
+        var t = toks[i].replace(/^[^0-9A-Za-zÀ-ɏЀ-ӿͰ-Ͽ֐-׿؀-ۿ぀-ヿ一-鿿가-힯]+/, "");
         if (t !== "") cleaned.push(t);
     }
     if (cleaned.length === 0) return "";

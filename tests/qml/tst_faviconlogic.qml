@@ -86,6 +86,13 @@ TestCase {
         compare(FL.monogramText("Õhtune Ärikanal"), "ÕÄ")
     }
 
+    function test_monogram_speaks_other_scripts() {
+        compare(FL.monogramText("Ελληνικό Ράδιο"), "ΕΡ")     // Greek
+        compare(FL.monogramText("Радио Маяк"), "РМ")          // Cyrillic
+        compare(FL.monogramText("東京 FM"), "東F")             // CJK + Latin
+        compare(FL.monogramText("ラジオ"), "ラジ")             // kana, one token
+    }
+
     function test_monogram_strips_leading_punctuation() {
         compare(FL.monogramText("«Radio» +Nova"), "RN")
         compare(FL.monogramText("...Beat FM"), "BF")
