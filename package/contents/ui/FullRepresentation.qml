@@ -225,6 +225,13 @@ PlasmaExtras.Representation {
             && _countryCodeOf(q) === "") {
             var stems = SearchLogic.stems(q)
             if (stems.length > 0) {
+                // The word pass froze the cap at count+1 to retire its own
+                // "Show more" — but with ZERO rows found that freeze is 1,
+                // and the stem retry about to run would append exactly one
+                // row and stop: 'raadio elmari' showed a single result
+                // where the directory had thirty. An empty pass has nothing
+                // to protect — the stems start with the full page again.
+                fullRepresentation.webResultCap = 30
                 _webStemChain(q, stems, 0, seq, tail)
                 return
             }
@@ -1677,8 +1684,15 @@ PlasmaExtras.Representation {
                             if (previewing) {
                                 // The uuid rides along: a station saved
                                 // without its directory identity can only
-                                // ever be healed by name-guessing.
-                                root.addStationToList(root.currentStation, root._previewUrl,
+                                // ever be healed by name-guessing. And the
+                                // LIVE address is what gets saved — after a
+                                // rescue rung the row's own url is the dead
+                                // one, and starring it used to persist a
+                                // corpse that errored seconds after a
+                                // perfectly good listen.
+                                root.addStationToList(root.currentStation,
+                                                      root._currentUnwrappedUrl !== ""
+                                                      ? root._currentUnwrappedUrl : root._previewUrl,
                                                       root.currentStationFavicon, true,
                                                       root._previewUuid)
                             } else {

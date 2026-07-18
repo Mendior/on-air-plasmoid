@@ -382,6 +382,12 @@ PlasmoidItem {
     // The row's RAW submitted url — a late retry rung when the crawler's
     // url_resolved has rotted but the station itself still lives.
     property string _previewRawUrl: ""
+    // Attempt generation — every ladder callback matches it, so a re-click
+    // of the same row (same URL!) orphans the old attempt's in-flight rungs.
+    property int _previewSeq: 0
+    // One byuuid lookup per attempt. A flag, not a cleared uuid: the uuid is
+    // the row's IDENTITY and the Now Playing star saves it.
+    property bool _previewIdRetried: false
     // One name-search rescue per preview: the directory often lists the
     // same station twice — one entry pointing at a dead mount its checker
     // last reached months ago, one at wherever the station streams today.
@@ -451,6 +457,14 @@ PlasmoidItem {
         }
         root._previewUrl = url;
         root._previewUuid = rbUuid || "";
+        // Attempt generation: the ladder's identity guard compares URLs, but
+        // a re-click of the SAME row starts a fresh attempt under the same
+        // URL — the old attempt's in-flight callbacks (byuuid across slow
+        // mirrors, the name rescue) would pass a URL-only guard and play
+        // their stale answer right over the fresh one. Every ladder callback
+        // must match the generation too.
+        root._previewSeq++;
+        root._previewIdRetried = false;
         // The row's RAW url is the retry ladder's last rung: url_resolved
         // is a crawler artifact that can go stale while the station's own
         // submitted address (often a playlist) still answers.
@@ -475,25 +489,27 @@ PlasmoidItem {
     // staring at silence with no retry and no honest word.
     function _previewRetryByIdentity() {
         if (root._previewUrl === "") return;
-        var pvUuid = root._previewUuid;
-        root._previewUuid = "";
         var pvName = root.currentStation;
         var pvIcon = root.currentStationFavicon;
         // _previewUrl KEEPS the original address: the result row's
         // "is previewing" marker compares against it, and the fresh
         // address plays under the row's identity. The guard checks
-        // identity, not emptiness — the directory can take many
-        // seconds across mirrors, and by then the user may be
-        // previewing the NEXT result; the old retry must not hijack
-        // that with yesterday's station.
+        // identity AND generation — the directory can take many seconds
+        // across mirrors, and by then the user may be previewing the NEXT
+        // result or have re-clicked THIS one; the old ladder must not
+        // hijack either with yesterday's answer.
         var pvKey = root._previewUrl;
+        var pvSeq = root._previewSeq;
+        var live = function() {
+            return root._previewSeq === pvSeq && root._previewUrl === pvKey;
+        };
         // The retry rungs play a FRESH address via startWithFade, which does
         // not touch the resolved-URL trio (only _playStation/heal do). Left
         // stale, _castStreamUrl would hand a cast device the dead pre-retry
         // URL — total silence a second after a live stream was playing. This
         // keeps the trio pointing at whatever is actually on the speakers.
         var pvPlay = function(playUrl) {
-            if (root._previewUrl !== pvKey) return;
+            if (!live()) return;
             root._currentUnwrappedUrl = playUrl;
             root._currentResolvedUrl = playUrl;
             startWithFade({ "name": pvName, "hostname": playUrl,
@@ -505,21 +521,25 @@ PlasmoidItem {
         // sees it fine) must not leave the listener staring at a backend
         // growl.
         var tryRaw = function() {
-            if (root._previewUrl !== pvKey) return;
+            if (!live()) return;
             var raw = root._previewRawUrl;
             root._previewRawUrl = "";
             if (raw !== "" && raw !== pvKey) {
                 _unwrapPlaylist(raw, pvPlay);
                 return;
             }
-            _previewNameRescue(pvKey, pvName, pvIcon);
+            _previewNameRescue(pvKey, pvName, pvIcon, pvSeq);
         };
-        // byuuid, not /url: the lookup must not count a listener
-        // click for a stream that just refused to play (and
-        // reportClicks may be off — a retry is not a listen).
-        if (pvUuid === "") { tryRaw(); return; }
-        _rbFetch("/json/stations/byuuid/" + pvUuid, 4000, function(xhr) {
-            if (root._previewUrl !== pvKey) return; // stopped or moved on
+        // byuuid, not /url: the lookup must not count a listener click for
+        // a stream that just refused to play (and reportClicks may be off —
+        // a retry is not a listen). One shot per attempt, marked by a FLAG:
+        // the uuid itself stays, because it is the row's identity — the
+        // Now Playing star saves it, and clearing it here used to persist
+        // rescued stations with a dead URL and no identity to heal by.
+        if (root._previewUuid === "" || root._previewIdRetried) { tryRaw(); return; }
+        root._previewIdRetried = true;
+        _rbFetch("/json/stations/byuuid/" + root._previewUuid, 4000, function(xhr) {
+            if (!live()) return; // stopped, moved on, or re-clicked
             var fresh = "";
             try {
                 var pvRow = (JSON.parse(xhr.responseText) || [])[0] || {};
@@ -541,10 +561,10 @@ PlasmoidItem {
     // the same stations sit in the same directory again under their new
     // host. HealLogic ranks candidates exactly like the list-station heal:
     // exact name beats contains, the station's own base domain beats both.
-    function _previewNameRescue(pvKey, pvName, pvIcon) {
-        if (root._previewUrl !== pvKey) return;
+    function _previewNameRescue(pvKey, pvName, pvIcon, pvSeq) {
+        if (root._previewSeq !== pvSeq || root._previewUrl !== pvKey) return;
         if (root._previewRescueSpent) {
-            _previewRescueAudition(pvKey, pvName, pvIcon);
+            _previewRescueAudition(pvKey, pvName, pvIcon, pvSeq);
             return;
         }
         root._previewRescueSpent = true;
@@ -552,7 +572,7 @@ PlasmoidItem {
         _rbFetch("/json/stations/search?name=" + encodeURIComponent(pvName)
                  + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
-            if (root._previewUrl !== pvKey) return;
+            if (root._previewSeq !== pvSeq || root._previewUrl !== pvKey) return;
             var ranked = [];
             if (xhr && xhr.status === 200) {
                 try {
@@ -582,25 +602,30 @@ PlasmoidItem {
             // almost always near the top, and a preview must not spend a
             // minute chewing through a famous name's thirty entries.
             root._previewRescueCands = ranked.slice(0, 4);
-            _previewRescueAudition(pvKey, pvName, pvIcon);
+            _previewRescueAudition(pvKey, pvName, pvIcon, pvSeq);
         });
     }
 
     // Play the next rescue candidate, or say the honest word when the
     // ladder is empty. Each audition that fails routes back here through
     // the ordinary preview failure roads.
-    function _previewRescueAudition(pvKey, pvName, pvIcon) {
-        if (root._previewUrl !== pvKey) return;
+    function _previewRescueAudition(pvKey, pvName, pvIcon, pvSeq) {
+        if (root._previewSeq !== pvSeq || root._previewUrl !== pvKey) return;
         var cands = root._previewRescueCands;
         if (!cands || cands.length === 0) {
+            // The honest word must be SEEN: it often finishes minutes of
+            // asynchronous rungs after the 5 s error window closed, and a
+            // sentence set into a hidden status line was never said at all.
             root._friendlyError = i18n("The station did not answer — it may be offline or not available in your country. Try another result.");
+            isError = true;
+            errorTimer.restart();
             return;
         }
         var next = cands.shift();
         root._previewRescueCands = cands;
         console.log("[ARP] preview rescue: auditioning " + next + " for dead " + pvKey);
         _unwrapPlaylist(next, function(playUrl) {
-            if (root._previewUrl !== pvKey) return;
+            if (root._previewSeq !== pvSeq || root._previewUrl !== pvKey) return;
             // Keep the resolved-URL trio on the live rescue address, so a
             // cast started during the rescue pushes what is actually playing.
             root._currentUnwrappedUrl = playUrl;
@@ -3210,6 +3235,7 @@ PlasmoidItem {
         root._previewUrl = "";
         root._previewUuid = "";
         root._previewRawUrl = "";
+        root._previewSeq++;
         root._friendlyError = "";
         // An explicit stop also cancels a heal audition in flight — "stop
         // must never start playback" applies to healing too.
