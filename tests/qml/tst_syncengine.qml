@@ -221,6 +221,50 @@ Item {
             compare(r3.cfg.combineWanted, false);         // wish cleared
         }
 
+        function test_resurrect_draws_the_same_generation_boundary_as_disable() {
+            // A rebuild in flight when the sink dies acks as stale and keeps
+            // its hands off the flags — the resurrect must reset them itself
+            // or every later rebuild parks behind an ack that never comes.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._combineReloopBusy = true;
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(btSink), dev("onair_combined_7")] };
+            r.e.onOutputsChanged();
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(btSink)] };
+            r.e.onOutputsChanged();
+            verify(!r.e._combineReloopBusy);
+            verify(!r.e._combineReloopPending);
+        }
+
+        function test_disable_mid_measurement_does_not_remember_the_park() {
+            // The verify parks the master at 100% for the clicks; a disable
+            // landing inside that window must not write the PARK into
+            // combineMasterPct — the next enable would ramp to a blast.
+            var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 40 });
+            activate(r);
+            r.e._verifyPending = true;
+            r.e._verifyArmTimers();
+            r.e.combineOutputsDisable();
+            var un = "";
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_UNCOMBINE_DONE;") === 0) un = r.mock.execLog[i];
+            verify(un !== "");
+            verify(un.indexOf("MASTER") === -1);        // nothing to remember
+            compare(r.cfg.combineMasterPct, 40);        // the real level stands
+        }
+
+        function test_the_verify_union_is_consumed_on_use() {
+            // Last evening's frozen member set must not ride along in a later
+            // cancel's unmute — the user may have silenced a speaker on
+            // purpose since, and a clicks-phase cancel never muted anything.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._verifyPending = true;
+            r.e._verifyArmTimers();
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", "VERIFY_OK 3\n", "");
+            compare(r.e._verifyMembers.length, 0);
+        }
+
         function test_the_park_survives_a_logout_in_a_restore_file() {
             // A logout SIGTERMs the whole cgroup — the in-shell restore
             // never runs and the next session would play every speaker at
@@ -231,7 +275,7 @@ Item {
             r.e.calibrateSync();
             var cal = r.mock.execLog[r.mock.execLog.length - 1];
             verify(cal.indexOf("onair_park_7.sh") !== -1);
-            verify(cal.indexOf("printf 'pactl set-sink-volume \"%s\" %s\\n' \"$s0\"") !== -1);
+            verify(cal.indexOf("printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n' \"$s0\"") !== -1);
             // XDG_RUNTIME_DIR only — the /tmp fallback was a world-writable
             // path that startup() then replays with sh (security fix).
             verify(cal.indexOf("rm -f \"$XDG_RUNTIME_DIR/onair_park_7.sh\"") !== -1);
@@ -240,7 +284,7 @@ Item {
             r.e._verifyLaunch();
             var ver = r.mock.execLog[r.mock.execLog.length - 1];
             verify(ver.indexOf("onair_park_7.sh") !== -1);
-            verify(ver.indexOf("printf 'pactl set-sink-mute \"%s\" 0\\n' \"$w0\"") !== -1);
+            verify(ver.indexOf("printf 'pactl set-sink-mute '\\''%s'\\'' 0\\n' \"$w0\"") !== -1);
             var r2 = rig([]);
             r2.e.startup();
             var seen = false;

@@ -147,6 +147,15 @@ Item {
         _combineNullId = "";
         _combineActive = false;
         _combineWantActive = false;
+        // The same generation boundary the disable draws: a rebuild that was
+        // in flight when the sink died will ack as stale and deliberately
+        // keep its hands off these flags — a leftover busy would otherwise
+        // park every rebuild of the resurrected group behind an ack that is
+        // never coming, and sliders, device changes and calibrations would
+        // all silently no-op for the rest of the session.
+        _combineReloopBusy = false;
+        _combineReloopPending = false;
+        combineLbRetry.stop();
         // A measurement mid-flight measures a dead group — same cancel the
         // disable does, generation bump included. The isolation's hardware
         // mutes sit on REAL sinks that are (or will be) back: lift them.
@@ -173,6 +182,13 @@ Item {
             || cmd.indexOf(": PW_TRIM;") === 0 || cmd.indexOf(": PW_STEALBACK;") === 0
             || cmd.indexOf(": PW_RAMP;") === 0 || cmd.indexOf(": PW_PARKREST;") === 0) {
             return true; // fire-and-forget
+        }
+        // The kick-abort's own disconnect landed — only the menu wants to
+        // know; the user-disconnect handler (parked wishes, in-flight state)
+        // is deliberately NOT on this road.
+        if (cmd.indexOf(": BT_KICK_ABORT;") === 0) {
+            app.btList();
+            return true;
         }
         // Combined local output: pactl availability probe
         if (cmd.indexOf(": PW_PROBE;") === 0) {
@@ -287,14 +303,20 @@ Item {
                 // would read unchecked with the sink still running and
                 // disable early-returning on the cleared intent.
                 if (_combineActive) return true;
+                // A failure the user already walked away from (ticked off
+                // inside the load's round-trip) is nobody's news — the
+                // intent is withdrawn, the box is empty, a warning toast
+                // about it would only confuse.
+                var wasWanted = _combineWantActive;
                 _combineWantActive = false;
                 _combinePrevOutput = "";
                 // The persisted copy too — a stale key here used to make
                 // the startup restore fire on every later login.
                 cfg.combinePrevOutput = "";
-                app.notify(i18n("Could not combine the outputs"),
-                           ((stderr || "").split("\n")[0] || i18n("pactl refused to create the combined output.")).substring(0, 120),
-                           "dialog-warning");
+                if (wasWanted)
+                    app.notify(i18n("Could not combine the outputs"),
+                               ((stderr || "").split("\n")[0] || i18n("pactl refused to create the combined output.")).substring(0, 120),
+                               "dialog-warning");
                 return true;
             }
             _combineNullId = nullM[1];
@@ -407,6 +429,13 @@ Item {
             if (_combineReloopPending) {
                 _combineReloopPending = false;
                 _combineLoopbackIds = _combineLoopbackIds.concat(rlIds);
+                // The map rides along even on this road: the queued rebuild
+                // can be HELD (a verify in flight) instead of running now,
+                // and a verify launched with an empty map loses its pre2
+                // full-level trims — a balance-trimmed loopback then eats
+                // the click on the cubic curve and a healthy speaker reads
+                // back as unheard.
+                _combineLoopbackSinkByModule = rlPairs;
                 _combineRebuildLoopbacks();
                 return true;
             }
@@ -809,8 +838,13 @@ Item {
             if (_btKickAbort && app._btValidMac(_btKickMac))
                 // Uniquified: an identical disconnect for the same MAC may
                 // already be in flight from the user's own click, and the
-                // exec dedup would silently swallow this one.
-                app.exec(": BT_DISCONNECT; timeout 12 bluetoothctl disconnect "
+                // exec dedup would silently swallow this one. OWN sentinel,
+                // not BT_DISCONNECT: that ack's handler belongs to the
+                // USER's click — it clears the in-flight disconnect state
+                // and launches any parked connect wish, and this engine-made
+                // disconnect must not be able to fire either for a device
+                // the user never touched.
+                app.exec(": BT_KICK_ABORT; timeout 12 bluetoothctl disconnect "
                                 + _btKickMac + "; true # " + app.nextSeq());
             else if (_btJoinWatchMac !== "" && _btJoinWatchMac === _btKickMac)
                 _btJoinWatchTicks = 0; // fresh window for the reconnect
@@ -1402,7 +1436,7 @@ Item {
         var parkFile = "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\"";
         var parkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + parkFile + ";";
         for (var pf = 0; pf < calSinks.length; pf++)
-            parkSave += " printf 'pactl set-sink-volume \"%s\" %s\\n'"
+            parkSave += " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
                       + " \"$s" + pf + "\" \"${v" + pf + ":-" + park + "%}\" >> " + parkFile + ";";
         app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " P" + park + " ;"
             + setup
@@ -1554,6 +1588,13 @@ Item {
         _combinePendingRoute = false;
         _combineLbRetries = 0;
         combineLbRetry.stop();
+        // Whether a measurement holds the master right now — read BEFORE the
+        // cancel below clears the flags. A verify parks the master at 100%
+        // for the clicks; a disable landing inside that window must not
+        // remember the PARK as "the level the user left the room at", or
+        // the next morning's enable ramps to a full blast the user never
+        // chose — the very regression the memory exists to prevent.
+        var masterParked = _calibrating || _verifyPending;
         // Generation boundary: an in-flight rebuild's ack is stale from here
         // on and deliberately keeps its hands off these flags — a leftover
         // busy would deadlock every rebuild of the next enable.
@@ -1598,9 +1639,11 @@ Item {
             // remembered so the next enable's ramp ends where the user left
             // the room, not at a 100% they never chose.
             un = "d=$(pactl get-default-sink 2>/dev/null);"
-               + " cm=$(pactl get-sink-volume " + _combineSinkName
-               + " 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%');"
-               + " echo \"MASTER ${cm:-100}\"; " + unMods;
+               + (masterParked ? " " :
+                  " cm=$(pactl get-sink-volume " + _combineSinkName
+                  + " 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%');"
+                  + " echo \"MASTER ${cm:-100}\";")
+               + " " + unMods;
         }
         // Hand the system default back to whoever held it before the sync —
         // but only if it is still OURS to hand back: a default the user moved
@@ -1745,9 +1788,13 @@ Item {
         // measurement is gone from the live list, but the script may have
         // hardware-muted it for the isolation — skipping it here would
         // leave that sink silent everywhere, group or not, until the user
-        // finds pavucontrol.
+        // finds pavucontrol. Consumed ON USE: the frozen set belongs to
+        // THIS measurement only — a stale union from last evening's verify
+        // must not unmute a speaker the user has since silenced on purpose
+        // (a clicks-phase cancel never hardware-muted anything at all).
         for (var m = 0; m < _verifyMembers.length; m++)
             if (vs.indexOf(_verifyMembers[m]) === -1) vs.push(_verifyMembers[m]);
+        _verifyMembers = [];
         for (var i = 0; i < vs.length; i++)
             un += "pactl set-sink-mute '" + vs[i].replace(/'/g, "'\\''") + "' 0; ";
         if (un !== "")
@@ -1890,12 +1937,12 @@ Item {
         // XDG_RUNTIME_DIR only, same reason as the calibration's park file.
         var vParkFile = "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\"";
         var vParkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + vParkFile + ";"
-                      + " printf 'pactl set-sink-volume \"%s\" %s\\n' "
+                      + " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n' "
                       + _combineSinkName + " \"${cm:-100%}\" >> " + vParkFile + ";";
         for (var vf = 0; vf < sinks.length && vf < 8; vf++)
-            vParkSave += " printf 'pactl set-sink-volume \"%s\" %s\\n'"
+            vParkSave += " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
                        + " \"$w" + vf + "\" \"${y" + vf + ":-" + park + "%}\" >> " + vParkFile + ";"
-                       + " printf 'pactl set-sink-mute \"%s\" 0\\n' \"$w" + vf + "\" >> " + vParkFile + ";";
+                       + " printf 'pactl set-sink-mute '\\''%s'\\'' 0\\n' \"$w" + vf + "\" >> " + vParkFile + ";";
         app.exec(": PW_VERIFY " + _calibRunSeq + ";" + setup + vParkSave + " " + pre2
                  + " timeout " + vBudget + " python3 '" + script + "' verify '"
                  + _combineSinkName + "' ''" + argv + ";"
