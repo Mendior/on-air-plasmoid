@@ -274,6 +274,67 @@ PlasmaComponents3.ItemDelegate {
             }
         }
 
+        // Drag handle: grab and drop the station anywhere in the list — one
+        // config write per journey, where the arrows charged one per step.
+        // The arrows stay right next to it: they are the keyboard's and the
+        // screen reader's road, and some hands simply prefer them.
+        Item {
+            id: dragHandle
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.6
+            Layout.alignment: Qt.AlignVCenter
+            opacity: (dragArea.pressed || listItem.hovered || listItem.isKeyboardCurrent) ? 0.75 : 0.0
+            visible: opacity > 0.0 && listItem.reorderable && !root.favoritesOnly
+            Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+
+            Kirigami.Icon {
+                anchors.fill: parent
+                anchors.margins: 4
+                source: "handle-sort"
+                fallback: "transform-move"
+            }
+
+            MouseArea {
+                id: dragArea
+                anchors.fill: parent
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                // The Flickable must not steal the gesture mid-drag.
+                preventStealing: true
+                onPressed: {
+                    const view = listItem.ListView.view
+                    if (view) { view.dropSlot = model.index; view.dropFrom = model.index }
+                }
+                onPositionChanged: (mouse) => {
+                    const view = listItem.ListView.view
+                    if (!view) return
+                    const pitch = listItem.height + view.spacing
+                    const pt = mapToItem(view.contentItem, mouse.x, mouse.y)
+                    view.dropSlot = Math.max(0, Math.min(view.count, Math.round(pt.y / pitch)))
+                    // Edge autoscroll, so a long list is one gesture too.
+                    const vy = mapToItem(view, mouse.x, mouse.y).y
+                    if (vy < listItem.height)
+                        view.contentY = Math.max(0, view.contentY - Kirigami.Units.gridUnit)
+                    else if (vy > view.height - listItem.height)
+                        view.contentY = Math.min(Math.max(0, view.contentHeight - view.height),
+                                                 view.contentY + Kirigami.Units.gridUnit)
+                }
+                onReleased: {
+                    const view = listItem.ListView.view
+                    if (!view) return
+                    const slot = view.dropSlot
+                    view.dropSlot = -1; view.dropFrom = -1
+                    // Dropping into either slot around the row itself is a
+                    // no-move; anything else lands in one write.
+                    if (slot >= 0 && slot !== model.index && slot !== model.index + 1)
+                        root.moveStationTo(listItem.targetIndex, model.name, model.hostname, slot)
+                }
+                onCanceled: {
+                    const view = listItem.ListView.view
+                    if (view) { view.dropSlot = -1; view.dropFrom = -1 }
+                }
+            }
+        }
+
         // Reorder arrows: move the station (or, in the favorites view, the
         // favorite) one step up/down. Ctrl+Up/Down does the same via keyboard.
         CircleButton {
@@ -405,4 +466,29 @@ PlasmaComponents3.ItemDelegate {
     TapHandler {
         onTapped: listItem._activate()
     }
+
+    // The drop indicator: each row draws the slice of the line that belongs
+    // to it — a slot above this row, or (for the last row only) the
+    // below-everything slot. The dragged row itself dims, so the eye tracks
+    // what is moving.
+    Rectangle {
+        anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: -1 }
+        height: 2
+        radius: 1
+        color: Kirigami.Theme.highlightColor
+        visible: listItem.ListView.view && listItem.ListView.view.dropSlot === model.index
+        z: 10
+    }
+    Rectangle {
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: -1 }
+        height: 2
+        radius: 1
+        color: Kirigami.Theme.highlightColor
+        visible: listItem.ListView.view
+                 && listItem.ListView.view.dropSlot === listItem.ListView.view.count
+                 && model.index === listItem.ListView.view.count - 1
+        z: 10
+    }
+    opacity: (ListView.view && ListView.view.dropFrom === model.index
+              && ListView.view.dropSlot >= 0) ? 0.45 : 1.0
 }

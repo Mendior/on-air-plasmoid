@@ -1837,6 +1837,62 @@ PlasmoidItem {
     // is the nearest favorite that is actually visible — a stale entry (its
     // station was deactivated but not deleted) would make the swap look like
     // a silent no-op.
+    // The drag-and-drop landing: move a station to an INSERTION slot in the
+    // visible list (0 = before the first row, count = after the last) with
+    // ONE config write — an eight-row journey used to be eight writes and
+    // eight model reloads on the arrow road. The arrows stay for keyboard
+    // and screen readers; this is the hand's road.
+    function moveStationTo(popupIndex, name, hostname, insertAt) {
+        if (!hostname) return;
+        try {
+            const servers = JSON.parse(Plasmoid.configuration.servers);
+            var activeCount = 0;
+            for (var c = 0; c < servers.length; c++)
+                if (servers[c].active) activeCount++;
+            // Same walk and identity check as moveStation — duplicate URLs
+            // make bare index matching unsafe.
+            var cfgIdx = -1, seen = -1;
+            for (var i = 0; i < servers.length; i++) {
+                if (!servers[i].active) continue;
+                seen++;
+                if (seen === popupIndex) { cfgIdx = i; break; }
+            }
+            if (cfgIdx < 0
+                || (servers[cfgIdx].hostname || "") !== hostname
+                || (servers[cfgIdx].name || "") !== name) return;
+            // An insertion slot past the dragged row means one less final
+            // position — removing the row shifts everything below it up.
+            var final = insertAt > popupIndex ? insertAt - 1 : insertAt;
+            final = Math.max(0, Math.min(activeCount - 1, final));
+            if (final === popupIndex) return;
+            const entry = servers.splice(cfgIdx, 1)[0];
+            var insertCfg = servers.length;
+            var pos = -1;
+            for (var j = 0; j < servers.length; j++) {
+                if (!servers[j].active) continue;
+                pos++;
+                if (pos === final) { insertCfg = j; break; }
+            }
+            servers.splice(insertCfg, 0, entry);
+            const followUrl = (lastPlay >= 0 && lastPlay < stationsModel.count)
+                              ? stationsModel.get(lastPlay).hostname : "";
+            const followName = (lastPlay >= 0 && lastPlay < stationsModel.count)
+                               ? stationsModel.get(lastPlay).name : "";
+            _reorderKeepPlaying = true;
+            Plasmoid.configuration.servers = JSON.stringify(servers);
+            Qt.callLater(function() {
+                if (followUrl === "") return;
+                for (var k = 0; k < stationsModel.count; k++) {
+                    const s = stationsModel.get(k);
+                    if (s.hostname === followUrl && s.name === followName) {
+                        lastPlay = k;
+                        return;
+                    }
+                }
+            });
+        } catch (e) {}
+    }
+
     function moveFavorite(name, delta) {
         if (!name || (delta !== 1 && delta !== -1)) return;
         const list = favoriteNames.slice();

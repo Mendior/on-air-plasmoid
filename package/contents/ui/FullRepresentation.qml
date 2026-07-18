@@ -841,6 +841,12 @@ PlasmaExtras.Representation {
 
                 contentItem: ListView {
                     id: stationView
+                    // Live drag-reorder state, written by the row handles:
+                    // the insertion slot under the pointer (-1 = no drag)
+                    // and the row being dragged — every row draws its own
+                    // slice of the drop indicator from these.
+                    property int dropSlot: -1
+                    property int dropFrom: -1
 
                     leftMargin: Kirigami.Units.smallSpacing
                     rightMargin: Kirigami.Units.smallSpacing
@@ -3282,7 +3288,19 @@ PlasmaExtras.Representation {
                                 to: 900
                                 stepSize: 10
                                 value: Plasmoid.configuration.syncOffsetMs || 0
-                                onMoved: root.sync.setSyncOffset(value)
+                                // Applied on RELEASE, not per step: every
+                                // apply swaps the loopbacks, which is an
+                                // audible ~1-2 s gap on every speaker — a
+                                // drag across the scale used to stutter the
+                                // room once per notch. One drag, one gap.
+                                onPressedChanged: {
+                                    if (!pressed) root.sync.setSyncOffset(value)
+                                }
+                                Keys.onReleased: (event) => {
+                                    // Arrow-key nudges have no press cycle.
+                                    if (event.key === Qt.Key_Left || event.key === Qt.Key_Right)
+                                        root.sync.setSyncOffset(value)
+                                }
 
                                 PlasmaComponents3.ToolTip {
                                     text: i18n("If the Bluetooth speaker still trails the wired ones, raise this until they play together.")

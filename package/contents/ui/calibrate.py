@@ -371,13 +371,16 @@ def _capture_alive(mic, seconds=0.7):
 # pactl's output is gettext-translated ("Name:" becomes "Nom :" on a French
 # desktop) and every parser below matches the English prefixes — the C locale
 # is pinned or the mic handover would be silently inert outside English.
-_C_ENV = dict(os.environ, LC_ALL="C")
+# (A function, not a module constant: the test loader lifts assignments into
+# a bare namespace where os does not exist.)
+def _c_env():
+    return dict(os.environ, LC_ALL="C")
 
 
 def _default_source_name():
     try:
         return subprocess.run(["pactl", "get-default-source"],
-                              capture_output=True, text=True, env=_C_ENV,
+                              capture_output=True, text=True, env=_c_env(),
                               timeout=3).stdout.strip()
     except Exception:
         return ""
@@ -387,7 +390,7 @@ def _alternative_mics(skip):
     """(name, description) of candidate microphones, monitors excluded."""
     try:
         out = subprocess.run(["pactl", "list", "sources"], capture_output=True,
-                             text=True, env=_C_ENV, timeout=5).stdout
+                             text=True, env=_c_env(), timeout=5).stdout
     except Exception:
         return []
     mics = []
