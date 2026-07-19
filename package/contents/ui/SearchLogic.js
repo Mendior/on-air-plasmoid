@@ -7,6 +7,7 @@
 // decisions, no network, under qmltestrunner. FullRepresentation.qml
 // fetches and renders; this file matches, ranks and reads probe answers.
 .pragma library
+.import "HostGuard.js" as HostGuard
 
 // The case- and accent-blind form both sides of every comparison use:
 // "Järviradio" and "jarviradio" are the same station to a searcher.
@@ -69,31 +70,12 @@ function stems(q) {
 // Whether the liveness probe may knock on this URL's host at all. The
 // directory is publicly writable, and a crafted entry pointing the
 // probe's GET at 127.0.0.1 or 192.168.x would turn every search into a
-// scan of the user's own machine and network. Literal addresses only:
-// QML has no resolver, so a DNS name that resolves privately (rebinding)
-// is out of scope here — every plain hostname passes.
+// scan of the user's own machine and network. The actual address
+// judgement lives in HostGuard.js, shared with the settings pages'
+// logo fetcher — one gate, every spelling.
 function isProbeSafeHost(url) {
-    var m = /^[a-z][a-z0-9+.-]*:\/\/(?:[^@\/]*@)?(\[[^\]]*\]|[^:\/?#]*)/i
-            .exec(url || "");
-    if (!m || m[1] === "") return false;
-    var host = m[1].toLowerCase();
-    if (host.charAt(0) === "[") {
-        var h6 = host.slice(1, -1);
-        if (h6 === "::1") return false;               // loopback
-        if (/^f[cd]/.test(h6)) return false;          // fc00::/7 unique-local
-        if (/^fe[89ab]/.test(h6)) return false;       // fe80::/10 link-local
-        return true;
-    }
-    if (host === "localhost") return false;
-    var ip4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(host);
-    if (ip4) {
-        var a = +ip4[1], b = +ip4[2];
-        if (a === 127 || a === 10) return false;
-        if (a === 172 && b >= 16 && b <= 31) return false;
-        if (a === 192 && b === 168) return false;
-        if (a === 169 && b === 254) return false;
-    }
-    return true;
+    var host = HostGuard.hostOf(url);
+    return host !== "" && !HostGuard.isPrivateHost(host);
 }
 
 // One probe answer, read at the response headers. Dead is ONLY what

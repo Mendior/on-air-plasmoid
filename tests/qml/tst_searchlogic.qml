@@ -71,6 +71,34 @@ TestCase {
         verify(!SL.isProbeSafeHost(""));
     }
 
+    function test_probe_safe_host_blocks_every_alternate_spelling() {
+        // An address has more spellings than a dotted quad. Qt's URL layer
+        // resolves inet_aton's dialects (verified live: 2130706433,
+        // 0177.0.0.1 and 127.1 all connect to 127.0.0.1), glibc resolves a
+        // trailing root dot, and IPv6 embeds IPv4 two ways — the guard
+        // (HostGuard.js, shared with the settings pages) must read them all.
+        verify(!SL.isProbeSafeHost("http://[::ffff:127.0.0.1]/x"));   // mapped, dotted
+        verify(!SL.isProbeSafeHost("http://[::ffff:7f00:1]/x"));      // mapped, hex
+        verify(!SL.isProbeSafeHost("http://[::ffff:192.168.1.1]/x"));
+        verify(!SL.isProbeSafeHost("http://[0:0:0:0:0:0:0:1]/x"));    // loopback, longhand
+        verify(!SL.isProbeSafeHost("http://[::0:1]/x"));              // loopback, partial run
+        verify(!SL.isProbeSafeHost("http://[::]/x"));                 // unspecified
+        verify(!SL.isProbeSafeHost("http://2130706433/x"));           // decimal 127.0.0.1
+        verify(!SL.isProbeSafeHost("http://127.1/x"));                // shortened
+        verify(!SL.isProbeSafeHost("http://0177.0.0.1/x"));           // octal
+        verify(!SL.isProbeSafeHost("http://0x7f.0.0.1/x"));           // hex
+        verify(!SL.isProbeSafeHost("http://0.0.0.0/x"));              // routes to loopback
+        verify(!SL.isProbeSafeHost("http://localhost./x"));           // DNS root dot
+        verify(!SL.isProbeSafeHost("http://sub.localhost/x"));        // RFC 6761 subdomains
+        verify(!SL.isProbeSafeHost("http://a@b@127.0.0.1/x"));        // the LAST @ ends userinfo
+        // ...and the spellings must not swallow the public internet.
+        verify(SL.isProbeSafeHost("http://0x08.0x08.0x08.0x08/x"));   // 8.8.8.8
+        verify(SL.isProbeSafeHost("http://[::ffff:8.8.8.8]/x"));      // mapped public
+        verify(SL.isProbeSafeHost("http://10.or.at/x"));              // hostname, not a quad
+        verify(SL.isProbeSafeHost("http://999.1.2.3/x"));             // not inet_aton-valid
+        verify(SL.isProbeSafeHost("http://fcstation.example/x"));     // fc-prefixed NAME
+    }
+
     function test_probe_safe_host_passes_public_and_dns_hosts() {
         // Literal-only by design: QML has no resolver, so a DNS name that
         // resolves privately (rebinding) cannot be caught here.
