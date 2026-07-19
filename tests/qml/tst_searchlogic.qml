@@ -52,6 +52,37 @@ TestCase {
         compare(SL.stems("  "), []);
     }
 
+    function test_probe_safe_host_blocks_literal_private_addresses() {
+        // The catalogue is publicly writable — a crafted entry must not
+        // aim the probe's GET at the user's own machine or network.
+        verify(!SL.isProbeSafeHost("http://localhost:8000/stream"));
+        verify(!SL.isProbeSafeHost("http://127.0.0.1/stream"));
+        verify(!SL.isProbeSafeHost("http://127.8.9.10/stream"));      // whole /8
+        verify(!SL.isProbeSafeHost("http://10.0.0.5:8080/live"));
+        verify(!SL.isProbeSafeHost("http://172.16.0.1/x"));
+        verify(!SL.isProbeSafeHost("http://172.31.255.254/x"));
+        verify(!SL.isProbeSafeHost("http://192.168.1.1/x"));
+        verify(!SL.isProbeSafeHost("http://169.254.1.1/x"));
+        verify(!SL.isProbeSafeHost("http://user:pass@127.0.0.1/x"));  // userinfo hides nothing
+        verify(!SL.isProbeSafeHost("http://[::1]:8000/x"));
+        verify(!SL.isProbeSafeHost("http://[fc00::1]/x"));
+        verify(!SL.isProbeSafeHost("http://[fd12:3456::1]/x"));
+        verify(!SL.isProbeSafeHost("http://[fe80::1%25eth0]/x"));     // zone id included
+        verify(!SL.isProbeSafeHost(""));
+    }
+
+    function test_probe_safe_host_passes_public_and_dns_hosts() {
+        // Literal-only by design: QML has no resolver, so a DNS name that
+        // resolves privately (rebinding) cannot be caught here.
+        verify(SL.isProbeSafeHost("http://stream.example.com/live"));
+        verify(SL.isProbeSafeHost("https://user:pass@radio.example.org:8000/x"));
+        verify(SL.isProbeSafeHost("http://93.184.216.34/stream"));
+        verify(SL.isProbeSafeHost("http://172.15.0.1/x"));            // outside the /12
+        verify(SL.isProbeSafeHost("http://172.32.0.1/x"));
+        verify(SL.isProbeSafeHost("http://192.169.0.1/x"));
+        verify(SL.isProbeSafeHost("http://[2001:db8::1]/x"));
+    }
+
     function test_probe_verdict_reads_the_status_line() {
         compare(SL.probeVerdict(200), 1);    // a live mount
         compare(SL.probeVerdict(206), 1);

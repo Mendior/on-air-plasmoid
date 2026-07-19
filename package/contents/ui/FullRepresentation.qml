@@ -101,8 +101,17 @@ PlasmaExtras.Representation {
     property string webSearchOrder: "votes"
     // Rows the list will show — "Show more" raises it page by page.
     property int webResultCap: 30
+    // Where "Show more" stops for good — a result this deep is noise, and
+    // every extra page still knocks on up to thirty stream hosts.
+    readonly property int webResultCapMax: 300
     // The last query string sent, offset-free — "Show more" re-issues it.
     property string _webLastQs: ""
+    // Rows the last parsed directory page carried, and how many known
+    // duplicates paging must ask past: a whole page can be rows the list
+    // already shows (the dedup eats it), and offset=count would then
+    // fetch that same page forever.
+    property int _webLastParsed: 0
+    property int _webSkipAhead: 0
     // Recent successful searches, newest first, persisted in the config.
     property var webHistory: []
 
@@ -136,6 +145,13 @@ PlasmaExtras.Representation {
         for (var i = 0; i < webResultsModel.count; i++) {
             var row = webResultsModel.get(i)
             if (row.alive !== -1 || fullRepresentation._probeSpent[row.url]) continue
+            // Loopback/private hosts never get the knock — the row keeps
+            // its "unknown" verdict and stays clickable (a preview is the
+            // user's own deliberate act; the background probe is not).
+            if (!SearchLogic.isProbeSafeHost(row.url)) {
+                fullRepresentation._probeSpent[row.url] = true
+                continue
+            }
             var hit = fullRepresentation._probeVerdicts[row.url]
             if (hit !== undefined && now - hit.t < fullRepresentation._probeVerdictTtlMs) {
                 fullRepresentation._probeSpent[row.url] = true
@@ -345,6 +361,7 @@ PlasmaExtras.Representation {
         }
         fullRepresentation.webSearching = true
         fullRepresentation.webResultCap = 30
+        fullRepresentation._webSkipAhead = 0
         const tail = "&hidebroken=true&order=" + fullRepresentation.webSearchOrder
                      + "&reverse=true&limit=50"
         const mode = fullRepresentation.webSearchMode
@@ -441,6 +458,7 @@ PlasmaExtras.Representation {
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
         fullRepresentation.webResultCap = 30
+        fullRepresentation._webSkipAhead = 0
         fullRepresentation.webSearching = true
         const qs = "/json/stations/search?hidebroken=true&order=clicktrend&reverse=true&limit=50"
         fullRepresentation._webLastQs = qs
@@ -455,18 +473,31 @@ PlasmaExtras.Representation {
     // The next page of whatever is showing — same query, same generation.
     function loadMoreWeb() {
         if (fullRepresentation._webLastQs === "" || fullRepresentation.webSearching) return
+        if (fullRepresentation.webResultCap >= fullRepresentation.webResultCapMax) return
         const seq = fullRepresentation._webSearchSeq
+        const before = webResultsModel.count
         fullRepresentation.webResultCap += 30
         fullRepresentation.webSearching = true
-        root._rbFetch(fullRepresentation._webLastQs + "&offset=" + webResultsModel.count,
+        root._rbFetch(fullRepresentation._webLastQs + "&offset="
+                      + (webResultsModel.count + fullRepresentation._webSkipAhead),
                       4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             // A failed page must give the cap back — the button's
             // visibility compares count against the cap, and a raised cap
             // with no rows to show made "Show more" vanish for good after
             // one bad mirror moment.
-            if (!_webAppendResults(xhr))
+            if (!_webAppendResults(xhr)) {
                 fullRepresentation.webResultCap = Math.max(30, fullRepresentation.webResultCap - 30)
+            } else if (fullRepresentation._webLastParsed > 0
+                       && webResultsModel.count === before) {
+                // The server page existed but the dedup ate every row of
+                // it — the next request must ask PAST it, and the cap
+                // falls back to the count so the button survives to ask.
+                // An empty page (_webLastParsed 0) is the honest end of
+                // the results and retires the button as before.
+                fullRepresentation._webSkipAhead += fullRepresentation._webLastParsed
+                fullRepresentation.webResultCap = webResultsModel.count
+            }
             _probeKick(seq)
             fullRepresentation.webSearching = false
         })
@@ -508,10 +539,14 @@ PlasmaExtras.Representation {
         if (!xhr || xhr.status !== 200) return false
         try {
             const results = JSON.parse(xhr.responseText) || []
-            const existing = {}
+            fullRepresentation._webLastParsed = results.length
+            // Null-prototype maps: these are keyed by names and urls from
+            // the catalogue, and a station called "constructor" would hit
+            // Object.prototype on a plain {} (same trap _countryCodeOf dodges).
+            const existing = Object.create(null)
             for (var i = 0; i < stationsModel.count; i++)
                 existing[stationsModel.get(i).hostname] = true
-            const seen = {}
+            const seen = Object.create(null)
             for (var j = 0; j < webResultsModel.count; j++)
                 seen[webResultsModel.get(j).url] = true
             for (const r of results) {
@@ -650,7 +685,10 @@ PlasmaExtras.Representation {
     Image {
         id: backdropImage
         anchors.fill: parent
-        source: fullRepresentation._bestArtUrl
+        // With the blur setting off the texture is pure waste — don't
+        // even fetch it. (Not gated on the view: page swipes must fade
+        // the ready image, not reload it.)
+        source: Plasmoid.configuration.blurBackdrop ? fullRepresentation._bestArtUrl : ""
         fillMode: Image.PreserveAspectCrop
         // The source can be a catalog-controlled station favicon, and the
         // catalog is publicly writable — a pixel-flood image (30000×30000)
@@ -851,7 +889,10 @@ PlasmaExtras.Representation {
                     leftMargin: Kirigami.Units.smallSpacing
                     rightMargin: Kirigami.Units.smallSpacing
                     model: filteredStationsModel
-                    enabled: isConnected
+                    // Not gated on connectivity: a click while offline just
+                    // runs the normal error path, and the red "Check internet
+                    // connection…" status line is the hint — a greyed-out list
+                    // on a possibly-stale Disconnected report only looks broken.
                     focus: true
                     currentIndex: 0
                     boundsBehavior: Flickable.StopAtBounds
@@ -898,9 +939,12 @@ PlasmaExtras.Representation {
                         }
                     }
 
-                    // 2026: rows entering in a cascade
+                    // 2026: rows entering in a cascade. Filter rebuilds
+                    // replace the whole model on every keystroke — replaying
+                    // the stagger there turns typing into a light show.
                     populate: Transition {
                         id: popTrans
+                        enabled: root.searchFilter === ""
                         SequentialAnimation {
                             PropertyAction { property: "opacity"; value: 0 }
                             PauseAnimation { duration: Math.min(popTrans.ViewTransition.index, 14) * 26 }
@@ -912,6 +956,7 @@ PlasmaExtras.Representation {
                     }
                     add: Transition {
                         id: addTrans
+                        enabled: root.searchFilter === ""
                         SequentialAnimation {
                             PropertyAction { property: "opacity"; value: 0 }
                             PauseAnimation { duration: Math.min(addTrans.ViewTransition.index, 10) * 20 }
@@ -1044,6 +1089,10 @@ PlasmaExtras.Representation {
                                             Image {
                                                 anchors.fill: parent
                                                 anchors.margins: 1
+                                                // Decode at display size — catalogue favicons are
+                                                // untrusted (same pixel-flood cap as the backdrop).
+                                                sourceSize.width: 128
+                                                sourceSize.height: 128
                                                 source: webItem.model.favicon || ""
                                                 fillMode: Image.PreserveAspectCrop
                                                 asynchronous: true
@@ -1152,6 +1201,7 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.ToolButton {
                             anchors.horizontalCenter: parent.horizontalCenter
                             visible: webResultsModel.count >= fullRepresentation.webResultCap
+                                     && fullRepresentation.webResultCap < fullRepresentation.webResultCapMax
                                      && !fullRepresentation.webSearching
                             text: i18n("Show more results")
                             icon.name: "arrow-down"
@@ -1384,6 +1434,10 @@ PlasmaExtras.Representation {
                                 Image {
                                     id: vinylCenterLogo
                                     anchors.fill: parent
+                                    // Decode at display size: a station's full-res logo
+                                    // otherwise keeps a full-size texture alive here.
+                                    sourceSize.width: 256
+                                    sourceSize.height: 256
                                     // Disk-cached copy when available. Self-heal goes
                                     // through the central _favBroken map (faviconSrc
                                     // then serves the remote), so the binding stays
@@ -1755,7 +1809,8 @@ PlasmaExtras.Representation {
                         implicitHeight: implicitWidth
                         iconName: "arrow-up-double"
                         iconScale: 0.55
-                        checkable: true
+                        // Not checkable: one-shot action button (same rule as
+                        // download); checked only drives the "voted" visual.
                         checked: voted
                         enabledState: root._voteStatus === "" && root._previewUrl === ""
                                       && root._currentOrigUrl !== ""
@@ -2055,7 +2110,27 @@ PlasmaExtras.Representation {
                                 spacing: Kirigami.Units.smallSpacing
 
                                 PlasmaComponents3.Label {
-                                    text: histItem.model.when
+                                    // Newer history entries carry a ms-epoch "ts"; a bare
+                                    // "14:05" on yesterday's play reads as today's. Fixed
+                                    // English months, like the UI's fixed day names. Old
+                                    // entries (and liked rows) have no ts and keep the
+                                    // plain time.
+                                    text: {
+                                        var ts = histItem.model.ts
+                                        if (ts) {
+                                            var d = new Date(ts)
+                                            var now = new Date()
+                                            if (d.getFullYear() !== now.getFullYear()
+                                                || d.getMonth() !== now.getMonth()
+                                                || d.getDate() !== now.getDate()) {
+                                                var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                                                return mon[d.getMonth()] + " " + d.getDate()
+                                                       + " " + histItem.model.when
+                                            }
+                                        }
+                                        return histItem.model.when
+                                    }
                                     opacity: 0.5
                                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 }
@@ -2836,7 +2911,9 @@ PlasmaExtras.Representation {
             // The favorites view follows the favorites list's own order (not
             // the main list's), so the reorder arrows work on exactly the
             // order the user is looking at.
-            const idxByName = {}
+            // Null-prototype: a station named "constructor" must not read
+            // Object.prototype as its index (same trap _countryCodeOf dodges).
+            const idxByName = Object.create(null)
             for (var m = 0; m < stationsModel.count; m++) {
                 const st = stationsModel.get(m)
                 if (idxByName[st.name] === undefined) idxByName[st.name] = m
@@ -2872,9 +2949,12 @@ PlasmaExtras.Representation {
 
     Connections {
         target: stationsModel
-        // clear()+append() is the model's only mutation path (main.qml
-        // reloadStationsModel), so count changes cover every reload; nothing
-        // calls setProperty on it, so a dataChanged handler would be dead code.
+        // clear()+append() is how the model reloads (main.qml
+        // reloadStationsModel), so count changes cover every reload. The one
+        // setProperty writer (faviconSelfHeal) always follows with a
+        // _faviconStore config write, and THAT triggers a full reload —
+        // countChanged covers it too; a dataChanged handler would only
+        // double the rebuild.
         // Qt.callLater coalesces the burst: a 200-station reload used to run
         // the full rebuild once per append — O(n²) on every list load.
         function onCountChanged() { Qt.callLater(rebuildFilteredModel) }
