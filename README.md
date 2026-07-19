@@ -20,7 +20,7 @@
 - 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up
 - 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a live fine-tune slider, so nothing echoes; works on PipeWire and plain PulseAudio alike. Each speaker carries its own balance, can play stereo, left, right or a mono mix (two speakers on L and R make a true stereo pair), and any speaker can sit an evening out with one tick — all remembered per device
 - 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker and the microphone does the rest: the Bluetooth lag is timed and set automatically, and every speaker's loudness is matched at the listening position — both remembered per device
-- 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, on by default, one switch in settings turns them off) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
+- 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, off by default — one switch in settings turns them on) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
 - ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
@@ -30,6 +30,7 @@
 
 - **KDE Plasma 6** (any distribution: Kubuntu, Fedora KDE, openSUSE, Arch/CachyOS, Manjaro…)
 - Qt 6 Multimedia with the FFmpeg backend (default on most distros)
+- The `org.kde.plasma.plasma5support` QML module — ships with Plasma on most distros (package `plasma5support` on Arch). Without it the widget silently fails to load
 
 Optional (features degrade gracefully without them):
 
@@ -42,6 +43,17 @@ Optional (features degrade gracefully without them):
 | `inotify-tools` | Zero-polling MPRIS command channel |
 | `python-chromecast` (pychromecast) | Cast to Chromecast / Nest devices (DLNA TVs and speakers work without it) |
 | `claude` (Claude Code CLI) | Optional AI cleanup of messy radio titles |
+
+## Network behavior
+
+Besides the streams you play, the widget talks to:
+
+- **radio-browser.info** — station catalog search; self-healing of dead saved stream URLs; the optional auto-bitrate upgrade; mirror discovery at startup; logo lookup for saved stations that are missing one.
+- **Deezer / iTunes** — cover-art lookup for the playing track (its own switch in settings).
+- **Station click reporting** — opt-in, off by default; sends the station id only.
+- **AI title cleanup** — opt-in; runs the local `claude` CLI, which talks to its own API.
+
+Like any web server, these services see ordinary request metadata (your IP address, a user agent). Nothing else leaves your machine.
 
 ## Install
 
@@ -76,7 +88,7 @@ A Bluetooth speaker adds its own 100–300 ms of codec latency on top, so it can
 ## Recording
 
 - Press the **⏺ REC button** on the now-playing page to record the station you're listening to. Press again to stop. The recording is a bit-exact stream copy (original quality) saved to `~/Music/OnAir`, with a `.tracks.txt` file listing the songs and their timestamps.
-- **Scheduled recordings** live on the **My Music page** (the stopwatch button): pick a station, a start time, a duration and *once / daily / weekly* — the widget records it in the background, even if you're not listening. A red dot on the panel icon shows when a recording is running.
+- **Scheduled recordings** live on the **My Music page** (the stopwatch button): pick a station, a start time, a duration and *once / daily / weekly* — the widget records it in the background, even if you're not listening. A red dot on the panel icon shows when a recording is running. Schedules fire only while the widget is running: logged out, powered off or asleep means paused, and missed recordings are reported when you're back.
 - One recording runs at a time, and every recording has a hard length cap (Settings → *Recording*, default 3 hours) so a forgotten REC can't fill your disk.
 - **Format** (Settings → *Recording*): *Original stream* (bit-exact copy — recommended; radio streams are already compressed, so this IS the maximum quality), *MP3* (high-quality re-encode for maximum device compatibility) or *WAV* (uncompressed PCM for editing — very large files, no quality gain).
 - **Personal use only.** Recording internet radio for your own, non-commercial use is a recognised private-copy exception in the EU (Directive 2001/29/EC art. 5(2)(b)) and many other jurisdictions, and these public streams carry no copy protection that would be circumvented. Do **not** share, upload or commercially exploit recordings — that is outside the exception. You are responsible for complying with the laws of your country.

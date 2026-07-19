@@ -10,13 +10,24 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="$REPO_DIR/package"
 # The local install may live under the current plugin id or the pre-rename
 # one, depending on when this machine first installed the widget — sync into
-# whichever actually exists (preferring the current id when both do).
+# whichever actually exists. With BOTH present any guess could silently sync
+# a tree the panel is not running, so refuse and require an explicit choice.
 INSTALL_BASE="$HOME/.local/share/plasma/plasmoids"
-if [ -d "$INSTALL_BASE/io.github.mendior.onair" ]; then
-  INSTALL_DIR="$INSTALL_BASE/io.github.mendior.onair"
-else
-  INSTALL_DIR="$INSTALL_BASE/org.kde.plasma.advancedradio"
+# Resolve lazily: leave INSTALL_DIR unset when ambiguous so read-only commands
+# (lint/check/build/i18n/view/restart) still run; require_install_dir refuses
+# only when a command actually touches the install tree.
+if [ -z "${INSTALL_DIR:-}" ]; then
+  if [ -d "$INSTALL_BASE/io.github.mendior.onair" ] && [ -d "$INSTALL_BASE/org.kde.plasma.advancedradio" ]; then
+    :  # both present → stay unset, decide only when needed
+  elif [ -d "$INSTALL_BASE/io.github.mendior.onair" ]; then
+    INSTALL_DIR="$INSTALL_BASE/io.github.mendior.onair"
+  else
+    INSTALL_DIR="$INSTALL_BASE/org.kde.plasma.advancedradio"
+  fi
 fi
+require_install_dir() {
+  [ -n "${INSTALL_DIR:-}" ] || { echo "ERROR: both io.github.mendior.onair and org.kde.plasma.advancedradio exist under $INSTALL_BASE — set INSTALL_DIR to the tree the panel actually runs"; exit 1; }
+}
 # NB: /usr/bin/qmllint may be the Qt5 version, which reports NOTHING — the Qt6
 # binary is required for real checks.
 QMLLINT="${QMLLINT:-/usr/lib/qt6/bin/qmllint}"
@@ -46,6 +57,7 @@ EOF
 
 case "${1:-}" in
   install)
+    require_install_dir
     rsync "${RSYNC_OPTS[@]}" "$PKG/contents/" "$INSTALL_DIR/contents/"
     # The install keeps its own metadata.json (old plugin id — replacing it
     # would orphan the user's stations/favorites), but the VERSION field must
@@ -63,6 +75,12 @@ PYEOF
     echo "To reload the QML: scripts/dev.sh restart"
     ;;
   pull)
+    require_install_dir
+    # pull --delete overwrites the repo copy; committed work is recoverable
+    # from git, uncommitted edits are gone for good. --porcelain also catches
+    # staged and untracked files (a new NewThing.qml has no blob to recover).
+    [ -z "$(git -C "$REPO_DIR" status --porcelain -- package/contents)" ] \
+      || { echo "refusing pull: uncommitted or untracked changes in package/contents"; exit 1; }
     rsync "${RSYNC_OPTS[@]}" "$INSTALL_DIR/contents/" "$PKG/contents/"
     echo "OK: $INSTALL_DIR/contents -> package/contents (metadata.json and locale untouched)"
     ;;
@@ -169,13 +187,23 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # QT_LOGGING_RULES: console.log must reach stderr even when the developer's
     # environment disables qml/js debug output — the positive assertion below
     # would otherwise false-FAIL a perfectly healthy widget.
+    rc=0
     out="$(timeout 25 env QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
            QT_LOGGING_RULES='qml.debug=true;js.debug=true;default.debug=true' \
-           plasmoidviewer -a "$PKG" 2>&1 || true)"
+           plasmoidviewer -a "$PKG" 2>&1)" || rc=$?
     # /usr/share/plasma is the viewer's own shell (desktopcontainment etc.),
     # which emits unrelated TypeErrors — only our package's messages count.
     bad="$(printf '%s\n' "$out" | grep -v '/usr/share/plasma/' | grep -Ei 'duplicat|syntax|unavailable|non-existent|binding loop|typeerror|referenceerror|error loading' || true)"
     if [ -n "$bad" ]; then printf 'runtime FAILED:\n%s\n' "$bad"; exit 1; fi
+    # 124 = timeout expiry, the NORMAL success path here (the viewer never
+    # exits on its own); any other nonzero exit is a crash, which can slip
+    # past the keyword grep when it happens after the load marker.
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+      echo "runtime FAILED: viewer exit $rc"
+      echo "--- viewer output (last 100 lines) ---"
+      printf '%s\n' "$out" | tail -n 100
+      exit 1
+    fi
     # Positive assertion: the widget must PROVE it came up — main.qml logs this
     # marker from Component.onCompleted (keep the two literals in sync). The
     # keyword grep above passed vacuously when the viewer crashed instantly or
@@ -214,6 +242,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     echo "OK: $out"
     ;;
   locale-install)
+    require_install_dir
     # Compile the po catalogs into the LOCAL install under its OLD plugin id
     # (org.kde.plasma.advancedradio) so the panel widget is translated too.
     # The published package gets its own catalogs at build time; the regular
@@ -238,14 +267,15 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # and a reference comment only helps a translator when it points inside
     # the repo. The kde-format flags make msgfmt --check actually validate
     # %1/%2 placeholders in translations from now on.
-    ( cd "$REPO_DIR" && find "package/contents" -name '*.qml' | sort > /tmp/onair-qml-files.txt \
+    tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
+    ( cd "$REPO_DIR" && find "package/contents" -name '*.qml' | sort > "$tmp" \
       && xgettext --from-code=UTF-8 -C -kde -ci18n -ki18n:1 -ki18nc:1c,2 -ki18np:1,2 -ki18ncp:1c,2,3 \
         --flag=i18n:1:kde-format --flag=i18nc:2:kde-format \
         --flag=i18np:1:kde-format --flag=i18np:2:kde-format \
         --flag=i18ncp:2:kde-format --flag=i18ncp:3:kde-format \
         --package-name='plasma_applet_io.github.mendior.onair' \
         --msgid-bugs-address='https://github.com/Mendior/on-air-plasmoid/issues' \
-        -o po/template.pot --files-from=/tmp/onair-qml-files.txt 2>/dev/null )
+        -o po/template.pot --files-from="$tmp" 2>/dev/null )
     for po in "$REPO_DIR"/po/*.po; do
       [ -e "$po" ] || continue
       msgmerge --no-wrap -q --update --backup=off "$po" "$REPO_DIR/po/template.pot"

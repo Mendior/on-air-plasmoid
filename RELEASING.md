@@ -43,6 +43,11 @@ Then the 5-minute matrix on the actual panel — every line, no skipping:
 - [ ] Space / M shortcuts work, and do nothing while the search field has focus.
 - [ ] Popup opens with sane layout at default size (blank rows, clipped
       buttons and shifted layouts have all shipped before).
+- [ ] Set a one-minute alarm and let it fire — station or fallback chime audible.
+- [ ] Toggle "all local outputs in sync" on and off — the system default sink
+      returns to what it was.
+- [ ] Let a short scheduled recording trigger while not listening — it records
+      and reports.
 
 ## 4. Build and publish
 
