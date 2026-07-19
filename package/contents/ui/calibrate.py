@@ -781,7 +781,21 @@ def _drift_estimate(mic_samples, mon_samples, rate):
     i2, c2 = max(rest, key=lambda p: p[1])
     if c2 < DRIFT_SECOND_PEAK * c1:
         return "DRIFT_EST 0"
-    ms = abs(i2 - i1) * 1000.0 / env_rate
+    # Rhythm guard, learned from a live false positive: music with a
+    # steady beat is SELF-similar in its envelope (120 BPM = a 500 ms
+    # period), and that self-similarity paints a second cross-correlation
+    # peak exactly one beat away from the true one — measured live as a
+    # phantom "508 ms split" on an in-sync room. If the MONITOR's own
+    # autocorrelation is high at the candidate separation, the second
+    # peak is the music, not a speaker: this material cannot answer.
+    lag_d = abs(i2 - i1)
+    auto = 0.0
+    for t in range(lag_d, n):
+        auto += b[t] * b[t - lag_d]
+    auto /= (eb * eb)
+    if auto > 0.3:
+        return "DRIFT_NOSIG"
+    ms = lag_d * 1000.0 / env_rate
     return "DRIFT_EST %d" % round(ms)
 
 

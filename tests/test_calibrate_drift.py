@@ -70,6 +70,39 @@ def test_silence_and_dead_mic_stay_quiet():
     assert calibrate._drift_estimate([1] * 100, mon, RATE) == "DRIFT_QUIET"
 
 
+def _metronome(seconds, period_s=0.5):
+    """Strictly periodic bursts — the envelope self-similarity trap."""
+    n = int(seconds * RATE)
+    out = [0] * n
+    t = int(0.1 * RATE)
+    while t < n - int(0.1 * RATE):
+        for j in range(int(0.02 * RATE)):
+            out[t + j] += int(12000 * math.exp(-j / (0.004 * RATE)))
+        t += int(period_s * RATE)
+    return out
+
+
+def test_rhythmic_material_does_not_fake_a_split():
+    # One speaker path only, in perfect sync — but a 120 BPM metronome.
+    # The beat paints a second correlation peak one period away; the
+    # rhythm guard must refuse to read it as a 500 ms drift (a live run
+    # did exactly that before the guard existed).
+    mon = _metronome(8.0)
+    mic = _delayed(mon, 150)
+    verdict = calibrate._drift_estimate(mic, mon, RATE)
+    assert verdict in ("DRIFT_NOSIG", "DRIFT_EST 0"), verdict
+
+
+def test_aperiodic_split_still_reads_through_the_rhythm_guard():
+    # The guard must not blind the estimator on honest material: random
+    # inter-burst gaps carry no self-similarity at the split distance.
+    mon = _program(8.0)
+    mic = _mix(_delayed(mon, 120), _delayed(mon, 200, 0.8))
+    verdict = calibrate._drift_estimate(mic, mon, RATE)
+    kind, ms = verdict.split()
+    assert kind == "DRIFT_EST" and abs(int(ms) - 80) <= 8, verdict
+
+
 def test_unrelated_noise_gives_no_signal():
     mon = _program(8.0, seed=7)
     rng = random.Random(99)
