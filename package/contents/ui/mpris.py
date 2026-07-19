@@ -57,7 +57,8 @@ class MPRISBridge(dbus.service.Object):
             "canPlay": False,
             "canPause": False,
         }
-        self._tracker_path = "/org/mpris/MediaPlayer2/Track/0"
+        self._track_seq = 0
+        self._tracker_path = f"{OBJ_PATH}/Track/0"
 
     def update_from_state_file(self):
         # mtime gate: this runs every 300 ms for the whole session — reading
@@ -83,6 +84,12 @@ class MPRISBridge(dbus.service.Object):
                 if self._state.get(key) != value:
                     self._state[key] = value
                     changed_player[key] = value
+            if "title" in changed_player or "artist" in changed_player:
+                # A new track gets a new mpris:trackid — clients that diff
+                # Metadata by trackid would otherwise treat the whole session
+                # as one long track. Digits only, so the path stays valid.
+                self._track_seq += 1
+                self._tracker_path = f"{OBJ_PATH}/Track/{self._track_seq}"
 
         if not changed_player:
             return
@@ -252,10 +259,18 @@ class MPRISBridge(dbus.service.Object):
     def _get_prop(self, interface_name, property_name):
         with self._lock:
             if interface_name == ROOT_IF:
-                return self._root_props().get(property_name)
-            if interface_name == PLAYER_IF:
-                return self._player_props().get(property_name)
-        return None
+                props = self._root_props()
+            elif interface_name == PLAYER_IF:
+                props = self._player_props()
+            else:
+                props = {}
+        if property_name in props:
+            return props[property_name]
+        # Spec-correct error reply: a None return is not marshallable as a
+        # variant, so clients saw a generic failure instead of the real cause.
+        raise dbus.exceptions.DBusException(
+            f"Unknown property {interface_name}.{property_name}",
+            name="org.freedesktop.DBus.Error.UnknownProperty")
 
 
 def main():

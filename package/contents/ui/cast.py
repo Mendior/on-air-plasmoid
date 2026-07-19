@@ -35,6 +35,7 @@ Commands (argv[1]):
 Every command prints a sentinel the QML side matches on and always exits 0, so
 a missing optional dependency is a clean "feature unavailable", never a crash.
 """
+import glob
 import hashlib
 import http.client
 import json
@@ -44,6 +45,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -90,8 +92,16 @@ def _import():
     return pychromecast
 
 
+# C0/C1 controls plus the Unicode bidi formatting marks (LRM/RLM, the
+# LRE..RLO embeddings, LRI..PDI isolates): device names travel into the
+# TAB-separated DEV protocol and the picker UI, and a hostile friendlyName
+# could use these to split records or visually reorder/mask text.
+_CLEAN_RE = re.compile(
+    "[\\x00-\\x1f\\x7f-\\x9f\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]")
+
+
 def _clean(text):
-    return (text or "").replace("\t", " ").replace("\n", " ")
+    return " ".join(_CLEAN_RE.sub(" ", text or "").split())[:120]
 
 
 def _udn_safe(text):
@@ -240,14 +250,23 @@ def cmd_stop(host, port, uuid, model):
         return
     cast = None
     try:
-        cast = _connect_host(pychromecast, host, port, uuid, model)
+        try:
+            cast = _connect_host(pychromecast, host, port, uuid, model)
+        except Exception as exc:
+            # Unreachable/off device — nothing is playing on it, so a quiet
+            # DONE is the truth. FAIL is reserved for a stop that REACHED the
+            # device and then raised (that one likely left it playing).
+            _dbg("stop connect (device offline)", exc)
+            _out(DONE)
+            return
         # quit_app stops playback and returns the device to its idle backdrop,
         # freeing it for other apps — cleaner than a lingering paused receiver.
         cast.quit_app()
         _out(DONE)
     except Exception as exc:
-        _dbg("stop", exc)
-        _out(DONE)
+        # A stop that raised on a reached device very likely left it playing —
+        # a silent DONE would tell the UI otherwise, so the failure is visible.
+        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
     finally:
         _disconnect(cast)
 
@@ -438,6 +457,7 @@ def _describe_renderer(location):
     # URLBase is deprecated but still used by older stacks (e.g. Frontier
     # Silicon); without it relative control URLs resolve against the location.
     base = (root.findtext(_DEVNS + "URLBase") or "").strip() or location
+    loc_host = urllib.parse.urlsplit(location).hostname
     for dev in root.iter(_DEVNS + "device"):
         if (dev.findtext(_DEVNS + "deviceType") or "").startswith(
                 "urn:schemas-upnp-org:device:MediaRenderer:"):
@@ -446,7 +466,17 @@ def _describe_renderer(location):
                 stype = (svc.findtext(_DEVNS + "serviceType") or "").strip()
                 curl = (svc.findtext(_DEVNS + "controlURL") or "").strip()
                 if stype and curl:
-                    services[stype] = urllib.parse.urljoin(base, curl)
+                    resolved = urllib.parse.urljoin(base, curl)
+                    # Control URLs stay pinned to the descriptor's host: a
+                    # hostile URLBase/absolute controlURL would otherwise
+                    # redirect SOAP POSTs to a third host (LAN SSRF, incl.
+                    # 127.0.0.1 on this machine). Ports may differ — Frontier
+                    # Silicon legitimately moves the port, never the host.
+                    if urllib.parse.urlsplit(resolved).hostname != loc_host:
+                        _dbg("describe %s cross-host controlURL" % location,
+                             resolved)
+                        continue
+                    services[stype] = resolved
             avt = next((u for t, u in services.items()
                         if t.startswith("urn:schemas-upnp-org:service:AVTransport:")), None)
             if not avt:
@@ -557,11 +587,32 @@ def _cache_save(devices):
         cache = {u: d for u, d in cache.items()
                  if now - d.get("last_seen", 0) < CACHE_MAX_AGE_S}
         try:
-            os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-            tmp = CACHE_PATH + ".tmp"
-            with open(tmp, "w") as fh:
-                json.dump(cache, fh)
-            os.replace(tmp, CACHE_PATH)
+            cache_dir = os.path.dirname(CACHE_PATH)
+            os.makedirs(cache_dir, exist_ok=True)
+            # mkstemp instead of a fixed ".tmp": unpredictable name (no
+            # symlink games in a shared /tmp-style dir) and 0600 from birth.
+            # os.replace keeps the swap atomic; last writer wins as before.
+            fd, tmp = tempfile.mkstemp(dir=cache_dir, prefix=".onair-cast-")
+            try:
+                os.fchmod(fd, 0o600)
+                with os.fdopen(fd, "w") as fh:
+                    json.dump(cache, fh)
+                os.replace(tmp, CACHE_PATH)
+            except Exception:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
+            # A hard kill between mkstemp and os.replace orphans a uniquely
+            # named temp forever (the old fixed ".tmp" self-overwrote). Sweep
+            # aged siblings; the 1 h guard spares a concurrent in-flight temp.
+            for p in glob.glob(os.path.join(cache_dir, ".onair-cast-*")):
+                try:
+                    if now - os.path.getmtime(p) > 3600:
+                        os.unlink(p)
+                except OSError:
+                    pass
         except Exception as exc:
             _dbg("cache-save", exc)
 
@@ -803,12 +854,23 @@ def cmd_dlna_play(location, url, ctype, title):
 
 
 def cmd_dlna_stop(location):
+    # No descriptor = the device is off or gone, so nothing is playing — DONE.
+    dev = _describe_renderer(location)
+    if not dev:
+        _out(DONE)
+        return
     try:
-        dev = _describe_renderer(location)
-        if dev:
-            _soap(dev["avtransport"], AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>")
+        _soap(dev["avtransport"], AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>")
+    except urllib.error.HTTPError as exc:
+        # A SOAP fault is the documented answer of an already-idle renderer to
+        # Stop — the same class cmd_dlna_play deliberately swallows. Nothing is
+        # playing, so DONE, not a misleading FAIL.
+        _dbg("dlna-stop fault (idle renderer)", exc)
     except Exception as exc:
-        _dbg("dlna-stop", exc)
+        # Descriptor answered but the control URL did not — the renderer may
+        # still be streaming, so surface the failure rather than a quiet DONE.
+        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        return
     _out(DONE)
 
 

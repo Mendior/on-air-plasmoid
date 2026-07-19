@@ -10,6 +10,7 @@ won't deliver usable metadata, so the plasmoid stops respawning us.
 import signal
 import sys
 import time
+import urllib.parse
 
 try:
     import requests
@@ -26,6 +27,13 @@ if len(sys.argv) < 3:
     sys.exit(2)
 
 script, url, meta = sys.argv[0], sys.argv[1], sys.argv[2]
+
+# Errors log the hostname only: full stream URLs can carry listener tokens in
+# path/query, and stderr ends up in the journal.
+try:
+    log_host = urllib.parse.urlsplit(url).hostname or "<no-host>"
+except ValueError:
+    log_host = "<unparseable-url>"
 
 # Hard total-duration cap — the requests timeout only covers the connect and
 # the pause between chunks, not the whole download. Without this the process
@@ -83,7 +91,7 @@ def main():
         response = requests.get(url, headers=headers, stream=True, timeout=10)
 
         if response.status_code != 200:
-            print(f"reader.py: HTTP {response.status_code} for {url}", file=sys.stderr)
+            print(f"reader.py: HTTP {response.status_code} for {log_host}", file=sys.stderr)
             # Sentinel only on DEFINITIVE failures (4xx: UA filter, 404...) —
             # a transient server error (5xx) must not pin __NO_ICY__ for the
             # whole listening session; exiting silently lets the poll retry.
@@ -169,9 +177,10 @@ def main():
         # TRANSIENT network failure — exit silently (no sentinel) so the
         # plasmoid's poll can retry once the network/server recovers. The
         # 6-empty-results counter on the QML side still bounds endless polling.
-        print(f"reader.py: transient {type(exc).__name__}: {exc}", file=sys.stderr)
+        # requests embeds the full URL in the exception text — type+host only.
+        print(f"reader.py: transient {type(exc).__name__} for {log_host}", file=sys.stderr)
     except requests.exceptions.RequestException as exc:
-        print(f"reader.py: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"reader.py: {type(exc).__name__} for {log_host}", file=sys.stderr)
         # A DEFINITIVE failure (invalid URL, TLS error, redirect loop) — don't
         # let the plasmoid retry forever.
         print("__NO_ICY__")

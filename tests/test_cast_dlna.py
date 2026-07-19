@@ -64,12 +64,31 @@ def test_describe_renderer_strips_shell_metacharacters_from_udn(cast, monkeypatc
 
 
 def test_describe_renderer_honors_urlbase(cast, monkeypatch):
+    # Same host, different port — the legitimate URLBase shape (Frontier
+    # Silicon moves the control port, never the host).
     xml = RENDERER_XML.replace(
         "<device>",
-        "<URLBase>http://192.0.2.9:9999/</URLBase><device>", 1)
+        "<URLBase>http://192.0.2.1:9999/</URLBase><device>", 1)
     monkeypatch.setattr(cast, "_http_get", lambda url, timeout=3.0: xml.encode())
     dev = cast._describe_renderer("http://192.0.2.1:8080/dd.xml")
-    assert dev["avtransport"] == "http://192.0.2.9:9999/upnp/control/avt"
+    assert dev["avtransport"] == "http://192.0.2.1:9999/upnp/control/avt"
+
+
+def test_describe_renderer_rejects_cross_host_urlbase(cast, monkeypatch):
+    # A hostile descriptor must not be able to point SOAP POSTs at a third
+    # host (LAN SSRF — including 127.0.0.1 services on this machine).
+    xml = RENDERER_XML.replace(
+        "<device>",
+        "<URLBase>http://127.0.0.1:6600/</URLBase><device>", 1)
+    monkeypatch.setattr(cast, "_http_get", lambda url, timeout=3.0: xml.encode())
+    assert cast._describe_renderer("http://192.0.2.1:8080/dd.xml") is None
+
+
+def test_describe_renderer_rejects_cross_host_absolute_controlurl(cast, monkeypatch):
+    xml = RENDERER_XML.replace(
+        "/upnp/control/avt", "http://192.0.2.66:9999/upnp/control/avt")
+    monkeypatch.setattr(cast, "_http_get", lambda url, timeout=3.0: xml.encode())
+    assert cast._describe_renderer("http://192.0.2.1:8080/dd.xml") is None
 
 
 def test_describe_renderer_rejects_non_renderer(cast, monkeypatch):
@@ -87,6 +106,22 @@ def test_describe_renderer_requires_avtransport(cast, monkeypatch):
 def test_describe_renderer_survives_broken_xml(cast, monkeypatch):
     monkeypatch.setattr(cast, "_http_get", lambda url, timeout=3.0: b"<not-xml")
     assert cast._describe_renderer("http://192.0.2.1/dd.xml") is None
+
+
+def test_describe_renderer_sanitizes_hostile_friendly_name(cast, monkeypatch):
+    # CR would split the TAB/newline DEV protocol, RLO (U+202E) and the C1
+    # CSI (U+009B) can visually reorder/mask picker text — all must die here.
+    evil = RENDERER_XML.replace(
+        "Test&#9;Speaker", "Sneaky&#13;&#x202e;Speaker&#x9b;")
+    monkeypatch.setattr(cast, "_http_get", lambda url, timeout=3.0: evil.encode())
+    dev = cast._describe_renderer("http://192.0.2.1:8080/dd.xml")
+    assert dev["name"] == "Sneaky Speaker"
+
+
+def test_clean_strips_controls_and_bidi_and_caps_length(cast):
+    assert cast._clean("Evil\u202e\x00\rName\x9b\u2066  padded") == "Evil Name padded"
+    assert cast._clean("\u200e\u200f\u2069") == ""
+    assert len(cast._clean("A" * 500)) == 120
 
 
 def test_didl_metadata_escapes_and_repeats_url(cast):

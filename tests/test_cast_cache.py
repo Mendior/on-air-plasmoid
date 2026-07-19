@@ -4,6 +4,7 @@
 lottery — the cache is what keeps the device picker stable between rounds, so
 its merge/expiry behaviour and the avahi fallback parser get pinned here."""
 import json
+import os
 import time
 
 AVAHI_SAMPLE = "\n".join([
@@ -55,6 +56,22 @@ def test_cache_expires_long_unseen_devices(cast, tmp_path, monkeypatch):
     path.write_text(json.dumps({"udn-old": stale}))
     cast._cache_save({"udn-new": _dev("New")})
     assert set(cast._cache_load()) == {"udn-new"}
+
+
+def test_cache_save_sweeps_aged_orphan_temps(cast, tmp_path, monkeypatch):
+    # A hard kill between mkstemp and os.replace leaves a uniquely named temp
+    # behind. A successful save must sweep aged siblings, but spare a recent
+    # one (it may be a concurrent in-flight temp) and the real cache file.
+    monkeypatch.setattr(cast, "CACHE_PATH", str(tmp_path / "onair-cast-devices.json"))
+    old = tmp_path / ".onair-cast-deadbeef"
+    old.write_text("{}")
+    os.utime(old, (time.time() - 7200, time.time() - 7200))
+    fresh = tmp_path / ".onair-cast-inflight"
+    fresh.write_text("{}")
+    cast._cache_save({"udn-a": _dev("A")})
+    assert not old.exists()
+    assert fresh.exists()
+    assert (tmp_path / "onair-cast-devices.json").exists()
 
 
 def test_cache_load_survives_corrupt_file(cast, tmp_path, monkeypatch):
