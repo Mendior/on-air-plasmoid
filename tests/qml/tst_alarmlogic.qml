@@ -57,6 +57,42 @@ TestCase {
         compare(next.getDate(), 29)
     }
 
+    // ── _resolveGap: the spring-forward hole ──────────────────────────────
+    // Pure math on already-constructed Dates: no real gap in the test zone
+    // is needed, only the "resolved clock reads short of asked-for" shape
+    // an engine produces inside one.
+
+    function test_gap_backward_hour_shifts_forward_an_hour() {
+        // Qt's road through Tallinn's hole: 03:30 resolved back to 02:30 —
+        // the cure is exactly the missing hour.
+        var d = new Date(ms(2026, 3, 29, 2, 30))
+        compare(AL._resolveGap(d, 3, 30).getTime(), d.getTime() + 3600000)
+    }
+
+    function test_gap_is_measured_in_minutes_not_hours() {
+        // Lord Howe's DST is 30 min: asked 02:15, resolved back to 01:45 —
+        // a fixed one-hour cure would ring half an hour late.
+        var d = new Date(ms(2026, 10, 4, 1, 45))
+        compare(AL._resolveGap(d, 2, 15).getTime(), d.getTime() + 30 * 60000)
+        // Troll's is 2 h: asked 01:00, resolved back across midnight to
+        // 23:00 — the modulo keeps the shortfall at 120, never negative.
+        var t = new Date(ms(2026, 3, 18, 23, 0))
+        compare(AL._resolveGap(t, 1, 0).getTime(), t.getTime() + 120 * 60000)
+    }
+
+    function test_gap_forward_resolution_is_left_alone() {
+        // An engine that resolved the hole FORWARD is past the gap and
+        // correct: its "shortfall" wraps to ~23.5 h, over the cap, so no
+        // shift — shifting it too would ring late.
+        var d = new Date(ms(2026, 3, 29, 4, 30))
+        compare(AL._resolveGap(d, 3, 30).getTime(), d.getTime())
+    }
+
+    function test_gap_exact_readback_is_untouched() {
+        var d = new Date(ms(2026, 7, 14, 7, 30))
+        compare(AL._resolveGap(d, 7, 30).getTime(), d.getTime())
+    }
+
     // ── fireDecision ──────────────────────────────────────────────────────
 
     function test_fire_decisions() {

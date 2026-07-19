@@ -48,7 +48,22 @@ Item {
             property bool recording: false
             property bool alarmEngaged: false
             property var mediaDevs: ({ audioOutputs: [] })
-            property var playerOutput: ({ volume: 0.5, device: null })
+            // A QtObject, not a plain JS object: the engine's volume observer
+            // needs a real volumeChanged signal to fire, exactly as the live
+            // AudioOutput does.
+            property QtObject playerOutput: QtObject {
+                property real volume: 0.5
+                property var device: null
+            }
+            property real lastUserVolume: -1
+            // Mirrors main.qml: only a deliberate gesture stamps the pending
+            // pct, and it is stamped AFTER the volume write.
+            property int _pendingUserVolumePct: -1
+            function setUserVolume(v) {
+                lastUserVolume = v;
+                playerOutput.volume = Math.max(0, Math.min(1, v));
+                _pendingUserVolumePct = Math.round(playerOutput.volume * 100);
+            }
             property string instanceId: "7"
             property string _btConnectingMac: ""
             property string _btPairingMac: ""
@@ -1156,7 +1171,7 @@ Item {
         // ── the automatic caretaker ───────────────────────────────────────
 
         function test_drift_confirmation_launches_one_auto_verify_then_hints() {
-            var r = rig([dev(wired), dev(btSink)]);
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
             activate(r);
             // One estimate is a hypothesis — nothing happens.
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
@@ -1166,16 +1181,73 @@ Item {
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", "");
             verify(r.e._verifyPending);
             verify(!r.e._verifyCorrected);
+            // This verify launches over live music: the stream is parked
+            // like calibrateSync's, or the room-quiet precheck hears On Air
+            // itself and every auto verify fails with a misleading toast.
+            compare(r.mock.playerOutput.volume, 0);
+            fuzzyCompare(r.e._calibVolumeBefore, 0.5, 0.001);
+            // The park is silent with the popup closed — it must announce.
+            compare(r.mock.notes.length, 1);
+            compare(r.mock.notes[0].title, "Sync check");
+            verify(r.mock.notes[0].text.indexOf("Music pauses") !== -1);
             // A later confirmed drift in the same session only says a word.
             r.e._verifyPending = false;
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 90\n", "");
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 92\n", "");
             verify(!r.e._verifyPending);
-            compare(r.mock.notes.length, 1);
+            compare(r.mock.notes.length, 2);
+            compare(r.mock.notes[1].title, "Sync has drifted");
+        }
+
+        function test_volume_nudge_during_the_auto_care_park_is_not_half_clobbered() {
+            // The park mutes the stream to 0 while the popup is closed. A
+            // compact-wheel nudge then computes its step from that 0
+            // (setUserVolume(0 + 0.05)) — landing at ~5% and, being non-zero,
+            // defeating _calibRestoreVolume's "still muted?" restore. The
+            // gesture must fold onto the real pre-park level and drop the
+            // verify instead.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", "");
+            verify(r.e._verifyPending);
+            verify(r.e._autoCareParked);
+            compare(r.mock.playerOutput.volume, 0);       // parked
+            // The compact wheel calls setUserVolume(volume + 0.05) = 0.05: the
+            // volume write lands first, the pending stamp right after.
+            r.mock.playerOutput.volume = 0.05;
+            r.mock._pendingUserVolumePct = 5;
+            // The deferred handler (Qt.callLater in production) folds it onto
+            // the real level, drops the verify, and persists THAT.
+            r.e._autoCareVolumeGesture();
+            verify(!r.e._verifyPending);                  // verify dropped
+            verify(!r.e._autoCareParked);                 // park released
+            fuzzyCompare(r.mock.playerOutput.volume, 0.55, 0.001);  // 0.5 + 0.05
+            fuzzyCompare(r.mock.lastUserVolume, 0.55, 0.001);       // persisted
+            verify(r.e._calibVolumeBefore < 0);           // nothing stale to restore
+        }
+
+        function test_a_programmatic_write_during_the_park_is_not_a_gesture() {
+            // A stop or station change during the park writes volume =
+            // targetVolume() directly, WITHOUT stamping _pendingUserVolumePct.
+            // That must not be mistaken for the user's word (folding
+            // targetVolume onto the level would persist a blast) — the verify
+            // rides on and the terminal restore still owns the volume.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", "");
+            verify(r.e._verifyPending);
+            r.mock.playerOutput.volume = 0.5;   // a stop's reset, not a gesture
+            r.mock._pendingUserVolumePct = -1;  // stop never stamps it
+            r.e._autoCareVolumeGesture();
+            verify(r.e._verifyPending);          // verify untouched
+            verify(r.e._autoCareParked);         // park still held
+            compare(r.mock.lastUserVolume, -1);  // no fold-and-persist happened
         }
 
         function test_drift_quiet_or_small_resets_the_pending_sighting() {
-            var r = rig([dev(wired), dev(btSink)]);
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
             activate(r);
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
             // Silence between the sighting and its would-be twin retires it.
@@ -1186,6 +1258,20 @@ Item {
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 0\n", "");
             r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 81\n", "");
             verify(!r.e._verifyPending);
+        }
+
+        function test_drift_stale_ack_after_toggle_off_never_arms() {
+            // The probe is out for up to 20 s — an ack landing after the
+            // user toggled auto-care off (or the group died) must be
+            // consumed without arming the audible verify, the same liveness
+            // contract PW_CALIB/PW_VERIFY keep through their seq gates.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            r.cfg.syncAutoCare = false;
+            verify(r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", ""));
+            verify(!r.e._verifyPending);
+            fuzzyCompare(r.mock.playerOutput.volume, 0.5, 0.001);
         }
 
         // ── the silent Bluetooth recompensation ───────────────────────────

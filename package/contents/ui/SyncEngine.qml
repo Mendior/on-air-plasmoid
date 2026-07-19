@@ -840,6 +840,11 @@ Item {
         // the user clicked Disconnect while the cycle was mid-flight:
         // its reconnect phase just reverted their choice — undo that.
         if (cmd.indexOf(": PW_DRIFT;") === 0) {
+            // Liveness gate, kin of the seq gates on PW_CALIB/PW_VERIFY: the
+            // probe is out for up to 20 s, and a stale ack must not arm the
+            // audible verify after the user toggled auto-care off or the
+            // group died. Consume without acting.
+            if (cfg.syncAutoCare !== true || !_combineActive) return true;
             var deWhen = Qt.formatTime(new Date(), "hh:mm");
             var deM = (stdout || "").match(/DRIFT_EST (\d+)/);
             console.log("[ARP] sync: auto-care result — "
@@ -871,8 +876,24 @@ Item {
                 // calibration's pass already spent it, and an auto-care
                 // verify without its correction would measure and shrug.
                 _verifyCorrected = false;
+                // Park our own stream, same as calibrateSync: this verify
+                // launches over live music by definition, so the room-quiet
+                // precheck would hear On Air itself and fail with a
+                // misleading toast — after an audible level jump. Every
+                // terminal verify path restores via _calibRestoreVolume().
+                if (_calibVolumeBefore < 0)
+                    _calibVolumeBefore = app.playerOutput.volume;
+                // The park runs with the popup closed and the panel still
+                // reading "playing" — announce it once (manual calibrate has
+                // its own started-toast). The flag folds a volume nudge during
+                // the window onto the real pre-park level.
+                _autoCareParked = true;
+                app.playerOutput.volume = 0;
                 _verifyPending = true;
                 _verifyArmTimers();
+                app.notify(i18n("Sync check"),
+                           i18n("Speakers drifted — checking sync. Music pauses for about a minute."),
+                           "audio-speakers");
             } else if (!_driftHintShown) {
                 _driftHintShown = true;
                 app.notify(i18n("Sync has drifted"),
@@ -1631,6 +1652,11 @@ Item {
     property bool _calibrating: false
     // Stream volume to put back after calibration (-1 = nothing to restore).
     property real _calibVolumeBefore: -1
+    // Set only when the AUTOMATIC caretaker parks the stream (manual calibrate
+    // shows its own UI): announces the silent window and lets a volume nudge
+    // during it fold onto the pre-park level instead of the muted 0. Cleared
+    // in _calibRestoreVolume and the gesture's own cancel.
+    property bool _autoCareParked: false
 
     // Jack detection, refreshed at startup, on device changes and before a
     // calibration: sink name → true when its active port says "not
@@ -2095,9 +2121,61 @@ Item {
     // Restore the stream volume muted for the calibration clicks. Skipped if
     // the user moved the slider themselves meanwhile — their word wins.
     function _calibRestoreVolume() {
+        // Clear the park flag FIRST: the restore write below must not read
+        // back through the volume observer as a fresh user gesture.
+        _autoCareParked = false;
         if (_calibVolumeBefore >= 0 && app.playerOutput.volume === 0)
             app.playerOutput.volume = _calibVolumeBefore;
         _calibVolumeBefore = -1;
+    }
+
+    // A user volume gesture (compact wheel, slider, MPRIS) that lands while the
+    // auto-care park holds the stream at 0. The caller read the muted 0 and
+    // computed its new level from there, so a raw apply both persists ~5% as
+    // the remembered volume AND, being non-zero, makes the terminal
+    // _calibRestoreVolume skip its restore — losing the real level for the
+    // session. Fold the gesture onto the pre-park level, drop the now unwanted
+    // verify, and let setUserVolume persist the corrected absolute. Manual
+    // calibration never sets _autoCareParked, so its semantics are untouched.
+    Connections {
+        target: app.playerOutput
+        // The check is DEFERRED past the write for two reasons: setUserVolume
+        // stamps _pendingUserVolumePct AFTER the volume assignment that lands
+        // us here, and re-entering it now would let its own stamp clobber our
+        // corrected one on return.
+        function onVolumeChanged() {
+            if (!_autoCareParked || app.playerOutput.volume <= 0) return;
+            Qt.callLater(_autoCareVolumeGesture);
+        }
+    }
+    function _autoCareVolumeGesture() {
+        if (!_autoCareParked) return;
+        // Only setUserVolume stamps _pendingUserVolumePct (>= 0); a fade or a
+        // stop's `volume = targetVolume()` writes the property directly and
+        // leaves it -1 — those parked-window writes must not read as the
+        // user's word, or a stop would fold targetVolume onto the level and
+        // persist a blast.
+        if (app._pendingUserVolumePct < 0) return;
+        var v = app.playerOutput.volume;
+        if (v <= 0) return;
+        var target = Math.max(0, Math.min(1, _calibVolumeBefore + v));
+        _cancelAutoCareVerify();
+        app.setUserVolume(target);
+    }
+    // Tear down a pending/in-flight auto-care verify WITHOUT touching the
+    // stream volume — the gesture handler owns the restore. Same shape as the
+    // disable path's cancel, generation bump included so a verify already
+    // launched has its late ack dropped by the seq gate.
+    function _cancelAutoCareVerify() {
+        _verifyPending = false;
+        _verifyCorrected = false;
+        _rebuildHeld = false;
+        verifySettleTimer.stop();
+        verifyGuardTimer.stop();
+        _verifyUnmuteAll();
+        _autoCareParked = false;
+        _calibVolumeBefore = -1;
+        _calibRunSeq++;
     }
 
     Timer {

@@ -24,17 +24,21 @@ var GRACE_MS = 60 * 60 * 1000;
 // on Qt 6.11 under Europe/Tallinn), so a 03:30 alarm rang an hour EARLY
 // and a scheduled recording captured the hour before the show. V8 resolves
 // the same hole forward; relying on either is a coin toss. When the
-// resolved wall clock does not read back the asked-for hour, the moment
-// fell into the hole — push one hour forward, which lands on the first
-// instant that actually exists (03:30 → 04:30 new time).
-function _resolveGap(d, hh) {
-    // Shift ONLY the backward case — the resolved hour reading exactly one
-    // less than asked (modulo midnight). An engine that already resolved
-    // the hole FORWARD (the spec-conformant direction) is past the gap and
-    // correct; shifting that too would ring an hour late, the exact mirror
-    // of the bug this cures.
-    if (d.getHours() === (hh + 23) % 24) {
-        return new Date(d.getTime() + 3600 * 1000);
+// resolved wall clock does not read back the asked-for time, the moment
+// fell into the hole — push forward by the exact shortfall, which lands on
+// the first instant that actually exists (03:30 → 04:30 new time).
+function _resolveGap(d, hh, mm) {
+    // Shift ONLY the backward case — the resolved clock reading SHORT of
+    // the asked-for time (modulo midnight). Gaps are not always one hour:
+    // Lord Howe jumps 30 min and Troll 2 h, so the shortfall is measured in
+    // minutes and added exactly, capped at 180 (the largest real DST jump).
+    // An engine that already resolved the hole FORWARD (the spec-conformant
+    // direction) is past the gap and correct — its shortfall wraps to ~1410
+    // and stays untouched; shifting that too would ring late, the exact
+    // mirror of the bug this cures.
+    var diff = ((hh * 60 + mm) - (d.getHours() * 60 + d.getMinutes()) + 1440) % 1440;
+    if (diff > 0 && diff <= 180) {
+        return new Date(d.getTime() + diff * 60000);
     }
     return d;
 }
@@ -49,7 +53,7 @@ function nextOccurrence(hh, mm, repeat, weekday, fromMs) {
     } else if (d.getTime() <= fromMs) {
         d.setDate(d.getDate() + 1);
     }
-    d = _resolveGap(d, hh);
+    d = _resolveGap(d, hh, mm);
     return d.getTime();
 }
 
@@ -210,11 +214,12 @@ function castSilencesWakeTone(casting, confirmed, localPlay) {
 }
 
 // How long one systemd-inhibit holder should hold, in seconds — 0 when
-// nothing wants the machine awake. Capped at 12 hours: a weekly alarm must
-// not pin the machine awake for six days. The scheduler tick re-arms a
-// fresh holder as the current one nears expiry, so a due alarm is still
-// covered right up to firing; the +120 s tail keeps the fire moment itself
-// inside the hold.
+// nothing wants the machine awake. The 12-hour cap bounds ONE holder, not
+// the coverage: it is orphan protection, so a holder whose shell dies
+// releases within half a day instead of pinning the machine toward a
+// weekly alarm six days out. The scheduler tick chains a fresh holder as
+// the current one nears expiry, so net coverage runs unbroken right up to
+// firing; the +120 s tail keeps the fire moment itself inside the hold.
 var INHIBIT_MAX_S = 12 * 3600;
 
 function inhibitSeconds(untilMs, nowMs) {
