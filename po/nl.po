@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-19 00:05+0300\n"
+"POT-Creation-Date: 2026-07-19 06:29+0300\n"
 "PO-Revision-Date: 2026-07-12 11:12\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Dutch\n"
@@ -46,7 +46,7 @@ msgstr "Audio"
 
 #: package/contents/ui/CompactRepresentation.qml:86
 #: package/contents/ui/FullRepresentation.qml:2593
-#: package/contents/ui/FullRepresentation.qml:3892
+#: package/contents/ui/FullRepresentation.qml:3908
 msgid "Volume"
 msgstr "Volume"
 
@@ -1062,123 +1062,123 @@ msgstr "Synchronisatie automatisch bijstellen"
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Luistert elke paar minuten met de microfoon naar het spelende geluid en controleert de synchronisatie opnieuw wanneer de luidsprekers uit elkaar lopen. Audio wordt alleen op deze computer verwerkt — nooit opgeslagen, nooit ergens naartoe gestuurd."
 
-#: package/contents/ui/FullRepresentation.qml:3452
+#: package/contents/ui/FullRepresentation.qml:3468
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Ronde 1 van 2 — klikken door elke luidspreker…"
 
-#: package/contents/ui/FullRepresentation.qml:3453
+#: package/contents/ui/FullRepresentation.qml:3469
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Ronde 2 van 2 — stil, resultaat wordt gecontroleerd…"
 
-#: package/contents/ui/FullRepresentation.qml:3491
+#: package/contents/ui/FullRepresentation.qml:3507
 msgid "%1 plays in the group"
 msgstr "%1 speelt in de groep"
 
-#: package/contents/ui/FullRepresentation.qml:3504
+#: package/contents/ui/FullRepresentation.qml:3520
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Of deze luidspreker in de groep meespeelt — vink uit om hem over te slaan zonder de verbinding te verbreken. Onthouden voor het apparaat."
 
-#: package/contents/ui/FullRepresentation.qml:3513
+#: package/contents/ui/FullRepresentation.qml:3529
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (niets aangesloten)"
 
-#: package/contents/ui/FullRepresentation.qml:3527
+#: package/contents/ui/FullRepresentation.qml:3543
 msgid "Balance of %1"
 msgstr "Balans van %1"
 
-#: package/contents/ui/FullRepresentation.qml:3536
+#: package/contents/ui/FullRepresentation.qml:3552
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Het aandeel van deze luidspreker in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden. Hij werkt alleen op wat deze widget afspeelt; het volume per apparaat in de systeeminstellingen is een aparte, onaangeroerde laag — daarom wijken die getallen af van deze schuifregelaars."
 
-#: package/contents/ui/FullRepresentation.qml:3553
+#: package/contents/ui/FullRepresentation.qml:3569
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:3554
+#: package/contents/ui/FullRepresentation.qml:3570
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:3555
+#: package/contents/ui/FullRepresentation.qml:3571
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:3556
+#: package/contents/ui/FullRepresentation.qml:3572
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:3561
+#: package/contents/ui/FullRepresentation.qml:3577
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Welke kanalen deze luidspreker speelt: stereo, alleen links, alleen rechts of een monomix van beide. Zet één luidspreker op L en een andere op R voor een echt stereopaar — onthouden voor het apparaat."
 
-#: package/contents/ui/FullRepresentation.qml:3591
+#: package/contents/ui/FullRepresentation.qml:3607
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:3606
+#: package/contents/ui/FullRepresentation.qml:3622
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth staat uit of er is geen adapter beschikbaar — controleer Systeeminstellingen."
 
-#: package/contents/ui/FullRepresentation.qml:3617
+#: package/contents/ui/FullRepresentation.qml:3633
 msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
 msgstr "Geen gekoppelde Bluetooth-audioapparaten — koppel de luidspreker eenmalig in Systeeminstellingen en hij verschijnt hier."
 
-#: package/contents/ui/FullRepresentation.qml:3631
+#: package/contents/ui/FullRepresentation.qml:3647
 msgid "%1 — connecting…"
 msgstr "%1 — verbinden…"
 
-#: package/contents/ui/FullRepresentation.qml:3649
+#: package/contents/ui/FullRepresentation.qml:3665
 msgid "%1 — pairing…"
 msgstr "%1 — koppelen…"
 
-#: package/contents/ui/FullRepresentation.qml:3650
+#: package/contents/ui/FullRepresentation.qml:3666
 msgid "%1 — new, click to pair"
 msgstr "%1 — nieuw, klik om te koppelen"
 
-#: package/contents/ui/FullRepresentation.qml:3661
+#: package/contents/ui/FullRepresentation.qml:3677
 msgid "Pair a new speaker…"
 msgstr "Nieuwe luidspreker koppelen…"
 
-#: package/contents/ui/FullRepresentation.qml:3677
+#: package/contents/ui/FullRepresentation.qml:3693
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Zoeken — zet de luidspreker in koppelmodus…"
 
-#: package/contents/ui/FullRepresentation.qml:3698
+#: package/contents/ui/FullRepresentation.qml:3714
 msgid "WiFi & network"
 msgstr "WiFi & netwerk"
 
-#: package/contents/ui/FullRepresentation.qml:3730
+#: package/contents/ui/FullRepresentation.qml:3746
 msgid "%1 (speaker group)"
 msgstr "%1 (luidsprekergroep)"
 
-#: package/contents/ui/FullRepresentation.qml:3758
+#: package/contents/ui/FullRepresentation.qml:3774
 msgid "Balance"
 msgstr "Balans"
 
-#: package/contents/ui/FullRepresentation.qml:3772
+#: package/contents/ui/FullRepresentation.qml:3788
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Het aandeel van dit apparaat in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden."
 
-#: package/contents/ui/FullRepresentation.qml:3794
+#: package/contents/ui/FullRepresentation.qml:3810
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Elk apparaat buffert de stream zelf, waardoor kamers enkele seconden uit elkaar kunnen lopen. Groepeer luidsprekers in de Google Home-app voor perfecte synchronisatie — de groep verschijnt hier als één apparaat."
 
-#: package/contents/ui/FullRepresentation.qml:3804
+#: package/contents/ui/FullRepresentation.qml:3820
 msgid "Stop casting everywhere"
 msgstr "Casten overal stoppen"
 
-#: package/contents/ui/FullRepresentation.qml:3822
+#: package/contents/ui/FullRepresentation.qml:3838
 msgid "Searching for devices…"
 msgstr "Zoeken naar apparaten…"
 
-#: package/contents/ui/FullRepresentation.qml:3831
+#: package/contents/ui/FullRepresentation.qml:3847
 msgid "No devices found on your network"
 msgstr "Geen apparaten gevonden in uw netwerk"
 
-#: package/contents/ui/FullRepresentation.qml:3853
+#: package/contents/ui/FullRepresentation.qml:3869
 msgid "Volume: %1% (scroll to adjust)"
 msgstr "Volume: %1% (scroll om aan te passen)"
 
@@ -1495,47 +1495,59 @@ msgstr "Elke luidspreker komt binnen %1 ms aan bij de microfoon — voor het oor
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "De luidsprekers komen nog %1 ms uit elkaar aan. Kalibreer nogmaals of verschuif de vertragingsschuif."
 
-#: package/contents/ui/SyncEngine.qml:866
+#: package/contents/ui/SyncEngine.qml:849
+msgid "Auto-check %1: too quiet to tell"
+msgstr "Autocontrole %1: te stil om te zeggen"
+
+#: package/contents/ui/SyncEngine.qml:855
+msgid "Auto-check %1: in sync"
+msgstr "Autocontrole %1: synchroon"
+
+#: package/contents/ui/SyncEngine.qml:858
+msgid "Auto-check %1: %2 ms apart"
+msgstr "Autocontrole %1: %2 ms uit elkaar"
+
+#: package/contents/ui/SyncEngine.qml:878
 msgid "Sync has drifted"
 msgstr "Synchronisatie is verlopen"
 
-#: package/contents/ui/SyncEngine.qml:867
+#: package/contents/ui/SyncEngine.qml:879
 msgid "The speakers are audibly apart again — run Calibrate when convenient."
 msgstr "De luidsprekers lopen weer hoorbaar uiteen — voer de kalibratie uit wanneer het uitkomt."
 
-#: package/contents/ui/SyncEngine.qml:963
+#: package/contents/ui/SyncEngine.qml:975
 msgid "Speaker timing drifted"
 msgstr "Luidsprekertiming is verlopen"
 
-#: package/contents/ui/SyncEngine.qml:964
+#: package/contents/ui/SyncEngine.qml:976
 msgid "A Bluetooth speaker came back noticeably off its calibration — the sync compensated automatically. Recalibrate when convenient for exact ears."
 msgstr "Een Bluetooth-luidspreker kwam merkbaar naast zijn kalibratie terug — de synchronisatie heeft automatisch gecompenseerd. Kalibreer opnieuw wanneer het uitkomt voor exacte oren."
 
-#: package/contents/ui/SyncEngine.qml:1763
+#: package/contents/ui/SyncEngine.qml:1790
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Twee rondes klikken met een stille controle ertussen — in totaal ongeveer twee minuten. De muziek blijft stil tot de controle klaar is."
 
-#: package/contents/ui/SyncEngine.qml:1765
+#: package/contents/ui/SyncEngine.qml:1792
 msgid "Skipped (empty jack): %1."
 msgstr "Overgeslagen (lege aansluiting): %1."
 
-#: package/contents/ui/SyncEngine.qml:1766
+#: package/contents/ui/SyncEngine.qml:1793
 msgid "Calibration started"
 msgstr "Kalibratie gestart"
 
-#: package/contents/ui/SyncEngine.qml:1827
+#: package/contents/ui/SyncEngine.qml:1854
 msgid "All local outputs (On Air)"
 msgstr "Alle lokale uitgangen (On Air)"
 
-#: package/contents/ui/SyncEngine.qml:2529
+#: package/contents/ui/SyncEngine.qml:2556
 msgid "%1 did not join the sync"
 msgstr "%1 heeft zich niet bij de synchronisatie gevoegd"
 
-#: package/contents/ui/SyncEngine.qml:2531
+#: package/contents/ui/SyncEngine.qml:2558
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "De luidspreker is verbonden, maar kon niet aan de groep worden toegevoegd — zet de synchronisatie uit en weer aan."
 
-#: package/contents/ui/SyncEngine.qml:2532
+#: package/contents/ui/SyncEngine.qml:2559
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "De luidspreker is verbonden, maar zijn audio-uitgang is nooit verschenen — zet de luidspreker uit en weer aan en verbind opnieuw."
 

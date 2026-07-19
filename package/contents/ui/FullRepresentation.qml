@@ -3433,6 +3433,22 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // The caretaker's heartbeat: the last check's verdict
+                        // and time, so "is it even running?" has an answer.
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2.2
+                            visible: Plasmoid.configuration.syncAutoCare === true
+                                     && root.sync.driftLastText !== ""
+                                     && (root.sync._combineWantActive
+                                         || (root.sync._combineIdleParked
+                                             && Plasmoid.configuration.combineWanted === true))
+                            text: root.sync.driftLastText
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.6
+                            wrapMode: Text.WordWrap
+                        }
+
                         // The whole ride, both rounds: the quiet gap between
                         // the calibration clicks and the check clicks reads
                         // as "done" — this row stays up until it really is.

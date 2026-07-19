@@ -840,10 +840,22 @@ Item {
         // the user clicked Disconnect while the cycle was mid-flight:
         // its reconnect phase just reverted their choice — undo that.
         if (cmd.indexOf(": PW_DRIFT;") === 0) {
+            var deWhen = Qt.formatTime(new Date(), "hh:mm");
             var deM = (stdout || "").match(/DRIFT_EST (\d+)/);
-            if (!deM) { _driftPendingMs = -1; return true; }  // quiet/no signal
+            console.log("[ARP] sync: auto-care result — "
+                        + ((stdout || "").trim().split("\n")[0] || "no output"));
+            if (!deM) {
+                _driftPendingMs = -1;   // quiet/no signal
+                driftLastText = i18n("Auto-check %1: too quiet to tell", deWhen);
+                return true;
+            }
             var deMs = parseInt(deM[1], 10);
-            if (deMs < 25) { _driftPendingMs = -1; return true; }  // in sync
+            if (deMs < 25) {
+                _driftPendingMs = -1;
+                driftLastText = i18n("Auto-check %1: in sync", deWhen);
+                return true;
+            }
+            driftLastText = i18n("Auto-check %1: %2 ms apart", deWhen, deMs);
             // Twin confirmation, same philosophy as REFLAT: one estimate is
             // a hypothesis, two within 15 ms are a fact.
             if (_driftPendingMs < 0 || Math.abs(_driftPendingMs - deMs) > 15) {
@@ -1433,6 +1445,9 @@ Item {
     property int _driftPendingMs: -1
     property bool _autoCareVerifyDone: false
     property bool _driftHintShown: false
+    // The caretaker's last word, for the popup — silence would read as
+    // "is this thing even on?", and trust needs a heartbeat.
+    property string driftLastText: ""
 
     Timer {
         id: driftMonitorTimer
@@ -1440,6 +1455,17 @@ Item {
         repeat: true
         running: cfg.syncAutoCare === true && _combineActive
                  && app.anythingPlaying === true
+        onTriggered: _driftProbe()
+        // The first heartbeat comes early: 45 s into the music the fade-in
+        // is long over and the listener gets a "yes, it is running" line
+        // without waiting out the full period.
+        onRunningChanged: running ? driftFirstCheck.restart() : driftFirstCheck.stop()
+    }
+
+    Timer {
+        id: driftFirstCheck
+        interval: 45000
+        repeat: false
         onTriggered: _driftProbe()
     }
 
@@ -1449,6 +1475,7 @@ Item {
         if (_calibrating || _verifyPending || _combineReloopBusy
             || _btKickInFlight || app.recording === true
             || app.alarmEngaged === true) return;
+        console.log("[ARP] sync: auto-care listening (periodic drift check)");
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
         app.exec(": PW_DRIFT; timeout 20 python3 '" + script + "' drift "
                  + _combineSinkName + " ''; true # " + app.nextSeq());
