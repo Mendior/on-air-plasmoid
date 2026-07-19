@@ -93,7 +93,7 @@ KCM.SimpleKCM {
             text: i18n("Count my listening in the worldwide station catalog")
 
             QQC2.ToolTip.visible: hovered
-            QQC2.ToolTip.text: i18n("When a station starts playing, an anonymous click is reported to radio-browser.info (station id only, nothing about you) — popular stations become easier to find for everyone")
+            QQC2.ToolTip.text: i18n("When a station starts playing, a click is reported to radio-browser.info — the request carries the station id only, no account or personal data is added; popular stations become easier to find for everyone")
         }
 
         Kirigami.Separator {
@@ -108,7 +108,7 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: albumArtCheck
             Kirigami.FormData.label: i18n("Album art:")
-            text: i18n("Look up cover art via iTunes")
+            text: i18n("Look up cover art online (Deezer, iTunes)")
         }
 
         QQC2.CheckBox {

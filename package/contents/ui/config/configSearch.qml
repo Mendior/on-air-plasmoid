@@ -307,6 +307,9 @@ KCM.ScrollViewKCM {
         discoverServers()
     }
 
+    // The settings window can be torn down with a preview still sounding.
+    Component.onDestruction: testPlay.stop()
+
     Connections {
         target: plasmoid.configuration
         function onServersChanged() {
@@ -863,7 +866,11 @@ KCM.ScrollViewKCM {
     // }
     MediaPlayer {
         id: testPlay
-        audioOutput: AudioOutput {}
+        audioOutput: AudioOutput {
+            // The preview obeys the widget's configured volume — the
+            // default is full blast.
+            volume: Math.max(0, Math.min(1, (plasmoid.configuration.defaultVolume || 75) / 100))
+        }
         onErrorOccurred: {
             message.positive = false
             message.text = i18n("Error: %1", testPlay.errorString)

@@ -23,11 +23,12 @@ KCM.ScrollViewKCM {
 
     property int dialogMode: -1
 
-    // "all" is the directory's own DNS round-robin over LIVE servers — the
-    // right first knock; the named mirrors stay as the rotation's rungs
-    // (several of the old hardcoded ones have died over the years, and a
-    // settings page should not gamble on history).
-    property var _apiServers: ["all", "de1", "nl1", "at1", "fi1"]
+    // "all" is the directory's own DNS round-robin over LIVE servers — every
+    // fetch starts there deterministically; the named mirrors are only the
+    // retry rotation's rungs (live set as of 2026-07 — most of the old
+    // hardcoded ones are dead DNS by now, and a settings page should not
+    // gamble on history).
+    property var _apiServers: ["all", "de1", "de2"]
     property string _apiServer: "all"
     property var _logoQueue: []
     property int _logoTotal: 0
@@ -50,15 +51,42 @@ KCM.ScrollViewKCM {
             // printf %s, NOT echo: a dash/busybox /bin/sh echo interprets the
             // backslash escapes JSON.stringify emits (\\, \n, \t) and corrupts
             // the exported file (same pattern as _mprisWriteState in main.qml).
-            executable.exec("sh -c 'printf %s \"$1\" > \"$2\" && cat \"$2\"' _ '" + escapedText + "' '" + file + "'");
+            // Write to .tmp then mv: a full disk or a kill mid-write must not
+            // leave a half-written file where the user's backup was.
+            executable.exec("sh -c 'printf %s \"$1\" > \"$2.tmp\" && mv \"$2.tmp\" \"$2\" && cat \"$2\"' _ '" + escapedText + "' '" + file + "'");
         } else {
-            executable.exec("cat '" + file + "'");
+            // 2 MiB cap: a mispicked huge file just fails JSON.parse below
+            // instead of being slurped whole into the shell and the heap.
+            executable.exec("head -c 2097152 '" + file + "'");
         }
     }
 
     function _webUrlOrEmpty(v) {
         const s = v && v !== "null" ? String(v).trim() : "";
         return /^https?:\/\//i.test(s) ? s : "";
+    }
+
+    // Catalogue data must not point the fetcher (or a saved logo URL) at
+    // localhost or the LAN. Literal-IP checks only: QML has no resolver,
+    // so DNS rebinding is out of scope here.
+    function _privateHostUrl(url) {
+        const m = String(url).match(/^https?:\/\/(?:[^@\/]*@)?(\[[^\]]*\]|[^\/:?#]+)/i);
+        if (!m)
+            return false;
+        var host = m[1].toLowerCase();
+        if (host.charAt(0) === "[")
+            host = host.slice(1, -1);
+        if (host === "localhost" || host === "::1")
+            return true;
+        // The private-range test only means anything on a full IPv4
+        // literal — a public domain whose first label looks numeric
+        // (e.g. "10.or.at") is not a LAN address.
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)
+            && /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host))
+            return true;
+        // fc00::/7 (unique local) and fe80::/10 (link local); the ":" test
+        // keeps hostnames that merely START with fc/fd/fe8 out of the net.
+        return host.indexOf(":") !== -1 && /^(fc|fd|fe[89ab])/.test(host);
     }
 
     function showMessage(positive, text) {
@@ -165,7 +193,7 @@ KCM.ScrollViewKCM {
             return;
         }
         _logoFetching = true;
-        _pickApiServer();
+        _apiServer = "all";
         _fetchNextLogo();
     }
 
@@ -347,6 +375,10 @@ KCM.ScrollViewKCM {
     function _saveLogo(job, faviconUrl) {
         if (faviconUrl === "" || job.index >= stationsModel.count)
             return false;
+        // Same self-hosted-station exception as _probeNextCandidate: a LAN
+        // favicon is refused unless it is the user's own station origin.
+        if (_privateHostUrl(faviconUrl) && _originOf(faviconUrl) !== _originOf(job.hostname))
+            return false;
         const cur = stationsModel.get(job.index);
         if (cur && cur.name === job.name) {
             stationsModel.setProperty(job.index, "favicon", faviconUrl);
@@ -424,8 +456,24 @@ KCM.ScrollViewKCM {
     }
 
     function _scrapeHomepageAndProbe(job, apiFavicon, homepage) {
+        if (_privateHostUrl(homepage)) {
+            // A loopback/LAN homepage never gets scraped — continue the
+            // ladder as if the catalogue had no homepage at all.
+            const candidates = [];
+            if (apiFavicon !== "")
+                candidates.push(apiFavicon);
+            for (const u of _hostnameStdCandidates(job.hostname))
+                if (candidates.indexOf(u) === -1)
+                    candidates.push(u);
+            for (const u of _googleFaviconCandidates(job.hostname))
+                if (candidates.indexOf(u) === -1)
+                    candidates.push(u);
+            _probeNextCandidate(job, candidates, 0);
+            return;
+        }
         const xhr = new XMLHttpRequest();
         var guard = null;
+        var keptPrefix = "";
         xhr.open("GET", homepage);
         xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.20)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
@@ -457,6 +505,16 @@ KCM.ScrollViewKCM {
             _probeNextCandidate(job, candidates, 0);
         };
         xhr.onreadystatechange = () => {
+            // Only the first ~96 KiB get scraped anyway — a body that keeps
+            // streaming past 512 KiB must not buffer without bound. abort()
+            // clears responseText, so keep the head first (icons live in
+            // <head>, within the first 96 KiB) and fall back to it below.
+            if (xhr.readyState === xhr.LOADING && xhr.responseText
+                && xhr.responseText.length > 524288) {
+                keptPrefix = xhr.responseText.substring(0, 98304);
+                try { xhr.abort() } catch(e) {}
+                return;
+            }
             if (xhr.readyState !== xhr.DONE)
                 return;
             _clearXhrTimeout(guard);
@@ -468,10 +526,11 @@ KCM.ScrollViewKCM {
             // IMPORTANT: many SPAs/React sites (e.g. pleier.ee uses react-helmet) return 404
             // for unknown paths but the response body still contains the full HTML with icon
             // <link> tags. So scrape whenever the body looks like HTML, regardless of status.
-            const respLen = xhr.responseText ? xhr.responseText.length : 0;
-            const bodyLooksHtml = respLen > 200 && xhr.responseText.indexOf("<") !== -1;
+            const body = xhr.responseText || keptPrefix;
+            const respLen = body.length;
+            const bodyLooksHtml = respLen > 200 && body.indexOf("<") !== -1;
             if (bodyLooksHtml) {
-                const html = xhr.responseText.substring(0, 98304);
+                const html = body.substring(0, 98304);
                 const finalUrl = xhr.responseURL || homepage;
                 const scraped = _extractIconLinks(html, finalUrl);
                 for (const u of scraped) {
@@ -592,6 +651,14 @@ KCM.ScrollViewKCM {
             return;
         }
         const url = candidates[idx];
+        // A LAN address is refused as an SSRF target, EXCEPT when it is
+        // the user's own station origin — a self-hosted stream's own
+        // favicon (from _hostnameStdCandidates) is legitimate intent,
+        // not a remote catalogue/homepage reaching for an internal host.
+        if (_privateHostUrl(url) && _originOf(url) !== _originOf(job.hostname)) {
+            _probeNextCandidate(job, candidates, idx + 1);
+            return;
+        }
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
@@ -599,6 +666,16 @@ KCM.ScrollViewKCM {
         xhr.setRequestHeader("User-Agent", "OnAir/2026.20");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
+            // A "logo" that streams past 512 KiB is not a logo — cap the
+            // buffer; abort() lands back here as DONE and the empty
+            // response fails the magic-byte check like any bad candidate.
+            if (xhr.readyState === xhr.LOADING) {
+                try {
+                    if (xhr.responseText && xhr.responseText.length > 524288)
+                        xhr.abort();
+                } catch(e) {}
+                return;
+            }
             if (xhr.readyState !== xhr.DONE)
                 return;
             _clearXhrTimeout(guard);
@@ -645,7 +722,7 @@ KCM.ScrollViewKCM {
             return;
         }
         _logoFetching = true;
-        _pickApiServer();
+        _apiServer = "all";
         _fetchNextLogo();
     }
 
@@ -683,18 +760,64 @@ KCM.ScrollViewKCM {
                     root._lastSynced = external;
                 } catch (e) {}
             } else {
-                // Unsaved local edits — merge in externally added stations by
-                // hostname so Apply loses neither side.
+                // Unsaved local edits — three-way merge against the
+                // _lastSynced base so Apply loses neither side: rows this
+                // page never touched follow the external outcome (a deletion
+                // stays deleted, a healed hostname moves instead of
+                // duplicating), rows edited here win their conflicts, and
+                // externally added stations still come along.
                 try {
                     const ext = JSON.parse(external);
-                    const have = {};
-                    for (var i = 0; i < stationsModel.count; i++)
-                        have[stationsModel.get(i).hostname] = true;
-                    var added = false;
-                    for (const srv of ext) {
-                        if (!have[srv.hostname]) { stationsModel.append(srv); added = true; }
+                    let base = [];
+                    try { base = JSON.parse(root._lastSynced) || []; } catch (e2) {}
+                    // Key-order-stable serialization. The JSON round-trip
+                    // flattens ListModel rows to plain objects (for..in over
+                    // a model row drags wrapper internals along with the
+                    // roles) and the wrapper's objectName is not an edit.
+                    const norm = (o) => {
+                        const plain = JSON.parse(JSON.stringify(o));
+                        delete plain.objectName;
+                        const keys = [];
+                        for (const k in plain)
+                            if (plain[k] !== undefined) keys.push(k);
+                        keys.sort();
+                        const flat = {};
+                        for (const k of keys) flat[k] = plain[k];
+                        return JSON.stringify(flat);
+                    };
+                    const baseByHost = {};
+                    for (const b of base) baseByHost[b.hostname] = norm(b);
+                    const extByHost = {};
+                    for (const srv of ext) extByHost[srv.hostname] = srv;
+                    var changed = false;
+                    // Backwards: removals must not shift unvisited rows.
+                    for (var i = stationsModel.count - 1; i >= 0; i--) {
+                        const cur = stationsModel.get(i);
+                        const baseNorm = baseByHost[cur.hostname];
+                        if (baseNorm === undefined || norm(cur) !== baseNorm)
+                            continue; // locally added or edited — local wins
+                        const extRow = extByHost[cur.hostname];
+                        if (extRow === undefined) {
+                            // Externally deleted, untouched here — do not
+                            // resurrect it.
+                            stationsModel.remove(i);
+                            changed = true;
+                        } else if (norm(extRow) !== baseNorm) {
+                            stationsModel.set(i, extRow);
+                            changed = true;
+                        }
                     }
-                    if (added) root.cfg_servers = JSON.stringify(getServersArray());
+                    const have = {};
+                    for (var j = 0; j < stationsModel.count; j++)
+                        have[stationsModel.get(j).hostname] = true;
+                    for (const srv of ext) {
+                        if (!have[srv.hostname]) { stationsModel.append(srv); changed = true; }
+                    }
+                    if (changed) root.cfg_servers = JSON.stringify(getServersArray());
+                    // The base advances to the state just merged — otherwise
+                    // an adopted row reads as a local edit next time and a
+                    // later external deletion would resurrect it.
+                    root._lastSynced = external;
                 } catch (e) {}
             }
         }
@@ -796,6 +919,11 @@ KCM.ScrollViewKCM {
                             id: faviconImage
 
                             anchors.fill: parent
+                            // Decode at display size: a station's 512-pixel
+                            // logo otherwise keeps a full-size texture per
+                            // visible row (same cap as MediaListItem).
+                            sourceSize.width: 64
+                            sourceSize.height: 64
                             source: faviconHolder.faviconUrl
                             fillMode: Image.PreserveAspectFit
                             asynchronous: true
@@ -925,7 +1053,7 @@ KCM.ScrollViewKCM {
                 _logoDone = 0;
                 _logoFound = 0;
                 _logoFetching = true;
-                _pickApiServer();
+                _apiServer = "all";
                 _fetchNextLogo();
             }
         }
@@ -1024,18 +1152,36 @@ KCM.ScrollViewKCM {
 
         function onExited(cmd, exitCode, exitStatus, stdout, stderr) {
             var formattedText = stdout.trim();
-            if (cmd.startsWith("cat")) {
+            if (cmd.startsWith("head")) {
                 //   if (formattedText != cfg_servers) {
                 try {
                     const servers = JSON.parse(formattedText);
                     stationsModel.clear();
-                    for (const srv of servers) {
-                        // Imports were the last road into the config without
-                        // the favicon gate — an .arp written by hand (or by
-                        // an older version) could carry file://, data: or
-                        // "null" straight into Image.source and the shell.
-                        srv.favicon = _webUrlOrEmpty(srv.favicon);
-                        stationsModel.append(srv);
+                    // An .arp is just a file the user picked: rebuild each
+                    // row from the fields the config actually uses, coerced
+                    // and capped, instead of appending whatever object the
+                    // file carried (a file:// favicon, a 10 MB "name", keys
+                    // nothing here ever wrote). 500 rows / 500 chars is far
+                    // beyond any real station list.
+                    const clip = (v) => v == null ? "" : String(v).substring(0, 500);
+                    for (const srv of servers.slice(0, 500)) {
+                        const row = {
+                            "name": clip(srv.name),
+                            "hostname": clip(srv.hostname),
+                            "favicon": _webUrlOrEmpty(clip(srv.favicon)),
+                            "active": srv.active !== undefined ? Boolean(srv.active) : true
+                        };
+                        // No URL = unplayable and unremovable-by-URL — the
+                        // add dialog refuses these too.
+                        if (row.hostname === "")
+                            continue;
+                        if (row.name === "")
+                            row.name = row.hostname;
+                        if (srv.country !== undefined)
+                            row.country = clip(srv.country);
+                        if (srv.uuid !== undefined)
+                            row.uuid = clip(srv.uuid);
+                        stationsModel.append(row);
                     }
                     cfg_servers = JSON.stringify(getServersArray());
                     showMessage(true, i18n("Configuration has been loaded. Click 'Apply' to save changes."));
