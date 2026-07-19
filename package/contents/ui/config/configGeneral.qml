@@ -70,19 +70,37 @@ KCM.ScrollViewKCM {
     // localhost or the LAN. Literal-IP checks only: QML has no resolver,
     // so DNS rebinding is out of scope here.
     function _privateHostUrl(url) {
-        const m = String(url).match(/^https?:\/\/(?:[^@\/]*@)?(\[[^\]]*\]|[^\/:?#]+)/i);
+        // Strip userinfo up to the LAST '@' so "a@b@10.0.0.5" cannot hide the
+        // real host behind an earlier '@'.
+        const m = String(url).match(/^https?:\/\/(?:[^\/?#]*@)?(\[[^\]]*\]|[^\/:?#]+)/i);
         if (!m)
             return false;
         var host = m[1].toLowerCase();
         if (host.charAt(0) === "[")
             host = host.slice(1, -1);
-        if (host === "localhost" || host === "::1")
+        if (host === "localhost" || host === "::1" || host === "::")
             return true;
-        // The private-range test only means anything on a full IPv4
-        // literal — a public domain whose first label looks numeric
-        // (e.g. "10.or.at") is not a LAN address.
-        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)
-            && /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host))
+        // Find the IPv4 an address literal actually targets: a plain dotted
+        // quad, or the IPv4 embedded in an IPv4-mapped IPv6 literal
+        // (::ffff:192.168.0.1 dotted, or ::ffff:c0a8:0001 hex) — both route to
+        // that IPv4, so the private-range test below must see it. A public
+        // domain whose first label merely looks numeric ("10.or.at") has no
+        // dotted quad and is left alone.
+        var v4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ? host : "";
+        if (!v4 && host.indexOf(":") !== -1) {
+            var dotted = host.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+            if (dotted) {
+                v4 = dotted[1];
+            } else {
+                var hex = host.match(/:ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+                if (hex) {
+                    var hi = parseInt(hex[1], 16), lo = parseInt(hex[2], 16);
+                    v4 = ((hi >> 8) & 255) + "." + (hi & 255) + "."
+                       + ((lo >> 8) & 255) + "." + (lo & 255);
+                }
+            }
+        }
+        if (v4 && /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(v4))
             return true;
         // fc00::/7 (unique local) and fe80::/10 (link local); the ":" test
         // keeps hostnames that merely START with fc/fd/fe8 out of the net.
