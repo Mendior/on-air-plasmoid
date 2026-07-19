@@ -1155,7 +1155,8 @@ KCM.ScrollViewKCM {
                             "name": clip(srv.name),
                             "hostname": clip(srv.hostname),
                             "favicon": _webUrlOrEmpty(clip(srv.favicon)),
-                            "active": srv.active !== undefined ? Boolean(srv.active) : true
+                            "active": srv.active === undefined ? true
+                                      : srv.active !== false && srv.active !== "false" && srv.active !== 0
                         };
                         // No URL = unplayable and unremovable-by-URL — the
                         // add dialog refuses these too.

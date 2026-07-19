@@ -869,7 +869,8 @@ KCM.ScrollViewKCM {
         audioOutput: AudioOutput {
             // The preview obeys the widget's configured volume — the
             // default is full blast.
-            volume: Math.max(0, Math.min(1, (plasmoid.configuration.defaultVolume || 75) / 100))
+            volume: Math.max(0, Math.min(1, (plasmoid.configuration.defaultVolume === undefined
+                                             ? 75 : plasmoid.configuration.defaultVolume) / 100))
         }
         onErrorOccurred: {
             message.positive = false
