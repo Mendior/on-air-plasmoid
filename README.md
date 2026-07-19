@@ -63,7 +63,7 @@ Like any web server, these services see ordinary request metadata (your IP addre
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.20.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.21.plasmoid
 ```
 
 ## Usage tips
