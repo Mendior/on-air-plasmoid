@@ -109,3 +109,44 @@ def test_unrelated_noise_gives_no_signal():
     mic = [int(rng.gauss(0, 800)) for _ in range(8 * RATE)]
     verdict = calibrate._drift_estimate(mic, mon, RATE)
     assert verdict in ("DRIFT_NOSIG", "DRIFT_EST 0"), verdict
+
+
+def test_monitor_recorder_targets_the_sink_itself_on_pipewire(monkeypatch):
+    # "<sink>.monitor" is a pulse-layer name only — pw-record given an
+    # unresolvable --target falls back to the default SOURCE, and both
+    # drift recorders end up on the microphone (verified live: pw-dump
+    # lists no *.monitor node, and the fallback linked to the mic ports).
+    # Native capture must target the sink node with stream.capture.sink.
+    monkeypatch.setattr(calibrate.shutil, "which",
+                        lambda name: "/usr/bin/" + name)
+    args = calibrate.monitor_recorder_args("onair_combined_7", "/tmp/x.wav")
+    assert args[0] == "pw-record"
+    assert "onair_combined_7" in args
+    assert "onair_combined_7.monitor" not in args
+    p = args.index("-P")
+    assert "stream.capture.sink = true" in args[p + 1]
+
+
+def test_monitor_recorder_keeps_the_pulse_monitor_device_as_fallback(monkeypatch):
+    # In the pulse compatibility layer the .monitor source genuinely
+    # exists — parecord keeps it.
+    monkeypatch.setattr(calibrate.shutil, "which", lambda name: None)
+    args = calibrate.monitor_recorder_args("onair_combined_7", "/tmp/x.wav")
+    assert args[0] == "parecord"
+    assert "--device=onair_combined_7.monitor" in args
+
+
+def test_drift_runs_under_the_sigterm_conversion_with_a_sentinel_net():
+    # The guard runs the probe under `timeout 20`; a SIGTERM that skipped
+    # the finally blocks would orphan two recorder children holding the
+    # microphone open. The conversion must be installed BEFORE the drift
+    # dispatch, and a crash inside it must print a sentinel, not a
+    # traceback — the caller reads sentinels only.
+    src = pathlib.Path(SPEC.origin).read_text()
+    main_body = src.split("def main():", 1)[1]
+    assert main_body.index("signal.signal(signal.SIGTERM") \
+        < main_body.index('== "drift"')
+    drift_branch = main_body.split('== "drift"', 1)[1]
+    assert drift_branch.index("except Exception") \
+        < drift_branch.index('== "verify"')
+    assert 'print("DRIFT_NOSIG")' in drift_branch.split('== "verify"')[0]

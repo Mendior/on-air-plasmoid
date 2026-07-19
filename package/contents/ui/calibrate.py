@@ -256,6 +256,25 @@ def recorder_args(mic, rec):
     return args + [rec]
 
 
+def monitor_recorder_args(sink, rec):
+    """The capture command line for what a sink is PLAYING — its monitor.
+
+    "<sink>.monitor" is a pulse-compatibility name only: PipeWire has no
+    node called that, and pw-record given an unresolvable --target falls
+    back to the default SOURCE — the microphone. Both drift recorders then
+    hear the same mic and the estimator correlates the mic with itself.
+    Native pw-record reaches the monitor by targeting the sink node itself
+    with stream.capture.sink; the pulse fallback keeps the .monitor device
+    name, which genuinely exists in that layer."""
+    if shutil.which("pw-record"):
+        return ["pw-record", "--rate", str(RATE), "--channels", "1",
+                "-P", "{ stream.capture.sink = true }",
+                "--target", sink, rec]
+    return ["parecord", "--rate=%d" % RATE, "--channels=1",
+            "--format=s16le", "--file-format=wav",
+            "--device=" + sink + ".monitor", rec]
+
+
 def _record_one(sink, click, mic, rec, seconds=None):
     """One click through `sink` while the mic records into `rec` — the
     shared plumbing under both the calibration and the verify pass. The
@@ -809,25 +828,28 @@ def cmd_drift(argv):
     mon_f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     procs = []
     try:
-        procs.append(subprocess.Popen(recorder_args(mic, mic_f),
-                                      stdout=subprocess.DEVNULL,
-                                      stderr=subprocess.DEVNULL))
-        procs.append(subprocess.Popen(recorder_args(combined + ".monitor", mon_f),
-                                      stdout=subprocess.DEVNULL,
-                                      stderr=subprocess.DEVNULL))
-        time.sleep(DRIFT_SECONDS)
-    finally:
-        for p in procs:
-            try:
-                p.terminate()
-                p.wait(timeout=2)
-            except Exception:
+        # One outer finally owns the WAVs: a recorder Popen that raises
+        # (binary missing) must still unlink BOTH temp files, not just
+        # reap the recorder it never started.
+        try:
+            procs.append(subprocess.Popen(recorder_args(mic, mic_f),
+                                          stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL))
+            procs.append(subprocess.Popen(monitor_recorder_args(combined, mon_f),
+                                          stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL))
+            time.sleep(DRIFT_SECONDS)
+        finally:
+            for p in procs:
                 try:
-                    p.kill()
-                    p.wait(timeout=1)
+                    p.terminate()
+                    p.wait(timeout=2)
                 except Exception:
-                    pass
-    try:
+                    try:
+                        p.kill()
+                        p.wait(timeout=1)
+                    except Exception:
+                        pass
         mic_s, rate = read_mono(mic_f)
         mon_s, _ = read_mono(mon_f)
     finally:
@@ -843,8 +865,22 @@ def cmd_drift(argv):
 
 
 def main():
+    # The widget's guard runs EVERY mode under `timeout`, which SIGTERMs a
+    # run that overran (a dying sink holding each paplay for its full 5 s).
+    # A plain SIGTERM skips every finally-block — the calibration leaks its
+    # click and recording WAVs, and the drift probe leaves two recorder
+    # children holding the microphone open indefinitely. Convert it up
+    # front so the finally blocks always run; cmd_verify re-installs the
+    # same conversion around its own mute bookkeeping. SystemExit is not
+    # caught by `except Exception`, so the sentinel protocols are unchanged.
+    signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
     if len(sys.argv) > 1 and sys.argv[1] == "drift":
-        cmd_drift(sys.argv[2:])
+        try:
+            cmd_drift(sys.argv[2:])
+        except Exception:
+            # The caller reads sentinels, never tracebacks — a missing
+            # recorder binary is "cannot tell", not a stack dump.
+            print("DRIFT_NOSIG")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "verify":
         cmd_verify(sys.argv[2:])
@@ -855,13 +891,6 @@ def main():
     wired, bt = sys.argv[1], sys.argv[2]
     mic = sys.argv[3] if len(sys.argv) > 3 else ""
     extras = sys.argv[4:4 + MAX_EXTRA_SINKS]
-    # The widget's guard runs this under `timeout`, which SIGTERMs a run that
-    # overran (a dying sink holding each paplay for its full 5 s). A plain
-    # SIGTERM skips every finally-block, leaking the click and recording WAVs
-    # in /tmp on each wedged run — cmd_verify already converts it; the
-    # calibration path must too. SystemExit is not caught by `except
-    # Exception`, so the sentinel protocol is unchanged.
-    signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
     click = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
         # The microphone must provably hear ANYTHING before forty seconds of
