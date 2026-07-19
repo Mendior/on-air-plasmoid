@@ -75,10 +75,15 @@ PlasmoidItem {
     // Timer's initial value — needed to draw the sleep-timer progress ring
     property int sleepTotalSec: 0
 
-    // MPRIS files live in XDG_RUNTIME_DIR (0700, tmpfs) — instead of /tmp
+    // MPRIS files live in XDG_RUNTIME_DIR (0700, tmpfs); a system without
+    // one falls back to the user's own cache dir — never world-readable
+    // /tmp, where predictable names would hand another local user the
+    // now-playing history and a symlink seat at the state file.
     readonly property string _mprisRunDir: {
         var loc = Labs.StandardPaths.writableLocation(Labs.StandardPaths.RuntimeLocation).toString();
-        return loc.indexOf("file://") === 0 && loc.length > 7 ? loc.substring(7) : "/tmp";
+        if (loc.indexOf("file://") === 0 && loc.length > 7) return loc.substring(7);
+        var cache = Labs.StandardPaths.writableLocation(Labs.StandardPaths.CacheLocation).toString();
+        return cache.indexOf("file://") === 0 && cache.length > 7 ? cache.substring(7) : "/tmp";
     }
     // Use the STABLE per-applet id (not Date.now()): a restart reuses the same
     // file so the old daemon is replaced rather than orphaned (no ghost "On Air"

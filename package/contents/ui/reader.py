@@ -145,8 +145,14 @@ def main():
                     # TAB separator: '::' appeared in real titles and broke the
                     # QML split. A TAB cannot occur in a stream title
                     # (we replace it with a space just in case).
-                    safe_title = cleaned_title.replace("\t", " ")
-                    safe_url = stream_url.replace("\t", " ")
+                    # Tabs are the field separator and NEWLINES are the
+                    # record separator of the line protocol — a station
+                    # whose ICY title carries either would split the line
+                    # and feed the parser a stray half-record.
+                    safe_title = cleaned_title.replace("\t", " ") \
+                                              .replace("\n", " ").replace("\r", " ")
+                    safe_url = stream_url.replace("\t", " ") \
+                                         .replace("\n", " ").replace("\r", " ")
                     stream_metadata = safe_title + "\t" + safe_url
                     if stream_metadata != meta:
                         print(stream_metadata)

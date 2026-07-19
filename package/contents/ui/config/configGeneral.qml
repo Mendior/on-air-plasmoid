@@ -23,8 +23,12 @@ KCM.ScrollViewKCM {
 
     property int dialogMode: -1
 
-    property var _apiServers: ["de1", "de2", "nl1", "at1", "fi1"]
-    property string _apiServer: "de1"
+    // "all" is the directory's own DNS round-robin over LIVE servers — the
+    // right first knock; the named mirrors stay as the rotation's rungs
+    // (several of the old hardcoded ones have died over the years, and a
+    // settings page should not gamble on history).
+    property var _apiServers: ["all", "de1", "nl1", "at1", "fi1"]
+    property string _apiServer: "all"
     property var _logoQueue: []
     property int _logoTotal: 0
     property int _logoDone: 0
