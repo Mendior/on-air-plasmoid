@@ -23,8 +23,11 @@ PlasmaComponents3.ItemDelegate {
     // arrows hide themselves instead of doing something surprising.
     readonly property bool reorderable: root.searchFilter === ""
     readonly property bool isCurrent: lastPlay === listItem.targetIndex && (isPlaying() || root._casting)
+    // Cast-only playback buffers on the device — the idle local player would
+    // otherwise leave the current row on an eternal BusyIndicator.
     readonly property bool isBuffered: playMusic.mediaStatus === MediaPlayer.BufferedMedia
                                        || playMusic.mediaStatus === MediaPlayer.BufferingMedia
+                                       || (root._casting && !root._castLocalPlay)
     readonly property bool isLoading: listItem.isCurrent && !listItem.isBuffered
     readonly property bool isFav: root.isFavorite(model.name)
     readonly property bool isKeyboardCurrent: ListView.isCurrentItem && ListView.view && ListView.view.activeFocus
@@ -303,9 +306,13 @@ PlasmaComponents3.ItemDelegate {
                         target: trackName
                         from: 0
                         to: -trackName.contentWidth
-                        duration: Math.round(Math.abs(to - from) / Kirigami.Units.gridUnit
-                                             * 300 * Plasmoid.configuration.speedfactor)
+                        // Clamped: a corrupt speedfactor must not yield a
+                        // zero/negative duration
+                        duration: Math.round(Math.abs(to - from) / Kirigami.Units.gridUnit * 300
+                                             * Math.max(0.1, Math.min(8, (Plasmoid.configuration.speedfactor || 1))))
+                        // longDuration is 0 when animations are disabled system-wide
                         running: listItem.hovered && trackName.contentWidth > trackRect.width
+                                 && Kirigami.Units.longDuration > 0
                         loops: 1
                         onFinished: {
                             from = trackRect.width
@@ -332,7 +339,9 @@ PlasmaComponents3.ItemDelegate {
             // Always in the layout while reorderable (opacity alone hides):
             // popping in and out of existence shifted the row's content the
             // moment the pointer arrived, so the target moved under it.
-            opacity: (dragArea.pressed || listItem.hovered || listItem.isKeyboardCurrent) ? 0.75 : 0.0
+            // Tablet mode has no hover — the controls stay revealed there.
+            opacity: (dragArea.pressed || listItem.hovered || listItem.isKeyboardCurrent
+                      || Kirigami.Settings.tabletMode) ? 0.75 : 0.0
             visible: listItem.reorderable
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
 
@@ -401,7 +410,8 @@ PlasmaComponents3.ItemDelegate {
             // that pop into the layout on hover moved the target under the
             // arriving pointer. Opacity hides; enabledState keeps the
             // invisible button unclickable and out of the Tab order.
-            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0
+            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus
+                      || Kirigami.Settings.tabletMode) ? 0.6 : 0.0
             visible: listItem.reorderable && model.index > 0
             enabledState: opacity > 0
             tooltipText: i18n("Move up")
@@ -424,7 +434,8 @@ PlasmaComponents3.ItemDelegate {
             Layout.alignment: Qt.AlignVCenter
             iconName: "go-down"
             iconScale: 0.55
-            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0
+            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus
+                      || Kirigami.Settings.tabletMode) ? 0.6 : 0.0
             visible: listItem.reorderable
                      && listItem.ListView.view
                      && model.index < listItem.ListView.view.count - 1
@@ -458,7 +469,8 @@ PlasmaComponents3.ItemDelegate {
             checkedIconColor: "#FFFFFF"
             // Keyboard-current row (or own focus) reveals the button too —
             // visible:false items are skipped by Tab and screen readers
-            opacity: armed ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0)
+            opacity: armed ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus
+                                     || Kirigami.Settings.tabletMode) ? 0.6 : 0.0)
             visible: true            // reserved slot — see the arrows above
             enabledState: opacity > 0
             tooltipText: armed
@@ -497,7 +509,8 @@ PlasmaComponents3.ItemDelegate {
             iconScale: 0.55
             checkable: true
             checked: listItem.isFav
-            opacity: listItem.isFav ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.85 : 0.0)
+            opacity: listItem.isFav ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus
+                                              || Kirigami.Settings.tabletMode) ? 0.85 : 0.0)
             visible: opacity > 0.0
             tooltipText: listItem.isFav ? i18n("Remove from favorites") : i18n("Add to favorites")
             onClicked: root.toggleFavorite(model.name)

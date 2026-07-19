@@ -17,7 +17,8 @@ MouseArea {
     property int wheelDelta: 0
 
     function setToolTip() {
-        if (isPlaying() && root.title !== Plasmoid.title) {
+        // Cast-only playback (local player idle, stream on a device) counts too
+        if ((isPlaying() || root._casting) && root.title !== Plasmoid.title) {
             tooltip.mainText = root.title;
             tooltip.subText = Plasmoid.title;
         } else {
@@ -48,7 +49,7 @@ MouseArea {
     Accessible.role: Accessible.Button
     Accessible.name: root.recording
         ? i18n("%1 — recording", Plasmoid.title)
-        : (isPlaying() && root.title !== Plasmoid.title
+        : ((isPlaying() || root._casting) && root.title !== Plasmoid.title
             ? i18n("%1 — playing %2", Plasmoid.title, root.title)
             : Plasmoid.title)
     Accessible.description: Plasmoid.metaData.description
@@ -57,9 +58,10 @@ MouseArea {
     onClicked: (mouse) => {
         if (mouse.button === Qt.MiddleButton) {
             if (Plasmoid.configuration.lastplay) {
-                if (isPlaying()) {
+                if (isPlaying() || root._casting) {
                     // Toggle semantics also while a preview/local file plays
-                    // (lastPlay is -1 then and refreshServer would no-op)
+                    // (lastPlay is -1 then and refreshServer would no-op) and
+                    // while casting — stopWithFade stops cast devices too
                     stopWithFade();
                 } else if (stationsModel.count > 0) {
                     const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0;
@@ -96,7 +98,7 @@ MouseArea {
         fallback: Plasmoid.configuration.iconFallback
         anchors.fill: parent
         isMask: true
-        color: isPlaying() ? root.accent : Kirigami.Theme.textColor
+        color: (isPlaying() || root._casting) ? root.accent : Kirigami.Theme.textColor
 
         Behavior on color { ColorAnimation { duration: 400 } }
     }
@@ -106,7 +108,7 @@ MouseArea {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 1
-        visible: isPlaying()
+        visible: isPlaying() || root._casting
         // Don't tick while the panel window isn't on screen at all
         // (auto-hidden panel, screen off) — nobody is watching.
         animating: visible && panelIconWidget.Window.visibility !== Window.Hidden
@@ -133,9 +135,12 @@ MouseArea {
 
         SequentialAnimation on opacity {
             loops: Animation.Infinite
-            running: recDot.visible
+            // longDuration is 0 when animations are disabled system-wide
+            running: recDot.visible && Kirigami.Units.longDuration > 0
             NumberAnimation { from: 1.0; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
             NumberAnimation { from: 0.35; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+            // Speed flipped to Instant mid-cycle: restore full dot, not a dim one
+            onStopped: recDot.opacity = 1.0
         }
     }
 

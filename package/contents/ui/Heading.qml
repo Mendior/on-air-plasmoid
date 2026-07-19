@@ -78,9 +78,12 @@ RowLayout {
             // The strip "breathes" while music is playing
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
-                running: isPlaying() && root.expanded
+                // longDuration is 0 when animations are disabled system-wide
+                running: isPlaying() && root.expanded && Kirigami.Units.longDuration > 0
                 NumberAnimation { from: 0.95; to: 0.45; duration: 1400; easing.type: Easing.InOutSine }
                 NumberAnimation { from: 0.45; to: 0.95; duration: 1400; easing.type: Easing.InOutSine }
+                // Speed flipped to Instant mid-cycle: settle on the rest opacity, not mid-breath
+                onStopped: accentUnderline.opacity = 0.95
             }
         }
 

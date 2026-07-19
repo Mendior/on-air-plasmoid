@@ -92,10 +92,13 @@ Item {
         opacity: 0
 
         ParallelAnimation {
-            running: circleRoot.glowPulse
+            // longDuration is 0 when animations are disabled system-wide
+            running: circleRoot.glowPulse && Kirigami.Units.longDuration > 0
             loops: Animation.Infinite
             NumberAnimation { target: pulseRing; property: "scale"; from: 1.0; to: 1.38; duration: 1900; easing.type: Easing.OutQuad }
             NumberAnimation { target: pulseRing; property: "opacity"; from: 0.6; to: 0; duration: 1900; easing.type: Easing.OutQuad }
+            // Speed flipped to Instant mid-cycle: land on the rest frame, not a ghost ring
+            onStopped: { pulseRing.scale = 1.0; pulseRing.opacity = 0 }
         }
     }
 
