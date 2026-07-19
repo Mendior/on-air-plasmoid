@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-19 06:29+0300\n"
+"POT-Creation-Date: 2026-07-19 10:32+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Swedish\n"
@@ -46,7 +46,7 @@ msgstr "Ljud"
 
 #: package/contents/ui/CompactRepresentation.qml:86
 #: package/contents/ui/FullRepresentation.qml:2593
-#: package/contents/ui/FullRepresentation.qml:3908
+#: package/contents/ui/FullRepresentation.qml:3933
 msgid "Volume"
 msgstr "Volym"
 
@@ -203,109 +203,109 @@ msgstr "Mittenklick spelar/stoppar den senaste stationen"
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "Mittenklicka på panelikonen för att spela eller stoppa den senaste stationen"
 
-#: package/contents/ui/config/configGeneral.qml:160
+#: package/contents/ui/config/configGeneral.qml:164
 msgid "All stations already have a logo."
 msgstr "Alla stationer har redan en logotyp."
 
-#: package/contents/ui/config/configGeneral.qml:178
+#: package/contents/ui/config/configGeneral.qml:182
 msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
 msgstr "Logotyphämtning klar: %1 / %2 stationer uppdaterade. Klicka på Verkställ för att spara."
 
-#: package/contents/ui/config/configGeneral.qml:180
+#: package/contents/ui/config/configGeneral.qml:184
 msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
 msgstr "Logotyphämtning klar: %1 / %2 stationer uppdaterade (%3 kunde inte hittas automatiskt). Klicka på Verkställ för att spara."
 
-#: package/contents/ui/config/configGeneral.qml:640
+#: package/contents/ui/config/configGeneral.qml:644
 msgid "No stations to refresh."
 msgstr "Inga stationer att uppdatera."
 
-#: package/contents/ui/config/configGeneral.qml:725
+#: package/contents/ui/config/configGeneral.qml:729
 msgid "Edit"
 msgstr "Redigera"
 
-#: package/contents/ui/config/configGeneral.qml:733
+#: package/contents/ui/config/configGeneral.qml:737
 msgid "Hide"
 msgstr "Dölj"
 
-#: package/contents/ui/config/configGeneral.qml:733
+#: package/contents/ui/config/configGeneral.qml:737
 msgid "Show"
 msgstr "Visa"
 
-#: package/contents/ui/config/configGeneral.qml:743
+#: package/contents/ui/config/configGeneral.qml:747
 msgid "Remove"
 msgstr "Ta bort"
 
-#: package/contents/ui/config/configGeneral.qml:863
+#: package/contents/ui/config/configGeneral.qml:867
 #: package/contents/ui/config/configSearch.qml:516
 msgid "Add Station"
 msgstr "Lägg till station"
 
-#: package/contents/ui/config/configGeneral.qml:863
+#: package/contents/ui/config/configGeneral.qml:867
 msgid "Edit station"
 msgstr "Redigera station"
 
-#: package/contents/ui/config/configGeneral.qml:934
+#: package/contents/ui/config/configGeneral.qml:938
 #: package/contents/ui/config/configSearch.qml:699
 msgid "Name:"
 msgstr "Namn:"
 
-#: package/contents/ui/config/configGeneral.qml:940
+#: package/contents/ui/config/configGeneral.qml:944
 msgid "URL:"
 msgstr "URL:"
 
-#: package/contents/ui/config/configGeneral.qml:947
+#: package/contents/ui/config/configGeneral.qml:951
 msgid "Logo URL:"
 msgstr "Logotypens URL:"
 
-#: package/contents/ui/config/configGeneral.qml:948
+#: package/contents/ui/config/configGeneral.qml:952
 msgid "e.g. https://example.com/logo.png"
 msgstr "t.ex. https://example.com/logo.png"
 
-#: package/contents/ui/config/configGeneral.qml:956
+#: package/contents/ui/config/configGeneral.qml:960
 msgid "Active"
 msgstr "Aktiv"
 
-#: package/contents/ui/config/configGeneral.qml:1037
+#: package/contents/ui/config/configGeneral.qml:1041
 msgid "Configuration has been loaded. Click 'Apply' to save changes."
 msgstr "Inställningarna har lästs in. Klicka på ”Verkställ” för att spara ändringarna."
 
-#: package/contents/ui/config/configGeneral.qml:1039
+#: package/contents/ui/config/configGeneral.qml:1043
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "Fel vid inläsning av inställningarna. Prova att välja en annan fil."
 
-#: package/contents/ui/config/configGeneral.qml:1043
+#: package/contents/ui/config/configGeneral.qml:1047
 msgid "Your configuration was saved successfully."
 msgstr "Dina inställningar sparades."
 
-#: package/contents/ui/config/configGeneral.qml:1045
+#: package/contents/ui/config/configGeneral.qml:1049
 msgid "Error, make sure the selected directory is writable!"
 msgstr "Fel — kontrollera att den valda mappen är skrivbar!"
 
-#: package/contents/ui/config/configGeneral.qml:1105
+#: package/contents/ui/config/configGeneral.qml:1109
 msgid "Add…"
 msgstr "Lägg till…"
 
-#: package/contents/ui/config/configGeneral.qml:1114
+#: package/contents/ui/config/configGeneral.qml:1118
 msgid "Fetching… %1 / %2"
 msgstr "Hämtar… %1 / %2"
 
-#: package/contents/ui/config/configGeneral.qml:1115
+#: package/contents/ui/config/configGeneral.qml:1119
 msgid "Fetch missing logos"
 msgstr "Hämta saknade logotyper"
 
-#: package/contents/ui/config/configGeneral.qml:1124
+#: package/contents/ui/config/configGeneral.qml:1128
 msgid "Re-fetch all"
 msgstr "Hämta om alla"
 
-#: package/contents/ui/config/configGeneral.qml:1129
+#: package/contents/ui/config/configGeneral.qml:1133
 msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
 msgstr "Hämta nya logotyper för alla stationer; befintliga behålls om inget bättre hittas"
 
-#: package/contents/ui/config/configGeneral.qml:1144
+#: package/contents/ui/config/configGeneral.qml:1148
 msgid "Import…"
 msgstr "Importera…"
 
-#: package/contents/ui/config/configGeneral.qml:1150
+#: package/contents/ui/config/configGeneral.qml:1154
 msgid "Export…"
 msgstr "Exportera…"
 
@@ -738,7 +738,7 @@ msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klick = sök på YouTube · ⬇ = ladda ner"
 
 #: package/contents/ui/FullRepresentation.qml:2135
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:1915
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:1932
 msgid "My Music"
 msgstr "Min musik"
 
@@ -1062,123 +1062,127 @@ msgstr "Håll synkroniseringen justerad automatiskt"
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Lyssnar på det spelande ljudet med mikrofonen med några minuters mellanrum och kontrollerar synkroniseringen igen när högtalarna glider isär. Ljudet behandlas bara på den här datorn — sparas aldrig, skickas aldrig någonstans."
 
-#: package/contents/ui/FullRepresentation.qml:3468
+#: package/contents/ui/FullRepresentation.qml:3469
+msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
+msgstr "%1 är ihågkommen för synkroniseringen — anslut den så återansluter den automatiskt."
+
+#: package/contents/ui/FullRepresentation.qml:3492
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Omgång 1 av 2 — klick genom varje högtalare…"
 
-#: package/contents/ui/FullRepresentation.qml:3469
+#: package/contents/ui/FullRepresentation.qml:3493
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Omgång 2 av 2 — tyst, kontrollerar resultatet…"
 
-#: package/contents/ui/FullRepresentation.qml:3507
+#: package/contents/ui/FullRepresentation.qml:3531
 msgid "%1 plays in the group"
 msgstr "%1 spelar i gruppen"
 
-#: package/contents/ui/FullRepresentation.qml:3520
+#: package/contents/ui/FullRepresentation.qml:3544
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Om den här högtalaren spelar i gruppen — avmarkera för att lämna den utanför utan att koppla från den. Sparas för enheten."
 
-#: package/contents/ui/FullRepresentation.qml:3529
+#: package/contents/ui/FullRepresentation.qml:3553
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (inget anslutet)"
 
-#: package/contents/ui/FullRepresentation.qml:3543
+#: package/contents/ui/FullRepresentation.qml:3567
 msgid "Balance of %1"
 msgstr "Balans för %1"
 
-#: package/contents/ui/FullRepresentation.qml:3552
+#: package/contents/ui/FullRepresentation.qml:3576
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Den här högtalarens andel av volymen — balansen följer varje rörelse av huvudreglaget och kommer ihåg per enhet. Den påverkar bara det den här widgeten spelar; volymen per enhet i systemets ljudinställningar är ett eget, orört lager — därför skiljer sig de siffrorna från de här reglagen."
 
-#: package/contents/ui/FullRepresentation.qml:3569
+#: package/contents/ui/FullRepresentation.qml:3593
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:3570
+#: package/contents/ui/FullRepresentation.qml:3594
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:3571
+#: package/contents/ui/FullRepresentation.qml:3595
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:3572
+#: package/contents/ui/FullRepresentation.qml:3596
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:3577
+#: package/contents/ui/FullRepresentation.qml:3601
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Vilka kanaler den här högtalaren spelar: stereo, endast vänster, endast höger eller en monomix av båda. Sätt en högtalare på L och en annan på R för ett äkta stereopar — sparas för enheten."
 
-#: package/contents/ui/FullRepresentation.qml:3607
+#: package/contents/ui/FullRepresentation.qml:3632
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:3622
+#: package/contents/ui/FullRepresentation.qml:3647
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth är avstängt eller ingen adapter finns — kontrollera Systeminställningar."
 
-#: package/contents/ui/FullRepresentation.qml:3633
-msgid "No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here."
-msgstr "Inga parkopplade Bluetooth-ljudenheter — parkoppla högtalaren en gång i Systeminställningar så visas den här."
+#: package/contents/ui/FullRepresentation.qml:3658
+msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
+msgstr "Inga ihopparade Bluetooth-ljudenheter — använd „Para ihop en ny högtalare…” nedan, eller para ihop en gång i Systeminställningar."
 
-#: package/contents/ui/FullRepresentation.qml:3647
+#: package/contents/ui/FullRepresentation.qml:3672
 msgid "%1 — connecting…"
 msgstr "%1 — ansluter…"
 
-#: package/contents/ui/FullRepresentation.qml:3665
+#: package/contents/ui/FullRepresentation.qml:3690
 msgid "%1 — pairing…"
 msgstr "%1 — parkopplar…"
 
-#: package/contents/ui/FullRepresentation.qml:3666
+#: package/contents/ui/FullRepresentation.qml:3691
 msgid "%1 — new, click to pair"
 msgstr "%1 — ny, klicka för att parkoppla"
 
-#: package/contents/ui/FullRepresentation.qml:3677
+#: package/contents/ui/FullRepresentation.qml:3702
 msgid "Pair a new speaker…"
 msgstr "Parkoppla en ny högtalare…"
 
-#: package/contents/ui/FullRepresentation.qml:3693
+#: package/contents/ui/FullRepresentation.qml:3718
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Söker — sätt högtalaren i parkopplingsläge…"
 
-#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3739
 msgid "WiFi & network"
 msgstr "WiFi & nätverk"
 
-#: package/contents/ui/FullRepresentation.qml:3746
+#: package/contents/ui/FullRepresentation.qml:3771
 msgid "%1 (speaker group)"
 msgstr "%1 (högtalargrupp)"
 
-#: package/contents/ui/FullRepresentation.qml:3774
+#: package/contents/ui/FullRepresentation.qml:3799
 msgid "Balance"
 msgstr "Balans"
 
-#: package/contents/ui/FullRepresentation.qml:3788
+#: package/contents/ui/FullRepresentation.qml:3813
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Den här enhetens andel av volymen — balansen följer varje rörelse av huvudreglaget och sparas för enheten."
 
-#: package/contents/ui/FullRepresentation.qml:3810
+#: package/contents/ui/FullRepresentation.qml:3835
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Varje enhet buffrar strömmen för sig, så rummen kan spela några sekunder isär. För perfekt synkade högtalare, gruppera dem i Google Home-appen — gruppen visas här som en enda enhet."
 
-#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3845
 msgid "Stop casting everywhere"
 msgstr "Sluta casta på alla enheter"
 
-#: package/contents/ui/FullRepresentation.qml:3838
+#: package/contents/ui/FullRepresentation.qml:3863
 msgid "Searching for devices…"
 msgstr "Söker efter enheter…"
 
-#: package/contents/ui/FullRepresentation.qml:3847
+#: package/contents/ui/FullRepresentation.qml:3872
 msgid "No devices found on your network"
 msgstr "Inga enheter hittades i ditt nätverk"
 
-#: package/contents/ui/FullRepresentation.qml:3869
+#: package/contents/ui/FullRepresentation.qml:3894
 msgid "Volume: %1% (scroll to adjust)"
 msgstr "Volym: %1 % (skrolla för att justera)"
 
@@ -1190,192 +1194,192 @@ msgstr "Tillbaka till stationerna"
 msgid "Show now playing"
 msgstr "Visa nu spelas-vyn"
 
-#: package/contents/ui/main.qml:638
+#: package/contents/ui/main.qml:643
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "Stationen svarade inte — den kan vara nere eller inte tillgänglig i ditt land. Prova ett annat resultat."
 
-#: package/contents/ui/main.qml:1338
+#: package/contents/ui/main.qml:1355
 msgid "Scheduled recording started"
 msgstr "Schemalagd inspelning startade"
 
-#: package/contents/ui/main.qml:1458
+#: package/contents/ui/main.qml:1475
 msgid "Scheduled recording missed"
 msgstr "Schemalagd inspelning missades"
 
-#: package/contents/ui/main.qml:1464
+#: package/contents/ui/main.qml:1481
 msgid "Scheduled recording skipped"
 msgstr "Schemalagd inspelning hoppades över"
 
-#: package/contents/ui/main.qml:1465
+#: package/contents/ui/main.qml:1482
 msgid "%1 — another recording is already running."
 msgstr "%1 — en annan inspelning pågår redan."
 
-#: package/contents/ui/main.qml:1639
+#: package/contents/ui/main.qml:1656
 msgid "Wake-up alarm missed"
 msgstr "Missat väckarlarm"
 
-#: package/contents/ui/main.qml:1640
+#: package/contents/ui/main.qml:1657
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 var inställt på %2 — datorn var avstängd eller i viloläge då."
 
-#: package/contents/ui/main.qml:1674 package/contents/ui/main.qml:1751
-#: package/contents/ui/main.qml:1804 package/contents/ui/main.qml:1807
+#: package/contents/ui/main.qml:1691 package/contents/ui/main.qml:1768
+#: package/contents/ui/main.qml:1821 package/contents/ui/main.qml:1824
 msgid "Wake-up alarm"
 msgstr "Väckarlarm"
 
-#: package/contents/ui/main.qml:1675
+#: package/contents/ui/main.qml:1692
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 skulle gå av samtidigt — %2 spelas i stället."
 
-#: package/contents/ui/main.qml:1808
+#: package/contents/ui/main.qml:1825
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Stationen kunde inte starta — den inbyggda väckningstonen spelas i stället."
 
-#: package/contents/ui/main.qml:2466
+#: package/contents/ui/main.qml:2483
 msgid "%1 devices"
 msgstr "%1 enheter"
 
-#: package/contents/ui/main.qml:2889
+#: package/contents/ui/main.qml:2915
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-högtalaren"
 
-#: package/contents/ui/main.qml:2888
+#: package/contents/ui/main.qml:2914
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 är ansluten, men ljudet kom aldrig fram"
 
-#: package/contents/ui/main.qml:2890
+#: package/contents/ui/main.qml:2916
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Stäng av och sätt på högtalaren igen och anslut den sedan på nytt."
 
-#: package/contents/ui/main.qml:3279
+#: package/contents/ui/main.qml:3305
 msgid "Station seems to be off the air"
 msgstr "Stationen verkar inte sända"
 
-#: package/contents/ui/main.qml:3280
+#: package/contents/ui/main.qml:3306
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 svarar inte på någon adress katalogen känner till. Den ligger kvar i din lista — nya försök görs i bakgrunden."
 
-#: package/contents/ui/main.qml:3352
+#: package/contents/ui/main.qml:3378
 msgid "Playing from a backup address"
 msgstr "Spelar från en reservadress"
 
-#: package/contents/ui/main.qml:3353
+#: package/contents/ui/main.qml:3379
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Stationens sparade adress svarar inte — spelar tills vidare närmaste träff från katalogen. Din sparade adress behölls."
 
-#: package/contents/ui/main.qml:3393
+#: package/contents/ui/main.qml:3419
 msgid "Station found at a new address"
 msgstr "Stationen hittad på en ny adress"
 
-#: package/contents/ui/main.qml:3394
+#: package/contents/ui/main.qml:3420
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 har flyttat — den nya adressen sparades i din lista."
 
-#: package/contents/ui/main.qml:4596
+#: package/contents/ui/main.qml:4622
 msgid "Casting needs python-chromecast"
 msgstr "Casting kräver python-chromecast"
 
-#: package/contents/ui/main.qml:4597
+#: package/contents/ui/main.qml:4623
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Installera paketet python-chromecast för att casta till dina enheter."
 
-#: package/contents/ui/main.qml:4600
+#: package/contents/ui/main.qml:4626
 msgid "the device"
 msgstr "enheten"
 
-#: package/contents/ui/main.qml:4600
+#: package/contents/ui/main.qml:4626
 msgid "Could not cast to %1"
 msgstr "Kunde inte casta till %1"
 
-#: package/contents/ui/main.qml:4601
+#: package/contents/ui/main.qml:4627
 msgid "The device could not play this station."
 msgstr "Enheten kunde inte spela den här stationen."
 
-#: package/contents/ui/main.qml:4695 package/contents/ui/main.qml:4797
+#: package/contents/ui/main.qml:4721 package/contents/ui/main.qml:4823
 msgid "the Bluetooth device"
 msgstr "Bluetooth-enheten"
 
-#: package/contents/ui/main.qml:4694
+#: package/contents/ui/main.qml:4720
 msgid "Could not connect to %1"
 msgstr "Kunde inte ansluta till %1"
 
-#: package/contents/ui/main.qml:4696
+#: package/contents/ui/main.qml:4722
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Kontrollera att högtalaren är på och inom räckhåll."
 
-#: package/contents/ui/main.qml:4796
+#: package/contents/ui/main.qml:4822
 msgid "Could not pair with %1"
 msgstr "Kunde inte parkoppla med %1"
 
-#: package/contents/ui/main.qml:4798
+#: package/contents/ui/main.qml:4824
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Sätt högtalaren i parkopplingsläge (håll in Bluetooth-knappen) och försök igen."
 
-#: package/contents/ui/main.qml:4896
+#: package/contents/ui/main.qml:4922
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg är inte installerat"
 
-#: package/contents/ui/main.qml:4897
+#: package/contents/ui/main.qml:4923
 msgid "Install ffmpeg to record radio."
 msgstr "Installera ffmpeg för att spela in radio."
 
-#: package/contents/ui/main.qml:4900
+#: package/contents/ui/main.qml:4926
 msgid "Recording saved ✓ (%1)"
 msgstr "Inspelning sparad ✓ (%1)"
 
-#: package/contents/ui/main.qml:4904
+#: package/contents/ui/main.qml:4930
 msgid "Recording interrupted (%1 captured)"
 msgstr "Inspelningen avbröts (%1 inspelat)"
 
-#: package/contents/ui/main.qml:4906
+#: package/contents/ui/main.qml:4932
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — filen är mycket mindre än väntat."
 
-#: package/contents/ui/main.qml:4910
+#: package/contents/ui/main.qml:4936
 msgid "Recording failed"
 msgstr "Inspelningen misslyckades"
 
-#: package/contents/ui/main.qml:4911
+#: package/contents/ui/main.qml:4937
 msgid "The stream could not be captured."
 msgstr "Strömmen kunde inte spelas in."
 
-#: package/contents/ui/main.qml:4995
+#: package/contents/ui/main.qml:5021
 msgid "Downloading again without the cover"
 msgstr "Laddar ner igen utan omslag"
 
-#: package/contents/ui/main.qml:4996
+#: package/contents/ui/main.qml:5022
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Inbäddning av taggar kräver paketet python-mutagen — installera det för att få omslag i dina filer."
 
-#: package/contents/ui/main.qml:5004
+#: package/contents/ui/main.qml:5030
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp är inte installerat"
 
-#: package/contents/ui/main.qml:5005
+#: package/contents/ui/main.qml:5031
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installera yt-dlp (och ffmpeg) för att ladda ner spår."
 
-#: package/contents/ui/main.qml:5008
+#: package/contents/ui/main.qml:5034
 msgid "Track downloaded ✓"
 msgstr "Spår nedladdat ✓"
 
-#: package/contents/ui/main.qml:5009
+#: package/contents/ui/main.qml:5035
 msgid "Saved to: %1"
 msgstr "Sparad i: %1"
 
-#: package/contents/ui/main.qml:5012
+#: package/contents/ui/main.qml:5038
 msgid "Download failed"
 msgstr "Nedladdningen misslyckades"
 
-#: package/contents/ui/main.qml:5013
+#: package/contents/ui/main.qml:5039
 msgid "Unknown error"
 msgstr "Okänt fel"
 
-#: package/contents/ui/main.qml:5298
+#: package/contents/ui/main.qml:5324
 msgid "Audio output changed"
 msgstr "Ljudutgång ändrad"
 
-#: package/contents/ui/main.qml:5299
+#: package/contents/ui/main.qml:5325
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Den valda utgångsenheten försvann — systemets standard används i stället."
 

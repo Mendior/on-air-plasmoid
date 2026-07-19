@@ -3449,6 +3449,30 @@ PlasmaExtras.Representation {
                             wrapMode: Text.WordWrap
                         }
 
+                        // A remembered sync member whose sink is gone right
+                        // now (speaker asleep or powered off) used to just
+                        // VANISH from the rows above — which read as "the
+                        // widget forgot my speaker". Say what is true.
+                        Repeater {
+                            model: btDevicesModel
+                            delegate: PlasmaComponents3.Label {
+                                required property string mac
+                                required property string name
+                                required property bool connected
+                                Layout.fillWidth: true
+                                Layout.leftMargin: Kirigami.Units.gridUnit * 2.2
+                                visible: !connected
+                                         && root._syncRemembersMac(mac)
+                                         && (root.sync._combineWantActive
+                                             || (root.sync._combineIdleParked
+                                                 && Plasmoid.configuration.combineWanted === true))
+                                text: i18n("%1 is remembered for the sync — connect it and it rejoins automatically.", name)
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.6
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
                         // The whole ride, both rounds: the quiet gap between
                         // the calibration clicks and the check clicks reads
                         // as "done" — this row stays up until it really is.
@@ -3583,8 +3607,9 @@ PlasmaExtras.Representation {
                         // Paired Bluetooth speakers/headphones that are not
                         // connected yet — one click connects and, once the
                         // sink appears, playback is routed onto it. Connected
-                        // ones can be dropped the same way. Pairing itself
-                        // stays in System Settings.
+                        // ones can be dropped the same way. Pairing happens
+                        // either right below ("Pair a new speaker…") or in
+                        // System Settings — BlueZ remembers it, not us.
                         Kirigami.Separator {
                             Layout.fillWidth: true
                             visible: root._btAvailable
@@ -3630,7 +3655,7 @@ PlasmaExtras.Representation {
                             Layout.margins: Kirigami.Units.smallSpacing
                             visible: root._btAvailable && root._btControllerUp
                                      && btDevicesModel.count === 0 && !root._btListing
-                            text: i18n("No paired Bluetooth audio devices — pair the speaker once in System Settings and it appears here.")
+                            text: i18n("No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings.")
                             font: Kirigami.Theme.smallFont
                             opacity: 0.6
                             wrapMode: Text.WordWrap

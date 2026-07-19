@@ -965,6 +965,18 @@ PlasmoidItem {
     function monogramText(name) { return FaviconLogic.monogramText(name); }
     function monogramHue(name) { return FaviconLogic.monogramHue(name); }
 
+    // Whether the sync remembers this Bluetooth device (a calibrated lag
+    // exists for its MAC) — the popup uses it to say "remembered, just
+    // not connected" instead of letting a sleeping speaker silently
+    // vanish from the sync rows, which read as the widget forgetting it.
+    function _syncRemembersMac(mac) {
+        try {
+            return JSON.parse(Plasmoid.configuration.syncOffsetMap || "{}")[mac] !== undefined;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function _favUrls() {
         const seen = {};
         const urls = [];
@@ -2879,12 +2891,21 @@ PlasmoidItem {
                 root._btSoloKicked = mac;
                 root._btPendingSinkMac = mac;
                 root._btPendingSinkName = root._btClickedName;
-                executable.exec(": BT_SOLOKICK; pactl set-card-profile bluez_card."
-                    + mac.replace(/:/g, "_") + " a2dp-sink 2>/dev/null;"
-                    + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
-                    + " && { timeout 12 bluetoothctl disconnect " + mac + " >/dev/null 2>&1;"
-                    + " timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
-                    + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1; }; true"
+                // A PROFILE bounce, never a disconnect: the old
+                // disconnect+reconnect cycle here was the same one the
+                // sync watchdog dropped — measured on a real JBL Flip 7,
+                // a software disconnect can DESTROY the pairing outright.
+                // The bounce renegotiates A2DP; the link stays untouched,
+                // and the previous profile is restored if both standard
+                // names refuse, so the card is never left dead on "off".
+                var soloMacU = mac.replace(/:/g, "_");
+                executable.exec(": BT_SOLOKICK; c=bluez_card." + soloMacU
+                    + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + soloMacU + "/{f=1}"
+                    + " f && /Active Profile:/{print $3; exit}');"
+                    + " timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
+                    + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
+                    + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
+                    + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true"
                     + " # " + (++root._execSeq));
                 btRouteTimeout.interval = 30000;
                 btRouteTimeout.restart();
