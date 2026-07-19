@@ -329,8 +329,11 @@ PlasmaComponents3.ItemDelegate {
             Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
             Layout.preferredHeight: Kirigami.Units.gridUnit * 1.6
             Layout.alignment: Qt.AlignVCenter
+            // Always in the layout while reorderable (opacity alone hides):
+            // popping in and out of existence shifted the row's content the
+            // moment the pointer arrived, so the target moved under it.
             opacity: (dragArea.pressed || listItem.hovered || listItem.isKeyboardCurrent) ? 0.75 : 0.0
-            visible: opacity > 0.0 && listItem.reorderable && !root.favoritesOnly
+            visible: listItem.reorderable
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
 
             Kirigami.Icon {
@@ -371,8 +374,12 @@ PlasmaComponents3.ItemDelegate {
                     view.dropSlot = -1; view.dropFrom = -1
                     // Dropping into either slot around the row itself is a
                     // no-move; anything else lands in one write.
-                    if (slot >= 0 && slot !== model.index && slot !== model.index + 1)
-                        root.moveStationTo(listItem.targetIndex, model.name, model.hostname, slot)
+                    if (slot >= 0 && slot !== model.index && slot !== model.index + 1) {
+                        if (root.favoritesOnly)
+                            root.moveFavoriteTo(model.name, slot)
+                        else
+                            root.moveStationTo(listItem.targetIndex, model.name, model.hostname, slot)
+                    }
                 }
                 onCanceled: {
                     const view = listItem.ListView.view
@@ -390,8 +397,13 @@ PlasmaComponents3.ItemDelegate {
             Layout.alignment: Qt.AlignVCenter
             iconName: "go-up"
             iconScale: 0.55
+            // Space stays reserved while the row is reorderable — buttons
+            // that pop into the layout on hover moved the target under the
+            // arriving pointer. Opacity hides; enabledState keeps the
+            // invisible button unclickable and out of the Tab order.
             opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0
-            visible: opacity > 0.0 && listItem.reorderable && model.index > 0
+            visible: listItem.reorderable && model.index > 0
+            enabledState: opacity > 0
             tooltipText: i18n("Move up")
             onClicked: {
                 if (root.favoritesOnly)
@@ -413,9 +425,10 @@ PlasmaComponents3.ItemDelegate {
             iconName: "go-down"
             iconScale: 0.55
             opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0
-            visible: opacity > 0.0 && listItem.reorderable
+            visible: listItem.reorderable
                      && listItem.ListView.view
                      && model.index < listItem.ListView.view.count - 1
+            enabledState: opacity > 0
             tooltipText: i18n("Move down")
             onClicked: {
                 if (root.favoritesOnly)
@@ -446,7 +459,8 @@ PlasmaComponents3.ItemDelegate {
             // Keyboard-current row (or own focus) reveals the button too —
             // visible:false items are skipped by Tab and screen readers
             opacity: armed ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus) ? 0.6 : 0.0)
-            visible: opacity > 0.0
+            visible: true            // reserved slot — see the arrows above
+            enabledState: opacity > 0
             tooltipText: armed
                          ? i18n("Click again to confirm removal")
                          : i18n("Remove station from list")

@@ -2114,6 +2114,13 @@ PlasmoidItem {
         } catch (e) {}
     }
 
+    // In-place hint for the popup: the last favorites move as VISIBLE
+    // indices, so the filtered model can move() one row instead of being
+    // rebuilt — a rebuild recreates every delegate, which kills the hover
+    // the next arrow click needs and cascades 28 row animations per step.
+    property int _favMovedFrom: -1
+    property int _favMovedTo: -1
+
     function moveFavorite(name, delta) {
         if (!name || (delta !== 1 && delta !== -1)) return;
         const list = favoriteNames.slice();
@@ -2127,11 +2134,46 @@ PlasmoidItem {
             if (visible[list[j]]) { swapIdx = j; break; }
         }
         if (swapIdx < 0) return;
+        // A swap with the nearest VISIBLE favorite is exactly one step in
+        // the visible ordering — hand the popup that step.
+        var visBefore = 0;
+        for (var v = 0; v < idx; v++) if (visible[list[v]]) visBefore++;
+        _favMovedFrom = visBefore;
+        _favMovedTo = visBefore + delta;
         const tmp = list[idx];
         list[idx] = list[swapIdx];
         list[swapIdx] = tmp;
         favoriteNames = list;
         Plasmoid.configuration.favorites = JSON.stringify(list);
+    }
+
+    // Drag-drop for the favorites view: land `name` at visible slot `slot`
+    // (0..visibleCount, insert-before semantics — the same contract as
+    // moveStationTo). Hidden favorites (their station deactivated) keep
+    // their exact positions; only the visible ordering is rewritten.
+    function moveFavoriteTo(name, slot) {
+        if (!name) return;
+        const list = favoriteNames.slice();
+        if (list.indexOf(name) === -1) return;
+        const visible = {};
+        for (var i = 0; i < stationsModel.count; i++)
+            visible[stationsModel.get(i).name] = true;
+        var vis = list.filter(function(n) { return visible[n]; });
+        const fromVis = vis.indexOf(name);
+        if (fromVis === -1) return;
+        var target = Math.max(0, Math.min(vis.length, slot));
+        if (target > fromVis) target--;      // removal shifts the slot
+        if (target === fromVis) return;
+        vis.splice(fromVis, 1);
+        vis.splice(target, 0, name);
+        // Weave the new visible order back through the old list so hidden
+        // favorites stay exactly where they were.
+        var vi = 0;
+        const out = list.map(function(n) { return visible[n] ? vis[vi++] : n; });
+        _favMovedFrom = fromVis;
+        _favMovedTo = target;
+        favoriteNames = out;
+        Plasmoid.configuration.favorites = JSON.stringify(out);
     }
 
     // ⭐ on an internet result: add the station PERMANENTLY to the list + favorites.
@@ -3883,10 +3925,35 @@ PlasmoidItem {
     // query MUST normalize identically, or fetched art is silently never
     // shown (the stale-result guard in _artFinish compares the two).
     function _normalizeQuery(s) {
-        return (s || "").replace(/\s*\([^)]*\)\s*/g, " ")
+        // The broadcast dressing radio stations wrap around a track name —
+        // measured live: "NOW PLAYING: ABBA - Dancing Queen" and
+        // "ABBA - Dancing Queen | Elmar" both return EMPTY from Deezer
+        // while the undressed string finds the cover. This also fixes the
+        // negative-cache key: a dressed query's definitive "no cover"
+        // used to pin the track coverless for the whole TTL.
+        return (s || "").replace(/^\s*(now\s+playing|playing\s+now|np)\s*[:\-–]\s*/i, "")
+                        .replace(/^\s*\d{1,3}[\.\)]\s+/, "")
+                        .replace(/\*{2,}/g, " ")
+                        .replace(/\s*\|.*$/, "")
+                        .replace(/\s*\([^)]*\)\s*/g, " ")
                         .replace(/\s*\[[^\]]*\]\s*/g, " ")
                         .replace(/\b\d{2,3}\s?kbps\b/gi, " ")
                         .replace(/\s+/g, " ").trim();
+    }
+
+    // Undress the RAW track string before the artist/title split: the
+    // same broadcast prefixes and tails, plus the third " - " segment —
+    // Estonian stations love "Artist - Title - Station", and the station
+    // name poisons every search it rides into.
+    function _preCleanTrack(s) {
+        var t = (s || "").replace(/^\s*(now\s+playing|playing\s+now|np)\s*[:\-–]\s*/i, "")
+                         .replace(/^\s*\d{1,3}[\.\)]\s+/, "")
+                         .replace(/\*{2,}/g, " ")
+                         .replace(/\s*\|.*$/, "")
+                         .trim();
+        var parts = t.split(" - ");
+        if (parts.length >= 3) t = parts[0] + " - " + parts[1];
+        return t;
     }
 
     // definitive=false means the empty result came from a transient failure
@@ -3909,9 +3976,22 @@ PlasmoidItem {
         console.log("[ARP] currentKey=" + currentKey.substring(0, 60));
         if (url && currentKey === cacheKey) {
             albumArtUrl = url;
+            _albumArtKey = cacheKey;
             console.log("[ARP] albumArtUrl set");
+        } else if (!url && definitive && currentKey === cacheKey) {
+            // A definitive miss for the CURRENT track clears the panel —
+            // the previous track's cover posing over a new song is worse
+            // than the honest vinyl.
+            albumArtUrl = "";
+            _albumArtKey = "";
         }
     }
+
+    // Which track's key the shown albumArtUrl belongs to — so a track
+    // change can clear a stale cover the moment the new lookup starts,
+    // instead of letting the old song's face sit there until (unless)
+    // the new answer lands.
+    property string _albumArtKey: ""
 
     function trackArtistTitleKey() {
         return _normalizeQuery((root.trackArtist + " " + root.trackTitle).trim() || root.title);
@@ -4061,16 +4141,24 @@ PlasmoidItem {
             albumArtUrl = "";
             return;
         }
-        var parsed = parseTrackString(trackString);
+        var parsed = parseTrackString(_preCleanTrack(trackString));
         var query = _normalizeQuery((parsed.artist + " " + parsed.title).trim() || trackString);
         if (query.length === 0) {
             albumArtUrl = "";
+            _albumArtKey = "";
             return;
         }
         var hit = _artCache[query];
         if (hit !== undefined && (hit.url !== "" || Date.now() - hit.t < _artNegativeTtlMs)) {
             albumArtUrl = hit.url;
+            _albumArtKey = hit.url ? query : "";
             return;
+        }
+        // A NEW track's lookup begins: the old track's cover must not pose
+        // over it while the network answers (or fails to).
+        if (albumArtUrl !== "" && _albumArtKey !== query) {
+            albumArtUrl = "";
+            _albumArtKey = "";
         }
 
         // One request at a time, Deezer first: its rate limit is far
@@ -4335,7 +4423,12 @@ PlasmoidItem {
             // is allowed through to the artwork chain.
             var icyImg = parts[1] || "";
             root.imageurl = /^https?:\/\//i.test(icyImg) ? icyImg : "";
-            var parsed = parseTrackString(raw);
+            // Same undressing as the art lookup — the two roads MUST parse
+            // the same string, or the lookup's cache key and the current-
+            // track key disagree on three-segment titles and a found cover
+            // is thrown away as stale. Bonus: the display and the history
+            // lose the "NOW PLAYING:"/station-tail noise too.
+            var parsed = parseTrackString(_preCleanTrack(raw));
             root.trackArtist = parsed.artist;
             root.trackTitle = parsed.title;
             // Only radio tracks go into the history (not local files)

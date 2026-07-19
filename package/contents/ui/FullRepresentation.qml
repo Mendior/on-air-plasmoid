@@ -2887,7 +2887,25 @@ PlasmaExtras.Representation {
             webSearchDebounce.restart()
         }
         function onFavoritesOnlyChanged() { rebuildFilteredModel() }
-        function onFavoriteNamesChanged() { rebuildFilteredModel() }
+        function onFavoriteNamesChanged() {
+            // A reorder inside the favorites view moves ONE row in place —
+            // a full rebuild would recreate every delegate, killing the
+            // hover the next arrow click needs and cascading a row
+            // animation per station for every single step.
+            if (root.favoritesOnly && root.searchFilter === ""
+                && root._favMovedFrom >= 0 && root._favMovedTo >= 0
+                && root._favMovedFrom < filteredStationsModel.count
+                && root._favMovedTo < filteredStationsModel.count
+                && root._favMovedFrom !== root._favMovedTo) {
+                filteredStationsModel.move(root._favMovedFrom, root._favMovedTo, 1)
+                root._favMovedFrom = -1
+                root._favMovedTo = -1
+                return
+            }
+            root._favMovedFrom = -1
+            root._favMovedTo = -1
+            rebuildFilteredModel()
+        }
     }
 
     Component.onCompleted: {
