@@ -76,14 +76,17 @@ PlasmoidItem {
     property int sleepTotalSec: 0
 
     // MPRIS files live in XDG_RUNTIME_DIR (0700, tmpfs); a system without
-    // one falls back to the user's own cache dir — never world-readable
-    // /tmp, where predictable names would hand another local user the
-    // now-playing history and a symlink seat at the state file.
+    // one falls back to the user's cache dir, then ~/.cache. World-readable
+    // /tmp — where predictable names would hand another local user the
+    // now-playing history and a symlink seat at the state file — is the
+    // absolute last resort, for a system that can't even resolve home.
     readonly property string _mprisRunDir: {
         var loc = Labs.StandardPaths.writableLocation(Labs.StandardPaths.RuntimeLocation).toString();
         if (loc.indexOf("file://") === 0 && loc.length > 7) return loc.substring(7);
         var cache = Labs.StandardPaths.writableLocation(Labs.StandardPaths.CacheLocation).toString();
-        return cache.indexOf("file://") === 0 && cache.length > 7 ? cache.substring(7) : "/tmp";
+        if (cache.indexOf("file://") === 0 && cache.length > 7) return cache.substring(7);
+        var home = Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation).toString();
+        return home.indexOf("file://") === 0 && home.length > 7 ? home.substring(7) + "/.cache" : "/tmp";
     }
     // Use the STABLE per-applet id (not Date.now()): a restart reuses the same
     // file so the old daemon is replaced rather than orphaned (no ghost "On Air"
@@ -144,7 +147,12 @@ PlasmoidItem {
 
     function _ensureMusicDir() {
         _musicDirEnsured = false;
-        executable.exec(": MUSICDIR; mkdir -p '" + downloadDirPath.replace(/'/g, "'\\''") + "'; true");
+        var safeMusicDir = downloadDirPath.replace(/'/g, "'\\''");
+        // Sentinel only when the directory REALLY exists — a bare "mkdir
+        // succeeded or not, load anyway" would point FolderListModel at a
+        // missing folder, which is exactly the $HOME listing of issue #3.
+        executable.exec(": MUSICDIR; mkdir -p '" + safeMusicDir + "'"
+            + " && [ -d '" + safeMusicDir + "' ] && echo __MUSICDIR_OK__; true");
     }
 
     onDownloadDirPathChanged: _ensureMusicDir()
@@ -251,13 +259,20 @@ PlasmoidItem {
     // the favorite instead of the name-based prune silently dropping it.
     property var _stationNameByHost: ({})
 
+    // Malformed servers JSON is worth one loud word — a silent console.log
+    // left the widget looking empty for no visible reason. One word only:
+    // reloads repeat, the nag must not.
+    property bool _serversJsonNagged: false
+
     function reloadStationsModel(keepPlaying) {
         if (!keepPlaying) playMusic.stop();
         stationsModel.clear();
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             const allNames = [];
-            const nameByHost = {};
+            // Null prototype: a station literally named "constructor" or
+            // "toString" must not collide with Object.prototype's members.
+            const nameByHost = Object.create(null);
             for (const server of servers) {
                 allNames.push(server.name || "");
                 nameByHost[(server.hostname || "").toString()] = server.name || "";
@@ -267,7 +282,7 @@ PlasmoidItem {
             // Favorites are name-based (deliberate). If a favorite's name is
             // gone but its previous hostname still exists under a new name,
             // this was a rename — follow it instead of losing the favorite.
-            const oldHostByName = {};
+            const oldHostByName = Object.create(null);
             for (const h in _stationNameByHost) oldHostByName[_stationNameByHost[h]] = h;
             var favs = favoriteNames.slice();
             var migrated = false;
@@ -290,6 +305,12 @@ PlasmoidItem {
             _stationNameByHost = nameByHost;
         } catch (e) {
             console.log(e);
+            if (!_serversJsonNagged) {
+                _serversJsonNagged = true;
+                notify(i18n("Station list could not be read"),
+                       i18n("The saved station configuration is malformed. Your data was not changed; fix the servers entry or use Settings → Import."),
+                       "dialog-error");
+            }
         }
     }
 
@@ -771,13 +792,15 @@ PlasmoidItem {
         // the recorder's ffmpeg "-t" cap. 30 min is far above any real track.
         // The trailing sweep drops the pre-conversion .webp when a converted
         // .jpg/.png of the same cover exists — yt-dlp keeps both, and nobody
-        // needs the same picture twice. yt-dlp's own exit code is preserved
-        // for the handler (the mutagen retry reads it).
+        // needs the same picture twice. Week-old *.part residue (downloads
+        // that never resumed) goes too; younger ones stay resumable. yt-dlp's
+        // own exit code is preserved for the handler (the mutagen retry reads it).
         executable.exec(": DL_YTDLP; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
                         + "mkdir -p '" + safeDir + "' && timeout 1800 yt-dlp --no-playlist " + fmtArgs
                         + " -o '" + safeDir + "/%(title)s.%(ext)s' 'ytsearch1:" + safeQuery + "'; rc=$?; "
                         + "for f in '" + safeDir + "'/.covers/*.webp; do s=\"${f%.webp}\"; "
                         + "if [ -f \"$s.jpg\" ] || [ -f \"$s.png\" ]; then rm -f \"$f\"; fi; done 2>/dev/null; "
+                        + "find '" + safeDir + "' -maxdepth 1 -name '*.part' -mtime +7 -delete 2>/dev/null; "
                         + "exit $rc");
     }
 
@@ -792,7 +815,9 @@ PlasmoidItem {
                     "artist": arr[i].artist || "",
                     "trackName": arr[i].trackName || "",
                     "station": arr[i].station || "",
-                    "when": arr[i].when || ""
+                    "when": arr[i].when || "",
+                    // Entries saved before ts existed carry 0 ("unknown day").
+                    "ts": arr[i].ts || 0
                 });
             }
         } catch (e) {
@@ -804,7 +829,7 @@ PlasmoidItem {
         const arr = [];
         for (var i = 0; i < historyModel.count; i++) {
             const h = historyModel.get(i);
-            arr.push({ "artist": h.artist, "trackName": h.trackName, "station": h.station, "when": h.when });
+            arr.push({ "artist": h.artist, "trackName": h.trackName, "station": h.station, "when": h.when, "ts": h.ts || 0 });
         }
         Plasmoid.configuration.history = JSON.stringify(arr);
     }
@@ -838,7 +863,9 @@ PlasmoidItem {
         }
         const d = new Date();
         const when = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
-        historyModel.insert(0, { "artist": artist || "", "trackName": trackName, "station": station || "", "when": when });
+        // "when" is the display clock; ts carries the full moment so the list
+        // can tell today's 14:05 from yesterday's.
+        historyModel.insert(0, { "artist": artist || "", "trackName": trackName, "station": station || "", "when": when, "ts": Date.now() });
         while (historyModel.count > 30) historyModel.remove(historyModel.count - 1);
         if (!historyPersistTimer.running) historyPersistTimer.start();
     }
@@ -1240,11 +1267,11 @@ PlasmoidItem {
         return s || "Radio";
     }
 
-    // HLS/playlist wrappers don't survive a plain "-c copy"; local files and
-    // empty URLs can't be recorded at all.
+    // HLS/playlist wrappers don't survive a plain "-c copy"; anything that
+    // is not an http(s) stream (local files, odd schemes) can't be recorded.
     function canRecordUrl(url) {
         var s = (url || "").toString();
-        if (s === "" || s.indexOf("file://") === 0) return false;
+        if (!/^https?:\/\//i.test(s)) return false;
         var fmt = _streamFormat(s);
         return fmt !== "hls" && fmt !== "playlist";
     }
@@ -1289,7 +1316,10 @@ PlasmoidItem {
         // NO quality gain over the stream, offered for editing workflows only.
         var recFmt = (Plasmoid.configuration.recordFormat || "original").toLowerCase();
         var codecArgs, ext;
-        if (recFmt === "mp3" && _streamFormat(url) !== "mp3") {
+        // strict format: a container written to disk must be judged on the
+        // extension alone — a fuzzy "probably mp3" re-encodes (safe) instead
+        // of -c copy'ing an unknown codec into a .mp3 shell.
+        if (recFmt === "mp3" && _streamFormat(url, true) !== "mp3") {
             codecArgs = "-c:a libmp3lame -q:a 0";
             ext = "mp3";
         } else if (recFmt === "wav") {
@@ -1300,7 +1330,7 @@ PlasmoidItem {
             // (an mp3→mp3 re-encode would only lose quality).
             codecArgs = "-c copy";
             var extMap = { "mp3": "mp3", "aac": "aac", "ogg": "ogg", "opus": "opus", "flac": "flac" };
-            ext = extMap[_streamFormat(url)] || "mka";
+            ext = extMap[_streamFormat(url, true)] || "mka";
         }
         var d = new Date();
         var stamp = d.getFullYear() + "-" + _pad2(d.getMonth() + 1) + "-" + _pad2(d.getDate())
@@ -1322,15 +1352,33 @@ PlasmoidItem {
         var safeTracks = _recTracksPath.replace(/'/g, "'\\''");
         var safeUrl = url.replace(/'/g, "'\\''");
         var safePid = _recPidFile.replace(/'/g, "'\\''");
-        // ffmpeg runs as a CHILD (&, wait) — the pid file holds ffmpeg's own
-        // pid for SIGINT, the wrapper cleans up and reports via sentinels, and
-        // the attached process gives us a free completion event in onExited.
-        // "-t" is a hard duration cap: even an orphaned recording can never
-        // fill the disk. The VLC user agent matches reader.py (some stations
-        // block ffmpeg's default UA).
+        // ffmpeg runs as a CHILD (&, wait) — the pid file holds the timeout
+        // wrapper's pid for SIGINT (GNU timeout forwards it, so a user stop
+        // still finalizes the container), the wrapper cleans up and reports
+        // via sentinels, and the attached process gives us a free completion
+        // event in onExited. "-t" caps recorded MEDIA time; wall-clock is
+        // bounded by the timeout prefix (~1.1× the requested duration), so even
+        // an orphaned recording can neither fill the disk nor run forever. A
+        // fixed grace was too tight — a stream that stalls burns wall time with
+        // no media progress, and -t counts only media, so a long recording got
+        // SIGINT'd before -t completed. The VLC user agent matches
+        // reader.py (some stations block ffmpeg's default UA).
+        // Pre-flight free-space check: refusing up front beats ffmpeg dying
+        // mid-file on a full disk. WAV ≈10 MiB/min, compressed ≈2 MiB/min;
+        // an empty/odd df answer fails open (the check is best-effort).
+        // Instant REC carries the full cap (up to 180 min) as its "duration"
+        // with no known length, so size its estimate against a modest floor —
+        // else an ordinary short capture is refused under ~2 GiB free. A truly
+        // full disk still trips this; mid-recording disk-full is caught later.
+        var recEstMin = scheduled ? Math.ceil(_recDurationSec / 60)
+                                  : Math.min(30, Math.ceil(_recDurationSec / 60));
+        var recNeedKiB = recEstMin * (ext === "wav" ? 10240 : 2048);
         executable.exec(": REC_START; if ! command -v ffmpeg >/dev/null 2>&1; then echo __NO_FFMPEG__; exit 0; fi; "
             + "mkdir -p '" + safeDir + "' || { echo __REC_EMPTY__; exit 0; }; "
-            + "ffmpeg -hide_banner -nostdin -loglevel error"
+            + "avail=$(df -Pk '" + safeDir + "' 2>/dev/null | awk 'NR==2{print $4}'); "
+            + "if [ -n \"$avail\" ] && [ \"$avail\" -lt " + recNeedKiB + " ] 2>/dev/null; then echo __REC_NOSPACE__; exit 0; fi; "
+            + "timeout --signal=INT --kill-after=30 " + (_recDurationSec + Math.max(300, Math.ceil(_recDurationSec * 0.10)))
+            + " ffmpeg -hide_banner -nostdin -loglevel error"
             + " -user_agent 'VLC/3.0.20 LibVLC/3.0.20'"
             + " -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10"
             // A server that stops sending but holds the TCP socket open makes
@@ -1703,6 +1751,9 @@ PlasmoidItem {
         // mid-flight would drag the volume right back down, and a pending
         // sleep timer would stop the just-started station minutes later.
         cancelSleepTimer();
+        // ...and a sink left muted last night would turn the wake-up into
+        // silence — unmute it, best-effort (no pactl / no PulseAudio is fine).
+        executable.exec(": ALARM_UNMUTE; pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null; true");
         // Volume floor as a one-shot override so startWithFade's fade-in
         // target picks it up immediately — the debounced setUserVolume path
         // would lose the race against the fade, and writing the config
@@ -2240,18 +2291,32 @@ PlasmoidItem {
     // and plays the best one. Falls back to the user's original URL on error.
 
     function _hostOf(url) {
-        const m = String(url).match(/^https?:\/\/([^\/:]+)/i);
+        // Strip userinfo and keep IPv6 brackets whole — "user@host" or
+        // "[::1]:8000" would otherwise yield the wrong host.
+        const m = String(url).match(/^https?:\/\/(?:[^\/?#@]*@)?(\[[^\]]*\]|[^\/:?#]+)/i);
         return m ? m[1].toLowerCase() : "";
     }
 
     function _baseDomain(domain) {
         if (!domain) return "";
+        // An IP literal has no registrable "base" — exact match only.
+        if (domain.charAt(0) === "[" || /^\d+(\.\d+){3}$/.test(domain)) return domain;
         const parts = domain.split(".");
         if (parts.length <= 2) return domain;
-        return parts.slice(-2).join(".");
+        // ccSLD heuristic (no bundled public-suffix list): under a
+        // "co.uk"-style pair the registrable name is THREE labels — two
+        // would make every *.co.uk host look like the same station.
+        const n = /(^|\.)(co|com|net|org|gov|edu|ac|or|ne|go)\.[a-z]{2}$/.test(parts.slice(-2).join(".")) ? 3 : 2;
+        return parts.slice(-n).join(".");
     }
 
-    function _streamFormat(url) {
+    // strict: extension-only verdict, used by the RECORDER's container
+    // choice — a substring guess ("mp3" somewhere in the path) written with
+    // -c copy into .mp3 produces a broken file when the codec is anything
+    // else; "unknown" routes to mka, which holds any codec. Playback
+    // heuristics (canRecordUrl, auto-bitrate) keep the fuzzy match, where
+    // a wrong guess costs nothing.
+    function _streamFormat(url, strict) {
         const lower = String(url).toLowerCase();
         const noQuery = lower.split("?")[0];
         if (noQuery.endsWith(".m3u8")) return "hls";
@@ -2262,6 +2327,7 @@ PlasmoidItem {
         if (noQuery.endsWith(".opus")) return "opus";
         if (noQuery.endsWith(".flac")) return "flac";
         if (noQuery.endsWith(".mp3")) return "mp3";
+        if (strict) return "unknown";
         if (noQuery.indexOf("aacp") !== -1 || noQuery.indexOf("aac") !== -1) return "aac";
         if (noQuery.indexOf("mp3") !== -1) return "mp3";
         return "unknown";
@@ -2728,6 +2794,15 @@ PlasmoidItem {
     // model and back — validate before they touch a shell line.
     function _btValidMac(mac) {
         return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac);
+    }
+
+    // Device-supplied display text (cast beacons, Bluetooth aliases): markup
+    // metacharacters would read as rich text, control chars and bidi
+    // formatting marks (LRM/RLM/embedding/override/isolate) can hide or
+    // reorder what a row shows, and an unbounded name can flood the layout.
+    function _sanitizeDeviceName(s) {
+        return (s || "").replace(/[<>&\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+                        .substring(0, 120);
     }
 
     // ── In-menu pairing — a NEW speaker is one click away too ────────────────
@@ -3710,16 +3785,29 @@ PlasmoidItem {
                 });
             };
             // A preview row came out of the directory seconds ago — that row
-            // IS the freshest answer there is. Asking the directory again
-            // (the bitrate upgrade is a full name-search) put the whole
-            // mirror chain's worst case — five mirrors, four seconds each —
-            // between the click and the first note, and its "upgrade" could
-            // swap in a sibling URL the row never promised. Play what the
-            // row says, instantly; upgrades belong to saved stations.
+            // IS the freshest answer there is, and the upgrade's name-search
+            // could swap in a sibling URL the row never promised. Play what
+            // the row says; upgrades belong to saved stations.
             if (noUpgrade) { finish(playUrl); return; }
+            // Cache-first: a cached answer upgrades this very play. A miss
+            // plays the user's URL immediately — waiting on the directory
+            // put the mirror chain's worst case (five mirrors, four seconds
+            // each) between the click and the first note — and only warms
+            // the cache in the background; the upgrade applies on the next
+            // play.
+            if (_bitrateCache[playUrl] !== undefined) {
+                _autoSelectBitrate({ "name": station.name, "hostname": playUrl,
+                                     "favicon": station.favicon,
+                                     "active": station.active }, finish);
+                return;
+            }
+            finish(playUrl);
             _autoSelectBitrate({ "name": station.name, "hostname": playUrl,
                                  "favicon": station.favicon,
-                                 "active": station.active }, finish);
+                                 "active": station.active }, function(picked) {
+                // Cache warmed inside _autoSelectBitrate — playback is
+                // deliberately not touched here.
+            });
         });
     }
 
@@ -3793,7 +3881,9 @@ PlasmoidItem {
             fadeOutAnimation.target = playMusicOutput;
             fadeOutAnimation.from = playMusicOutput.volume;
             fadeOutAnimation.to = 0;
-            fadeOutAnimation.duration = Plasmoid.configuration.fadeDuration;
+            // Clamped: a hand-corrupted negative config value must not become
+            // a negative animation duration.
+            fadeOutAnimation.duration = Math.max(0, Plasmoid.configuration.fadeDuration);
             fadeOutAnimation.restart();
         } else {
             playMusic.stop();
@@ -3888,7 +3978,8 @@ PlasmoidItem {
         if (Plasmoid.configuration.fadeEnabled) {
             fadeInAnimation.from = 0;
             fadeInAnimation.to = targetVolume();
-            fadeInAnimation.duration = Plasmoid.configuration.fadeDuration;
+            // Same clamp as the fade-out: no negative durations from config.
+            fadeInAnimation.duration = Math.max(0, Plasmoid.configuration.fadeDuration);
             fadeInAnimation.target = playMusicOutput;
             fadeInAnimation.restart();
         }
@@ -3906,10 +3997,13 @@ PlasmoidItem {
         // must not be applied to a meanwhile-switched station.
         root._icyQueryUrl = streamUrl.toString();
         var safeUrl = streamUrl.toString().replace(/'/g, "'\\''");
-        var safeMeta = (metadata || "").toString().replace(/'/g, "'\\''");
         var scriptPath = Qt.resolvedUrl("reader.py").toString().substring(7);
         var safeScript = scriptPath.replace(/'/g, "'\\''");
-        var cmd = "python3 '" + safeScript + "' '" + safeUrl + "' '" + safeMeta + "'";
+        // The previous metadata is deliberately NOT passed: on argv it sits
+        // world-readable in /proc, leaking the listening history — and all
+        // it ever bought was suppressing a repeated print (the exec handler
+        // drops an unchanged title anyway).
+        var cmd = "python3 '" + safeScript + "' '" + safeUrl + "' ''";
         executable.exec(cmd);
     }
 
@@ -3961,7 +4055,9 @@ PlasmoidItem {
     // of the same track simply tries again. Definitive empties are cached
     // with a timestamp and expire after _artNegativeTtlMs.
     function _artFinish(cacheKey, url, definitive) {
-        console.log("[ARP] artFinish key=" + cacheKey.substring(0, 60) + " url=" + (url || "<empty>")
+        // Event-only log — keys and URLs are the listening history, which
+        // has no business sitting in the journal.
+        console.log("[ARP] artFinish " + (url ? "art found" : "no art")
                     + (definitive ? "" : " (transient, not cached)"));
         if (url || definitive) {
             if (_artCache[cacheKey] === undefined) {
@@ -3973,7 +4069,6 @@ PlasmoidItem {
             _artCache[cacheKey] = { "url": url || "", "t": Date.now() };
         }
         var currentKey = trackArtistTitleKey();
-        console.log("[ARP] currentKey=" + currentKey.substring(0, 60));
         if (url && currentKey === cacheKey) {
             albumArtUrl = url;
             _albumArtKey = cacheKey;
@@ -4003,7 +4098,7 @@ PlasmoidItem {
     // an HTTP error (iTunes rate-limits at ~20 req/min with 403), a quota
     // error or an unparseable body — and must not be negative-cached.
     function _queryItunes(query, cacheKey, onResult) {
-        console.log("[ARP] iTunes query: " + query);
+        console.log("[ARP] iTunes query");
         var xhr = new XMLHttpRequest;
         var guard = null;
         xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=song&limit=1&media=music");
@@ -4048,7 +4143,7 @@ PlasmoidItem {
     }
 
     function _queryDeezer(query, cacheKey, onResult) {
-        console.log("[ARP] Deezer query: " + query);
+        console.log("[ARP] Deezer query");
         var xhr = new XMLHttpRequest;
         var guard = null;
         xhr.open("GET", "https://api.deezer.com/search?q=" + encodeURIComponent(query) + "&limit=1");
@@ -4083,7 +4178,7 @@ PlasmoidItem {
     }
 
     function _queryDeezerArtist(artistName, cacheKey, onResult) {
-        console.log("[ARP] DeezerArtist query: " + artistName);
+        console.log("[ARP] DeezerArtist query");
         var xhr = new XMLHttpRequest;
         var guard = null;
         xhr.open("GET", "https://api.deezer.com/search/artist?q=" + encodeURIComponent(artistName) + "&limit=1");
@@ -4126,6 +4221,22 @@ PlasmoidItem {
             }
         }
         return s.trim();
+    }
+
+    // A flapping StreamTitle (rotating ad text, titles carrying elapsed
+    // time) used to launch a full art-lookup chain per flap. Debounced to
+    // one chain per stable window; the ~1.5 s later cover is acceptable.
+    property string _artLookupPendingRaw: ""
+    // The normalized lookup key the pending debounce is already aimed at —
+    // so same-key raw flaps (an embedded per-second counter) don't restart
+    // the timer forever and starve the lookup.
+    property string _artPendingKey: ""
+
+    Timer {
+        id: artLookupDebounce
+        interval: 1500
+        repeat: false
+        onTriggered: root.lookupAlbumArt(root._artLookupPendingRaw)
     }
 
     function lookupAlbumArt(trackString) {
@@ -4444,8 +4555,23 @@ PlasmoidItem {
                 executable.exec(": REC_TRACK; printf '%s\\n' '" + recLine.replace(/'/g, "'\\''")
                                 + "' >> '" + root._recTracksPath.replace(/'/g, "'\\''") + "'");
             }
-            lookupAlbumArt(raw);
+            // Restart the debounce only when the NORMALIZED key moves — a title
+            // carrying a per-second counter would otherwise restart the 1.5 s
+            // timer forever and the art never fires. Same key = same query, so
+            // which raw the pending lookup ends up using is immaterial.
+            var artKey = _normalizeQuery((parsed.artist + " " + parsed.title).trim() || raw);
+            if (artKey !== root._artPendingKey) {
+                root._artPendingKey = artKey;
+                root._artLookupPendingRaw = raw;
+                artLookupDebounce.restart();
+            }
         } else {
+            // A lookup still waiting out its debounce is for a title that no
+            // longer exists — it must not repaint the art after this clear.
+            artLookupDebounce.stop();
+            // Drop the pending key so the same track returning fires a fresh
+            // lookup instead of being swallowed as a same-key flap.
+            root._artPendingKey = "";
             root.title = Plasmoid.title;
             root.imageurl = "";
             root.trackArtist = "";
@@ -4633,10 +4759,15 @@ PlasmoidItem {
             // Whole-room sync: every PW_*/BT_KICK round-trip belongs to
             // the engine, which answers true when the command was its own.
             if (syncEngine.handleExec(cmd, stdout, stderr)) return;
-            // Music-library folder created (or already existed) → safe to load
+            // Music-library folder confirmed on disk → safe to load. Without
+            // the sentinel a failed mkdir would still fire the signal and My
+            // Music would list $HOME (issue #3); a failure instead leaves the
+            // page on its match-nothing filter.
             if (cmd.indexOf(": MUSICDIR;") === 0) {
-                root._musicDirEnsured = true;
-                root.musicDirReady();
+                if ((stdout || "").indexOf("__MUSICDIR_OK__") !== -1) {
+                    root._musicDirEnsured = true;
+                    root.musicDirReady();
+                }
                 return;
             }
             // Casting: bridge availability probe (python3 present = usable;
@@ -4676,16 +4807,16 @@ PlasmoidItem {
                         continue;
                     }
                     var prt = parseInt(p[5], 10);
-                    // Name and model are LAN-supplied display text: strip
-                    // markup metacharacters at the door (same rule the
-                    // search chips apply) so a hostile beacon's name can
-                    // never read as rich text anywhere it is shown.
+                    // Name and model are LAN-supplied display text: sanitized
+                    // at the door (same rule the search chips apply) so a
+                    // hostile beacon's name can never read as rich text or
+                    // scramble a row anywhere it is shown.
                     var dev = {
                         "kind": p[1], "uuid": p[2],
-                        "name": (p[3] || "").replace(/[<>&]/g, ""),
+                        "name": _sanitizeDeviceName(p[3]),
                         "host": p[4],
                         "port": isNaN(prt) ? 8009 : prt,
-                        "deviceModel": (p[6] || "").replace(/[<>&]/g, ""),
+                        "deviceModel": _sanitizeDeviceName(p[6]),
                         "location": p.length > 7 ? p[7] : ""
                     };
                     seenUuids[dev.uuid] = true;
@@ -4716,7 +4847,25 @@ PlasmoidItem {
                            i18n("Install the python-chromecast package to cast to your devices."),
                            "dialog-warning");
                 } else if (castOut.indexOf("__CAST_OK__") === -1) {
-                    notify(i18n("Could not cast to %1", root._castName || i18n("the device")),
+                    // Name the device that actually failed — the aggregate
+                    // _castName ("2 devices") blames the whole room for one
+                    // target's hiccup. Same argv-parse as the OK branch.
+                    var fuM = cmd.match(/'play' '[^']*' '[^']*' '([^']*)'/);
+                    var fUuid = fuM ? fuM[1] : "";
+                    if (fUuid === "") {
+                        var flM = cmd.match(/'dlna-play' '((?:'\\''|[^'])*)'/);
+                        if (flM) {
+                            var fLoc = flM[1].replace(/'\\''/g, "'");
+                            for (var fti = 0; fti < root._castTargets.length; fti++)
+                                if (root._castTargets[fti].location === fLoc) {
+                                    fUuid = root._castTargets[fti].uuid;
+                                    break;
+                                }
+                        }
+                    }
+                    var fIdx = root.castTargetIndex(fUuid);
+                    var fName = fIdx >= 0 ? root._castTargets[fIdx].name : "";
+                    notify(i18n("Could not cast to %1", fName || root._castName || i18n("the device")),
                            i18n("The device could not play this station."),
                            "dialog-error");
                 } else {
@@ -4758,7 +4907,17 @@ PlasmoidItem {
                 }
                 return;
             }
-            if (cmd.indexOf(": CAST_STOP;") === 0 || cmd.indexOf(": CAST_VOL;") === 0) {
+            if (cmd.indexOf(": CAST_STOP;") === 0) {
+                // The device was reached but rejected the stop — worth one
+                // soft word. State cleanup stays optimistic: re-adding the
+                // target or retrying would fight the user's explicit stop.
+                if ((stdout || "").indexOf("__CAST_FAIL__") !== -1)
+                    notify(i18n("Casting"),
+                           i18n("The device did not stop — it may still be playing."),
+                           "dialog-warning");
+                return;
+            }
+            if (cmd.indexOf(": CAST_VOL;") === 0) {
                 return; // fire-and-forget
             }
             // Bluetooth: bluetoothctl availability + controller probe
@@ -4780,9 +4939,8 @@ PlasmoidItem {
                         "mac": btp[1], "connected": btp[2] === "yes",
                         // A tab INSIDE the alias splits into extra fields —
                         // rejoin them so the name survives (tabs as spaces).
-                        // Markup metacharacters stripped: the alias is
-                        // device-supplied display text.
-                        "name": btp.slice(3).join(" ").trim().replace(/[<>&]/g, "") || btp[1]
+                        // Sanitized: the alias is device-supplied display text.
+                        "name": _sanitizeDeviceName(btp.slice(3).join(" ").trim()) || btp[1]
                     });
                 }
                 if (root._btListAgain) {
@@ -4866,7 +5024,7 @@ PlasmoidItem {
                     var fp = fLines[fi].split("\t");
                     if (fp.length < 3 || !_btValidMac(fp[1])) continue;
                     btFoundModel.append({ "mac": fp[1],
-                        "name": fp.slice(2).join(" ").trim().replace(/[<>&]/g, "") || fp[1] });
+                        "name": _sanitizeDeviceName(fp.slice(2).join(" ").trim()) || fp[1] });
                 }
                 return;
             }
@@ -5015,6 +5173,10 @@ PlasmoidItem {
                     recTitle = i18n("ffmpeg is not installed");
                     recText = i18n("Install ffmpeg to record radio.");
                     recIcon = "dialog-warning";
+                } else if (recOut.indexOf("__REC_NOSPACE__") !== -1) {
+                    recTitle = i18n("Not enough disk space for this recording");
+                    recText = i18n("Free some space in %1 and try again.", root.downloadDirPath);
+                    recIcon = "dialog-warning";
                 } else if (recOk) {
                     recTitle = i18n("Recording saved ✓ (%1)", recDur);
                     recText = recName;
@@ -5031,6 +5193,7 @@ PlasmoidItem {
                     recIcon = "dialog-error";
                 }
                 var recNoFfmpeg = recOut.indexOf("__NO_FFMPEG__") !== -1;
+                var recNoSpace = recOut.indexOf("__REC_NOSPACE__") !== -1;
                 // A near-instant failure (ffmpeg absent, mkdir/disk failure,
                 // stream refused at once) is what storms — a real capture
                 // that ran a while and got interrupted is not. Only the
@@ -5045,10 +5208,11 @@ PlasmoidItem {
                         delete _recRetryCount[recSchedKey];
                         delete _recRetryAfter[recSchedKey];
                         _recSchedAdvance(recSchedKey);
-                    } else if (recNoFfmpeg) {
-                        // ffmpeg will not appear inside this window — retrying
-                        // is pointless. Give up on the occurrence with the one
-                        // toast already shown, and advance it.
+                    } else if (recNoFfmpeg || recNoSpace) {
+                        // ffmpeg (or the missing disk space) will not appear
+                        // inside this window — retrying is pointless. Give up
+                        // on the occurrence with the one toast already shown,
+                        // and advance it.
                         delete _recRetryCount[recSchedKey];
                         delete _recRetryAfter[recSchedKey];
                         _recSchedAdvance(recSchedKey);
@@ -5166,7 +5330,11 @@ PlasmoidItem {
             }
             if (formattedText.length > 0) {
                 root._icyEmptyCount = 0;
-                root.metadata = formattedText;
+                // reader.py no longer sees the previous metadata (argv leaks
+                // to /proc), so an unchanged title now arrives every poll —
+                // drop it here instead.
+                if (formattedText !== root.metadata)
+                    root.metadata = formattedText;
             } else if (root.currentStation !== "" && root.trackTitle === "") {
                 root._icyEmptyCount += 1;
                 if (root._icyEmptyCount >= 6) {

@@ -59,10 +59,20 @@ def test_every_byuuid_concatenation_encodes_its_uuid():
 
 def test_device_supplied_names_are_stripped_at_the_model_door():
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    # The cast device dict, the paired list and the scan list each strip
-    # markup metacharacters from LAN/BT-supplied display text. Three
+    # The cast device dict, the paired list and the scan list each sanitize
+    # LAN/BT-supplied display text through _sanitizeDeviceName. Three
     # sites; losing one reopens the rich-text beacon door.
-    strips = src.count('replace(/[<>&]/g, "")')
-    assert strips >= 3, (
-        "expected >=3 [<>&] strips on device-name model inserts, found %d"
-        % strips)
+    assert "function _sanitizeDeviceName" in src, (
+        "_sanitizeDeviceName helper missing from main.qml")
+    helper = re.search(
+        r"function _sanitizeDeviceName[\s\S]{0,200}?replace\(/\[([^\]]+)\]/g",
+        src)
+    assert helper, "_sanitizeDeviceName no longer strips a character class"
+    for needed in ("<>&", "\\u0000-\\u001f", "\\u202a-\\u202e"):
+        assert needed in helper.group(1), (
+            "_sanitizeDeviceName class lost %r (markup / control / bidi)"
+            % needed)
+    strips = src.count("_sanitizeDeviceName(")
+    assert strips >= 4, (  # 3 model-door call sites + the definition itself
+        "expected >=4 _sanitizeDeviceName mentions (3 call sites + def), "
+        "found %d" % strips)
