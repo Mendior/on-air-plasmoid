@@ -845,6 +845,14 @@ Item {
             // audible verify after the user toggled auto-care off or the
             // group died. Consume without acting.
             if (cfg.syncAutoCare !== true || !_combineActive) return true;
+            // The same busy states that gate the probe's LAUNCH gate its
+            // ack: a manual calibration, a recording or an alarm that began
+            // inside the probe's window must not have an automatic verify
+            // hardware-muting speakers over it — the calibration would
+            // measure silence and persist garbage lags.
+            if (_calibrating || _verifyPending || _combineReloopBusy
+                || _btKickInFlight || app.recording === true
+                || app.alarmEngaged === true) return true;
             var deWhen = Qt.formatTime(new Date(), "hh:mm");
             var deM = (stdout || "").match(/DRIFT_EST (\d+)/);
             console.log("[ARP] sync: auto-care result — "
@@ -2158,7 +2166,15 @@ Item {
         if (app._pendingUserVolumePct < 0) return;
         var v = app.playerOutput.volume;
         if (v <= 0) return;
-        var target = Math.max(0, Math.min(1, _calibVolumeBefore + v));
+        // Only a wheel/keyboard STEP was computed from the displayed 0 and
+        // needs folding onto the pre-park level. An absolute gesture — the
+        // popup slider, the unmute button's targetVolume, an MPRIS
+        // SetVolume — already names its level; folding those doubled them
+        // (unmute at pre-park 65% became min(1, 0.65+0.65) = full blast,
+        // persisted).
+        var target = app._pendingUserVolumeStep
+                ? Math.max(0, Math.min(1, _calibVolumeBefore + v))
+                : v;
         _cancelAutoCareVerify();
         app.setUserVolume(target);
     }

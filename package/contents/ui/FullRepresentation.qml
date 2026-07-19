@@ -3996,7 +3996,7 @@ PlasmaExtras.Representation {
                 WheelHandler {
                     onWheel: (event) => {
                         const step = event.angleDelta.y > 0 ? 0.05 : -0.05
-                        root.setUserVolume(playMusicOutput.volume + step)
+                        root.setUserVolume(playMusicOutput.volume + step, true)
                     }
                 }
 

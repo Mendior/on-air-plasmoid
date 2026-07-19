@@ -79,11 +79,11 @@ MouseArea {
         wheelDelta += delta;
         while (wheelDelta >= 120) {
             wheelDelta -= 120;
-            root.setUserVolume(playMusicOutput.volume + 0.05);
+            root.setUserVolume(playMusicOutput.volume + 0.05, true);
         }
         while (wheelDelta <= -120) {
             wheelDelta += 120;
-            root.setUserVolume(playMusicOutput.volume - 0.05);
+            root.setUserVolume(playMusicOutput.volume - 0.05, true);
         }
         tooltip.mainText = playMusicOutput.volume === 0 ? i18n("Audio") : i18n("Volume");
         tooltip.subText = playMusicOutput.volume === 0 ? i18n("Muted") : Math.round(playMusicOutput.volume * 100) + "%";

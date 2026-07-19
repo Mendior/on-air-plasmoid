@@ -57,11 +57,15 @@ Item {
             }
             property real lastUserVolume: -1
             // Mirrors main.qml: only a deliberate gesture stamps the pending
-            // pct, and it is stamped AFTER the volume write.
+            // pct, and it is stamped AFTER the volume write. The step flag
+            // says whether it was a wheel step (folds during a park) or an
+            // absolute level (applies as spoken).
             property int _pendingUserVolumePct: -1
-            function setUserVolume(v) {
+            property bool _pendingUserVolumeStep: false
+            function setUserVolume(v, fromStep) {
                 lastUserVolume = v;
                 playerOutput.volume = Math.max(0, Math.min(1, v));
+                _pendingUserVolumeStep = fromStep === true;
                 _pendingUserVolumePct = Math.round(playerOutput.volume * 100);
             }
             property string instanceId: "7"
@@ -1217,6 +1221,7 @@ Item {
             // volume write lands first, the pending stamp right after.
             r.mock.playerOutput.volume = 0.05;
             r.mock._pendingUserVolumePct = 5;
+            r.mock._pendingUserVolumeStep = true;
             // The deferred handler (Qt.callLater in production) folds it onto
             // the real level, drops the verify, and persists THAT.
             r.e._autoCareVolumeGesture();
@@ -1225,6 +1230,45 @@ Item {
             fuzzyCompare(r.mock.playerOutput.volume, 0.55, 0.001);  // 0.5 + 0.05
             fuzzyCompare(r.mock.lastUserVolume, 0.55, 0.001);       // persisted
             verify(r.e._calibVolumeBefore < 0);           // nothing stale to restore
+        }
+
+        function test_an_absolute_gesture_during_the_park_applies_as_spoken() {
+            // The unmute button (setUserVolume(targetVolume())), the popup
+            // slider and MPRIS SetVolume name an ABSOLUTE level. Folding it
+            // onto the pre-park level doubled it: unmute at pre-park 50%
+            // became min(1, 0.5 + 0.5) = full blast — and persisted.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", "");
+            verify(r.e._verifyPending);
+            compare(r.mock.playerOutput.volume, 0);       // parked
+            // The unmute click: targetVolume() read the remembered 50%.
+            r.mock.playerOutput.volume = 0.5;
+            r.mock._pendingUserVolumePct = 50;
+            r.mock._pendingUserVolumeStep = false;
+            r.e._autoCareVolumeGesture();
+            verify(!r.e._verifyPending);                  // verify dropped
+            verify(!r.e._autoCareParked);                 // park released
+            fuzzyCompare(r.mock.playerOutput.volume, 0.5, 0.001);   // as spoken
+            fuzzyCompare(r.mock.lastUserVolume, 0.5, 0.001);        // not doubled
+        }
+
+        function test_drift_ack_during_a_busy_state_never_arms_the_verify() {
+            // The probe is out for up to 20 s. A manual calibration (or a
+            // recording, or an alarm) starting inside that window must not
+            // have the confirming ack hardware-mute speakers over it — the
+            // calibration would measure silence and persist garbage lags.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 80\n", "");
+            r.e._calibrating = true;
+            verify(r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 85\n", ""));
+            verify(!r.e._verifyPending);                  // consumed, not armed
+            r.e._calibrating = false;
+            r.mock.recording = true;
+            verify(r.e.handleExec(": PW_DRIFT;", "DRIFT_EST 84\n", ""));
+            verify(!r.e._verifyPending);
         }
 
         function test_a_programmatic_write_during_the_park_is_not_a_gesture() {

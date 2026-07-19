@@ -333,10 +333,17 @@ PlasmoidItem {
     // resets to targetVolume) and restarts no longer snap back to a stale
     // default. Fades never come through here — they must not be persisted.
     property int _pendingUserVolumePct: -1
+    // Whether the pending gesture was a wheel/keyboard STEP computed from
+    // the displayed volume (true) or an absolute level named by the user
+    // (slider, unmute, MPRIS — false). The auto-care park reads this to
+    // decide whether the gesture folds onto the pre-park level or applies
+    // as spoken.
+    property bool _pendingUserVolumeStep: false
 
-    function setUserVolume(v) {
+    function setUserVolume(v, fromStep) {
         var vol = Math.max(0, Math.min(1, v));
         playMusicOutput.volume = vol;
+        _pendingUserVolumeStep = fromStep === true;
         _pendingUserVolumePct = Math.round(vol * 100);
         volumePersistTimer.restart();
         // While casting, the slider drives the DEVICE volume (debounced) — the
