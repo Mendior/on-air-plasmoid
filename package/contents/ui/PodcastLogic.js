@@ -203,6 +203,49 @@ function prunePositions(map, cap) {
     return out
 }
 
+// The playback speeds the chip cycles through. 1x always present.
+var SPEEDS = [0.8, 1.0, 1.25, 1.5, 1.75, 2.0]
+
+// A safe playback rate. The backend misbehaves outside a sane band and a
+// hand-edited config must not hand it a wild value; 0 or negative would
+// freeze or reverse. Clamped to [0.5, 3.0], NaN falls back to 1.0.
+function clampRate(r) {
+    var n = Number(r)
+    if (!isFinite(n) || n <= 0) return 1.0
+    return Math.max(0.5, Math.min(3.0, n))
+}
+
+// The next speed in the ring after `cur` (wraps). Snaps an off-list rate
+// to the nearest listed one first, so cycling always lands on a clean step.
+function nextRate(cur) {
+    var c = clampRate(cur)
+    var best = 0, bestD = Infinity
+    for (var i = 0; i < SPEEDS.length; i++) {
+        var d = Math.abs(SPEEDS[i] - c)
+        if (d < bestD) { bestD = d; best = i }
+    }
+    // On an exact match advance; otherwise jump to the nearest step first.
+    if (bestD < 0.001) return SPEEDS[(best + 1) % SPEEDS.length]
+    return SPEEDS[best]
+}
+
+// A rate reads as "1x" / "1.5x" / "0.8x" — trailing zeros trimmed.
+function fmtRate(r) {
+    var n = clampRate(r)
+    var s = (Math.round(n * 100) / 100).toString()
+    return s + "x"
+}
+
+// Where a ±N-second skip lands, clamped inside the media. All in ms; a
+// skip past either end parks at that end rather than erroring.
+function skipTarget(posMs, deltaSec, durMs) {
+    var t = (Number(posMs) || 0) + (Number(deltaSec) || 0) * 1000
+    var d = Number(durMs) || 0
+    if (t < 0) return 0
+    if (d > 0 && t > d) return d
+    return t
+}
+
 // m:ss under an hour, h:mm:ss over it — the seek row's clock.
 function fmtTime(sec) {
     var s = Math.max(0, Math.round(sec))

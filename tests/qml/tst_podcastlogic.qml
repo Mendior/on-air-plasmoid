@@ -221,4 +221,38 @@ TestCase {
         compare(PL.fmtTime(3723), "1:02:03")
         compare(PL.fmtTime(-3), "0:00")
     }
+
+    function test_playback_rate_is_clamped_to_a_sane_band() {
+        compare(PL.clampRate(1.5), 1.5)
+        compare(PL.clampRate(0), 1.0)      // a frozen player is not a speed
+        compare(PL.clampRate(-2), 1.0)     // nor a reversed one
+        compare(PL.clampRate(99), 3.0)     // ceiling
+        compare(PL.clampRate(0.1), 0.5)    // floor
+        compare(PL.clampRate("abc"), 1.0)  // hand-edited garbage
+        compare(PL.clampRate(undefined), 1.0)
+    }
+
+    function test_rate_cycles_through_the_ring_and_wraps() {
+        compare(PL.nextRate(1.0), 1.25)
+        compare(PL.nextRate(2.0), 0.8)     // wraps
+        compare(PL.nextRate(0.8), 1.0)
+        // An off-list rate snaps to the nearest step first.
+        compare(PL.nextRate(1.3), 1.25)
+        compare(PL.nextRate(1.6), 1.5)
+    }
+
+    function test_rate_reads_cleanly() {
+        compare(PL.fmtRate(1.0), "1x")
+        compare(PL.fmtRate(1.5), "1.5x")
+        compare(PL.fmtRate(0.8), "0.8x")
+        compare(PL.fmtRate(1.25), "1.25x")
+    }
+
+    function test_skip_lands_inside_the_media() {
+        compare(PL.skipTarget(60000, 30, 600000), 90000)   // +30s
+        compare(PL.skipTarget(10000, -15, 600000), 0)      // back past start -> 0
+        compare(PL.skipTarget(595000, 30, 600000), 600000) // fwd past end -> end
+        compare(PL.skipTarget(0, -15, 0), 0)               // unknown duration, back
+        compare(PL.skipTarget(50000, 15, 0), 65000)        // unknown duration, fwd ok
+    }
 }

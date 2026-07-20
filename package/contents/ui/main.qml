@@ -928,6 +928,12 @@ PlasmoidItem {
     property int _podPosRev: 0
     property string _podPendingSeekUrl: ""
     property int _podPendingSeekSec: 0
+    // Playback speed for local playback. Remembered per show (feedUrl of the
+    // playing episode) over a global default; pitch-corrected where the
+    // backend can, so voices don't chipmunk. A radio stream always plays 1x.
+    property real podcastRate: 1.0
+    property string _currentEpisodeFeed: ""
+    property var _podSpeeds: ({})
 
     function _loadPodcastSubs() {
         try {
@@ -1161,17 +1167,71 @@ PlasmoidItem {
         _flushPodPositions();
         _podPlayingKey = "";
         _podPendingSeekUrl = "";
+        // A plain My Music track (played through playLocalFile without an
+        // episode) belongs to no show — it uses the global default speed.
+        _currentEpisodeFeed = "";
     }
 
     function playPodcastEpisode(fileUrl, title, key) {
+        var feed = podcastEpisodesFor || "";   // the open show
         var resume = podcastPositionSec(key || "");
-        playLocalFile(fileUrl, title);
+        playLocalFile(fileUrl, title);         // clears _currentEpisodeFeed
+        _currentEpisodeFeed = feed;            // ...re-set to this episode's show
         _podPlayingKey = key || "";
+        // The show's remembered speed (or the global default) takes effect
+        // once the media loads — playbackRate resets on every source change.
+        podcastRate = PodcastLogic.clampRate(_podSpeedFor(feed));
         if (resume > 8) {
             // Rewind a touch: the seconds around the bookmark restitch memory.
             _podPendingSeekUrl = fileUrl.toString();
             _podPendingSeekSec = Math.max(0, resume - 3);
         }
+    }
+
+    // ── Playback speed + skip ────────────────────────────────────────────
+    function _loadPodSpeeds() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.podcastSpeeds || "{}");
+            _podSpeeds = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _podSpeeds = {};
+        }
+    }
+    // The rate for a show: its own if set, else the global default ("" key),
+    // else 1x. Every stored value re-clamped in case the config was edited.
+    function _podSpeedFor(feed) {
+        var v = (feed && _podSpeeds[feed] !== undefined) ? _podSpeeds[feed]
+              : _podSpeeds[""];
+        return PodcastLogic.clampRate(v === undefined ? 1.0 : v);
+    }
+    // The applied rate: the show's speed for a local episode/track, always
+    // 1x for a radio stream (rate-shifting a live stream is meaningless and
+    // the backend mishandles it).
+    function _applyPlaybackRate() {
+        var local = playMusic.source.toString().indexOf("file://") === 0;
+        playMusic.playbackRate = local ? PodcastLogic.clampRate(podcastRate) : 1.0;
+        // Preserve pitch where the backend offers it; AlwaysOn needs no
+        // action, Unavailable degrades honestly (voices speed up in pitch).
+        if (playMusic.pitchCompensationAvailability !== undefined
+            && playMusic.pitchCompensationAvailability === MediaPlayer.Available)
+            playMusic.pitchCompensation = true;
+    }
+    function setPodcastRate(rate) {
+        podcastRate = PodcastLogic.clampRate(rate);
+        _applyPlaybackRate();
+        // Persist for the current show, and always as the global default so
+        // the next plain local track inherits the last speed too.
+        _podSpeeds[_currentEpisodeFeed || ""] = podcastRate;
+        _podSpeeds[""] = podcastRate;
+        Plasmoid.configuration.podcastSpeeds = JSON.stringify(_podSpeeds);
+    }
+    function cyclePodcastRate() {
+        setPodcastRate(PodcastLogic.nextRate(podcastRate));
+    }
+    function podcastSkip(deltaSec) {
+        if (playMusic.source.toString().indexOf("file://") !== 0) return;
+        playMusic.position = PodcastLogic.skipTarget(playMusic.position, deltaSec,
+                                                     playMusic.duration);
     }
 
     Timer {
@@ -1194,6 +1254,11 @@ PlasmoidItem {
         // The pending resume lands once the file is actually loaded; a
         // source that changed underneath (user switched fast) drops it.
         function onMediaStatusChanged() {
+            // playbackRate resets on every source change — re-assert the
+            // show's speed (or 1x for a stream) the moment the media loads.
+            if (playMusic.mediaStatus === MediaPlayer.LoadedMedia
+                || playMusic.mediaStatus === MediaPlayer.BufferedMedia)
+                root._applyPlaybackRate();
             if (root._podPendingSeekUrl === "") return;
             if (playMusic.source.toString() !== root._podPendingSeekUrl) {
                 root._podPendingSeekUrl = "";
@@ -4968,6 +5033,7 @@ PlasmoidItem {
         _ensureMusicDir();
         _loadPodcastSubs();
         _loadPodPositions();
+        _loadPodSpeeds();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
         // survives, so stop the orphan on the next start. ("-t" already caps

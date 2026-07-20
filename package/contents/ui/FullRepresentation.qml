@@ -1300,6 +1300,7 @@ PlasmaExtras.Representation {
                         + labelsCol.implicitHeight
                         + transportRow.implicitHeight
                         + (seekRow.visible ? seekRow.implicitHeight : 0)
+                        + (episodeControls.visible ? episodeControls.implicitHeight : 0)
                         + actionsRow.implicitHeight
                         // row spacings, per-row top margins and both breathers
                         + Kirigami.Units.gridUnit * 2.5
@@ -1797,6 +1798,60 @@ PlasmaExtras.Representation {
                         text: PodcastLogic.fmtTime(playMusic.duration / 1000)
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.75
+                    }
+                }
+
+                // Episode controls — skip within the track and set the speed.
+                // Local playback only (episodes, My Music files): a radio
+                // stream has no position to skip and always plays at 1x.
+                RowLayout {
+                    id: episodeControls
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: fullRepresentation._localPlayback && playMusic.duration > 0
+                    spacing: Kirigami.Units.largeSpacing
+
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.2
+                        implicitHeight: implicitWidth
+                        iconName: "media-seek-backward"
+                        iconScale: 0.5
+                        tooltipText: i18n("Skip back 15 seconds")
+                        onClicked: root.podcastSkip(-15)
+                    }
+
+                    // Speed chip — cycles 0.8 → 1 → 1.25 → 1.5 → 1.75 → 2 → 0.8.
+                    // Remembered per show; pitch-preserved where the backend can.
+                    QQC2.Button {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitHeight: Kirigami.Units.gridUnit * 1.9
+                        flat: true
+                        text: PodcastLogic.fmtRate(root.podcastRate)
+                        font.weight: root.podcastRate !== 1.0 ? Font.Bold : Font.Normal
+                        Accessible.name: i18n("Playback speed")
+                        PlasmaCore.ToolTipArea {
+                            anchors.fill: parent
+                            mainText: i18n("Playback speed — tap to change")
+                        }
+                        onClicked: root.cyclePodcastRate()
+                        contentItem: PlasmaComponents3.Label {
+                            text: parent.text
+                            font: parent.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            color: root.podcastRate !== 1.0 ? root.accentBright
+                                                            : Kirigami.Theme.textColor
+                        }
+                    }
+
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.2
+                        implicitHeight: implicitWidth
+                        iconName: "media-seek-forward"
+                        iconScale: 0.5
+                        tooltipText: i18n("Skip forward 30 seconds")
+                        onClicked: root.podcastSkip(30)
                     }
                 }
 
