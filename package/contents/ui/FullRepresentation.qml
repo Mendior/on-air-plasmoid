@@ -3525,62 +3525,10 @@ PlasmaExtras.Representation {
             anchors.rightMargin: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
 
-            CircleButton {
-                id: sleepBtn
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: Kirigami.Units.gridUnit * 2.2
-                implicitHeight: implicitWidth
-                iconName: root.sleepRemainingSec > 0 ? "chronometer" : "clock"
-                iconScale: 0.55
-                checkable: true
-                checked: root.sleepRemainingSec > 0
-                tooltipText: root.sleepRemainingSec > 0
-                             ? i18n("Sleep timer: %1", sleepFormatted())
-                             : i18n("Sleep timer")
-                onClicked: sleepMenu.open()
-
-                // Sleep timer progress ring
-                Canvas {
-                    id: sleepRing
-                    anchors.fill: parent
-                    anchors.margins: -2
-                    visible: root.sleepRemainingSec > 0 && root.sleepTotalSec > 0
-                    onPaint: {
-                        var ctx = getContext("2d")
-                        ctx.reset()
-                        if (root.sleepTotalSec <= 0) return
-                        var frac = root.sleepRemainingSec / root.sleepTotalSec
-                        var c = width / 2
-                        ctx.beginPath()
-                        ctx.arc(c, c, c - 1.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
-                        ctx.strokeStyle = Qt.alpha(root.accentBright, 0.9)
-                        ctx.lineWidth = 2.5
-                        ctx.lineCap = "round"
-                        ctx.stroke()
-                    }
-
-                    Connections {
-                        target: root
-                        function onSleepRemainingSecChanged() { sleepRing.requestPaint() }
-                        function onSleepTotalSecChanged() { sleepRing.requestPaint() }
-                    }
-                }
-
-                QQC2.Menu {
-                    id: sleepMenu
-                    QQC2.MenuItem { text: i18n("Sleep in 15 minutes"); icon.name: "chronometer"; onTriggered: root.startSleepTimer(15 * 60) }
-                    QQC2.MenuItem { text: i18n("Sleep in 30 minutes"); icon.name: "chronometer"; onTriggered: root.startSleepTimer(30 * 60) }
-                    QQC2.MenuItem { text: i18n("Sleep in 60 minutes"); icon.name: "chronometer"; onTriggered: root.startSleepTimer(60 * 60) }
-                    QQC2.MenuItem { text: i18n("Sleep in 90 minutes"); icon.name: "chronometer"; onTriggered: root.startSleepTimer(90 * 60) }
-                    QQC2.MenuSeparator { }
-                    QQC2.MenuItem {
-                        text: i18n("Cancel timer")
-                        icon.name: "dialog-cancel"
-                        enabled: root.sleepRemainingSec > 0
-                        onTriggered: root.cancelSleepTimer()
-                    }
-                }
-            }
+            // (The footer's sleep-timer button retired: the sleep timer
+            // now lives on the Timers tab with the alarms and schedules, so
+            // one clock served two homes. The running countdown still shows
+            // in the status label below — "Sleeping in mm:ss".)
 
             PlasmaComponents3.Label {
                 id: subtext
