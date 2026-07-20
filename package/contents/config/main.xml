@@ -157,6 +157,10 @@
             <label>Podcast resume positions (JSON map episode-key to {sec, dur, at})</label>
             <default>{}</default>
         </entry>
+        <entry name="castMenuHeight" type="Int">
+            <label>Remembered height of the output/volume menu in pixels (0 = auto-fit)</label>
+            <default>0</default>
+        </entry>
         <entry name="reportClicks" type="bool">
             <label>Report an anonymous listening click to radio-browser.info when a station starts playing — opt-in: anything leaving the machine is the user's call</label>
             <default>false</default>

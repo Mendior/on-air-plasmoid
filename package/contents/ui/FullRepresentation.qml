@@ -3694,17 +3694,69 @@ PlasmaExtras.Representation {
                     // page-switch handler.
                     focus: true
 
-                    // The menu grew past what a small popup window can show
-                    // (headers, pairing, sync controls, three device lists) —
-                    // a QQC2 Popup cannot extend beyond its window, so
-                    // without a scroll container the TOP rows silently
-                    // clipped away on a minimum-height widget.
-                    contentItem: PlasmaComponents3.ScrollView {
+                    // The most this menu may be tall: it opens UPWARD from the
+                    // footer button, so it has to fit between the popup's top
+                    // and the button — never clipping the header, on any popup
+                    // height.
+                    readonly property real _maxMenuH: Math.max(Kirigami.Units.gridUnit * 10,
+                        fullRepresentation.height - Kirigami.Units.gridUnit * 5)
+                    // The user's dragged height (0 = auto-fit the content,
+                    // capped so it opens compact and scrolls rather than
+                    // swallowing a tall popup). Always clamped to the available
+                    // range, so it can never overflow. Remembered per config.
+                    property real _userMenuH: 0
+                    Component.onCompleted: _userMenuH = Plasmoid.configuration.castMenuHeight
+                    readonly property real _menuH: Math.min(_maxMenuH,
+                        _userMenuH > 0 ? Math.max(Kirigami.Units.gridUnit * 10, _userMenuH)
+                                       : Math.min(castMenuColumn.implicitHeight,
+                                                  Kirigami.Units.gridUnit * 24))
+
+                    // A scroll container so the content (headers, pairing,
+                    // sync controls, three device lists) never clips on a
+                    // small popup — a QQC2 Popup cannot extend beyond its
+                    // window — with a drag grip on top to resize it.
+                    contentItem: ColumnLayout {
+                        spacing: 0
+
+                        // Resize grip — drag up to grow the menu, down to
+                        // shrink it (it opens upward); double-click resets to
+                        // auto-fit. The chosen height is remembered.
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: Kirigami.Units.gridUnit
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: Kirigami.Units.gridUnit * 2.5
+                                height: 4
+                                radius: 2
+                                color: Qt.alpha(Kirigami.Theme.textColor,
+                                    gripArea.pressed || gripArea.containsMouse ? 0.5 : 0.22)
+                            }
+                            MouseArea {
+                                id: gripArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.SizeVerCursor
+                                property real _startY: 0
+                                property real _startH: 0
+                                onPressed: (m) => { _startY = m.y; _startH = castMenu._menuH }
+                                onPositionChanged: (m) => {
+                                    if (!pressed) return
+                                    castMenu._userMenuH = Math.max(Kirigami.Units.gridUnit * 10,
+                                        Math.min(castMenu._maxMenuH, _startH - (m.y - _startY)))
+                                }
+                                onReleased: Plasmoid.configuration.castMenuHeight = Math.round(castMenu._userMenuH)
+                                onDoubleClicked: {
+                                    castMenu._userMenuH = 0
+                                    Plasmoid.configuration.castMenuHeight = 0
+                                }
+                            }
+                        }
+
+                        PlasmaComponents3.ScrollView {
                         id: castMenuScroll
-                        implicitWidth: castMenuColumn.implicitWidth
-                        implicitHeight: Math.min(
-                            castMenuColumn.implicitHeight,
-                            fullRepresentation.height - Kirigami.Units.gridUnit * 3)
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: castMenu._menuH
                         contentWidth: availableWidth
                         // The content is fitted to the width by design — an
                         // AsNeeded horizontal bar only feeds the padding<->
@@ -4448,6 +4500,7 @@ PlasmaExtras.Representation {
                             wrapMode: Text.Wrap
                             opacity: 0.6
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
                         }
                         }
                     }
