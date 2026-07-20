@@ -282,6 +282,18 @@ TestCase {
         compare(PL.notesToPlain("", 4000), "")
     }
 
+    function test_a_huge_leading_tag_does_not_swallow_the_note() {
+        // A note that opens with a big data-URI image (or any long tag) must
+        // still show the real text after it — a blind byte cap once cut
+        // inside the tag and left raw base64 as the whole "note".
+        var b64 = ""
+        for (var i = 0; i < 70000; i++) b64 += "A"
+        var html = '<img src="data:image/png;base64,' + b64 + '">The real description.'
+        var out = PL.notesToPlain(html, 4000)
+        verify(out.indexOf("The real description.") !== -1)
+        verify(out.indexOf("base64") === -1)   // the tag was stripped, not shown
+    }
+
     function test_a_megabyte_of_unclosed_tags_does_not_hang() {
         // A hostile notes block (unclosed <a> tags scan quadratically) must
         // be bounded by the input cap, not run for minutes. If the cap
