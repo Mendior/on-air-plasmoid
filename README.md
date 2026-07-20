@@ -22,7 +22,8 @@
 - 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker and the microphone does the rest: the Bluetooth lag is timed and set automatically, and every speaker's loudness is matched at the listening position — both remembered per device
 - 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, off by default — one switch in settings turns them on) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
-- ↕️ **Reorder stations right in the list** — hover arrows or Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
+- ↕️ **Reorder stations right in the list** — drag a row and it rides your finger, or use the hover arrows / Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
+- 🎙️ **Podcasts** — search the directory, subscribe to a show, and download episodes for offline listening; each episode remembers where you stopped and resumes there, with a seek bar for scrubbing
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
@@ -40,6 +41,7 @@ Optional (features degrade gracefully without them):
 | `python-dbus`, `python-gobject` | MPRIS media keys / media controls |
 | `ffmpeg` | Stream recording (instant + scheduled) |
 | `yt-dlp` + `ffmpeg` | Track downloads |
+| `curl` | Podcast episode downloads (present on virtually every system) |
 | `inotify-tools` | Zero-polling MPRIS command channel |
 | `python-chromecast` (pychromecast) | Cast to Chromecast / Nest devices (DLNA TVs and speakers work without it) |
 | `claude` (Claude Code CLI) | Optional AI cleanup of messy radio titles |
@@ -72,8 +74,8 @@ kpackagetool6 --type Plasma/Applet --install on-air-2026.21.plasmoid
 - **Hover** a station row for the ⭐, 🗑 and ↑/↓ reorder buttons (removal asks twice — no accidents); Ctrl+Up/Down moves the focused row
 - In the **favorites view** the arrows reorder your favorites list itself — your order, not the main list's
 - **Scroll** on the volume button or the panel icon to change volume
-- The **⬇ button** on the now-playing page downloads the current track to `~/Music/OnAir`
-- The **folder button** in the footer opens **My Music** — your offline library and play history
+- The **⬇ button** on the **Playing** tab downloads the current track to `~/Music/OnAir`
+- The **My Music** tab is your offline library and play history; the **Timers** tab holds the sleep timer, wake-up alarms and scheduled recordings; the **Podcasts** tab searches, subscribes and downloads episodes for offline listening
 
 ## Multi-room playback and sync
 
@@ -87,8 +89,8 @@ A Bluetooth speaker adds its own 100–300 ms of codec latency on top, so it can
 
 ## Recording
 
-- Press the **⏺ REC button** on the now-playing page to record the station you're listening to. Press again to stop. The recording is a bit-exact stream copy (original quality) saved to `~/Music/OnAir`, with a `.tracks.txt` file listing the songs and their timestamps.
-- **Scheduled recordings** live on the **My Music page** (the stopwatch button): pick a station, a start time, a duration and *once / daily / weekly* — the widget records it in the background, even if you're not listening. A red dot on the panel icon shows when a recording is running. Schedules fire only while the widget is running: logged out, powered off or asleep means paused, and missed recordings are reported when you're back.
+- Press the **⏺ REC button** on the **Playing** tab to record the station you're listening to. Press again to stop. The recording is a bit-exact stream copy (original quality) saved to `~/Music/OnAir`, with a `.tracks.txt` file listing the songs and their timestamps.
+- **Scheduled recordings** live on the **Timers** tab: pick a station, a start time, a duration and *once / daily / weekly* — the widget records it in the background, even if you're not listening. A red dot on the panel icon shows when a recording is running. Schedules fire only while the widget is running: logged out, powered off or asleep means paused, and missed recordings are reported when you're back.
 - One recording runs at a time, and every recording has a hard length cap (Settings → *Recording*, default 3 hours) so a forgotten REC can't fill your disk.
 - **Format** (Settings → *Recording*): *Original stream* (bit-exact copy — recommended; radio streams are already compressed, so this IS the maximum quality), *MP3* (high-quality re-encode for maximum device compatibility) or *WAV* (uncompressed PCM for editing — very large files, no quality gain).
 - **Personal use only.** Recording internet radio for your own, non-commercial use is a recognised private-copy exception in the EU (Directive 2001/29/EC art. 5(2)(b)) and many other jurisdictions, and these public streams carry no copy protection that would be circumvented. Do **not** share, upload or commercially exploit recordings — that is outside the exception. You are responsible for complying with the laws of your country.

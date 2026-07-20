@@ -3455,6 +3455,11 @@ PlasmaExtras.Representation {
                 font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
                 leftPadding: Kirigami.Units.smallSpacing / 2
                 rightPadding: Kirigami.Units.smallSpacing / 2
+                // Reachable by Tab, but a MOUSE click must not leave keyboard
+                // focus on the tab — otherwise the focused button swallows the
+                // global Space play/stop shortcut (the old CircleButton nav did
+                // not grab click-focus, so Space kept working after navigating).
+                focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
                 icon.name: "view-media-lyrics"
@@ -3463,6 +3468,11 @@ PlasmaExtras.Representation {
                 font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
                 leftPadding: Kirigami.Units.smallSpacing / 2
                 rightPadding: Kirigami.Units.smallSpacing / 2
+                // Reachable by Tab, but a MOUSE click must not leave keyboard
+                // focus on the tab — otherwise the focused button swallows the
+                // global Space play/stop shortcut (the old CircleButton nav did
+                // not grab click-focus, so Space kept working after navigating).
+                focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
                 icon.name: "folder-music"
@@ -3471,6 +3481,11 @@ PlasmaExtras.Representation {
                 font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
                 leftPadding: Kirigami.Units.smallSpacing / 2
                 rightPadding: Kirigami.Units.smallSpacing / 2
+                // Reachable by Tab, but a MOUSE click must not leave keyboard
+                // focus on the tab — otherwise the focused button swallows the
+                // global Space play/stop shortcut (the old CircleButton nav did
+                // not grab click-focus, so Space kept working after navigating).
+                focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
                 icon.name: "application-rss+xml"
@@ -3479,6 +3494,11 @@ PlasmaExtras.Representation {
                 font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
                 leftPadding: Kirigami.Units.smallSpacing / 2
                 rightPadding: Kirigami.Units.smallSpacing / 2
+                // Reachable by Tab, but a MOUSE click must not leave keyboard
+                // focus on the tab — otherwise the focused button swallows the
+                // global Space play/stop shortcut (the old CircleButton nav did
+                // not grab click-focus, so Space kept working after navigating).
+                focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
                 icon.name: "clock"
@@ -3487,6 +3507,11 @@ PlasmaExtras.Representation {
                 font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
                 leftPadding: Kirigami.Units.smallSpacing / 2
                 rightPadding: Kirigami.Units.smallSpacing / 2
+                // Reachable by Tab, but a MOUSE click must not leave keyboard
+                // focus on the tab — otherwise the focused button swallows the
+                // global Space play/stop shortcut (the old CircleButton nav did
+                // not grab click-focus, so Space kept working after navigating).
+                focusPolicy: Qt.TabFocus
             }
         }
     }
