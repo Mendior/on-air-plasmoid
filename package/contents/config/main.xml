@@ -149,6 +149,14 @@
             <label>Liked tracks (JSON)</label>
             <default>[]</default>
         </entry>
+        <entry name="podcastSubs" type="String">
+            <label>Podcast subscriptions (JSON array of {title, author, art, feedUrl})</label>
+            <default>[]</default>
+        </entry>
+        <entry name="podcastPositions" type="String">
+            <label>Podcast resume positions (JSON map episode-key to {sec, dur, at})</label>
+            <default>{}</default>
+        </entry>
         <entry name="reportClicks" type="bool">
             <label>Report an anonymous listening click to radio-browser.info when a station starts playing — opt-in: anything leaving the machine is the user's call</label>
             <default>false</default>

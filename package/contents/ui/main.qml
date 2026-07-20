@@ -18,6 +18,7 @@ import org.kde.plasma.plasmoid
 import "AlarmLogic.js" as AlarmLogic
 import "FaviconLogic.js" as FaviconLogic
 import "HealLogic.js" as HealLogic
+import "PodcastLogic.js" as PodcastLogic
 import "PlaylistLogic.js" as PlaylistLogic
 
 PlasmoidItem {
@@ -151,7 +152,11 @@ PlasmoidItem {
         // Sentinel only when the directory REALLY exists — a bare "mkdir
         // succeeded or not, load anyway" would point FolderListModel at a
         // missing folder, which is exactly the $HOME listing of issue #3.
-        executable.exec(": MUSICDIR; mkdir -p '" + safeMusicDir + "'"
+        // The Podcasts subfolder rides the same sentinel: episode
+        // downloads land there, and the podcast page's FolderListModel is
+        // gated on the identical latch (a model pointed at a missing
+        // folder lists $HOME — issue #3's lesson).
+        executable.exec(": MUSICDIR; mkdir -p '" + safeMusicDir + "/Podcasts'"
             + " && [ -d '" + safeMusicDir + "' ] && echo __MUSICDIR_OK__; true");
     }
 
@@ -860,7 +865,13 @@ PlasmoidItem {
         }
     }
 
-    onExpandedChanged: if (!root.expanded) _flushHistory()
+    onExpandedChanged: {
+        if (!root.expanded) {
+            _flushHistory();
+            _stampPodPosition();
+            _flushPodPositions();
+        }
+    }
 
     function _pushHistory(artist, trackName, station) {
         if (!trackName) return;
@@ -884,6 +895,309 @@ PlasmoidItem {
     }
 
     ListModel { id: historyModel }
+
+    // ── Podcasts ─────────────────────────────────────────────────────────
+    // Download-first by design: an episode is fetched as a plain file into
+    // Music/OnAir/Podcasts and plays through the local-file road, which
+    // already bypasses every live-stream mechanism (watchdog, stall retry,
+    // heal, LIVE pill, history push). Streaming an enclosure directly
+    // would need a media-kind flag through all of those — a later step,
+    // not this one. All feed content is untrusted input; PodcastLogic.js
+    // gates and sanitizes it before anything here touches it.
+
+    ListModel { id: podcastSubsModel }      // {title, author, art, feedUrl}
+    ListModel { id: podcastSearchModel }    // iTunes results, same roles
+    ListModel { id: podcastEpisodesModel }  // open feed: {title,url,guid,pubMs,durationSec,sizeBytes}
+
+    property bool podcastSearchBusy: false
+    property int _podSearchSeq: 0
+    property string podcastEpisodesFor: ""   // feedUrl the episodes model shows
+    property string podcastEpisodesTitle: ""
+    property bool podcastFeedLoading: false
+    property string podcastFeedError: ""
+    property int _podFeedSeq: 0
+    // One download at a time — deterministic, and the status line stays honest.
+    property string _podDownloadKey: ""
+    property string _podDownloadTitle: ""
+    // Resume bookkeeping: the playing episode's key and the seek waiting
+    // for the media to load.
+    property string _podPlayingKey: ""
+    property var _podPositions: ({})
+    // Bumped on every positions-map mutation: the map itself is mutated in
+    // place (no change signal), so badges bind through this tick instead.
+    property int _podPosRev: 0
+    property string _podPendingSeekUrl: ""
+    property int _podPendingSeekSec: 0
+
+    function _loadPodcastSubs() {
+        try {
+            const arr = JSON.parse(Plasmoid.configuration.podcastSubs || "[]");
+            podcastSubsModel.clear();
+            for (var i = 0; i < arr.length && i < 100; i++) {
+                const e = arr[i] || {};
+                if (!PodcastLogic.urlAllowed(e.feedUrl)) continue;
+                podcastSubsModel.append({
+                    "title": String(e.title || "").substring(0, 200),
+                    "author": String(e.author || "").substring(0, 200),
+                    "art": PodcastLogic.urlAllowed(e.art) ? e.art : "",
+                    "feedUrl": e.feedUrl
+                });
+            }
+        } catch (e) {
+            console.log("[ARP] loadPodcastSubs: " + e);
+        }
+    }
+
+    function _savePodcastSubs() {
+        const arr = [];
+        for (var i = 0; i < podcastSubsModel.count; i++) {
+            const p = podcastSubsModel.get(i);
+            arr.push({ "title": p.title, "author": p.author, "art": p.art, "feedUrl": p.feedUrl });
+        }
+        Plasmoid.configuration.podcastSubs = JSON.stringify(arr);
+    }
+
+    function isPodcastSubscribed(feedUrl) {
+        for (var i = 0; i < podcastSubsModel.count; i++)
+            if (podcastSubsModel.get(i).feedUrl === feedUrl) return true;
+        return false;
+    }
+
+    function addPodcastSub(title, author, art, feedUrl) {
+        if (!PodcastLogic.urlAllowed(feedUrl) || isPodcastSubscribed(feedUrl)) return false;
+        podcastSubsModel.append({
+            "title": String(title || "").substring(0, 200),
+            "author": String(author || "").substring(0, 200),
+            "art": PodcastLogic.urlAllowed(art) ? art : "",
+            "feedUrl": feedUrl
+        });
+        _savePodcastSubs();
+        return true;
+    }
+
+    function removePodcastSub(feedUrl) {
+        for (var i = 0; i < podcastSubsModel.count; i++) {
+            if (podcastSubsModel.get(i).feedUrl === feedUrl) {
+                podcastSubsModel.remove(i);
+                _savePodcastSubs();
+                return;
+            }
+        }
+    }
+
+    // Show search via the iTunes directory — keyless, so no secret ever
+    // sits in a public plasmoid (the PodcastIndex API wants a signed
+    // key and is out for exactly that reason).
+    function podcastSearch(term) {
+        var q = (term || "").trim();
+        if (q === "") { podcastSearchModel.clear(); podcastSearchBusy = false; return; }
+        podcastSearchBusy = true;
+        var seq = ++_podSearchSeq;
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            if (guard) guard.stop();
+            if (seq !== root._podSearchSeq) return;   // a newer search took over
+            root.podcastSearchBusy = false;
+            podcastSearchModel.clear();
+            try {
+                var res = JSON.parse(xhr.responseText || "{}").results || [];
+                for (var i = 0; i < res.length && podcastSearchModel.count < 30; i++) {
+                    var r = res[i] || {};
+                    var feed = String(r.feedUrl || "").trim();
+                    if (!PodcastLogic.urlAllowed(feed)) continue;
+                    var art = String(r.artworkUrl600 || r.artworkUrl100 || "").trim();
+                    podcastSearchModel.append({
+                        "title": String(r.collectionName || "").substring(0, 200),
+                        "author": String(r.artistName || "").substring(0, 200),
+                        "art": PodcastLogic.urlAllowed(art) ? art : "",
+                        "feedUrl": feed
+                    });
+                }
+            } catch (e) {
+                console.log("[ARP] podcastSearch: " + e);
+            }
+        };
+        xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
+                        + encodeURIComponent(q));
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
+        guard = _armXhrTimeout(xhr, 10000);
+        xhr.send();
+    }
+
+    function loadPodcastFeed(feedUrl, showTitle) {
+        if (!PodcastLogic.urlAllowed(feedUrl)) {
+            podcastFeedError = i18n("This feed address is not allowed.");
+            return;
+        }
+        var seq = ++_podFeedSeq;
+        podcastEpisodesFor = feedUrl;
+        podcastEpisodesTitle = showTitle || "";
+        podcastFeedLoading = true;
+        podcastFeedError = "";
+        podcastEpisodesModel.clear();
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        var aborted = false;
+        xhr.onreadystatechange = function() {
+            // 4 MB cap: a mega-feed must not balloon plasmashell. Abort is
+            // DEFERRED — aborting inside the handler re-enters the dying
+            // reply and has crashed the shell before (the probe lesson).
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 4 * 1024 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            if (guard) guard.stop();
+            if (seq !== root._podFeedSeq) return;
+            root.podcastFeedLoading = false;
+            // A capped body still parses — RSS carries the newest items first.
+            var feed = PodcastLogic.parseFeed(xhr.responseText || "", 50);
+            if (!feed.ok) {
+                root.podcastFeedError = xhr.status >= 400
+                    ? i18n("The feed did not answer (error %1).", xhr.status)
+                    : i18n("This address is not a podcast feed.");
+                return;
+            }
+            if (root.podcastEpisodesTitle === "" && feed.title !== "")
+                root.podcastEpisodesTitle = feed.title.substring(0, 200);
+            for (var i = 0; i < feed.episodes.length; i++)
+                podcastEpisodesModel.append(feed.episodes[i]);
+            if (feed.episodes.length === 0)
+                root.podcastFeedError = i18n("No playable episodes in this feed.");
+        };
+        xhr.open("GET", feedUrl);
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
+        guard = _armXhrTimeout(xhr, 15000);
+        xhr.send();
+    }
+
+    // The exact filename an episode downloads to — the UI checks the
+    // Podcasts folder for it to tell "download" from "play".
+    function podcastFileName(title, url) {
+        return PodcastLogic.safeFileName(title, "episode") + "." + PodcastLogic.fileExt(url);
+    }
+
+    function downloadEpisode(title, url, guid) {
+        if (_podDownloadKey !== "") return;             // one at a time
+        if (!PodcastLogic.urlAllowed(url)) return;
+        _podDownloadKey = PodcastLogic.episodeKey(guid, url);
+        _podDownloadTitle = String(title || "").substring(0, 120);
+        var dir = (downloadDirPath + "/Podcasts").replace(/'/g, "'\''");
+        var fname = podcastFileName(title, url).replace(/'/g, "'\''");
+        var safeUrl = url.replace(/'/g, "'\''");
+        // Staged download: .part first, atomic rename on success — the
+        // folder model never lists a half-written file as playable. The
+        // size cap guards the disk; -f keeps HTTP errors out of the file.
+        executable.exec(": POD_DL; mkdir -p '" + dir + "' && "
+            + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
+            + "-A 'OnAir/2026.21' -o '" + dir + "/" + fname + ".part' '" + safeUrl + "' "
+            + "&& mv -f '" + dir + "/" + fname + ".part' '" + dir + "/" + fname + "' "
+            + "&& echo __POD_OK__ || { rm -f '" + dir + "/" + fname + ".part'; echo __POD_FAIL__; }; "
+            + "true # " + nextSeq());
+    }
+
+    function _loadPodPositions() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.podcastPositions || "{}");
+            _podPositions = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _podPositions = {};
+        }
+    }
+
+    function _savePodPositions() {
+        _podPositions = PodcastLogic.prunePositions(_podPositions, 200);
+        Plasmoid.configuration.podcastPositions = JSON.stringify(_podPositions);
+    }
+
+    function podcastPositionSec(key) {
+        var e = _podPositions[key];
+        return (e && e.sec > 0) ? e.sec : 0;
+    }
+
+    // Stamp the playing episode's position. Near the end the entry is
+    // retired instead — a finished episode must not offer to "resume"
+    // at the credits.
+    function _stampPodPosition() {
+        if (_podPlayingKey === "") return;
+        if (!isPlaying() || playMusic.source.toString().indexOf("file://") !== 0) return;
+        var dur = Math.round(playMusic.duration / 1000);
+        var sec = Math.round(playMusic.position / 1000);
+        if (dur > 0 && sec >= dur - 10) {
+            delete _podPositions[_podPlayingKey];
+        } else if (sec > 5) {
+            _podPositions[_podPlayingKey] = { "sec": sec, "dur": dur, "at": Date.now() };
+        } else {
+            return;
+        }
+        _podPosRev++;
+        podPositionsPersist.restart();
+    }
+
+    function _flushPodPositions() {
+        if (podPositionsPersist.running) {
+            podPositionsPersist.stop();
+            _savePodPositions();
+        }
+    }
+
+    // Leaving an episode for anything else (a station, a plain track,
+    // another episode) saves the bookmark first and hands the key over.
+    function _podHandoff() {
+        _stampPodPosition();
+        _flushPodPositions();
+        _podPlayingKey = "";
+        _podPendingSeekUrl = "";
+    }
+
+    function playPodcastEpisode(fileUrl, title, key) {
+        var resume = podcastPositionSec(key || "");
+        playLocalFile(fileUrl, title);
+        _podPlayingKey = key || "";
+        if (resume > 8) {
+            // Rewind a touch: the seconds around the bookmark restitch memory.
+            _podPendingSeekUrl = fileUrl.toString();
+            _podPendingSeekSec = Math.max(0, resume - 3);
+        }
+    }
+
+    Timer {
+        id: podPositionStamp
+        interval: 5000
+        repeat: true
+        running: root._podPlayingKey !== "" && isPlaying()
+        onTriggered: _stampPodPosition()
+    }
+
+    Timer {
+        id: podPositionsPersist
+        interval: 3000
+        repeat: false
+        onTriggered: _savePodPositions()
+    }
+
+    Connections {
+        target: playMusic
+        // The pending resume lands once the file is actually loaded; a
+        // source that changed underneath (user switched fast) drops it.
+        function onMediaStatusChanged() {
+            if (root._podPendingSeekUrl === "") return;
+            if (playMusic.source.toString() !== root._podPendingSeekUrl) {
+                root._podPendingSeekUrl = "";
+                return;
+            }
+            if (playMusic.mediaStatus === MediaPlayer.LoadedMedia
+                || playMusic.mediaStatus === MediaPlayer.BufferedMedia) {
+                playMusic.position = root._podPendingSeekSec * 1000;
+                root._podPendingSeekUrl = "";
+            }
+        }
+    }
 
     // ── Station logo (favicon) disk cache ────────────────────────────────────
     // QML Image caches only in process memory and Qt sends a bare "Mozilla/5.0"
@@ -1935,6 +2249,10 @@ PlasmoidItem {
             stopWithFade();
             return;
         }
+        // A podcast episode that was playing saves its bookmark before the
+        // new track takes over (playPodcastEpisode re-arms its own key
+        // right after this call).
+        _podHandoff();
         // Picking a track is as clear an "I'm up" as picking a station:
         // the alarm's volume floor and the fallback chime stand down here
         // too, or the whole My Music session plays at wake-up loudness.
@@ -3764,6 +4082,9 @@ PlasmoidItem {
             alarmFallbackTimer.stop();
             _volumeOverridePct = -1;
         }
+        // A station taking over from a podcast episode saves the episode's
+        // bookmark first — the resume badge survives the radio detour.
+        _podHandoff();
         _healClearPending();
         _healSeq++;
         healTimer.stop();
@@ -3816,6 +4137,10 @@ PlasmoidItem {
     }
 
     function stopWithFade() {
+        // An explicit stop mid-episode keeps the listening position — the
+        // stamp must land BEFORE the fade starts tearing the source down.
+        _stampPodPosition();
+        _flushPodPositions();
         infoTimer.stop();
         connectWatchdog.stop();
         // A stop DURING a stall must retire the stall clock too — its
@@ -4633,6 +4958,8 @@ PlasmoidItem {
         // is only the door in.
         _rbDiscoverMirrors();
         _ensureMusicDir();
+        _loadPodcastSubs();
+        _loadPodPositions();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
         // survives, so stop the orphan on the next start. ("-t" already caps
@@ -4763,6 +5090,23 @@ PlasmoidItem {
             // Whole-room sync: every PW_*/BT_KICK round-trip belongs to
             // the engine, which answers true when the command was its own.
             if (syncEngine.handleExec(cmd, stdout, stderr)) return;
+            // Podcast episode download finished — one honest word either
+            // way, and the single-download slot frees up. The Podcasts
+            // folder model watches the directory itself, so the new file
+            // appears without a manual refresh.
+            if (cmd.indexOf(": POD_DL;") === 0) {
+                var podOk = (stdout || "").indexOf("__POD_OK__") !== -1;
+                if (podOk) {
+                    notify(i18n("Episode downloaded"), root._podDownloadTitle, "folder-music");
+                } else {
+                    console.warn("[ARP] podcast download failed: "
+                                 + (stderr || "").trim().split("\n").slice(-2).join(" "));
+                    notify(i18n("Episode download failed"), root._podDownloadTitle, "dialog-error");
+                }
+                root._podDownloadKey = "";
+                root._podDownloadTitle = "";
+                return;
+            }
             // Music-library folder confirmed on disk → safe to load. Without
             // the sentinel a failed mkdir would still fire the signal and My
             // Music would list $HOME (issue #3); a failure instead leaves the
@@ -5505,6 +5849,14 @@ PlasmoidItem {
                 var endedSrc = playMusic.source.toString();
                 var wasStream = endedSrc !== "" && endedSrc.indexOf("file://") !== 0
                                 && endedSrc !== root._alarmToneUrl.toString();
+                // A finished podcast episode is DONE: the bookmark goes,
+                // so its row offers a fresh start instead of the credits.
+                if (!wasStream && root._podPlayingKey !== "") {
+                    delete root._podPositions[root._podPlayingKey];
+                    root._podPosRev++;
+                    root._savePodPositions();
+                    root._podPlayingKey = "";
+                }
                 playMusic.source = "";
                 root.title = Plasmoid.title;
                 root.currentStation = "";

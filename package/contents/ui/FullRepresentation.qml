@@ -17,6 +17,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
+import "PodcastLogic.js" as PodcastLogic
 import "ReorderLogic.js" as ReorderLogic
 import "SearchLogic.js" as SearchLogic
 
@@ -1740,6 +1741,45 @@ PlasmaExtras.Representation {
                     }
                 }
 
+                // Seek row — local playback only (podcast episodes, My Music
+                // tracks). A radio stream has no position to hold; the LIVE
+                // pill already owns that story.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Kirigami.Units.largeSpacing * 2
+                    Layout.rightMargin: Kirigami.Units.largeSpacing * 2
+                    visible: fullRepresentation._localPlayback && playMusic.duration > 0
+                    spacing: Kirigami.Units.smallSpacing
+
+                    PlasmaComponents3.Label {
+                        text: PodcastLogic.fmtTime(playMusic.position / 1000)
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        opacity: 0.75
+                    }
+                    QQC2.Slider {
+                        id: seekSlider
+                        Layout.fillWidth: true
+                        from: 0
+                        to: Math.max(1, playMusic.duration)
+                        stepSize: 5000
+                        Accessible.name: i18n("Seek")
+                        // While the hand is on the slider, the hand leads;
+                        // the player follows only on release. Keyboard steps
+                        // arrive as onMoved without a press and apply at once.
+                        Binding on value {
+                            when: !seekSlider.pressed
+                            value: playMusic.position
+                        }
+                        onPressedChanged: if (!pressed) playMusic.position = value
+                        onMoved: if (!pressed) playMusic.position = value
+                    }
+                    PlasmaComponents3.Label {
+                        text: PodcastLogic.fmtTime(playMusic.duration / 1000)
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        opacity: 0.75
+                    }
+                }
+
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     visible: root.currentStation !== ""
@@ -2420,7 +2460,335 @@ PlasmaExtras.Representation {
             }
         }
 
-        // ── PAGE 4: Timers — every clock in one place ───────────────────
+
+        // ── PAGE 4: Podcasts — search, subscribe, download, resume ──────
+        // Download-first: an episode is a file in Music/OnAir/Podcasts and
+        // plays through the local road (seek, resume, no live-stream
+        // machinery). The show search is the keyless iTunes directory; the
+        // feed itself is fetched and parsed by the gated PodcastLogic.
+        ColumnLayout {
+            id: podcastPage
+            spacing: 0
+
+            readonly property bool showingEpisodes: root.podcastEpisodesFor !== ""
+            readonly property bool searching: podSearchField.text.trim() !== ""
+
+            // The downloaded-episodes ledger. Gated on the same latch as
+            // My Music: a FolderListModel pointed at a missing folder
+            // silently lists $HOME (issue #3's lesson).
+            FolderListModel {
+                id: podcastFolder
+                readonly property var podFilters: ["*.mp3", "*.m4a", "*.aac", "*.ogg",
+                                                   "*.opus", "*.oga", "*.flac", "*.wav"]
+                nameFilters: ["#pending#"]
+                showDirs: false
+
+                function pointAtPodcasts() {
+                    nameFilters = podFilters;
+                    folder = "file://" + root.downloadDirPath + "/Podcasts";
+                }
+
+                Component.onCompleted: if (root._musicDirEnsured) pointAtPodcasts()
+            }
+            Connections {
+                target: root
+                function onMusicDirReady() { podcastFolder.pointAtPodcasts() }
+            }
+
+            // The exact filename an episode would carry, matched against
+            // the folder — this is how a row knows it is downloaded. The
+            // count reference makes every binding re-check when a download
+            // lands or a file is deleted.
+            function localEpisodeUrl(title, url) {
+                var want = root.podcastFileName(title !== "" ? title : i18n("Episode"), url)
+                for (var i = 0; i < podcastFolder.count; i++)
+                    if (podcastFolder.get(i, "fileName") === want)
+                        return podcastFolder.get(i, "fileUrl").toString()
+                return ""
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                CircleButton {
+                    visible: podcastPage.showingEpisodes
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "go-previous"
+                    iconScale: 0.55
+                    tooltipText: i18n("Back to shows")
+                    onClicked: {
+                        root.podcastEpisodesFor = ""
+                        root.podcastFeedError = ""
+                    }
+                }
+                Kirigami.SearchField {
+                    id: podSearchField
+                    visible: !podcastPage.showingEpisodes
+                    Layout.fillWidth: true
+                    autoAccept: true
+                    placeholderText: i18n("Search podcasts… (e.g. history, technology)")
+                    onTextChanged: podSearchDebounce.restart()
+                }
+                PlasmaComponents3.Label {
+                    visible: podcastPage.showingEpisodes
+                    Layout.fillWidth: true
+                    text: root.podcastEpisodesTitle !== "" ? root.podcastEpisodesTitle : i18n("Episodes")
+                    // Untrusted (feed/directory content) — never HTML
+                    textFormat: Text.PlainText
+                    font.weight: Font.DemiBold
+                    color: root.accent
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                }
+                CircleButton {
+                    visible: podcastPage.showingEpisodes
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "view-refresh"
+                    iconScale: 0.55
+                    tooltipText: i18n("Refresh episodes")
+                    onClicked: root.loadPodcastFeed(root.podcastEpisodesFor, root.podcastEpisodesTitle)
+                }
+            }
+
+            Timer {
+                id: podSearchDebounce
+                interval: 600
+                repeat: false
+                onTriggered: root.podcastSearch(podSearchField.text)
+            }
+
+            // One honest status line: searching, loading, or the error.
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing * 2
+                Layout.rightMargin: Kirigami.Units.smallSpacing * 2
+                visible: root.podcastSearchBusy || root.podcastFeedLoading
+                         || (podcastPage.showingEpisodes && root.podcastFeedError !== "")
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents3.BusyIndicator {
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.2
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.2
+                    running: visible
+                    visible: root.podcastSearchBusy || root.podcastFeedLoading
+                }
+                PlasmaComponents3.Label {
+                    Layout.fillWidth: true
+                    text: root.podcastFeedLoading ? i18n("Loading episodes…")
+                        : root.podcastSearchBusy ? i18n("Searching…")
+                        : root.podcastFeedError
+                    color: root.podcastFeedError !== "" && !root.podcastFeedLoading
+                           ? "#E0463C" : Kirigami.Theme.textColor
+                    opacity: 0.85
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    elide: Text.ElideRight
+                }
+            }
+
+            // ── Shows (subscriptions, or search results while typing) ────
+            PlasmaComponents3.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: !podcastPage.showingEpisodes
+                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
+
+                contentItem: ListView {
+                    id: showsView
+                    leftMargin: Kirigami.Units.smallSpacing
+                    rightMargin: Kirigami.Units.smallSpacing
+                    model: podcastPage.searching ? podcastSearchModel : podcastSubsModel
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+                    spacing: 2
+
+                    delegate: PlasmaComponents3.ItemDelegate {
+                        id: showRow
+
+                        required property int index
+                        required property string title
+                        required property string author
+                        required property string art
+                        required property string feedUrl
+
+                        readonly property bool subscribed: {
+                            podcastSubsModel.count   // re-check on change
+                            return root.isPodcastSubscribed(feedUrl)
+                        }
+
+                        width: showsView.width - showsView.leftMargin - showsView.rightMargin
+                        height: Kirigami.Units.gridUnit * 3
+                        padding: 0
+                        hoverEnabled: true
+                        Accessible.name: title
+                        Accessible.role: Accessible.Button
+
+                        background: Item {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing / 2
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: Kirigami.Units.smallSpacing * 1.5
+                                color: showRow.hovered ? Qt.alpha(root.accent, 0.07)
+                                                       : Qt.alpha(Kirigami.Theme.textColor, 0.045)
+                                border.width: 1
+                                border.color: showRow.hovered ? Qt.alpha(root.accent, 0.25)
+                                                              : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                            }
+                        }
+
+                        contentItem: RowLayout {
+                            spacing: Kirigami.Units.smallSpacing * 1.5
+                            anchors.fill: parent
+                            anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
+                            anchors.rightMargin: Kirigami.Units.smallSpacing
+
+                            Rectangle {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: width * 0.2
+                                color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
+                                clip: true
+
+                                Image {
+                                    anchors.fill: parent
+                                    source: showRow.art
+                                    sourceSize.width: 96
+                                    sourceSize.height: 96
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                    visible: status === Image.Ready
+                                }
+                                Kirigami.Icon {
+                                    anchors.centerIn: parent
+                                    width: parent.width * 0.6
+                                    height: width
+                                    source: "application-rss+xml"
+                                    opacity: 0.5
+                                    visible: showRow.art === ""
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    text: showRow.title
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                }
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    text: showRow.author
+                                    textFormat: Text.PlainText
+                                    visible: text !== ""
+                                    opacity: 0.6
+                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                }
+                            }
+
+                            CircleButton {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+                                Layout.alignment: Qt.AlignVCenter
+                                iconName: showRow.subscribed ? "favorite" : "non-starred-symbolic"
+                                iconScale: 0.55
+                                checkable: true
+                                checked: showRow.subscribed
+                                opacity: showRow.subscribed ? 1.0
+                                         : (showRow.hovered || activeFocus
+                                            || Kirigami.Settings.tabletMode) ? 0.85 : 0.35
+                                tooltipText: showRow.subscribed ? i18n("Unsubscribe")
+                                                                : i18n("Subscribe")
+                                onClicked: {
+                                    if (showRow.subscribed)
+                                        root.removePodcastSub(showRow.feedUrl)
+                                    else
+                                        root.addPodcastSub(showRow.title, showRow.author,
+                                                           showRow.art, showRow.feedUrl)
+                                }
+                            }
+                        }
+
+                        TapHandler {
+                            onTapped: root.loadPodcastFeed(showRow.feedUrl, showRow.title)
+                        }
+                    }
+
+                    // Empty states, honest per mode.
+                    Column {
+                        anchors.centerIn: parent
+                        width: parent.width - Kirigami.Units.largeSpacing * 2
+                        visible: showsView.count === 0 && !root.podcastSearchBusy
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            source: "application-rss+xml"
+                            width: Kirigami.Units.iconSizes.huge
+                            height: width
+                            opacity: 0.4
+                        }
+                        PlasmaComponents3.Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            text: podcastPage.searching ? i18n("No shows found")
+                                                        : i18n("No subscriptions yet")
+                            font.weight: Font.DemiBold
+                            opacity: 0.7
+                        }
+                        PlasmaComponents3.Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            visible: !podcastPage.searching
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            opacity: 0.55
+                            text: i18n("Search for a show above, star it, and its episodes download here for offline listening")
+                        }
+                    }
+                }
+            }
+
+            // ── Episodes of the open show ────────────────────────────────
+            PlasmaComponents3.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: podcastPage.showingEpisodes
+                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
+
+                contentItem: ListView {
+                    id: episodesView
+                    leftMargin: Kirigami.Units.smallSpacing
+                    rightMargin: Kirigami.Units.smallSpacing
+                    model: podcastEpisodesModel
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+                    spacing: 2
+
+                    delegate: EpisodeListItem {
+                        localUrl: {
+                            podcastFolder.count   // re-check when files change
+                            return podcastPage.localEpisodeUrl(title, url)
+                        }
+                    }
+                }
+            }
+        }
+        // ── PAGE 5: Timers — every clock in one place ───────────────────
         // Sleep timer, wake-up alarms and scheduled recordings share one
         // labeled tab. They used to live behind three near-identical
         // clock icons on two different pages; a user hunting the radio
@@ -3005,9 +3373,14 @@ PlasmaExtras.Representation {
 
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
-            // Esc on ANY non-list page (Now Playing, My Music) returns to the
-            // station list; only on the list itself it may close the popup.
-            if (root.view !== 0) {
+            // Esc on ANY non-list page returns to the station list; only on
+            // the list itself it may close the popup. Inside the podcasts
+            // page an open feed steps back to the shows first.
+            if (root.view === 3 && root.podcastEpisodesFor !== "") {
+                root.podcastEpisodesFor = ""
+                root.podcastFeedError = ""
+                event.accepted = true
+            } else if (root.view !== 0) {
                 root.view = 0
                 event.accepted = true
             } else if (filterField.text !== "") {
@@ -3079,25 +3452,41 @@ PlasmaExtras.Representation {
                 icon.name: "radio"
                 text: i18n("Stations")
                 display: QQC2.AbstractButton.TextUnderIcon
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                leftPadding: Kirigami.Units.smallSpacing / 2
+                rightPadding: Kirigami.Units.smallSpacing / 2
             }
             PlasmaComponents3.TabButton {
                 icon.name: "view-media-lyrics"
                 text: i18n("Playing")
                 display: QQC2.AbstractButton.TextUnderIcon
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                leftPadding: Kirigami.Units.smallSpacing / 2
+                rightPadding: Kirigami.Units.smallSpacing / 2
             }
             PlasmaComponents3.TabButton {
                 icon.name: "folder-music"
                 text: i18n("My Music")
                 display: QQC2.AbstractButton.TextUnderIcon
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                leftPadding: Kirigami.Units.smallSpacing / 2
+                rightPadding: Kirigami.Units.smallSpacing / 2
+            }
+            PlasmaComponents3.TabButton {
+                icon.name: "application-rss+xml"
+                text: i18n("Podcasts")
+                display: QQC2.AbstractButton.TextUnderIcon
+                font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                leftPadding: Kirigami.Units.smallSpacing / 2
+                rightPadding: Kirigami.Units.smallSpacing / 2
             }
             PlasmaComponents3.TabButton {
                 icon.name: "clock"
                 text: i18n("Timers")
                 display: QQC2.AbstractButton.TextUnderIcon
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                leftPadding: Kirigami.Units.smallSpacing / 2
+                rightPadding: Kirigami.Units.smallSpacing / 2
             }
         }
     }

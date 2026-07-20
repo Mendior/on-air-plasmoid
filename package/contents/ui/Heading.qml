@@ -22,7 +22,8 @@ RowLayout {
     readonly property bool hasTrack: root.title && root.title !== Plasmoid.title && root.title.length > 0
     readonly property string primaryText: {
         if (root.view === 2 && !hasStation) return i18n("My Music")
-        if (root.view === 3 && !hasStation) return i18n("Timers")
+        if (root.view === 3 && !hasStation) return i18n("Podcasts")
+        if (root.view === 4 && !hasStation) return i18n("Timers")
         return hasStation ? root.currentStation : Plasmoid.title
     }
     readonly property string secondaryText: hasTrack ? root.title : ""
