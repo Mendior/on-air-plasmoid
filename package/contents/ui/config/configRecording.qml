@@ -72,7 +72,7 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            text: i18n("Schedules are managed in the widget itself: open the popup, press the music-note button in the footer to open My Music, then press the stopwatch button next to \"My Music\". Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing. Schedules fire only while the widget is running — they pause while you are logged out or the computer is off or asleep; missed ones are reported when it returns.")
+            text: i18n("Schedules are managed in the widget itself: open the popup and go to the Timers tab. Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing. Schedules fire only while the widget is running — they pause while you are logged out or the computer is off or asleep; missed ones are reported when it returns.")
             Layout.fillWidth: true
             Layout.maximumWidth: Kirigami.Units.gridUnit * 25
             wrapMode: Text.Wrap
