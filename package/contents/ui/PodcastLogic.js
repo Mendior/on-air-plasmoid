@@ -110,7 +110,13 @@ function parseDuration(s) {
 // links survive the strip and can be pulled back out; nothing here ever
 // produces markup for a rich-text sink.
 function notesToPlain(html, cap) {
-    var s = String(html || "")
+    var lim = cap > 0 ? cap : 4000
+    // Bound the WORK, not just the output: the tag regexes scan per match
+    // start, so a multi-megabyte notes block (a feed can send up to the 4 MB
+    // body cap) would scan quadratically and freeze the UI. The output is
+    // capped at `lim` anyway, and HTML runs a few times its text — 16x lim
+    // of raw markup is far more than any real note, so slice first.
+    var s = String(html || "").substring(0, lim * 16)
     // <a href="U">T</a> -> "T (U)" (or just "U" when the text IS the url)
     s = s.replace(/<a\b[^>]*?href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
         function(_, url, text) {
@@ -124,7 +130,6 @@ function notesToPlain(html, cap) {
     s = decodeEntities(s)
     s = s.replace(/[ \t\f\v]+/g, " ").replace(/\s*\n\s*/g, "\n")
          .replace(/\n{3,}/g, "\n\n").trim()
-    var lim = cap > 0 ? cap : 4000
     if (s.length > lim) s = s.substring(0, lim).trim() + "…"
     return s
 }

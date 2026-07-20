@@ -315,9 +315,14 @@ PlasmaComponents3.ItemDelegate {
                     text: modelData.label
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     onClicked: {
-                        if (!epItem.isThisPlaying)
-                            root.playPodcastEpisode(epItem.localUrl, epItem.shownTitle, epItem.epKey)
-                        playMusic.position = modelData.sec * 1000
+                        // Already the playing track: seek now. Otherwise start
+                        // AND arm the deferred seek — an immediate position
+                        // write is lost while the new source loads.
+                        if (epItem.isThisPlaying)
+                            playMusic.position = modelData.sec * 1000
+                        else
+                            root.playPodcastEpisodeAt(epItem.localUrl, epItem.shownTitle,
+                                                      epItem.epKey, modelData.sec)
                     }
                 }
             }

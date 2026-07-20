@@ -939,6 +939,11 @@ PlasmoidItem {
     property int _podPosRev: 0
     property string _podPendingSeekUrl: ""
     property int _podPendingSeekSec: 0
+    // The exact source URL of the tracked episode. The position-stamp and
+    // played-mark act ONLY when the current source is this — otherwise a
+    // file:// alarm chime playing over a stale _podPlayingKey would stamp
+    // and mark the WRONG episode (the key is not cleared on every stop).
+    property string _podPlayingUrl: ""
     // Playback speed for local playback. Remembered per show (feedUrl of the
     // playing episode) over a global default; pitch-corrected where the
     // backend can, so voices don't chipmunk. A radio stream always plays 1x.
@@ -1202,6 +1207,9 @@ PlasmoidItem {
     function _stampPodPosition() {
         if (_podPlayingKey === "") return;
         if (!isPlaying() || playMusic.source.toString().indexOf("file://") !== 0) return;
+        // Only the tracked episode's own file counts — never a chime, a
+        // My Music track or another episode that took the player over.
+        if (playMusic.source.toString() !== _podPlayingUrl) return;
         var dur = Math.round(playMusic.duration / 1000);
         var sec = Math.round(playMusic.position / 1000);
         if (EpisodeState.isNearEnd(sec, dur)) {
@@ -1231,6 +1239,7 @@ PlasmoidItem {
         _stampPodPosition();
         _flushPodPositions();
         _podPlayingKey = "";
+        _podPlayingUrl = "";
         _podPendingSeekUrl = "";
         // A plain My Music track (played through playLocalFile without an
         // episode) belongs to no show — it uses the global default speed.
@@ -1243,6 +1252,7 @@ PlasmoidItem {
         playLocalFile(fileUrl, title);         // clears _currentEpisodeFeed
         _currentEpisodeFeed = feed;            // ...re-set to this episode's show
         _podPlayingKey = key || "";
+        _podPlayingUrl = fileUrl.toString();
         // The show's remembered speed (or the global default) takes effect
         // once the media loads — playbackRate resets on every source change.
         podcastRate = PodcastLogic.clampRate(_podSpeedFor(feed));
@@ -1251,6 +1261,16 @@ PlasmoidItem {
             _podPendingSeekUrl = fileUrl.toString();
             _podPendingSeekSec = Math.max(0, resume - 3);
         }
+    }
+
+    // Start an episode AND jump to a specific second (a tapped chapter mark).
+    // An immediate position write is a no-op while the media loads, so the
+    // target rides the same deferred-seek road the resume uses — overriding
+    // any resume bookmark, since the user asked for this exact time.
+    function playPodcastEpisodeAt(fileUrl, title, key, sec) {
+        playPodcastEpisode(fileUrl, title, key);
+        _podPendingSeekUrl = fileUrl.toString();
+        _podPendingSeekSec = Math.max(0, Math.round(sec));
     }
 
     // ── Playback speed + skip ────────────────────────────────────────────
@@ -1273,7 +1293,12 @@ PlasmoidItem {
     // 1x for a radio stream (rate-shifting a live stream is meaningless and
     // the backend mishandles it).
     function _applyPlaybackRate() {
-        var local = playMusic.source.toString().indexOf("file://") === 0;
+        // A local episode/track uses the show speed; a radio stream AND the
+        // built-in alarm chime (a file:// URL too) always play at 1x — a
+        // wake-up must never ring at a leftover 2x, pitch-shifted.
+        var src = playMusic.source.toString();
+        var local = src.indexOf("file://") === 0
+                    && src !== _alarmToneUrl.toString();
         playMusic.playbackRate = local ? PodcastLogic.clampRate(podcastRate) : 1.0;
         // Preserve pitch where the backend offers it; AlwaysOn needs no
         // action, Unavailable degrades honestly (voices speed up in pitch).
@@ -4338,6 +4363,10 @@ PlasmoidItem {
         // stamp must land BEFORE the fade starts tearing the source down.
         _stampPodPosition();
         _flushPodPositions();
+        // ...then the episode tracking is DONE, so nothing that plays next
+        // (an alarm chime, a My Music track) is mistaken for it.
+        _podPlayingKey = "";
+        _podPlayingUrl = "";
         infoTimer.stop();
         connectWatchdog.stop();
         // A stop DURING a stall must retire the stall clock too — its
@@ -6065,11 +6094,14 @@ PlasmoidItem {
                                 && endedSrc !== root._alarmToneUrl.toString();
                 // A finished podcast episode is DONE: remember it as played
                 // (which also retires its bookmark), so the row reads "heard"
-                // and the unplayed filter hides it. The wasStream guard keeps
-                // a radio outage or the alarm tone from ever being "played".
-                if (!wasStream && root._podPlayingKey !== "") {
+                // and the unplayed filter hides it. Guarded on the exact
+                // tracked source, so only the real episode file counts — a
+                // radio outage, the alarm tone or any other file never does.
+                if (!wasStream && root._podPlayingKey !== ""
+                    && endedSrc === root._podPlayingUrl) {
                     root.markEpisodePlayed(root._podPlayingKey);
                     root._podPlayingKey = "";
+                    root._podPlayingUrl = "";
                 }
                 playMusic.source = "";
                 root.title = Plasmoid.title;

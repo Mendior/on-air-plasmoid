@@ -282,6 +282,17 @@ TestCase {
         compare(PL.notesToPlain("", 4000), "")
     }
 
+    function test_a_megabyte_of_unclosed_tags_does_not_hang() {
+        // A hostile notes block (unclosed <a> tags scan quadratically) must
+        // be bounded by the input cap, not run for minutes. If the cap
+        // regressed this test would time the suite out, which is the point.
+        var chunk = "<a href='http://x/i' class=y>text "
+        var s = ""
+        while (s.length < 3000000) s += chunk    // ~3 MB
+        var out = PL.notesToPlain(s, 4000)
+        verify(out.length <= 4001)
+    }
+
     function test_links_are_extracted_and_deduped() {
         var t = "See https://a.com/1, also https://a.com/1 and http://b.org/x."
         var l = PL.extractLinks(t)

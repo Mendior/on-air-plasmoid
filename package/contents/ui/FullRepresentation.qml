@@ -2637,6 +2637,11 @@ PlasmaExtras.Representation {
                 function onCountChanged() { podcastPage.rebuildEpisodes() }
             }
             onEpisodeFilterChanged: rebuildEpisodes()
+            // The source model lives on the root and outlives this page; if
+            // the popup is reopened on an already-loaded show (no count
+            // change), rebuild so the list is never blank.
+            onShowingEpisodesChanged: if (showingEpisodes) rebuildEpisodes()
+            Component.onCompleted: if (podcastEpisodesModel.count > 0) rebuildEpisodes()
 
             // The downloaded-episodes ledger. Gated on the same latch as
             // My Music: a FolderListModel pointed at a missing folder
