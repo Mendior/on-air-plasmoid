@@ -6,6 +6,7 @@
 
 import QtMultimedia
 import QtQuick
+import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
@@ -29,9 +30,21 @@ PlasmaComponents3.ItemDelegate {
     required property string guid
     required property double pubMs
     required property int durationSec
+    required property string notes
+    required property string image
 
     // Supplied by the page: file URL under Podcasts/ when downloaded.
     property string localUrl: ""
+    // The page owns which row is expanded (one at a time); the row asks it
+    // to toggle through this signal.
+    property bool expanded: false
+    signal detailsToggled()
+
+    readonly property bool hasDetails: notes !== ""
+    // The tappable timestamps and links pulled from the sanitized notes —
+    // computed only for the open row, so the closed list stays cheap.
+    readonly property var noteStamps: expanded ? PodcastLogic.extractTimestamps(notes) : []
+    readonly property var noteLinks: expanded ? PodcastLogic.extractLinks(notes) : []
 
     readonly property string epKey: PodcastLogic.episodeKey(guid, url)
     readonly property bool downloaded: localUrl !== ""
@@ -58,7 +71,9 @@ PlasmaComponents3.ItemDelegate {
     width: ListView.view
            ? ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
            : 0
-    height: Kirigami.Units.gridUnit * 3
+    readonly property real rowHeight: Kirigami.Units.gridUnit * 3
+    height: rowHeight + (expanded && hasDetails
+                         ? detailsCol.implicitHeight + Kirigami.Units.smallSpacing : 0)
     padding: 0
     hoverEnabled: true
     Accessible.name: shownTitle
@@ -101,9 +116,15 @@ PlasmaComponents3.ItemDelegate {
         }
     }
 
-    contentItem: RowLayout {
+    contentItem: Item {
+
+    RowLayout {
+        id: epMainRow
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: epItem.rowHeight
         spacing: Kirigami.Units.smallSpacing * 1.5
-        anchors.fill: parent
         anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
         anchors.rightMargin: Kirigami.Units.smallSpacing
 
@@ -197,6 +218,23 @@ PlasmaComponents3.ItemDelegate {
             onClicked: root.toggleEpisodePlayed(epItem.epKey)
         }
 
+        // Show notes toggle — only when the feed carried any.
+        CircleButton {
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+            Layout.alignment: Qt.AlignVCenter
+            visible: epItem.hasDetails && !epItem.isDownloading
+            iconName: "documentinfo"
+            iconScale: 0.5
+            checked: epItem.expanded
+            opacity: (epItem.expanded || epItem.hovered || epItem.activeFocus
+                      || Kirigami.Settings.tabletMode) ? 0.7 : 0.0
+            enabledState: opacity > 0
+            tooltipText: epItem.expanded ? i18n("Hide episode notes")
+                                         : i18n("Show episode notes")
+            onClicked: epItem.detailsToggled()
+        }
+
         PlasmaComponents3.BusyIndicator {
             Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
             Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
@@ -228,9 +266,78 @@ PlasmaComponents3.ItemDelegate {
             }
             onClicked: epItem.primaryAction()
         }
+
+        // Tapping the main row plays/downloads; the details area below has
+        // its own taps, so the row's own tap lives here, not on the whole
+        // (taller-when-expanded) delegate.
+        TapHandler {
+            onTapped: epItem.primaryAction()
+        }
     }
 
-    TapHandler {
-        onTapped: epItem.primaryAction()
+    // ── Episode notes (expanded) ─────────────────────────────────────────
+    // Sanitized plain text, with the timestamps and links pulled out as
+    // tappable chips. Feed content never reaches a rich-text sink.
+    ColumnLayout {
+        id: detailsCol
+        anchors.top: epMainRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Kirigami.Units.gridUnit * 2.5
+        anchors.rightMargin: Kirigami.Units.smallSpacing * 2
+        anchors.topMargin: Kirigami.Units.smallSpacing / 2
+        visible: epItem.expanded && epItem.hasDetails
+        spacing: Kirigami.Units.smallSpacing
+
+        PlasmaComponents3.Label {
+            Layout.fillWidth: true
+            text: epItem.notes
+            // Untrusted feed content — PLAIN TEXT ONLY, never rich/styled.
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            opacity: 0.8
+            font.pointSize: Kirigami.Theme.smallFont.pointSize
+        }
+
+        // Tappable chapter timestamps — seek straight into the episode.
+        Flow {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            visible: epItem.downloaded && epItem.noteStamps.length > 0
+            Repeater {
+                model: epItem.noteStamps
+                QQC2.Button {
+                    required property var modelData
+                    text: modelData.label
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    onClicked: {
+                        if (!epItem.isThisPlaying)
+                            root.playPodcastEpisode(epItem.localUrl, epItem.shownTitle, epItem.epKey)
+                        playMusic.position = modelData.sec * 1000
+                    }
+                }
+            }
+        }
+
+        // Links from the notes — each opens externally, gated by HostGuard.
+        Repeater {
+            model: epItem.noteLinks
+            PlasmaComponents3.Label {
+                required property var modelData
+                Layout.fillWidth: true
+                text: modelData
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                maximumLineCount: 1
+                color: root.accentBright
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.openExternalLink(parent.text)
+                }
+            }
+        }
+    }
     }
 }

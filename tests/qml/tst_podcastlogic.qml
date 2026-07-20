@@ -248,6 +248,50 @@ TestCase {
         compare(PL.fmtRate(1.25), "1.25x")
     }
 
+    function test_notes_become_safe_plain_text_with_links_inlined() {
+        var html = "<p>Hello <b>world</b> &amp; welcome.</p>"
+            + "<a href='https://ex.com/a'>the link</a> and "
+            + "<a href=\"https://ex.com/bare\">https://ex.com/bare</a>"
+            + "<script>alert(1)</script>"
+        var p = PL.notesToPlain(html, 4000)
+        // No tags survive — never markup for a rich sink.
+        verify(p.indexOf("<") === -1)
+        verify(p.indexOf(">") === -1)
+        verify(p.indexOf("world") !== -1)
+        verify(p.indexOf("&") !== -1)                 // entity decoded once
+        verify(p.indexOf("the link (https://ex.com/a)") !== -1)  // href inlined
+        verify(p.indexOf("https://ex.com/bare") !== -1)          // bare url kept once
+        // The script tag's TEXT may remain as inert plain text, but never
+        // as an executable/markup element.
+        verify(p.indexOf("<script") === -1)
+    }
+
+    function test_notes_are_length_capped() {
+        var big = ""
+        for (var i = 0; i < 5000; i++) big += "x"
+        verify(PL.notesToPlain(big, 4000).length <= 4001)  // +ellipsis
+        compare(PL.notesToPlain("", 4000), "")
+    }
+
+    function test_links_are_extracted_and_deduped() {
+        var t = "See https://a.com/1, also https://a.com/1 and http://b.org/x."
+        var l = PL.extractLinks(t)
+        compare(l.length, 2)
+        compare(l[0], "https://a.com/1")     // trailing comma trimmed, deduped
+        compare(l[1], "http://b.org/x")      // trailing period trimmed
+    }
+
+    function test_timestamps_are_extracted_as_seconds() {
+        var t = "Intro 00:00, topic at 12:30, deep dive 1:02:03. Price was 5:99 nope."
+        var ts = PL.extractTimestamps(t)
+        compare(ts.length, 3)
+        compare(ts[0].sec, 0)
+        compare(ts[1].sec, 750)          // 12:30
+        compare(ts[2].sec, 3723)         // 1:02:03
+        compare(ts[2].label, "1:02:03")
+        // 5:99 has seconds >= 60 -> rejected as not a real time.
+    }
+
     function test_skip_lands_inside_the_media() {
         compare(PL.skipTarget(60000, 30, 600000), 90000)   // +30s
         compare(PL.skipTarget(10000, -15, 600000), 0)      // back past start -> 0

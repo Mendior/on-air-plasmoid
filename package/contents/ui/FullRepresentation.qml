@@ -2616,6 +2616,8 @@ PlasmaExtras.Representation {
             // Applied at feed-load and on an explicit filter change, NOT on
             // every played-mark, so a row never vanishes under a mid-scroll.
             property int episodeFilter: 0
+            // Which episode's notes are expanded — one at a time.
+            property string expandedEpisodeKey: ""
 
             // The filtered episodes the list shows. Rebuilt from the parsed
             // model through the tested EpisodeState.matchesFilter.
@@ -2980,6 +2982,9 @@ PlasmaExtras.Representation {
                             podcastFolder.count   // re-check when files change
                             return podcastPage.localEpisodeUrl(title, url)
                         }
+                        expanded: podcastPage.expandedEpisodeKey === epKey
+                        onDetailsToggled: podcastPage.expandedEpisodeKey =
+                            (podcastPage.expandedEpisodeKey === epKey ? "" : epKey)
                     }
 
                     // Nothing matches the filter (all heard).

@@ -102,6 +102,70 @@ function parseDuration(s) {
            + (parseInt(m[2], 10) * 60) + parseInt(m[3], 10)
 }
 
+// ── show notes ─────────────────────────────────────────────────────────
+// Episode notes arrive as untrusted HTML (content:encoded / description).
+// This turns them into ONE plain string that is safe to put in a
+// PlainText Label — tags stripped, entities decoded, whitespace collapsed,
+// length capped. The URL inside an <a href> is inlined as "text (url)" so
+// links survive the strip and can be pulled back out; nothing here ever
+// produces markup for a rich-text sink.
+function notesToPlain(html, cap) {
+    var s = String(html || "")
+    // <a href="U">T</a> -> "T (U)" (or just "U" when the text IS the url)
+    s = s.replace(/<a\b[^>]*?href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+        function(_, url, text) {
+            var t = text.replace(/<[^>]+>/g, "").trim()
+            var u = url.trim()
+            if (t === "" || t === u) return " " + u + " "
+            return " " + t + " (" + u + ") "
+        })
+    s = s.replace(/<(br|p|div|li|tr|h[1-6])\b[^>]*>/gi, "\n")  // block breaks
+    s = s.replace(/<[^>]+>/g, "")                              // every other tag
+    s = decodeEntities(s)
+    s = s.replace(/[ \t\f\v]+/g, " ").replace(/\s*\n\s*/g, "\n")
+         .replace(/\n{3,}/g, "\n\n").trim()
+    var lim = cap > 0 ? cap : 4000
+    if (s.length > lim) s = s.substring(0, lim).trim() + "…"
+    return s
+}
+
+// The http(s) links inside plain notes, de-duplicated, order preserved.
+// Trailing sentence punctuation is trimmed; the caller still gates each
+// through HostGuard before opening. Capped so a link-farm note can't
+// spawn a thousand rows.
+function extractLinks(plain) {
+    var re = /https?:\/\/[^\s<>()"']+/gi
+    var seen = {}, out = [], m
+    while ((m = re.exec(String(plain || ""))) !== null && out.length < 40) {
+        var u = m[0].replace(/[.,;:!?)]+$/, "")
+        if (!seen[u]) { seen[u] = true; out.push(u) }
+    }
+    return out
+}
+
+// The HH:MM:SS / MM:SS timestamps in plain notes, as {label, sec} for
+// tap-to-seek. Only sensible times survive: minutes/seconds < 60, and a
+// bare "M:SS" needs the colon so a price like "5:00" in prose is at least
+// shaped like a time (podcasts write chapter marks this way). De-duped,
+// capped, sorted by position of appearance.
+function extractTimestamps(plain) {
+    var re = /\b(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b/g
+    var seen = {}, out = [], m
+    var s = String(plain || "")
+    while ((m = re.exec(s)) !== null && out.length < 200) {
+        var h = m[1] === undefined ? 0 : parseInt(m[1], 10)
+        var mi = parseInt(m[2], 10)
+        var se = parseInt(m[3], 10)
+        if (se >= 60) continue
+        if (m[1] !== undefined && mi >= 60) continue
+        var sec = h * 3600 + mi * 60 + se
+        if (seen[sec]) continue
+        seen[sec] = true
+        out.push({ label: m[0], sec: sec })
+    }
+    return out
+}
+
 // ── the feed ─────────────────────────────────────────────────────────────
 
 // RSS text in, episode rows out. Never throws. A page that is not an RSS
@@ -129,6 +193,16 @@ function parseFeed(xml, maxItems) {
         var title = _cleanText(_tagBody(item, "title"))
         var guid = _cleanText(_tagBody(item, "guid"))
         var when = Date.parse(_cleanText(_tagBody(item, "pubDate")))
+        // Notes: prefer the richer content:encoded, else description, else
+        // the itunes summary — all untrusted HTML, sanitized to plain here.
+        var rawNotes = _tagBody(item, "content:encoded")
+        if (rawNotes === "") rawNotes = _tagBody(item, "description")
+        if (rawNotes === "") rawNotes = _tagBody(item, "itunes:summary")
+        // Per-episode artwork: the itunes:image href (a self-closing tag,
+        // so read the attribute off the tag itself), kept only if it passes
+        // the same http(s)-and-not-private gate as every other fetched URL.
+        var imgTag = /<itunes:image\b[^>]*>/i.exec(item)
+        var img = imgTag ? _attr(imgTag[0], "href").trim() : ""
         // No i18n here — a .pragma library has no QML context; an
         // untitled episode ships as "" and the delegate names it.
         out.episodes.push({
@@ -137,7 +211,9 @@ function parseFeed(xml, maxItems) {
             guid: guid !== "" ? guid : url,
             pubMs: isNaN(when) ? 0 : when,
             durationSec: parseDuration(_tagBody(item, "itunes:duration")),
-            sizeBytes: parseInt(_attr(encTag[0], "length"), 10) || 0
+            sizeBytes: parseInt(_attr(encTag[0], "length"), 10) || 0,
+            notes: notesToPlain(stripCdata(rawNotes), 4000),
+            image: urlAllowed(img) ? img : ""
         })
     }
     // A real feed with zero usable episodes is still a feed — ok reports

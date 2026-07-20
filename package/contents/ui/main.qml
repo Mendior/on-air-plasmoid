@@ -710,6 +710,15 @@ PlasmoidItem {
             .replace(/\s+/g, " ").trim();
     }
 
+    // Open a feed-supplied link externally — gated exactly like every other
+    // untrusted URL (http(s), never a private/LAN address) and shell-escaped
+    // through the one tested quoter, so a hostile show note can neither reach
+    // the LAN nor break out of the command.
+    function openExternalLink(url) {
+        if (!PodcastLogic.urlAllowed(url)) return;
+        executable.exec("xdg-open " + PodcastLogic.shQuote(url));
+    }
+
     // Open the track in a YouTube search (in the browser)
     function youtubeSearchFor(q) {
         q = _cleanQueryLocal(q);
