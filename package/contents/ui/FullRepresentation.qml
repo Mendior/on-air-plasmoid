@@ -1887,10 +1887,6 @@ PlasmaExtras.Representation {
         // ── PAGE 3: My Music — downloaded tracks for offline use ────────
         ColumnLayout {
             id: libraryPage
-            // Scheduled-recordings panel visibility (toggled from the header row)
-            property bool showSchedules: false
-            // Wake-up alarms panel visibility (its own toggle, same header row)
-            property bool showAlarms: false
             // History header shows either the play history or the liked songs
             property bool showLiked: false
             spacing: 0
@@ -2221,66 +2217,6 @@ PlasmaExtras.Representation {
                 CircleButton {
                     implicitWidth: Kirigami.Units.gridUnit * 2
                     implicitHeight: implicitWidth
-                    iconName: "chronometer"
-                    iconScale: 0.55
-                    checkable: true
-                    checked: libraryPage.showSchedules
-                    tooltipText: i18n("Scheduled recordings")
-                    onClicked: libraryPage.showSchedules = !libraryPage.showSchedules
-
-                    // Badge with the number of scheduled recordings
-                    Rectangle {
-                        visible: root.recSchedules.length > 0
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.topMargin: -2
-                        anchors.rightMargin: -2
-                        width: Kirigami.Units.gridUnit * 0.85
-                        height: width
-                        radius: width / 2
-                        color: "#E0463C"
-                        PlasmaComponents3.Label {
-                            anchors.centerIn: parent
-                            text: root.recSchedules.length
-                            color: "#FFFFFF"
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 2
-                            font.weight: Font.Bold
-                        }
-                    }
-                }
-                CircleButton {
-                    implicitWidth: Kirigami.Units.gridUnit * 2
-                    implicitHeight: implicitWidth
-                    iconName: "clock"
-                    iconScale: 0.55
-                    checkable: true
-                    checked: libraryPage.showAlarms
-                    tooltipText: i18n("Wake-up alarms")
-                    onClicked: libraryPage.showAlarms = !libraryPage.showAlarms
-
-                    // Badge with the number of set alarms
-                    Rectangle {
-                        visible: root.alarms.length > 0
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.topMargin: -2
-                        anchors.rightMargin: -2
-                        width: Kirigami.Units.gridUnit * 0.85
-                        height: width
-                        radius: width / 2
-                        color: root.accent
-                        PlasmaComponents3.Label {
-                            anchors.centerIn: parent
-                            text: root.alarms.length
-                            color: "#0B0F0D"
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 2
-                            font.weight: Font.Bold
-                        }
-                    }
-                }
-                CircleButton {
-                    implicitWidth: Kirigami.Units.gridUnit * 2
-                    implicitHeight: implicitWidth
                     iconName: "folder-open"
                     iconScale: 0.55
                     tooltipText: i18n("Open folder in file manager")
@@ -2288,11 +2224,494 @@ PlasmaExtras.Representation {
                 }
             }
 
+            PlasmaComponents3.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
+
+                contentItem: ListView {
+                    id: libraryView
+                    leftMargin: Kirigami.Units.smallSpacing
+                    rightMargin: Kirigami.Units.smallSpacing
+                    model: musicFolder
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+                    spacing: 2
+
+                    delegate: Item {
+                        id: fileItem
+                        required property string fileName
+                        required property string filePath
+                        // FolderListModel's fileUrl is already percent-encoded — a raw
+                        // "file://" + filePath breaks on '#' or '?' in the file name.
+                        required property url fileUrl
+                        readonly property string localUrl: fileUrl.toString()
+                        // completeBaseName behaviour: strip only the LAST suffix —
+                        // fileBaseName would cut "Mr. Brightside.mp3" down to "Mr".
+                        readonly property string displayName: {
+                            const i = fileName.lastIndexOf(".")
+                            return i > 0 ? fileName.substring(0, i) : fileName
+                        }
+                        readonly property bool isThisPlaying: isPlaying() && playMusic.source.toString() === localUrl
+                        readonly property bool isVideo: fileName.endsWith(".mp4") || fileName.endsWith(".webm")
+                        width: libraryView.width - libraryView.leftMargin - libraryView.rightMargin
+                        height: Kirigami.Units.gridUnit * 3
+
+                        // Keyboard + screen-reader access — the row is otherwise
+                        // reachable only with a pointer (same pattern as web rows)
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: fileItem.isThisPlaying ? i18n("Stop: %1", displayName) : i18n("Play: %1", displayName)
+                        Accessible.onPressAction: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                                root.playLocalFile(fileItem.localUrl, fileItem.displayName)
+                                event.accepted = true
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing / 2
+                            radius: Kirigami.Units.smallSpacing * 1.5
+                            color: {
+                                if (fileItem.isThisPlaying) return Qt.alpha(root.accent, 0.15)
+                                if (fileHover.hovered) return Qt.alpha(root.accent, 0.07)
+                                return Qt.alpha(Kirigami.Theme.textColor, 0.045)
+                            }
+                            border.width: fileItem.activeFocus ? 2 : 1
+                            border.color: {
+                                if (fileItem.activeFocus) return root.accent
+                                if (fileItem.isThisPlaying) return Qt.alpha(root.accent, 0.55)
+                                return fileHover.hovered ? Qt.alpha(root.accent, 0.25) : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                            }
+
+                            Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
+                                anchors.rightMargin: Kirigami.Units.smallSpacing
+                                spacing: Kirigami.Units.smallSpacing * 1.5
+
+                                Rectangle {
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                                    radius: width * 0.32
+                                    color: fileItem.isThisPlaying ? root.accent : Qt.alpha(Kirigami.Theme.textColor, 0.1)
+
+                                    EqBars {
+                                        anchors.centerIn: parent
+                                        visible: fileItem.isThisPlaying
+                                        animating: visible && root.expanded
+                                        bars: 3
+                                        barWidth: 3
+                                        minHeight: 4
+                                        maxHeight: parent.height * 0.55
+                                        barColor: root.accentTextOn
+                                    }
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+                                        width: parent.width * 0.55
+                                        height: width
+                                        source: fileItem.isVideo ? "video-x-generic" : "audio-x-generic"
+                                        visible: !fileItem.isThisPlaying
+                                    }
+                                }
+
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    text: fileItem.displayName
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    color: fileItem.isThisPlaying ? root.accent : Kirigami.Theme.textColor
+                                    font.weight: fileItem.isThisPlaying ? Font.DemiBold : Font.Normal
+                                }
+
+                                CircleButton {
+                                    id: fileRemoveBtn
+                                    property bool armed: false
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+                                    iconName: "edit-delete"
+                                    iconScale: 0.55
+                                    // Not checkable: two-step confirm button; armed is a
+                                    // visual state, not checkbox semantics.
+                                    checked: armed
+                                    checkedColor: "#E0463C"
+                                    checkedIconColor: "#FFFFFF"
+                                    // Row focus reveals the button so Tab can reach it;
+                                    // its own focus keeps it revealed once tabbed into
+                                    // (fileItem is no FocusScope — both terms needed).
+                                    opacity: armed ? 1.0 : ((fileHover.hovered || fileItem.activeFocus || fileRemoveBtn.activeFocus) ? 0.6 : 0.0)
+                                    visible: opacity > 0.0
+                                    tooltipText: armed ? i18n("Click again to confirm delete") : i18n("Delete file")
+                                    onClicked: {
+                                        if (!armed) {
+                                            armed = true
+                                            fileDisarmTimer.restart()
+                                        } else {
+                                            armed = false
+                                            if (fileItem.isThisPlaying) stopWithFade()
+                                            // The track's sidecar cover art goes with it:
+                                            // yt-dlp leaves Title.webp/.jpg beside Title.opus
+                                            // when embedding was unavailable, and deleting
+                                            // only the audio strands covers in the library
+                                            // forever.
+                                            var safePath = fileItem.filePath.replace(/'/g, "'\\''")
+                                            var stem = safePath.replace(/\.[^.\/]+$/, "")
+                                            var slash = stem.lastIndexOf("/")
+                                            var coverStem = stem.substring(0, slash) + "/.covers" + stem.substring(slash)
+                                            executable.exec("rm -f '" + safePath + "'; "
+                                                + "for e in jpg jpeg png webp; do rm -f '" + stem + "'.\"$e\" '" + coverStem + "'.\"$e\"; done")
+                                        }
+                                    }
+                                    Timer {
+                                        id: fileDisarmTimer
+                                        interval: 2500
+                                        repeat: false
+                                        onTriggered: fileRemoveBtn.armed = false
+                                    }
+                                    Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+                                }
+                            }
+                        }
+
+                        HoverHandler { id: fileHover }
+                        TapHandler {
+                            onTapped: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
+                        }
+                    }
+
+                    Column {
+                        anchors.centerIn: parent
+                        width: parent.width - Kirigami.Units.largeSpacing * 2
+                        visible: musicFolder.count === 0
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            source: "folder-music"
+                            width: Kirigami.Units.iconSizes.huge
+                            height: width
+                            opacity: 0.4
+                        }
+                        PlasmaComponents3.Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            text: i18n("Nothing here yet")
+                            font.weight: Font.DemiBold
+                            opacity: 0.7
+                        }
+                        PlasmaComponents3.Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            opacity: 0.55
+                            text: i18n("When a good song plays on the radio, press ⬇ — it will be saved here for offline listening")
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── PAGE 4: Timers — every clock in one place ───────────────────
+        // Sleep timer, wake-up alarms and scheduled recordings share one
+        // labeled tab. They used to live behind three near-identical
+        // clock icons on two different pages; a user hunting the radio
+        // alarm reliably found the sleep timer first.
+        Flickable {
+            id: timersPage
+            clip: true
+            contentHeight: timersCol.implicitHeight + Kirigami.Units.smallSpacing * 2
+            boundsBehavior: Flickable.StopAtBounds
+            PlasmaComponents3.ScrollBar.vertical: PlasmaComponents3.ScrollBar {}
+
+            ColumnLayout {
+                id: timersCol
+                width: timersPage.width
+                spacing: 0
+
+                // ── Sleep timer ──────────────────────────────────────────
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.margins: Kirigami.Units.smallSpacing
+                    implicitHeight: sleepCol.implicitHeight + Kirigami.Units.smallSpacing * 3
+                    radius: Kirigami.Units.smallSpacing * 1.5
+                    color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
+                    border.width: 1
+                    border.color: Qt.alpha(root.accent, 0.25)
+
+                    ColumnLayout {
+                        id: sleepCol
+                        anchors.fill: parent
+                        anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                        spacing: Kirigami.Units.smallSpacing
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+                            Kirigami.Icon {
+                                source: "chronometer"
+                                width: Kirigami.Units.iconSizes.small
+                                height: width
+                                color: root.accent
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Sleep timer")
+                                font.weight: Font.DemiBold
+                                color: root.accent
+                            }
+                            PlasmaComponents3.Label {
+                                visible: root.sleepRemainingSec > 0
+                                text: i18n("Sleeping in %1", sleepFormatted())
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                opacity: 0.8
+                            }
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            Repeater {
+                                model: [15, 30, 60, 90]
+                                QQC2.Button {
+                                    required property int modelData
+                                    text: i18n("%1 min", modelData)
+                                    onClicked: root.startSleepTimer(modelData * 60)
+                                }
+                            }
+                            QQC2.Button {
+                                icon.name: "dialog-cancel"
+                                text: i18n("Cancel")
+                                enabled: root.sleepRemainingSec > 0
+                                onClicked: root.cancelSleepTimer()
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Playback fades out and stops when the timer ends.")
+                            wrapMode: Text.Wrap
+                            opacity: 0.55
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                    }
+                }
+
+            // ── Wake-up alarms panel ─────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                implicitHeight: alarmCol.implicitHeight + Kirigami.Units.smallSpacing * 3
+                radius: Kirigami.Units.smallSpacing * 1.5
+                color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
+                border.width: 1
+                border.color: Qt.alpha(root.accent, 0.25)
+
+                ColumnLayout {
+                    id: alarmCol
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                    spacing: Kirigami.Units.smallSpacing
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        Kirigami.Icon {
+                            source: "clock"
+                            width: Kirigami.Units.iconSizes.small
+                            height: width
+                            color: root.accent
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Wake-up alarms")
+                            font.weight: Font.DemiBold
+                            color: root.accent
+                        }
+                    }
+
+                    // Existing alarms
+                    Repeater {
+                        model: root.alarms
+
+                        RowLayout {
+                            id: alarmItem
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: {
+                                    var a = alarmItem.modelData
+                                    var when = root._pad2(a.hh) + ":" + root._pad2(a.mm)
+                                    // Day names via i18n, NOT Qt.locale(): the catalog
+                                    // keeps them in the widget's language, while the
+                                    // system locale may be something else entirely.
+                                    var days = [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
+                                                i18n("Thu"), i18n("Fri"), i18n("Sat")]
+                                    var d = new Date(a.nextRun)
+                                    var rep = a.repeat === "daily" ? i18n("Daily")
+                                            : a.repeat === "weekly" ? i18n("Every %1", days[a.weekday])
+                                            : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
+                                    return "⏰ " + rep + " " + when + " · " + a.volumePct + "% · " + a.station
+                                }
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            }
+                            CircleButton {
+                                implicitWidth: Kirigami.Units.gridUnit * 1.6
+                                implicitHeight: implicitWidth
+                                iconName: "edit-delete"
+                                iconScale: 0.5
+                                opacity: 0.7
+                                tooltipText: i18n("Remove this alarm")
+                                onClicked: root.removeAlarm(alarmItem.index)
+                            }
+                        }
+                    }
+
+                    PlasmaComponents3.Label {
+                        visible: root.alarms.length === 0
+                        text: i18n("No alarms yet — add one below.")
+                        opacity: 0.55
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    }
+
+                    Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
+
+                    // Add form: station · time · repeat · volume · [+]
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: Kirigami.Units.smallSpacing
+                        rowSpacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Station:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.ComboBox {
+                            id: alarmStation
+                            Layout.fillWidth: true
+                            model: stationsModel
+                            textRole: "name"
+                            Accessible.name: i18n("Station")
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Start:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.SpinBox {
+                                id: alarmHH
+                                from: 0; to: 23
+                                value: 7
+                                textFromValue: function(v) { return root._pad2(v) }
+                                wrap: true
+                                Accessible.name: i18n("Start hour")
+                            }
+                            PlasmaComponents3.Label { text: ":" }
+                            QQC2.SpinBox {
+                                id: alarmMM
+                                from: 0; to: 59
+                                stepSize: 5
+                                value: 0
+                                textFromValue: function(v) { return root._pad2(v) }
+                                wrap: true
+                                Accessible.name: i18n("Start minute")
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Repeat:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.ComboBox {
+                                id: alarmRepeat
+                                model: [i18n("Once"), i18n("Daily"), i18n("Weekly")]
+                                currentIndex: 1
+                                Accessible.name: i18n("Repeat")
+                            }
+                            QQC2.ComboBox {
+                                id: alarmWeekday
+                                visible: alarmRepeat.currentIndex === 2
+                                // Day names via i18n — same language as the rest of the UI
+                                model: [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
+                                        i18n("Thu"), i18n("Fri"), i18n("Sat")]
+                                currentIndex: new Date().getDay()
+                                Accessible.name: i18n("Weekday")
+                            }
+                        }
+
+                        PlasmaComponents3.Label {
+                            text: i18n("Volume:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.SpinBox {
+                            id: alarmVolume
+                            // The floor is 15%: an alarm must never be silent.
+                            from: 15; to: 100
+                            stepSize: 5
+                            value: 40
+                            textFromValue: function(v) { return v + "%" }
+                            valueFromText: function(t) { return parseInt(t) || 40 }
+                            Accessible.name: i18n("Volume")
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.CheckBox {
+                            id: alarmAwake
+                            Layout.fillWidth: true
+                            text: i18n("Keep the computer awake until the alarm")
+                            checked: true
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        QQC2.Button {
+                            icon.name: "list-add"
+                            text: i18n("Add")
+                            enabled: alarmStation.currentIndex >= 0
+                                     && alarmStation.currentIndex < stationsModel.count
+                            onClicked: {
+                                var st = stationsModel.get(alarmStation.currentIndex)
+                                if (!st || !st.hostname) return
+                                var repeats = ["once", "daily", "weekly"]
+                                root.addAlarm(st.name, st.hostname, st.favicon || "",
+                                              alarmHH.value, alarmMM.value,
+                                              repeats[alarmRepeat.currentIndex],
+                                              alarmWeekday.currentIndex,
+                                              alarmVolume.value, alarmAwake.checked,
+                                              st.uuid || "")
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── Scheduled recordings panel ───────────────────────────────
             Rectangle {
                 Layout.fillWidth: true
                 Layout.margins: Kirigami.Units.smallSpacing
-                visible: libraryPage.showSchedules
                 implicitHeight: schedCol.implicitHeight + Kirigami.Units.smallSpacing * 3
                 radius: Kirigami.Units.smallSpacing * 1.5
                 color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
@@ -2505,402 +2924,6 @@ PlasmaExtras.Representation {
                 }
             }
 
-            // ── Wake-up alarms panel ─────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.margins: Kirigami.Units.smallSpacing
-                visible: libraryPage.showAlarms
-                implicitHeight: alarmCol.implicitHeight + Kirigami.Units.smallSpacing * 3
-                radius: Kirigami.Units.smallSpacing * 1.5
-                color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
-                border.width: 1
-                border.color: Qt.alpha(root.accent, 0.25)
-
-                ColumnLayout {
-                    id: alarmCol
-                    anchors.fill: parent
-                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
-                    spacing: Kirigami.Units.smallSpacing
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-                        Kirigami.Icon {
-                            source: "clock"
-                            width: Kirigami.Units.iconSizes.small
-                            height: width
-                            color: root.accent
-                        }
-                        PlasmaComponents3.Label {
-                            Layout.fillWidth: true
-                            text: i18n("Wake-up alarms")
-                            font.weight: Font.DemiBold
-                            color: root.accent
-                        }
-                    }
-
-                    // Existing alarms
-                    Repeater {
-                        model: root.alarms
-
-                        RowLayout {
-                            id: alarmItem
-                            required property var modelData
-                            required property int index
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
-
-                            PlasmaComponents3.Label {
-                                Layout.fillWidth: true
-                                text: {
-                                    var a = alarmItem.modelData
-                                    var when = root._pad2(a.hh) + ":" + root._pad2(a.mm)
-                                    // Day names via i18n, NOT Qt.locale(): the catalog
-                                    // keeps them in the widget's language, while the
-                                    // system locale may be something else entirely.
-                                    var days = [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
-                                                i18n("Thu"), i18n("Fri"), i18n("Sat")]
-                                    var d = new Date(a.nextRun)
-                                    var rep = a.repeat === "daily" ? i18n("Daily")
-                                            : a.repeat === "weekly" ? i18n("Every %1", days[a.weekday])
-                                            : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
-                                    return "⏰ " + rep + " " + when + " · " + a.volumePct + "% · " + a.station
-                                }
-                                textFormat: Text.PlainText
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            }
-                            CircleButton {
-                                implicitWidth: Kirigami.Units.gridUnit * 1.6
-                                implicitHeight: implicitWidth
-                                iconName: "edit-delete"
-                                iconScale: 0.5
-                                opacity: 0.7
-                                tooltipText: i18n("Remove this alarm")
-                                onClicked: root.removeAlarm(alarmItem.index)
-                            }
-                        }
-                    }
-
-                    PlasmaComponents3.Label {
-                        visible: root.alarms.length === 0
-                        text: i18n("No alarms yet — add one below.")
-                        opacity: 0.55
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    }
-
-                    Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
-
-                    // Add form: station · time · repeat · volume · [+]
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 2
-                        columnSpacing: Kirigami.Units.smallSpacing
-                        rowSpacing: Kirigami.Units.smallSpacing
-
-                        PlasmaComponents3.Label {
-                            text: i18n("Station:")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        }
-                        QQC2.ComboBox {
-                            id: alarmStation
-                            Layout.fillWidth: true
-                            model: stationsModel
-                            textRole: "name"
-                            Accessible.name: i18n("Station")
-                        }
-
-                        PlasmaComponents3.Label {
-                            text: i18n("Start:")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        }
-                        RowLayout {
-                            spacing: Kirigami.Units.smallSpacing
-                            QQC2.SpinBox {
-                                id: alarmHH
-                                from: 0; to: 23
-                                value: 7
-                                textFromValue: function(v) { return root._pad2(v) }
-                                wrap: true
-                                Accessible.name: i18n("Start hour")
-                            }
-                            PlasmaComponents3.Label { text: ":" }
-                            QQC2.SpinBox {
-                                id: alarmMM
-                                from: 0; to: 59
-                                stepSize: 5
-                                value: 0
-                                textFromValue: function(v) { return root._pad2(v) }
-                                wrap: true
-                                Accessible.name: i18n("Start minute")
-                            }
-                        }
-
-                        PlasmaComponents3.Label {
-                            text: i18n("Repeat:")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        }
-                        RowLayout {
-                            spacing: Kirigami.Units.smallSpacing
-                            QQC2.ComboBox {
-                                id: alarmRepeat
-                                model: [i18n("Once"), i18n("Daily"), i18n("Weekly")]
-                                currentIndex: 1
-                                Accessible.name: i18n("Repeat")
-                            }
-                            QQC2.ComboBox {
-                                id: alarmWeekday
-                                visible: alarmRepeat.currentIndex === 2
-                                // Day names via i18n — same language as the rest of the UI
-                                model: [i18n("Sun"), i18n("Mon"), i18n("Tue"), i18n("Wed"),
-                                        i18n("Thu"), i18n("Fri"), i18n("Sat")]
-                                currentIndex: new Date().getDay()
-                                Accessible.name: i18n("Weekday")
-                            }
-                        }
-
-                        PlasmaComponents3.Label {
-                            text: i18n("Volume:")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        }
-                        QQC2.SpinBox {
-                            id: alarmVolume
-                            // The floor is 15%: an alarm must never be silent.
-                            from: 15; to: 100
-                            stepSize: 5
-                            value: 40
-                            textFromValue: function(v) { return v + "%" }
-                            valueFromText: function(t) { return parseInt(t) || 40 }
-                            Accessible.name: i18n("Volume")
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-
-                        QQC2.CheckBox {
-                            id: alarmAwake
-                            Layout.fillWidth: true
-                            text: i18n("Keep the computer awake until the alarm")
-                            checked: true
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        }
-                        QQC2.Button {
-                            icon.name: "list-add"
-                            text: i18n("Add")
-                            enabled: alarmStation.currentIndex >= 0
-                                     && alarmStation.currentIndex < stationsModel.count
-                            onClicked: {
-                                var st = stationsModel.get(alarmStation.currentIndex)
-                                if (!st || !st.hostname) return
-                                var repeats = ["once", "daily", "weekly"]
-                                root.addAlarm(st.name, st.hostname, st.favicon || "",
-                                              alarmHH.value, alarmMM.value,
-                                              repeats[alarmRepeat.currentIndex],
-                                              alarmWeekday.currentIndex,
-                                              alarmVolume.value, alarmAwake.checked,
-                                              st.uuid || "")
-                            }
-                        }
-                    }
-                }
-            }
-
-            PlasmaComponents3.ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
-
-                contentItem: ListView {
-                    id: libraryView
-                    leftMargin: Kirigami.Units.smallSpacing
-                    rightMargin: Kirigami.Units.smallSpacing
-                    model: musicFolder
-                    boundsBehavior: Flickable.StopAtBounds
-                    clip: true
-                    spacing: 2
-
-                    delegate: Item {
-                        id: fileItem
-                        required property string fileName
-                        required property string filePath
-                        // FolderListModel's fileUrl is already percent-encoded — a raw
-                        // "file://" + filePath breaks on '#' or '?' in the file name.
-                        required property url fileUrl
-                        readonly property string localUrl: fileUrl.toString()
-                        // completeBaseName behaviour: strip only the LAST suffix —
-                        // fileBaseName would cut "Mr. Brightside.mp3" down to "Mr".
-                        readonly property string displayName: {
-                            const i = fileName.lastIndexOf(".")
-                            return i > 0 ? fileName.substring(0, i) : fileName
-                        }
-                        readonly property bool isThisPlaying: isPlaying() && playMusic.source.toString() === localUrl
-                        readonly property bool isVideo: fileName.endsWith(".mp4") || fileName.endsWith(".webm")
-                        width: libraryView.width - libraryView.leftMargin - libraryView.rightMargin
-                        height: Kirigami.Units.gridUnit * 3
-
-                        // Keyboard + screen-reader access — the row is otherwise
-                        // reachable only with a pointer (same pattern as web rows)
-                        activeFocusOnTab: true
-                        Accessible.role: Accessible.Button
-                        Accessible.name: fileItem.isThisPlaying ? i18n("Stop: %1", displayName) : i18n("Play: %1", displayName)
-                        Accessible.onPressAction: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
-                        Keys.onPressed: (event) => {
-                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                root.playLocalFile(fileItem.localUrl, fileItem.displayName)
-                                event.accepted = true
-                            }
-                        }
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: Kirigami.Units.smallSpacing / 2
-                            radius: Kirigami.Units.smallSpacing * 1.5
-                            color: {
-                                if (fileItem.isThisPlaying) return Qt.alpha(root.accent, 0.15)
-                                if (fileHover.hovered) return Qt.alpha(root.accent, 0.07)
-                                return Qt.alpha(Kirigami.Theme.textColor, 0.045)
-                            }
-                            border.width: fileItem.activeFocus ? 2 : 1
-                            border.color: {
-                                if (fileItem.activeFocus) return root.accent
-                                if (fileItem.isThisPlaying) return Qt.alpha(root.accent, 0.55)
-                                return fileHover.hovered ? Qt.alpha(root.accent, 0.25) : Qt.alpha(Kirigami.Theme.textColor, 0.06)
-                            }
-
-                            Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
-                                anchors.rightMargin: Kirigami.Units.smallSpacing
-                                spacing: Kirigami.Units.smallSpacing * 1.5
-
-                                Rectangle {
-                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 2
-                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
-                                    radius: width * 0.32
-                                    color: fileItem.isThisPlaying ? root.accent : Qt.alpha(Kirigami.Theme.textColor, 0.1)
-
-                                    EqBars {
-                                        anchors.centerIn: parent
-                                        visible: fileItem.isThisPlaying
-                                        animating: visible && root.expanded
-                                        bars: 3
-                                        barWidth: 3
-                                        minHeight: 4
-                                        maxHeight: parent.height * 0.55
-                                        barColor: root.accentTextOn
-                                    }
-                                    Kirigami.Icon {
-                                        anchors.centerIn: parent
-                                        width: parent.width * 0.55
-                                        height: width
-                                        source: fileItem.isVideo ? "video-x-generic" : "audio-x-generic"
-                                        visible: !fileItem.isThisPlaying
-                                    }
-                                }
-
-                                PlasmaComponents3.Label {
-                                    Layout.fillWidth: true
-                                    text: fileItem.displayName
-                                    textFormat: Text.PlainText
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 1
-                                    color: fileItem.isThisPlaying ? root.accent : Kirigami.Theme.textColor
-                                    font.weight: fileItem.isThisPlaying ? Font.DemiBold : Font.Normal
-                                }
-
-                                CircleButton {
-                                    id: fileRemoveBtn
-                                    property bool armed: false
-                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
-                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
-                                    iconName: "edit-delete"
-                                    iconScale: 0.55
-                                    // Not checkable: two-step confirm button; armed is a
-                                    // visual state, not checkbox semantics.
-                                    checked: armed
-                                    checkedColor: "#E0463C"
-                                    checkedIconColor: "#FFFFFF"
-                                    // Row focus reveals the button so Tab can reach it;
-                                    // its own focus keeps it revealed once tabbed into
-                                    // (fileItem is no FocusScope — both terms needed).
-                                    opacity: armed ? 1.0 : ((fileHover.hovered || fileItem.activeFocus || fileRemoveBtn.activeFocus) ? 0.6 : 0.0)
-                                    visible: opacity > 0.0
-                                    tooltipText: armed ? i18n("Click again to confirm delete") : i18n("Delete file")
-                                    onClicked: {
-                                        if (!armed) {
-                                            armed = true
-                                            fileDisarmTimer.restart()
-                                        } else {
-                                            armed = false
-                                            if (fileItem.isThisPlaying) stopWithFade()
-                                            // The track's sidecar cover art goes with it:
-                                            // yt-dlp leaves Title.webp/.jpg beside Title.opus
-                                            // when embedding was unavailable, and deleting
-                                            // only the audio strands covers in the library
-                                            // forever.
-                                            var safePath = fileItem.filePath.replace(/'/g, "'\\''")
-                                            var stem = safePath.replace(/\.[^.\/]+$/, "")
-                                            var slash = stem.lastIndexOf("/")
-                                            var coverStem = stem.substring(0, slash) + "/.covers" + stem.substring(slash)
-                                            executable.exec("rm -f '" + safePath + "'; "
-                                                + "for e in jpg jpeg png webp; do rm -f '" + stem + "'.\"$e\" '" + coverStem + "'.\"$e\"; done")
-                                        }
-                                    }
-                                    Timer {
-                                        id: fileDisarmTimer
-                                        interval: 2500
-                                        repeat: false
-                                        onTriggered: fileRemoveBtn.armed = false
-                                    }
-                                    Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
-                                }
-                            }
-                        }
-
-                        HoverHandler { id: fileHover }
-                        TapHandler {
-                            onTapped: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
-                        }
-                    }
-
-                    Column {
-                        anchors.centerIn: parent
-                        width: parent.width - Kirigami.Units.largeSpacing * 2
-                        visible: musicFolder.count === 0
-                        spacing: Kirigami.Units.smallSpacing
-
-                        Kirigami.Icon {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            source: "folder-music"
-                            width: Kirigami.Units.iconSizes.huge
-                            height: width
-                            opacity: 0.4
-                        }
-                        PlasmaComponents3.Label {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            horizontalAlignment: Text.AlignHCenter
-                            width: parent.width
-                            wrapMode: Text.Wrap
-                            text: i18n("Nothing here yet")
-                            font.weight: Font.DemiBold
-                            opacity: 0.7
-                        }
-                        PlasmaComponents3.Label {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            horizontalAlignment: Text.AlignHCenter
-                            width: parent.width
-                            wrapMode: Text.Wrap
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            opacity: 0.55
-                            text: i18n("When a good song plays on the radio, press ⬇ — it will be saved here for offline listening")
-                        }
-                    }
-                }
             }
         }
     }
@@ -3013,13 +3036,69 @@ PlasmaExtras.Representation {
         id: headerArea
 
         focus: true
-        height: Kirigami.Units.gridUnit * 4.5
+        height: Kirigami.Units.gridUnit * 4.5 + navTabs.implicitHeight
         background.visible: Plasmoid.userBackgroundHints !== PlasmaCore.Types.ShadowBackground
 
         Heading {
-            anchors.fill: parent
+            id: headingRow
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: Kirigami.Units.gridUnit * 4.5
             anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
             anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5
+        }
+
+        // The popup's map, finally on the surface: four labeled tabs.
+        // Before this bar the pages hid behind an unlabeled folder icon,
+        // a post-first-play header button and an undiscoverable swipe —
+        // and the alarms sat three clicks deep on the downloads page.
+        PlasmaComponents3.TabBar {
+            id: navTabs
+            anchors.top: headingRow.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+
+            // Two-way sync with root.view, imperative like the SwipeView's:
+            // a declarative binding would break on the first click.
+            Component.onCompleted: currentIndex = root.view
+            onCurrentIndexChanged: {
+                if (root.view !== currentIndex) root.view = currentIndex
+            }
+            Connections {
+                target: root
+                function onViewChanged() {
+                    if (navTabs.currentIndex !== root.view) navTabs.currentIndex = root.view
+                }
+            }
+
+            // Icon above label: four side-by-side labels wrap into
+            // hyphen soup at popup width; stacked they stay whole in
+            // every language the catalog carries.
+            PlasmaComponents3.TabButton {
+                icon.name: "radio"
+                text: i18n("Stations")
+                display: QQC2.AbstractButton.TextUnderIcon
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+            }
+            PlasmaComponents3.TabButton {
+                icon.name: "view-media-lyrics"
+                text: i18n("Playing")
+                display: QQC2.AbstractButton.TextUnderIcon
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+            }
+            PlasmaComponents3.TabButton {
+                icon.name: "folder-music"
+                text: i18n("My Music")
+                display: QQC2.AbstractButton.TextUnderIcon
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+            }
+            PlasmaComponents3.TabButton {
+                icon.name: "clock"
+                text: i18n("Timers")
+                display: QQC2.AbstractButton.TextUnderIcon
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+            }
         }
     }
 
@@ -3031,19 +3110,6 @@ PlasmaExtras.Representation {
             anchors.leftMargin: Kirigami.Units.smallSpacing
             anchors.rightMargin: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
-
-            // My Music (downloaded tracks)
-            CircleButton {
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: Kirigami.Units.gridUnit * 2.2
-                implicitHeight: implicitWidth
-                iconName: "folder-music"
-                iconScale: 0.55
-                checkable: true
-                checked: root.view === 2
-                tooltipText: i18n("My Music (downloaded tracks)")
-                onClicked: root.view = root.view === 2 ? 0 : 2
-            }
 
             CircleButton {
                 id: sleepBtn

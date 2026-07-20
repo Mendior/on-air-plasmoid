@@ -22,21 +22,10 @@ RowLayout {
     readonly property bool hasTrack: root.title && root.title !== Plasmoid.title && root.title.length > 0
     readonly property string primaryText: {
         if (root.view === 2 && !hasStation) return i18n("My Music")
+        if (root.view === 3 && !hasStation) return i18n("Timers")
         return hasStation ? root.currentStation : Plasmoid.title
     }
     readonly property string secondaryText: hasTrack ? root.title : ""
-
-    CircleButton {
-        id: backButton
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 2.2
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 2.2
-        Layout.alignment: Qt.AlignVCenter
-        iconName: "go-previous"
-        iconScale: 0.55
-        visible: root.view === 1
-        tooltipText: i18n("Back to stations")
-        onClicked: root.view = 0
-    }
 
     ColumnLayout {
         Layout.fillWidth: true
@@ -116,17 +105,5 @@ RowLayout {
                 NumberAnimation { target: secondaryShift; property: "y"; from: Kirigami.Units.smallSpacing; to: 0; duration: 380; easing.type: Easing.OutCubic }
             }
         }
-    }
-
-    CircleButton {
-        id: infoButton
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 2.2
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 2.2
-        Layout.alignment: Qt.AlignVCenter
-        iconName: "view-media-lyrics"
-        iconScale: 0.55
-        visible: headingRoot.hasStation && root.view === 0
-        tooltipText: i18n("Show now playing")
-        onClicked: root.view = 1
     }
 }
