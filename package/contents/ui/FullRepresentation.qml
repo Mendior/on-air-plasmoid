@@ -2297,6 +2297,10 @@ PlasmaExtras.Representation {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.SizeVerCursor
+                    // The page lives inside a SwipeView — without this it
+                    // grabbed the vertical drag partway and the divider
+                    // "stuck". preventStealing keeps the gesture here.
+                    preventStealing: true
                     property real _startY: 0
                     property real _startH: 0
                     onPressed: (m) => {
@@ -3794,6 +3798,10 @@ PlasmaExtras.Representation {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.SizeVerCursor
+                                // Keep the drag here — a Flickable ancestor
+                                // (the scroll view, the swipe pages) must not
+                                // grab it partway and stall the resize.
+                                preventStealing: true
                                 // The grip sits at the TOP of a menu that
                                 // grows UPWARD — so resizing moves the grip
                                 // itself, and a local mouse.y feeds back into
