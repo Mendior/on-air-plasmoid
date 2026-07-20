@@ -3737,13 +3737,24 @@ PlasmaExtras.Representation {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.SizeVerCursor
+                                // The grip sits at the TOP of a menu that
+                                // grows UPWARD — so resizing moves the grip
+                                // itself, and a local mouse.y feeds back into
+                                // its own coordinate and the drag oscillates.
+                                // Track the cursor in SCREEN space instead: it
+                                // is where the finger physically is, unaffected
+                                // by the menu resizing under it.
                                 property real _startY: 0
                                 property real _startH: 0
-                                onPressed: (m) => { _startY = m.y; _startH = castMenu._menuH }
+                                onPressed: (m) => {
+                                    _startY = mapToGlobal(m.x, m.y).y
+                                    _startH = castMenu._menuH
+                                }
                                 onPositionChanged: (m) => {
                                     if (!pressed) return
+                                    var dy = mapToGlobal(m.x, m.y).y - _startY  // up = negative
                                     castMenu._userMenuH = Math.max(Kirigami.Units.gridUnit * 10,
-                                        Math.min(castMenu._maxMenuH, _startH - (m.y - _startY)))
+                                        Math.min(castMenu._maxMenuH, _startH - dy))
                                 }
                                 onReleased: Plasmoid.configuration.castMenuHeight = Math.round(castMenu._userMenuH)
                                 onDoubleClicked: {
