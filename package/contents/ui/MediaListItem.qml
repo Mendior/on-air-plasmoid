@@ -66,26 +66,6 @@ PlasmaComponents3.ItemDelegate {
     }
     Accessible.onPressAction: listItem._activate()
 
-    // One arrow step, UI first: the view moves the row immediately (the
-    // rebuild then recognizes its own order and only patches roles — no
-    // delegate teardown, the hover survives for the next click), and the
-    // engine persists the same step. A refused persist (config changed
-    // underneath) walks the view move back — the list never shows an
-    // order the config does not hold.
-    function _arrowStep(delta) {
-        const view = listItem.ListView.view
-        if (!view || view.dragActive) return
-        const from = model.index
-        const to = from + delta
-        if (to < 0 || to >= view.count) return
-        const nm = model.name, hn = model.hostname, ti = listItem.targetIndex
-        view.model.move(from, to, 1)
-        const ok = root.favoritesOnly
-                   ? root.moveFavorite(nm, delta)
-                   : root.moveStation(ti, nm, hn, delta)
-        if (!ok) view.model.move(to, from, 1)
-    }
-
     background: Item {
         anchors.fill: parent
         anchors.margins: Kirigami.Units.smallSpacing / 2
@@ -212,17 +192,14 @@ PlasmaComponents3.ItemDelegate {
                 // The empty-state face: the station's initials in its own
                 // deterministic tint. The row number this replaced only ever
                 // appeared on logo-less rows and was already hidden on hover
-                // — but while a reorder arrow is hovered the number
-                // RESURFACES, because that is the one moment position
-                // genuinely matters.
+                // — but while the row is being DRAGGED the number RESURFACES,
+                // because that is the one moment position genuinely matters.
                 PlasmaComponents3.Label {
                     anchors.centerIn: parent
-                    readonly property bool reorderHover: moveUpButton.hovered
-                                                         || moveDownButton.hovered
-                                                         || dragArea.pressed
+                    readonly property bool reorderHover: dragArea.pressed
                     text: (reorderHover || avatar.mono === "")
                           ? (listItem.targetIndex + 1) : avatar.mono
-                    // Monogram ink serves the number during arrow-hover too —
+                    // Monogram ink serves the number during a drag too —
                     // on-palette and higher-contrast than dimmed textColor
                     // over the tint. On the current row's accent flood the
                     // accent's own text color is the only honest choice.
@@ -268,13 +245,11 @@ PlasmaComponents3.ItemDelegate {
                            ? root.accentTextOn
                            : Kirigami.Theme.textColor
                     visible: {
-                        // While a reorder arrow is hovered or the row is
-                        // being DRAGGED, the position number takes this slot
-                        // — not the play/stop affordance, on the current row
-                        // included: the row being moved is the one whose
-                        // position matters most.
-                        if (moveUpButton.hovered || moveDownButton.hovered
-                            || dragArea.pressed) return false
+                        // While the row is being DRAGGED the position number
+                        // takes this slot — not the play/stop affordance, on
+                        // the current row included: the row being moved is the
+                        // one whose position matters most.
+                        if (dragArea.pressed) return false
                         if (listItem.isCurrent && listItem.hovered) return true
                         if (listItem.isCurrent) return false
                         return listItem.hovered && !listItem.isLoading
@@ -452,51 +427,9 @@ PlasmaComponents3.ItemDelegate {
             }
         }
 
-        // Reorder arrows: move the station (or, in the favorites view, the
-        // favorite) one step up/down. Ctrl+Up/Down does the same via keyboard.
-        CircleButton {
-            id: moveUpButton
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.6
-            Layout.alignment: Qt.AlignVCenter
-            iconName: "go-up"
-            iconScale: 0.55
-            // Space stays reserved while the row is reorderable — buttons
-            // that pop into the layout on hover moved the target under the
-            // arriving pointer. Opacity hides; enabledState keeps the
-            // invisible button unclickable and out of the Tab order.
-            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus
-                      || Kirigami.Settings.tabletMode) ? 0.6 : 0.0
-            visible: listItem.reorderable && model.index > 0
-            enabledState: opacity > 0
-            tooltipText: i18n("Move up")
-            onClicked: listItem._arrowStep(-1)
-
-            Behavior on opacity {
-                NumberAnimation { duration: Kirigami.Units.shortDuration }
-            }
-        }
-
-        CircleButton {
-            id: moveDownButton
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.6
-            Layout.alignment: Qt.AlignVCenter
-            iconName: "go-down"
-            iconScale: 0.55
-            opacity: (listItem.hovered || listItem.isKeyboardCurrent || activeFocus
-                      || Kirigami.Settings.tabletMode) ? 0.6 : 0.0
-            visible: listItem.reorderable
-                     && listItem.ListView.view
-                     && model.index < listItem.ListView.view.count - 1
-            enabledState: opacity > 0
-            tooltipText: i18n("Move down")
-            onClicked: listItem._arrowStep(1)
-
-            Behavior on opacity {
-                NumberAnimation { duration: Kirigami.Units.shortDuration }
-            }
-        }
+        // The reorder arrows retired: the live drag handle (and Ctrl+Up/Down
+        // for the keyboard) do the job, and the two extra hover-slots were
+        // exactly what knocked the row's controls out of column alignment.
 
         // Trash button: remove station — two-step confirmation (red = "are you sure?")
         CircleButton {
@@ -556,7 +489,11 @@ PlasmaComponents3.ItemDelegate {
             checked: listItem.isFav
             opacity: listItem.isFav ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus
                                               || Kirigami.Settings.tabletMode) ? 0.85 : 0.0)
-            visible: opacity > 0.0
+            // Slot ALWAYS reserved (opacity hides, not visibility) — a
+            // collapsing star column was what left the drag handle and the
+            // buttons at different x on favourite vs plain rows.
+            visible: true
+            enabledState: opacity > 0
             tooltipText: listItem.isFav ? i18n("Remove from favorites") : i18n("Add to favorites")
             onClicked: root.toggleFavorite(model.name)
 
@@ -565,15 +502,33 @@ PlasmaComponents3.ItemDelegate {
             }
         }
 
-        Kirigami.Icon {
-            id: speakerIcon
-            Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-            Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+        // Grab the current track — only on the row that is actually playing,
+        // where "the song that's on" exists. It saves a trip to the Playing
+        // tab: hear something you like in the list, download it right here.
+        // The slot is reserved on every row (opacity gates it) so the columns
+        // stay aligned; it took the old always-collapsing speaker icon's place
+        // (the avatar's bars already show which row is live).
+        CircleButton {
+            id: grabButton
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
             Layout.alignment: Qt.AlignVCenter
-            source: "audio-volume-high"
-            color: root.accent
-            visible: listItem.isCurrent && listItem.isBuffered
-            opacity: visible ? 0.85 : 0.0
+            readonly property bool hasTrack: root.trackTitle !== ""
+                || (root.title !== Plasmoid.title && root.title !== "")
+            iconName: root.downloading ? "view-refresh" : "download"
+            iconScale: 0.55
+            checked: root.downloading
+            checkedColor: root.accent
+            checkedIconColor: root.accentTextOn
+            opacity: (listItem.isCurrent && listItem.isBuffered) ? 0.9 : 0.0
+            visible: true
+            enabledState: opacity > 0 && !root.downloading && grabButton.hasTrack
+            tooltipText: root.downloading
+                         ? i18n("Downloading…")
+                         : grabButton.hasTrack
+                           ? i18n("Download this track (for offline listening)")
+                           : i18n("Waiting for track info…")
+            onClicked: root.downloadCurrentTrack()
 
             Behavior on opacity {
                 NumberAnimation { duration: Kirigami.Units.shortDuration }
