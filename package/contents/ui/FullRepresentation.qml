@@ -3599,22 +3599,34 @@ PlasmaExtras.Representation {
                 Layout.alignment: Qt.AlignVCenter
                 implicitWidth: Kirigami.Units.gridUnit * 2.2
                 implicitHeight: implicitWidth
-                visible: root._castAvailable
-                iconName: root._casting ? "media-playback-cast" : "video-display"
+                // Always shown: this is the audio hub now (master volume +
+                // output picker), and those need no python3. The cast, sync
+                // and Bluetooth sections inside stay gated on _castAvailable,
+                // so a machine without python3 still gets volume and output.
+                visible: true
+                iconName: root._casting ? "media-playback-cast"
+                          : root._castAvailable ? "video-display" : "audio-volume-high"
                 iconScale: 0.55
                 checkable: true
                 checked: root._casting
                 tooltipText: root._casting
                              ? i18n("Casting to %1 — click to choose or stop", root._castName)
-                             : i18n("Play on a device (Chromecast, TV, speaker)")
+                             : root._castAvailable
+                               ? i18n("Volume, output and devices (Chromecast, TV, speaker)")
+                               : i18n("Volume and audio output")
                 onClicked: {
                     if (!castMenu.opened) {
-                        root.castDiscover()
-                        // Re-probe too: an adapter that came up after login
-                        // (module reload, rfkill) should be noticed here, not
-                        // only at the next plasmashell restart.
-                        root.btProbe()
-                        root.btList()
+                        // Device discovery, Bluetooth and sync all need
+                        // python3/pactl — skip the probes entirely without
+                        // it (the menu still opens for volume and output).
+                        if (root._castAvailable) {
+                            root.castDiscover()
+                            // Re-probe too: an adapter that came up after login
+                            // (module reload, rfkill) should be noticed here,
+                            // not only at the next plasmashell restart.
+                            root.btProbe()
+                            root.btList()
+                        }
                         castMenu.open()
                     } else {
                         castMenu.close()
@@ -3698,6 +3710,53 @@ PlasmaExtras.Representation {
                                 Layout.fillWidth: true
                                 text: i18n("Play on")
                                 font.weight: Font.DemiBold
+                            }
+                        }
+
+                        Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
+
+                        // Master volume — the one the per-speaker balances
+                        // all follow. It lived on a separate footer button;
+                        // the output hub is where every audio control
+                        // belongs, so it moved here (the panel icon's scroll
+                        // wheel still nudges it without opening anything).
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.smallSpacing
+                            Layout.rightMargin: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.smallSpacing
+
+                            CircleButton {
+                                implicitWidth: Kirigami.Units.gridUnit * 2
+                                implicitHeight: implicitWidth
+                                iconName: {
+                                    if (playMusicOutput.volume <= 0) return "audio-volume-muted"
+                                    if (playMusicOutput.volume <= 0.33) return "audio-volume-low"
+                                    if (playMusicOutput.volume <= 0.66) return "audio-volume-medium"
+                                    return "audio-volume-high"
+                                }
+                                iconScale: 0.5
+                                tooltipText: playMusicOutput.volume > 0 ? i18n("Mute") : i18n("Unmute")
+                                // Absolute gesture (mute/unmute names its level)
+                                // — no step flag, so the auto-care park folds it
+                                // as spoken rather than as a delta.
+                                onClicked: root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+                            }
+                            PlasmaComponents3.Slider {
+                                id: masterVolumeSlider
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 1
+                                stepSize: 0.05
+                                value: playMusicOutput.volume
+                                onMoved: root.setUserVolume(value)
+                                Accessible.name: i18n("Volume")
+                            }
+                            PlasmaComponents3.Label {
+                                text: Math.round(playMusicOutput.volume * 100) + "%"
+                                opacity: 0.7
+                                Layout.minimumWidth: Kirigami.Units.gridUnit * 2
+                                horizontalAlignment: Text.AlignRight
                             }
                         }
 
@@ -4372,67 +4431,10 @@ PlasmaExtras.Representation {
                 }
             }
 
-            CircleButton {
-                id: volumeBtn
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: Kirigami.Units.gridUnit * 2.2
-                implicitHeight: implicitWidth
-                iconName: {
-                    if (playMusicOutput.volume <= 0) return "audio-volume-muted"
-                    if (playMusicOutput.volume <= 0.33) return "audio-volume-low"
-                    if (playMusicOutput.volume <= 0.66) return "audio-volume-medium"
-                    return "audio-volume-high"
-                }
-                iconScale: 0.55
-                tooltipText: i18n("Volume: %1% (scroll to adjust)", Math.round(playMusicOutput.volume * 100))
-                onClicked: volumePopup.open()
-
-                // Scroll wheel over the button = volume
-                WheelHandler {
-                    onWheel: (event) => {
-                        const step = event.angleDelta.y > 0 ? 0.05 : -0.05
-                        root.setUserVolume(playMusicOutput.volume + step, true)
-                    }
-                }
-
-                QQC2.Popup {
-                    id: volumePopup
-                    y: -height - Kirigami.Units.smallSpacing
-                    x: -width + parent.width
-                    padding: Kirigami.Units.smallSpacing * 1.5
-                    modal: false
-                    // Keyboard path: opening moves focus onto the slider (arrow
-                    // keys adjust, Esc closes), closing hands it back to the button
-                    focus: true
-                    onOpened: volumeSlider.forceActiveFocus()
-                    onClosed: volumeBtn.forceActiveFocus()
-
-                    contentItem: RowLayout {
-                        spacing: Kirigami.Units.smallSpacing
-                        Kirigami.Icon {
-                            source: "audio-volume-low"
-                            width: Kirigami.Units.iconSizes.small
-                            height: width
-                        }
-                        QQC2.Slider {
-                            id: volumeSlider
-                            implicitWidth: Kirigami.Units.gridUnit * 8
-                            from: 0
-                            to: 1
-                            // Same step as the wheel (arrow keys would jump 10% otherwise)
-                            stepSize: 0.05
-                            value: playMusicOutput.volume
-                            onMoved: root.setUserVolume(value)
-                            Accessible.name: i18n("Volume")
-                        }
-                        PlasmaComponents3.Label {
-                            text: Math.round(playMusicOutput.volume * 100) + "%"
-                            opacity: 0.7
-                            Layout.minimumWidth: Kirigami.Units.gridUnit * 2
-                        }
-                    }
-                }
-            }
+            // (The footer's volume button retired: master volume moved into
+            // the output hub with the routing, sync and per-speaker balance
+            // it governs. Quick nudges still ride the panel icon's scroll
+            // wheel and the keyboard, no menu needed.)
         }
     }
 

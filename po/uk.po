@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-20 15:54+0300\n"
+"POT-Creation-Date: 2026-07-20 23:35+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Ukrainian\n"
@@ -47,7 +47,7 @@ msgstr "Звук"
 
 #: package/contents/ui/CompactRepresentation.qml:88
 #: package/contents/ui/FullRepresentation.qml:3043
-#: package/contents/ui/FullRepresentation.qml:4453
+#: package/contents/ui/FullRepresentation.qml:3753
 msgid "Volume"
 msgstr "Гучність"
 
@@ -546,7 +546,7 @@ msgid "Tags:"
 msgstr "Мітки:"
 
 #: package/contents/ui/config/configSearch.qml:877
-#: package/contents/ui/FullRepresentation.qml:3603
+#: package/contents/ui/FullRepresentation.qml:3576
 msgid "Error: %1"
 msgstr "Помилка: %1"
 
@@ -755,7 +755,7 @@ msgid "Vote for this station in the worldwide catalog"
 msgstr "Проголосуйте за цю станцію у світовому каталозі"
 
 #: package/contents/ui/FullRepresentation.qml:1886
-#: package/contents/ui/FullRepresentation.qml:3590
+#: package/contents/ui/FullRepresentation.qml:3563
 msgid "Downloading…"
 msgstr "Завантаження…"
 
@@ -821,8 +821,8 @@ msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Клац = шукати на YouTube · ⬇ = завантажити"
 
 #: package/contents/ui/FullRepresentation.qml:2253
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2308
+#: package/contents/ui/FullRepresentation.qml:3479
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2316
 msgid "My Music"
 msgstr "Моя музика"
 
@@ -907,12 +907,11 @@ msgstr ""
 " прослуховування офлайн"
 
 #: package/contents/ui/FullRepresentation.qml:2835
-#: package/contents/ui/FullRepresentation.qml:3514
 msgid "Sleep timer"
 msgstr "Таймер сну"
 
 #: package/contents/ui/FullRepresentation.qml:2841
-#: package/contents/ui/FullRepresentation.qml:3587
+#: package/contents/ui/FullRepresentation.qml:3560
 msgid "Sleeping in %1"
 msgstr "Засинання через %1"
 
@@ -1088,92 +1087,80 @@ msgstr "Тривалість у хвилинах"
 msgid "Recordings are for personal use only."
 msgstr "Записи призначені лише для особистого користування."
 
-#: package/contents/ui/FullRepresentation.qml:3461
-#: package/contents/ui/FullRepresentation.qml:3611
+#: package/contents/ui/FullRepresentation.qml:3466
+#: package/contents/ui/FullRepresentation.qml:3584
 msgid "Playing"
 msgstr "Відтворення"
 
-#: package/contents/ui/FullRepresentation.qml:3477
+#: package/contents/ui/FullRepresentation.qml:3492
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Подкасти"
 
-#: package/contents/ui/FullRepresentation.qml:3485
+#: package/contents/ui/FullRepresentation.qml:3505
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Таймери"
 
-#: package/contents/ui/FullRepresentation.qml:3513
-msgid "Sleep timer: %1"
-msgstr "Таймер сну: %1"
-
-#: package/contents/ui/FullRepresentation.qml:3546
-msgid "Sleep in 15 minutes"
-msgstr "Вимкнути за 15 хвилин"
-
-#: package/contents/ui/FullRepresentation.qml:3547
-msgid "Sleep in 30 minutes"
-msgstr "Вимкнути за 30 хвилин"
-
-#: package/contents/ui/FullRepresentation.qml:3548
-msgid "Sleep in 60 minutes"
-msgstr "Вимкнути за 60 хвилин"
-
-#: package/contents/ui/FullRepresentation.qml:3549
-msgid "Sleep in 90 minutes"
-msgstr "Вимкнути за 90 хвилин"
-
-#: package/contents/ui/FullRepresentation.qml:3552
-msgid "Cancel timer"
-msgstr "Скасувати таймер"
-
-#: package/contents/ui/FullRepresentation.qml:3593
+#: package/contents/ui/FullRepresentation.qml:3566
 #: package/contents/ui/main.qml:68
 msgid "Casting to %1"
 msgstr "Трансляція на %1"
 
-#: package/contents/ui/FullRepresentation.qml:3596
+#: package/contents/ui/FullRepresentation.qml:3569
 msgid "Check internet connection…"
 msgstr "Перевірте з'єднання з інтернетом…"
 
-#: package/contents/ui/FullRepresentation.qml:3606
+#: package/contents/ui/FullRepresentation.qml:3579
 msgid "Bitrate: %1 kb/s"
 msgstr "Бітрейт: %1 кбіт/с"
 
-#: package/contents/ui/FullRepresentation.qml:3611
-#: package/contents/ui/FullRepresentation.qml:3614
+#: package/contents/ui/FullRepresentation.qml:3584
+#: package/contents/ui/FullRepresentation.qml:3587
 msgid "Connecting…"
 msgstr "З'єднання…"
 
-#: package/contents/ui/FullRepresentation.qml:3616
+#: package/contents/ui/FullRepresentation.qml:3589
 msgid "Choose station and enjoy…"
 msgstr "Оберіть станцію та насолоджуйтеся…"
 
-#: package/contents/ui/FullRepresentation.qml:3635
+#: package/contents/ui/FullRepresentation.qml:3613
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Трансляція на %1 — натисніть, щоб вибрати або зупинити"
 
-#: package/contents/ui/FullRepresentation.qml:3636
-msgid "Play on a device (Chromecast, TV, speaker)"
-msgstr "Відтворити на пристрої (Chromecast, телевізор, колонка)"
+#: package/contents/ui/FullRepresentation.qml:3615
+msgid "Volume, output and devices (Chromecast, TV, speaker)"
+msgstr "Гучність, вихід і пристрої (Chromecast, TV, динамік)"
 
-#: package/contents/ui/FullRepresentation.qml:3726
+#: package/contents/ui/FullRepresentation.qml:3616
+msgid "Volume and audio output"
+msgstr "Гучність і аудіовихід"
+
+#: package/contents/ui/FullRepresentation.qml:3711
 msgid "Play on"
 msgstr "Відтворити на"
 
 #: package/contents/ui/FullRepresentation.qml:3739
+msgid "Mute"
+msgstr "Вимкнути звук"
+
+#: package/contents/ui/FullRepresentation.qml:3739
+msgid "Unmute"
+msgstr "Увімкнути звук"
+
+#: package/contents/ui/FullRepresentation.qml:3771
 msgid "This computer"
 msgstr "Цей комп'ютер"
 
-#: package/contents/ui/FullRepresentation.qml:3763
+#: package/contents/ui/FullRepresentation.qml:3795
 msgid "System default output"
 msgstr "Системний вихід за замовчуванням"
 
-#: package/contents/ui/FullRepresentation.qml:3790
+#: package/contents/ui/FullRepresentation.qml:3822
 msgid "All local outputs, in sync"
 msgstr "Усі локальні виходи, синхронно"
 
-#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3852
 msgid ""
 "Plays on every connected speaker at the same time — wired outputs are "
 "delayed to stay in step with Bluetooth."
@@ -1181,12 +1168,12 @@ msgstr ""
 "Грає одночасно на всіх під'єднаних колонках — дротові виходи затримуються, "
 "щоб іти в ногу з Bluetooth."
 
-#: package/contents/ui/FullRepresentation.qml:3836
-#: package/contents/ui/FullRepresentation.qml:3843
+#: package/contents/ui/FullRepresentation.qml:3868
+#: package/contents/ui/FullRepresentation.qml:3875
 msgid "Sync fine-tune"
 msgstr "Точне налаштування синхронізації"
 
-#: package/contents/ui/FullRepresentation.qml:3877
+#: package/contents/ui/FullRepresentation.qml:3909
 msgid ""
 "If the Bluetooth speaker still trails the wired ones, raise this until they "
 "play together."
@@ -1194,26 +1181,26 @@ msgstr ""
 "Якщо Bluetooth-колонка все ще відстає від дротових, збільшуйте це, доки вони"
 " не заграють разом."
 
-#: package/contents/ui/FullRepresentation.qml:3889
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Sync delay in milliseconds"
 msgstr "Затримка синхронізації в мілісекундах"
 
-#: package/contents/ui/FullRepresentation.qml:3911
+#: package/contents/ui/FullRepresentation.qml:3943
 msgid ""
 "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr ""
 "Введіть точну затримку в мілісекундах — повзунок рухається кроками по "
 "десять."
 
-#: package/contents/ui/FullRepresentation.qml:3915
+#: package/contents/ui/FullRepresentation.qml:3947
 msgid "ms"
 msgstr "мс"
 
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3961
 msgid "Calibrate with the microphone"
 msgstr "Калібрувати мікрофоном"
 
-#: package/contents/ui/FullRepresentation.qml:3934
+#: package/contents/ui/FullRepresentation.qml:3966
 msgid ""
 "Plays a few loud clicks through each speaker and measures with the "
 "microphone how far the Bluetooth speaker trails — the delay is set "
@@ -1222,11 +1209,11 @@ msgstr ""
 "Відтворює кілька гучних клацань через кожну колонку та вимірює мікрофоном, "
 "наскільки відстає Bluetooth-колонка — затримка встановлюється автоматично."
 
-#: package/contents/ui/FullRepresentation.qml:3949
+#: package/contents/ui/FullRepresentation.qml:3981
 msgid "Keep sync tuned automatically"
 msgstr "Автоматично підтримувати синхронізацію"
 
-#: package/contents/ui/FullRepresentation.qml:3952
+#: package/contents/ui/FullRepresentation.qml:3984
 msgid ""
 "Listens to the playing audio with the microphone every few minutes and re-"
 "checks the sync when the speakers drift apart. Audio is processed on this "
@@ -1236,26 +1223,26 @@ msgstr ""
 "перевіряє синхронізацію, коли колонки розходяться. Звук обробляється лише на"
 " цьому комп'ютері — ніколи не зберігається і нікуди не надсилається."
 
-#: package/contents/ui/FullRepresentation.qml:3989
+#: package/contents/ui/FullRepresentation.qml:4021
 msgid ""
 "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr ""
 "%1 запам'ятовано для синхронізації — під'єднайте, і вона автоматично "
 "приєднається знову."
 
-#: package/contents/ui/FullRepresentation.qml:4012
+#: package/contents/ui/FullRepresentation.qml:4044
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Раунд 1 із 2 — клацання через кожен динамік…"
 
-#: package/contents/ui/FullRepresentation.qml:4013
+#: package/contents/ui/FullRepresentation.qml:4045
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Раунд 2 із 2 — тиша, перевіряю результат…"
 
-#: package/contents/ui/FullRepresentation.qml:4051
+#: package/contents/ui/FullRepresentation.qml:4083
 msgid "%1 plays in the group"
 msgstr "%1 грає в групі"
 
-#: package/contents/ui/FullRepresentation.qml:4064
+#: package/contents/ui/FullRepresentation.qml:4096
 msgid ""
 "Whether this speaker plays in the group — untick to leave it out without "
 "disconnecting it. Remembered for the device."
@@ -1263,15 +1250,15 @@ msgstr ""
 "Чи грає ця колонка в групі — зніміть позначку, щоб залишити її осторонь, не "
 "від'єднуючи. Запам'ятовується для пристрою."
 
-#: package/contents/ui/FullRepresentation.qml:4073
+#: package/contents/ui/FullRepresentation.qml:4105
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (нічого не підключено)"
 
-#: package/contents/ui/FullRepresentation.qml:4087
+#: package/contents/ui/FullRepresentation.qml:4119
 msgid "Balance of %1"
 msgstr "Баланс %1"
 
-#: package/contents/ui/FullRepresentation.qml:4096
+#: package/contents/ui/FullRepresentation.qml:4128
 msgid ""
 "This speaker's share of the volume — the balance follows every master move "
 "and is remembered for the device. It scales only what this widget plays; the"
@@ -1283,27 +1270,27 @@ msgstr ""
 "відтворює цей віджет; гучність пристрою в системних налаштуваннях звуку — "
 "окремий, недоторканий шар, тому ті числа відрізняються від цих повзунків."
 
-#: package/contents/ui/FullRepresentation.qml:4113
+#: package/contents/ui/FullRepresentation.qml:4145
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:4114
+#: package/contents/ui/FullRepresentation.qml:4146
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:4115
+#: package/contents/ui/FullRepresentation.qml:4147
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:4116
+#: package/contents/ui/FullRepresentation.qml:4148
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:4121
+#: package/contents/ui/FullRepresentation.qml:4153
 msgid ""
 "Which channels this speaker plays: stereo, left only, right only, or a mono "
 "mix of both. Set one speaker to L and another to R for a true stereo pair — "
@@ -1313,16 +1300,16 @@ msgstr ""
 "обох. Поставте одну колонку на L, а іншу на R — отримаєте справжню "
 "стереопару; запам'ятовується для пристрою."
 
-#: package/contents/ui/FullRepresentation.qml:4152
+#: package/contents/ui/FullRepresentation.qml:4184
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:4167
+#: package/contents/ui/FullRepresentation.qml:4199
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr ""
 "Bluetooth вимкнено або адаптер недоступний — перевірте Системні параметри."
 
-#: package/contents/ui/FullRepresentation.qml:4178
+#: package/contents/ui/FullRepresentation.qml:4210
 msgid ""
 "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or "
 "pair once in System Settings."
@@ -1330,39 +1317,39 @@ msgstr ""
 "Немає спарених аудіопристроїв Bluetooth — скористайтеся «Спарувати нову "
 "колонку…» нижче або спаруйте один раз у Системних параметрах."
 
-#: package/contents/ui/FullRepresentation.qml:4192
+#: package/contents/ui/FullRepresentation.qml:4224
 msgid "%1 — connecting…"
 msgstr "%1 — з'єднання…"
 
-#: package/contents/ui/FullRepresentation.qml:4210
+#: package/contents/ui/FullRepresentation.qml:4242
 msgid "%1 — pairing…"
 msgstr "%1 — спарювання…"
 
-#: package/contents/ui/FullRepresentation.qml:4211
+#: package/contents/ui/FullRepresentation.qml:4243
 msgid "%1 — new, click to pair"
 msgstr "%1 — новий, натисніть щоб спарувати"
 
-#: package/contents/ui/FullRepresentation.qml:4222
+#: package/contents/ui/FullRepresentation.qml:4254
 msgid "Pair a new speaker…"
 msgstr "Спарувати нову колонку…"
 
-#: package/contents/ui/FullRepresentation.qml:4238
+#: package/contents/ui/FullRepresentation.qml:4270
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Пошук — переведіть колонку в режим спарювання…"
 
-#: package/contents/ui/FullRepresentation.qml:4259
+#: package/contents/ui/FullRepresentation.qml:4291
 msgid "WiFi & network"
 msgstr "WiFi та мережа"
 
-#: package/contents/ui/FullRepresentation.qml:4291
+#: package/contents/ui/FullRepresentation.qml:4323
 msgid "%1 (speaker group)"
 msgstr "%1 (група динаміків)"
 
-#: package/contents/ui/FullRepresentation.qml:4319
+#: package/contents/ui/FullRepresentation.qml:4351
 msgid "Balance"
 msgstr "Баланс"
 
-#: package/contents/ui/FullRepresentation.qml:4333
+#: package/contents/ui/FullRepresentation.qml:4365
 msgid ""
 "This device's share of the volume — the balance follows every master move "
 "and is remembered for the device."
@@ -1370,7 +1357,7 @@ msgstr ""
 "Частка цього пристрою в гучності — баланс іде за кожним рухом головного "
 "повзунка й запам'ятовується для пристрою."
 
-#: package/contents/ui/FullRepresentation.qml:4355
+#: package/contents/ui/FullRepresentation.qml:4387
 msgid ""
 "Each device buffers on its own, so rooms may play a few seconds apart. For "
 "perfectly synced speakers, group them in the Google Home app — the group "
@@ -1380,21 +1367,17 @@ msgstr ""
 "різницею в кілька секунд. Для ідеально синхронних динаміків згрупуйте їх у "
 "застосунку Google Home — група з'явиться тут як один пристрій."
 
-#: package/contents/ui/FullRepresentation.qml:4365
+#: package/contents/ui/FullRepresentation.qml:4397
 msgid "Stop casting everywhere"
 msgstr "Зупинити відтворення на всіх пристроях"
 
-#: package/contents/ui/FullRepresentation.qml:4383
+#: package/contents/ui/FullRepresentation.qml:4415
 msgid "Searching for devices…"
 msgstr "Пошук пристроїв…"
 
-#: package/contents/ui/FullRepresentation.qml:4392
+#: package/contents/ui/FullRepresentation.qml:4424
 msgid "No devices found on your network"
 msgstr "У вашій мережі не знайдено жодного пристрою"
-
-#: package/contents/ui/FullRepresentation.qml:4414
-msgid "Volume: %1% (scroll to adjust)"
-msgstr "Гучність: %1% (прокрутіть, щоб змінити)"
 
 #: package/contents/ui/main.qml:315
 msgid "Station list could not be read"
@@ -1432,65 +1415,65 @@ msgstr "Ця адреса не є подкаст-стрічкою."
 msgid "No playable episodes in this feed."
 msgstr "У цій стрічці немає придатних до відтворення епізодів."
 
-#: package/contents/ui/main.qml:1724
+#: package/contents/ui/main.qml:1732
 msgid "Scheduled recording started"
 msgstr "Запланований запис розпочато"
 
-#: package/contents/ui/main.qml:1844
+#: package/contents/ui/main.qml:1852
 msgid "Scheduled recording missed"
 msgstr "Запланований запис пропущено"
 
-#: package/contents/ui/main.qml:1850
+#: package/contents/ui/main.qml:1858
 msgid "Scheduled recording skipped"
 msgstr "Запланований запис пропущено"
 
-#: package/contents/ui/main.qml:1851
+#: package/contents/ui/main.qml:1859
 msgid "%1 — another recording is already running."
 msgstr "%1 — інший запис уже триває."
 
-#: package/contents/ui/main.qml:2025
+#: package/contents/ui/main.qml:2033
 msgid "Wake-up alarm missed"
 msgstr "Будильник пропущено"
 
-#: package/contents/ui/main.qml:2026
+#: package/contents/ui/main.qml:2034
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr ""
 "%1 було встановлено на %2 — комп'ютер у цей час був вимкнений або спав."
 
-#: package/contents/ui/main.qml:2060 package/contents/ui/main.qml:2140
-#: package/contents/ui/main.qml:2193 package/contents/ui/main.qml:2196
+#: package/contents/ui/main.qml:2068 package/contents/ui/main.qml:2148
+#: package/contents/ui/main.qml:2201 package/contents/ui/main.qml:2204
 msgid "Wake-up alarm"
 msgstr "Будильник"
 
-#: package/contents/ui/main.qml:2061
+#: package/contents/ui/main.qml:2069
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 припав на той самий час — замість нього грає %2."
 
-#: package/contents/ui/main.qml:2197
+#: package/contents/ui/main.qml:2205
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Станція не змогла запуститися — натомість грає вбудований сигнал."
 
-#: package/contents/ui/main.qml:2913
+#: package/contents/ui/main.qml:2921
 msgid "%1 devices"
 msgstr "%1 пристроїв"
 
-#: package/contents/ui/main.qml:3354
+#: package/contents/ui/main.qml:3362
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-колонка"
 
-#: package/contents/ui/main.qml:3353
+#: package/contents/ui/main.qml:3361
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 підключено, але звук так і не надійшов"
 
-#: package/contents/ui/main.qml:3355
+#: package/contents/ui/main.qml:3363
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Вимкніть і знову ввімкніть колонку, а потім підключіть її ще раз."
 
-#: package/contents/ui/main.qml:3744
+#: package/contents/ui/main.qml:3752
 msgid "Station seems to be off the air"
 msgstr "Схоже, станція не в ефірі"
 
-#: package/contents/ui/main.qml:3745
+#: package/contents/ui/main.qml:3753
 msgid ""
 "%1 is not answering at any address the directory knows. It stays in your "
 "list — trying again in the background."
@@ -1498,11 +1481,11 @@ msgstr ""
 "%1 не відповідає за жодною адресою, відомою каталогу. Вона лишається у "
 "вашому списку — спроби тривають у фоні."
 
-#: package/contents/ui/main.qml:3817
+#: package/contents/ui/main.qml:3825
 msgid "Playing from a backup address"
 msgstr "Відтворення з резервної адреси"
 
-#: package/contents/ui/main.qml:3818
+#: package/contents/ui/main.qml:3826
 msgid ""
 "The station's saved address is not answering — playing the directory's "
 "closest match for now. Your saved address was kept."
@@ -1510,115 +1493,115 @@ msgstr ""
 "Збережена адреса станції не відповідає — поки що грає найближчий збіг із "
 "каталогу. Вашу збережену адресу збережено."
 
-#: package/contents/ui/main.qml:3858
+#: package/contents/ui/main.qml:3866
 msgid "Station found at a new address"
 msgstr "Станцію знайдено за новою адресою"
 
-#: package/contents/ui/main.qml:3859
+#: package/contents/ui/main.qml:3867
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 переїхала — нову адресу збережено у вашому списку."
 
-#: package/contents/ui/main.qml:5100
+#: package/contents/ui/main.qml:5108
 msgid "Episode downloaded"
 msgstr "Епізод завантажено"
 
-#: package/contents/ui/main.qml:5104
+#: package/contents/ui/main.qml:5112
 msgid "Episode download failed"
 msgstr "Не вдалося завантажити епізод"
 
-#: package/contents/ui/main.qml:5194
+#: package/contents/ui/main.qml:5202
 msgid "Casting needs python-chromecast"
 msgstr "Трансляція потребує python-chromecast"
 
-#: package/contents/ui/main.qml:5195
+#: package/contents/ui/main.qml:5203
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr ""
 "Встановіть пакунок python-chromecast, щоб транслювати на свої пристрої."
 
-#: package/contents/ui/main.qml:5216
+#: package/contents/ui/main.qml:5224
 msgid "the device"
 msgstr "пристрій"
 
-#: package/contents/ui/main.qml:5216
+#: package/contents/ui/main.qml:5224
 msgid "Could not cast to %1"
 msgstr "Не вдалося транслювати на %1"
 
-#: package/contents/ui/main.qml:5217
+#: package/contents/ui/main.qml:5225
 msgid "The device could not play this station."
 msgstr "Пристрій не зміг відтворити цю станцію."
 
-#: package/contents/ui/main.qml:5263
+#: package/contents/ui/main.qml:5271
 msgid "Casting"
 msgstr "Трансляція"
 
-#: package/contents/ui/main.qml:5264
+#: package/contents/ui/main.qml:5272
 msgid "The device did not stop — it may still be playing."
 msgstr "Пристрій не зупинився — можливо, він ще відтворює."
 
-#: package/contents/ui/main.qml:5320 package/contents/ui/main.qml:5422
+#: package/contents/ui/main.qml:5328 package/contents/ui/main.qml:5430
 msgid "the Bluetooth device"
 msgstr "пристроєм Bluetooth"
 
-#: package/contents/ui/main.qml:5319
+#: package/contents/ui/main.qml:5327
 msgid "Could not connect to %1"
 msgstr "Не вдалося з'єднатися з %1"
 
-#: package/contents/ui/main.qml:5321
+#: package/contents/ui/main.qml:5329
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Переконайтеся, що динамік увімкнено і він у межах досяжності."
 
-#: package/contents/ui/main.qml:5421
+#: package/contents/ui/main.qml:5429
 msgid "Could not pair with %1"
 msgstr "Не вдалося спарувати з %1"
 
-#: package/contents/ui/main.qml:5423
+#: package/contents/ui/main.qml:5431
 msgid ""
 "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr ""
 "Переведіть колонку в режим спарювання (утримуйте кнопку Bluetooth) і "
 "спробуйте ще раз."
 
-#: package/contents/ui/main.qml:5521
+#: package/contents/ui/main.qml:5529
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg не встановлено"
 
-#: package/contents/ui/main.qml:5522
+#: package/contents/ui/main.qml:5530
 msgid "Install ffmpeg to record radio."
 msgstr "Встановіть ffmpeg, щоб записувати радіо."
 
-#: package/contents/ui/main.qml:5525
+#: package/contents/ui/main.qml:5533
 msgid "Not enough disk space for this recording"
 msgstr "Недостатньо місця на диску для цього запису"
 
-#: package/contents/ui/main.qml:5526
+#: package/contents/ui/main.qml:5534
 msgid "Free some space in %1 and try again."
 msgstr "Звільніть місце в %1 і спробуйте ще раз."
 
-#: package/contents/ui/main.qml:5529
+#: package/contents/ui/main.qml:5537
 msgid "Recording saved ✓ (%1)"
 msgstr "Запис збережено ✓ (%1)"
 
-#: package/contents/ui/main.qml:5533
+#: package/contents/ui/main.qml:5541
 msgid "Recording interrupted (%1 captured)"
 msgstr "Запис перервано (записано %1)"
 
-#: package/contents/ui/main.qml:5535
+#: package/contents/ui/main.qml:5543
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — файл значно менший, ніж очікувалося."
 
-#: package/contents/ui/main.qml:5539
+#: package/contents/ui/main.qml:5547
 msgid "Recording failed"
 msgstr "Не вдалося записати"
 
-#: package/contents/ui/main.qml:5540
+#: package/contents/ui/main.qml:5548
 msgid "The stream could not be captured."
 msgstr "Не вдалося захопити потік."
 
-#: package/contents/ui/main.qml:5626
+#: package/contents/ui/main.qml:5634
 msgid "Downloading again without the cover"
 msgstr "Завантажую знову без обкладинки"
 
-#: package/contents/ui/main.qml:5627
+#: package/contents/ui/main.qml:5635
 msgid ""
 "Embedding tags needs the python-mutagen package — install it to get covers "
 "in your files."
@@ -1626,35 +1609,35 @@ msgstr ""
 "Для вбудовування теґів потрібен пакунок python-mutagen — встановіть його, "
 "щоб мати обкладинки у файлах."
 
-#: package/contents/ui/main.qml:5635
+#: package/contents/ui/main.qml:5643
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp не встановлено"
 
-#: package/contents/ui/main.qml:5636
+#: package/contents/ui/main.qml:5644
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Встановіть yt-dlp (і ffmpeg), щоб завантажувати композиції."
 
-#: package/contents/ui/main.qml:5639
+#: package/contents/ui/main.qml:5647
 msgid "Track downloaded ✓"
 msgstr "Композицію завантажено ✓"
 
-#: package/contents/ui/main.qml:5640
+#: package/contents/ui/main.qml:5648
 msgid "Saved to: %1"
 msgstr "Збережено до: %1"
 
-#: package/contents/ui/main.qml:5643
+#: package/contents/ui/main.qml:5651
 msgid "Download failed"
 msgstr "Не вдалося завантажити"
 
-#: package/contents/ui/main.qml:5644
+#: package/contents/ui/main.qml:5652
 msgid "Unknown error"
 msgstr "Невідома помилка"
 
-#: package/contents/ui/main.qml:5941
+#: package/contents/ui/main.qml:5949
 msgid "Audio output changed"
 msgstr "Аудіовихід змінено"
 
-#: package/contents/ui/main.qml:5942
+#: package/contents/ui/main.qml:5950
 msgid ""
 "The chosen output device disappeared — using the system default instead."
 msgstr ""
@@ -1905,6 +1888,27 @@ msgid ""
 msgstr ""
 "Колонка під'єднана, але її аудіовихід так і не з'явився — вимкніть і "
 "ввімкніть колонку, а потім під'єднайте її знову."
+
+#~ msgid "Sleep timer: %1"
+#~ msgstr "Таймер сну: %1"
+
+#~ msgid "Sleep in 15 minutes"
+#~ msgstr "Вимкнути за 15 хвилин"
+
+#~ msgid "Sleep in 30 minutes"
+#~ msgstr "Вимкнути за 30 хвилин"
+
+#~ msgid "Sleep in 60 minutes"
+#~ msgstr "Вимкнути за 60 хвилин"
+
+#~ msgid "Sleep in 90 minutes"
+#~ msgstr "Вимкнути за 90 хвилин"
+
+#~ msgid "Cancel timer"
+#~ msgstr "Скасувати таймер"
+
+#~ msgid "Volume: %1% (scroll to adjust)"
+#~ msgstr "Гучність: %1% (прокрутіть, щоб змінити)"
 
 #~ msgid "My Music (downloaded tracks)"
 #~ msgstr "Моя музика (завантажені композиції)"
