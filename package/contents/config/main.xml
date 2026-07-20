@@ -161,6 +161,10 @@
             <label>Playback speed per show (JSON map feedUrl to rate; "" key is the default)</label>
             <default>{}</default>
         </entry>
+        <entry name="podcastPlayed" type="String">
+            <label>Played podcast episodes (JSON map episode-key to timestamp)</label>
+            <default>{}</default>
+        </entry>
         <entry name="castMenuHeight" type="Int">
             <label>Remembered height of the output/volume menu in pixels (0 = auto-fit)</label>
             <default>0</default>

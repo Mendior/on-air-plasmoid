@@ -17,6 +17,7 @@ import org.kde.plasma.plasmoid
 
 import "AlarmLogic.js" as AlarmLogic
 import "FaviconLogic.js" as FaviconLogic
+import "EpisodeState.js" as EpisodeState
 import "HealLogic.js" as HealLogic
 import "PodcastLogic.js" as PodcastLogic
 import "PlaylistLogic.js" as PlaylistLogic
@@ -934,6 +935,11 @@ PlasmoidItem {
     property real podcastRate: 1.0
     property string _currentEpisodeFeed: ""
     property var _podSpeeds: ({})
+    // Played/unplayed memory: an episodeKey -> timestamp map. Filled when an
+    // episode finishes (or is manually marked); the delegate reads it through
+    // the change tick, since the map is mutated in place.
+    property var _podPlayed: ({})
+    property int _podPlayedRev: 0
 
     function _loadPodcastSubs() {
         try {
@@ -1142,8 +1148,11 @@ PlasmoidItem {
         if (!isPlaying() || playMusic.source.toString().indexOf("file://") !== 0) return;
         var dur = Math.round(playMusic.duration / 1000);
         var sec = Math.round(playMusic.position / 1000);
-        if (dur > 0 && sec >= dur - 10) {
+        if (EpisodeState.isNearEnd(sec, dur)) {
+            // Near the end: retire the bookmark AND remember it as played,
+            // so the row reads "heard" and the unplayed filter hides it.
             delete _podPositions[_podPlayingKey];
+            markEpisodePlayed(_podPlayingKey);
         } else if (sec > 5) {
             _podPositions[_podPlayingKey] = { "sec": sec, "dur": dur, "at": Date.now() };
         } else {
@@ -1232,6 +1241,65 @@ PlasmoidItem {
         if (playMusic.source.toString().indexOf("file://") !== 0) return;
         playMusic.position = PodcastLogic.skipTarget(playMusic.position, deltaSec,
                                                      playMusic.duration);
+    }
+
+    // ── Played / unplayed state ──────────────────────────────────────────
+    function _loadPodPlayed() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.podcastPlayed || "{}");
+            _podPlayed = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _podPlayed = {};
+        }
+    }
+    function _savePodPlayed() {
+        _podPlayed = EpisodeState.prunePlayed(_podPlayed, 1000);
+        Plasmoid.configuration.podcastPlayed = JSON.stringify(_podPlayed);
+    }
+    function isEpisodePlayed(key) {
+        return !!(key && _podPlayed[key] !== undefined);
+    }
+    function episodeState(key) {
+        return EpisodeState.stateOf(_podPlayed, _podPositions, key);
+    }
+    function markEpisodePlayed(key) {
+        if (!key || _podPlayed[key] !== undefined) return;
+        EpisodeState.markPlayed(_podPlayed, key, Date.now());
+        // A played episode's resume bookmark is no longer wanted — it must
+        // not offer to resume at the credits.
+        if (_podPositions[key] !== undefined) { delete _podPositions[key]; _savePodPositions(); }
+        _podPlayedRev++;
+        _podPosRev++;
+        _savePodPlayed();
+    }
+    function markEpisodeUnplayed(key) {
+        if (!key || _podPlayed[key] === undefined) return;
+        EpisodeState.markUnplayed(_podPlayed, key);
+        _podPlayedRev++;
+        _savePodPlayed();
+    }
+    function toggleEpisodePlayed(key) {
+        if (isEpisodePlayed(key)) markEpisodeUnplayed(key);
+        else markEpisodePlayed(key);
+    }
+    // Mark every episode currently listed in the open feed as played — the
+    // "I've caught up" bulk action. keys is an array of episodeKeys.
+    function markEpisodesPlayed(keys) {
+        var changed = false;
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (k && _podPlayed[k] === undefined) {
+                EpisodeState.markPlayed(_podPlayed, k, Date.now());
+                if (_podPositions[k] !== undefined) delete _podPositions[k];
+                changed = true;
+            }
+        }
+        if (changed) {
+            _podPlayedRev++;
+            _podPosRev++;
+            _savePodPositions();
+            _savePodPlayed();
+        }
     }
 
     Timer {
@@ -5034,6 +5102,7 @@ PlasmoidItem {
         _loadPodcastSubs();
         _loadPodPositions();
         _loadPodSpeeds();
+        _loadPodPlayed();
         _applyAudioOutputDevice();
         // A plasmashell crash can orphan a recording ffmpeg — the pid file
         // survives, so stop the orphan on the next start. ("-t" already caps
@@ -5923,12 +5992,12 @@ PlasmoidItem {
                 var endedSrc = playMusic.source.toString();
                 var wasStream = endedSrc !== "" && endedSrc.indexOf("file://") !== 0
                                 && endedSrc !== root._alarmToneUrl.toString();
-                // A finished podcast episode is DONE: the bookmark goes,
-                // so its row offers a fresh start instead of the credits.
+                // A finished podcast episode is DONE: remember it as played
+                // (which also retires its bookmark), so the row reads "heard"
+                // and the unplayed filter hides it. The wasStream guard keeps
+                // a radio outage or the alarm tone from ever being "played".
                 if (!wasStream && root._podPlayingKey !== "") {
-                    delete root._podPositions[root._podPlayingKey];
-                    root._podPosRev++;
-                    root._savePodPositions();
+                    root.markEpisodePlayed(root._podPlayingKey);
                     root._podPlayingKey = "";
                 }
                 playMusic.source = "";

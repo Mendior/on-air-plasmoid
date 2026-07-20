@@ -17,6 +17,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
+import "EpisodeState.js" as EpisodeState
 import "PodcastLogic.js" as PodcastLogic
 import "ReorderLogic.js" as ReorderLogic
 import "SearchLogic.js" as SearchLogic
@@ -2611,6 +2612,28 @@ PlasmaExtras.Representation {
 
             readonly property bool showingEpisodes: root.podcastEpisodesFor !== ""
             readonly property bool searching: podSearchField.text.trim() !== ""
+            // Episode filter: 0 = all, 1 = unplayed (fresh + in-progress).
+            // Applied at feed-load and on an explicit filter change, NOT on
+            // every played-mark, so a row never vanishes under a mid-scroll.
+            property int episodeFilter: 0
+
+            // The filtered episodes the list shows. Rebuilt from the parsed
+            // model through the tested EpisodeState.matchesFilter.
+            ListModel { id: podEpisodesFiltered }
+            function rebuildEpisodes() {
+                podEpisodesFiltered.clear()
+                for (var i = 0; i < podcastEpisodesModel.count; i++) {
+                    var e = podcastEpisodesModel.get(i)
+                    var st = root.episodeState(PodcastLogic.episodeKey(e.guid, e.url))
+                    if (EpisodeState.matchesFilter(st, podcastPage.episodeFilter))
+                        podEpisodesFiltered.append(e)
+                }
+            }
+            Connections {
+                target: podcastEpisodesModel
+                function onCountChanged() { podcastPage.rebuildEpisodes() }
+            }
+            onEpisodeFilterChanged: rebuildEpisodes()
 
             // The downloaded-episodes ledger. Gated on the same latch as
             // My Music: a FolderListModel pointed at a missing folder
@@ -2683,6 +2706,40 @@ PlasmaExtras.Representation {
                     color: root.accent
                     elide: Text.ElideRight
                     maximumLineCount: 1
+                }
+                // Filter: All ⇄ Unplayed — hide what you have heard.
+                CircleButton {
+                    visible: podcastPage.showingEpisodes
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "view-filter"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: podcastPage.episodeFilter === 1
+                    opacity: checked ? 1.0 : 0.7
+                    tooltipText: podcastPage.episodeFilter === 1
+                                 ? i18n("Showing unplayed — tap for all")
+                                 : i18n("Show only unplayed")
+                    onClicked: podcastPage.episodeFilter = podcastPage.episodeFilter === 1 ? 0 : 1
+                }
+                // Mark every listed episode played — "I've caught up".
+                CircleButton {
+                    visible: podcastPage.showingEpisodes
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "checkmark"
+                    iconScale: 0.55
+                    opacity: 0.7
+                    tooltipText: i18n("Mark all as played")
+                    onClicked: {
+                        var keys = []
+                        for (var i = 0; i < podcastEpisodesModel.count; i++) {
+                            var e = podcastEpisodesModel.get(i)
+                            keys.push(PodcastLogic.episodeKey(e.guid, e.url))
+                        }
+                        root.markEpisodesPlayed(keys)
+                        podcastPage.rebuildEpisodes()
+                    }
                 }
                 CircleButton {
                     visible: podcastPage.showingEpisodes
@@ -2913,7 +2970,7 @@ PlasmaExtras.Representation {
                     id: episodesView
                     leftMargin: Kirigami.Units.smallSpacing
                     rightMargin: Kirigami.Units.smallSpacing
-                    model: podcastEpisodesModel
+                    model: podEpisodesFiltered
                     boundsBehavior: Flickable.StopAtBounds
                     clip: true
                     spacing: 2
@@ -2923,6 +2980,18 @@ PlasmaExtras.Representation {
                             podcastFolder.count   // re-check when files change
                             return podcastPage.localEpisodeUrl(title, url)
                         }
+                    }
+
+                    // Nothing matches the filter (all heard).
+                    PlasmaComponents3.Label {
+                        anchors.centerIn: parent
+                        width: parent.width - Kirigami.Units.largeSpacing * 2
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        visible: episodesView.count === 0 && podcastEpisodesModel.count > 0
+                        text: i18n("All caught up — no unplayed episodes")
+                        opacity: 0.6
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
                 }
             }

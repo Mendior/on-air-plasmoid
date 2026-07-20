@@ -38,8 +38,9 @@ PlasmaComponents3.ItemDelegate {
     readonly property bool isThisPlaying: downloaded && isPlaying()
                                           && playMusic.source.toString() === localUrl
     readonly property bool isDownloading: root._podDownloadKey === epItem.epKey
-    // The map is mutated in place; the rev tick is its change signal.
+    // The maps are mutated in place; the rev ticks are their change signals.
     readonly property int resumeSec: { root._podPosRev; return root.podcastPositionSec(epKey) }
+    readonly property bool played: { root._podPlayedRev; return root.isEpisodePlayed(epKey) }
     readonly property string shownTitle: title !== "" ? title : i18n("Episode")
 
     readonly property string metaLine: {
@@ -141,7 +142,9 @@ PlasmaComponents3.ItemDelegate {
                 // Untrusted (feed content) — never interpret as HTML
                 textFormat: Text.PlainText
                 font.weight: epItem.isThisPlaying ? Font.DemiBold : Font.Normal
+                // A played episode dims, so the unheard ones stand out.
                 color: epItem.isThisPlaying ? root.accentBright : Kirigami.Theme.textColor
+                opacity: epItem.played && !epItem.isThisPlaying ? 0.55 : 1.0
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
@@ -157,16 +160,41 @@ PlasmaComponents3.ItemDelegate {
             }
         }
 
-        // The resume dot: quietly marks a half-listened episode even
-        // before the meta line is read.
+        // A quiet status mark before the meta is read: a check when heard,
+        // a dot when half-listened.
+        Kirigami.Icon {
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+            Layout.alignment: Qt.AlignVCenter
+            source: "checkmark"
+            color: Kirigami.Theme.textColor
+            opacity: 0.45
+            visible: epItem.played && !epItem.isThisPlaying
+        }
         Rectangle {
             Layout.alignment: Qt.AlignVCenter
             width: Kirigami.Units.smallSpacing * 1.5
             height: width
             radius: width / 2
             color: root.accent
-            visible: epItem.resumeSec > 0 && !epItem.isThisPlaying
+            visible: epItem.resumeSec > 0 && !epItem.played && !epItem.isThisPlaying
             opacity: 0.8
+        }
+
+        // Mark heard / unheard — a hover toggle so catching up needs no menu.
+        CircleButton {
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+            Layout.alignment: Qt.AlignVCenter
+            iconName: epItem.played ? "edit-undo" : "checkmark"
+            iconScale: 0.5
+            opacity: (epItem.hovered || epItem.activeFocus
+                      || Kirigami.Settings.tabletMode) ? 0.7 : 0.0
+            enabledState: opacity > 0
+            visible: !epItem.isDownloading
+            tooltipText: epItem.played ? i18n("Mark as unplayed")
+                                       : i18n("Mark as played")
+            onClicked: root.toggleEpisodePlayed(epItem.epKey)
         }
 
         PlasmaComponents3.BusyIndicator {
