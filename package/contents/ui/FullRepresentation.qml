@@ -17,6 +17,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
+import "ReorderLogic.js" as ReorderLogic
 import "SearchLogic.js" as SearchLogic
 
 PlasmaExtras.Representation {
@@ -879,12 +880,10 @@ PlasmaExtras.Representation {
 
                 contentItem: ListView {
                     id: stationView
-                    // Live drag-reorder state, written by the row handles:
-                    // the insertion slot under the pointer (-1 = no drag)
-                    // and the row being dragged — every row draws its own
-                    // slice of the drop indicator from these.
-                    property int dropSlot: -1
-                    property int dropFrom: -1
+                    // A live drag is in progress (a row handle owns the
+                    // pointer and moves the row through the model as it
+                    // travels) — the keyboard reorder stands aside for it.
+                    property bool dragActive: false
 
                     leftMargin: Kirigami.Units.smallSpacing
                     rightMargin: Kirigami.Units.smallSpacing
@@ -920,20 +919,28 @@ PlasmaExtras.Representation {
                             return
                         }
                         // Ctrl+Up/Down = move the current row (same as the
-                        // hover arrows, reachable without a mouse)
+                        // hover arrows, reachable without a mouse). UI
+                        // first, like the arrows: the view moves, the
+                        // engine persists, a refused persist walks back.
                         if (event.modifiers & Qt.ControlModifier
                             && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)
                             && currentIndex >= 0 && currentItem
-                            && root.searchFilter === "") {
+                            && root.searchFilter === "" && !dragActive) {
                             const delta = event.key === Qt.Key_Up ? -1 : 1
                             const next = currentIndex + delta
                             if (next >= 0 && next < count) {
                                 const it = filteredStationsModel.get(currentIndex)
-                                if (root.favoritesOnly)
-                                    root.moveFavorite(it.name, delta)
+                                const nm = it.name, hn = it.hostname
+                                const ti = currentItem.targetIndex
+                                const cur = currentIndex
+                                filteredStationsModel.move(cur, next, 1)
+                                const ok = root.favoritesOnly
+                                           ? root.moveFavorite(nm, delta)
+                                           : root.moveStation(ti, nm, hn, delta)
+                                if (ok)
+                                    currentIndex = next
                                 else
-                                    root.moveStation(currentItem.targetIndex, it.name, it.hostname, delta)
-                                currentIndex = next
+                                    filteredStationsModel.move(next, cur, 1)
                             }
                             event.accepted = true
                         }
@@ -2903,48 +2910,22 @@ PlasmaExtras.Representation {
     }
 
     function rebuildFilteredModel() {
-        // Fold-blind like the web search: "sobra" finds "Sõbra Raadio".
-        const filter = SearchLogic.fold(root.searchFilter)
-        const favOnly = root.favoritesOnly
+        // What SHOULD be on screen (fold-blind filter, favorites order,
+        // duplicate-name and hidden-favorite rules) is decided by the
+        // tested logic in ReorderLogic.js. If the station sequence already
+        // matches — a reorder the view performed live before persisting,
+        // or a favicon that just backfilled — the roles are patched in
+        // place and no delegate is recreated: the hover survives for the
+        // next arrow click and the entry cascade stays quiet.
+        const stations = []
+        for (var i = 0; i < stationsModel.count; i++)
+            stations.push(stationsModel.get(i))
+        const rows = ReorderLogic.buildFilteredRows(
+            stations, root.favoriteNames, root.searchFilter, root.favoritesOnly)
+        if (ReorderLogic.syncModelToRows(filteredStationsModel, rows)) return
         filteredStationsModel.clear()
-        if (favOnly) {
-            // The favorites view follows the favorites list's own order (not
-            // the main list's), so the reorder arrows work on exactly the
-            // order the user is looking at.
-            // Null-prototype: a station named "constructor" must not read
-            // Object.prototype as its index (same trap _countryCodeOf dodges).
-            const idxByName = Object.create(null)
-            for (var m = 0; m < stationsModel.count; m++) {
-                const st = stationsModel.get(m)
-                if (idxByName[st.name] === undefined) idxByName[st.name] = m
-            }
-            for (var f = 0; f < root.favoriteNames.length; f++) {
-                const fi = idxByName[root.favoriteNames[f]]
-                if (fi === undefined) continue
-                const fs = stationsModel.get(fi)
-                if (filter !== "" && SearchLogic.fold(fs.name).indexOf(filter) === -1) continue
-                filteredStationsModel.append({
-                    "name": fs.name || "",
-                    "hostname": fs.hostname || "",
-                    "favicon": fs.favicon || "",
-                    "active": fs.active !== false,
-                    "originalIndex": fi
-                })
-            }
-            return
-        }
-        for (var i = 0; i < stationsModel.count; i++) {
-            const s = stationsModel.get(i)
-            if (filter !== "" && SearchLogic.fold(s.name).indexOf(filter) === -1) continue
-            const item = {
-                "name": s.name || "",
-                "hostname": s.hostname || "",
-                "favicon": s.favicon || "",
-                "active": s.active !== false,
-                "originalIndex": i
-            }
-            filteredStationsModel.append(item)
-        }
+        for (var r = 0; r < rows.length; r++)
+            filteredStationsModel.append(rows[r])
     }
 
     Connections {
@@ -2967,25 +2948,11 @@ PlasmaExtras.Representation {
             webSearchDebounce.restart()
         }
         function onFavoritesOnlyChanged() { rebuildFilteredModel() }
-        function onFavoriteNamesChanged() {
-            // A reorder inside the favorites view moves ONE row in place —
-            // a full rebuild would recreate every delegate, killing the
-            // hover the next arrow click needs and cascading a row
-            // animation per station for every single step.
-            if (root.favoritesOnly && root.searchFilter === ""
-                && root._favMovedFrom >= 0 && root._favMovedTo >= 0
-                && root._favMovedFrom < filteredStationsModel.count
-                && root._favMovedTo < filteredStationsModel.count
-                && root._favMovedFrom !== root._favMovedTo) {
-                filteredStationsModel.move(root._favMovedFrom, root._favMovedTo, 1)
-                root._favMovedFrom = -1
-                root._favMovedTo = -1
-                return
-            }
-            root._favMovedFrom = -1
-            root._favMovedTo = -1
-            rebuildFilteredModel()
-        }
+        // A reorder the view already performed live arrives here as an
+        // identical sequence and no-ops inside rebuildFilteredModel — the
+        // old _favMovedFrom/_favMovedTo index handshake this replaces is
+        // gone with all of its bounds-guard edge cases.
+        function onFavoriteNamesChanged() { rebuildFilteredModel() }
     }
 
     Component.onCompleted: {

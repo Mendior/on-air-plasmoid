@@ -2067,7 +2067,7 @@ PlasmoidItem {
     // ACTIVE-stations list (what the popup shows); the swap partner is the
     // neighbouring active entry, so hidden inactive entries keep their places.
     function moveStation(popupIndex, name, hostname, delta) {
-        if (!hostname || (delta !== 1 && delta !== -1)) return;
+        if (!hostname || (delta !== 1 && delta !== -1)) return false;
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             // Map the popup index to the config index — same walk and identity
@@ -2080,12 +2080,12 @@ PlasmoidItem {
             }
             if (cfgIdx < 0
                 || (servers[cfgIdx].hostname || "") !== hostname
-                || (servers[cfgIdx].name || "") !== name) return;
+                || (servers[cfgIdx].name || "") !== name) return false;
             var swapIdx = -1;
             for (var j = cfgIdx + delta; j >= 0 && j < servers.length; j += delta) {
                 if (servers[j].active) { swapIdx = j; break; }
             }
-            if (swapIdx < 0) return;
+            if (swapIdx < 0) return false;
             const tmp = servers[cfgIdx];
             servers[cfgIdx] = servers[swapIdx];
             servers[swapIdx] = tmp;
@@ -2107,8 +2107,10 @@ PlasmoidItem {
                     }
                 }
             });
+            return true;
         } catch (e) {
             console.log("[ARP] moveStation: " + e);
+            return false;
         }
     }
 
@@ -2122,7 +2124,7 @@ PlasmoidItem {
     // eight model reloads on the arrow road. The arrows stay for keyboard
     // and screen readers; this is the hand's road.
     function moveStationTo(popupIndex, name, hostname, insertAt) {
-        if (!hostname) return;
+        if (!hostname) return false;
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             var activeCount = 0;
@@ -2138,12 +2140,12 @@ PlasmoidItem {
             }
             if (cfgIdx < 0
                 || (servers[cfgIdx].hostname || "") !== hostname
-                || (servers[cfgIdx].name || "") !== name) return;
+                || (servers[cfgIdx].name || "") !== name) return false;
             // An insertion slot past the dragged row means one less final
             // position — removing the row shifts everything below it up.
             var final = insertAt > popupIndex ? insertAt - 1 : insertAt;
             final = Math.max(0, Math.min(activeCount - 1, final));
-            if (final === popupIndex) return;
+            if (final === popupIndex) return false;
             const entry = servers.splice(cfgIdx, 1)[0];
             var insertCfg = servers.length;
             var pos = -1;
@@ -2169,21 +2171,22 @@ PlasmoidItem {
                     }
                 }
             });
-        } catch (e) {}
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 
-    // In-place hint for the popup: the last favorites move as VISIBLE
-    // indices, so the filtered model can move() one row instead of being
-    // rebuilt — a rebuild recreates every delegate, which kills the hover
-    // the next arrow click needs and cascades 28 row animations per step.
-    property int _favMovedFrom: -1
-    property int _favMovedTo: -1
-
+    // The popup moves its row FIRST and then calls these to persist; a
+    // sequence the view already shows no-ops inside its rebuild. The
+    // return value says whether the persist happened — a false walks the
+    // view's optimistic move back, so the list never shows an order the
+    // config does not hold.
     function moveFavorite(name, delta) {
-        if (!name || (delta !== 1 && delta !== -1)) return;
+        if (!name || (delta !== 1 && delta !== -1)) return false;
         const list = favoriteNames.slice();
         const idx = list.indexOf(name);
-        if (idx === -1) return;
+        if (idx === -1) return false;
         const visible = {};
         for (var i = 0; i < stationsModel.count; i++)
             visible[stationsModel.get(i).name] = true;
@@ -2191,18 +2194,13 @@ PlasmoidItem {
         for (var j = idx + delta; j >= 0 && j < list.length; j += delta) {
             if (visible[list[j]]) { swapIdx = j; break; }
         }
-        if (swapIdx < 0) return;
-        // A swap with the nearest VISIBLE favorite is exactly one step in
-        // the visible ordering — hand the popup that step.
-        var visBefore = 0;
-        for (var v = 0; v < idx; v++) if (visible[list[v]]) visBefore++;
-        _favMovedFrom = visBefore;
-        _favMovedTo = visBefore + delta;
+        if (swapIdx < 0) return false;
         const tmp = list[idx];
         list[idx] = list[swapIdx];
         list[swapIdx] = tmp;
         favoriteNames = list;
         Plasmoid.configuration.favorites = JSON.stringify(list);
+        return true;
     }
 
     // Drag-drop for the favorites view: land `name` at visible slot `slot`
@@ -2210,28 +2208,27 @@ PlasmoidItem {
     // moveStationTo). Hidden favorites (their station deactivated) keep
     // their exact positions; only the visible ordering is rewritten.
     function moveFavoriteTo(name, slot) {
-        if (!name) return;
+        if (!name) return false;
         const list = favoriteNames.slice();
-        if (list.indexOf(name) === -1) return;
+        if (list.indexOf(name) === -1) return false;
         const visible = {};
         for (var i = 0; i < stationsModel.count; i++)
             visible[stationsModel.get(i).name] = true;
         var vis = list.filter(function(n) { return visible[n]; });
         const fromVis = vis.indexOf(name);
-        if (fromVis === -1) return;
+        if (fromVis === -1) return false;
         var target = Math.max(0, Math.min(vis.length, slot));
         if (target > fromVis) target--;      // removal shifts the slot
-        if (target === fromVis) return;
+        if (target === fromVis) return false;
         vis.splice(fromVis, 1);
         vis.splice(target, 0, name);
         // Weave the new visible order back through the old list so hidden
         // favorites stay exactly where they were.
         var vi = 0;
         const out = list.map(function(n) { return visible[n] ? vis[vi++] : n; });
-        _favMovedFrom = fromVis;
-        _favMovedTo = target;
         favoriteNames = out;
         Plasmoid.configuration.favorites = JSON.stringify(out);
+        return true;
     }
 
     // ⭐ on an internet result: add the station PERMANENTLY to the list + favorites.

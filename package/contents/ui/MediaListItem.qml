@@ -14,6 +14,8 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
+import "ReorderLogic.js" as ReorderLogic
+
 PlasmaComponents3.ItemDelegate {
     id: listItem
 
@@ -63,6 +65,26 @@ PlasmaComponents3.ItemDelegate {
         }
     }
     Accessible.onPressAction: listItem._activate()
+
+    // One arrow step, UI first: the view moves the row immediately (the
+    // rebuild then recognizes its own order and only patches roles — no
+    // delegate teardown, the hover survives for the next click), and the
+    // engine persists the same step. A refused persist (config changed
+    // underneath) walks the view move back — the list never shows an
+    // order the config does not hold.
+    function _arrowStep(delta) {
+        const view = listItem.ListView.view
+        if (!view || view.dragActive) return
+        const from = model.index
+        const to = from + delta
+        if (to < 0 || to >= view.count) return
+        const nm = model.name, hn = model.hostname, ti = listItem.targetIndex
+        view.model.move(from, to, 1)
+        const ok = root.favoritesOnly
+                   ? root.moveFavorite(nm, delta)
+                   : root.moveStation(ti, nm, hn, delta)
+        if (!ok) view.model.move(to, from, 1)
+    }
 
     background: Item {
         anchors.fill: parent
@@ -340,8 +362,11 @@ PlasmaComponents3.ItemDelegate {
             // popping in and out of existence shifted the row's content the
             // moment the pointer arrived, so the target moved under it.
             // Tablet mode has no hover — the controls stay revealed there.
+            // At rest the handle stays FAINTLY visible (the settings page
+            // taught this): an affordance at opacity 0 is a feature nobody
+            // finds.
             opacity: (dragArea.pressed || listItem.hovered || listItem.isKeyboardCurrent
-                      || Kirigami.Settings.tabletMode) ? 0.75 : 0.0
+                      || Kirigami.Settings.tabletMode) ? 0.75 : 0.3
             visible: listItem.reorderable
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
 
@@ -358,16 +383,38 @@ PlasmaComponents3.ItemDelegate {
                 cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                 // The Flickable must not steal the gesture mid-drag.
                 preventStealing: true
+                // Identity is captured at PRESS: the live move()s below
+                // change model.index as the row travels, and the commit
+                // functions verify name+hostname against the config, which
+                // stays untouched until the drop.
+                property string startName: ""
+                property string startHostname: ""
+                property int startVis: -1
                 onPressed: {
                     const view = listItem.ListView.view
-                    if (view) { view.dropSlot = model.index; view.dropFrom = model.index }
+                    if (!view) return
+                    startName = model.name
+                    startHostname = model.hostname
+                    startVis = model.index
+                    view.dragActive = true
                 }
                 onPositionChanged: (mouse) => {
                     const view = listItem.ListView.view
-                    if (!view) return
-                    const pitch = listItem.height + view.spacing
+                    if (!view || !view.dragActive) return
+                    // Geometry-true targeting: ask the view which row is
+                    // under the pointer (the x is this row's own center in
+                    // content coordinates — always inside every row) and
+                    // MOVE the row there live. The displaced transition
+                    // slides the neighbours aside; the row itself rides
+                    // its slot under the finger. One config write still
+                    // happens only at the drop.
                     const pt = mapToItem(view.contentItem, mouse.x, mouse.y)
-                    view.dropSlot = Math.max(0, Math.min(view.count, Math.round(pt.y / pitch)))
+                    const target = ReorderLogic.dragTarget(
+                        view.indexAt(listItem.x + listItem.width / 2, pt.y),
+                        pt.y, view.contentHeight, listItem.height,
+                        model.index, view.count)
+                    if (target !== model.index && target >= 0 && target < view.count)
+                        view.model.move(model.index, target, 1)
                     // Edge autoscroll, so a long list is one gesture too.
                     const vy = mapToItem(view, mouse.x, mouse.y).y
                     if (vy < listItem.height)
@@ -376,23 +423,31 @@ PlasmaComponents3.ItemDelegate {
                         view.contentY = Math.min(Math.max(0, view.contentHeight - view.height),
                                                  view.contentY + Kirigami.Units.gridUnit)
                 }
-                onReleased: {
+                onReleased: finishDrag(true)
+                onCanceled: finishDrag(false)
+                // The drop: the view already shows the final order, the
+                // config does not know yet. Commit translates the journey
+                // into the engine's insert-before contract; a cancelled
+                // gesture — or a commit the engine refused because the
+                // config changed underneath — walks the live moves back,
+                // so the view never lies about what is stored.
+                function finishDrag(commit) {
                     const view = listItem.ListView.view
-                    if (!view) return
-                    const slot = view.dropSlot
-                    view.dropSlot = -1; view.dropFrom = -1
-                    // Dropping into either slot around the row itself is a
-                    // no-move; anything else lands in one write.
-                    if (slot >= 0 && slot !== model.index && slot !== model.index + 1) {
-                        if (root.favoritesOnly)
-                            root.moveFavoriteTo(model.name, slot)
-                        else
-                            root.moveStationTo(listItem.targetIndex, model.name, model.hostname, slot)
+                    if (!view || !view.dragActive) return
+                    view.dragActive = false
+                    const from = startVis
+                    startVis = -1
+                    const final = model.index
+                    if (from < 0 || final === from) return
+                    var ok = false
+                    if (commit) {
+                        ok = root.favoritesOnly
+                             ? root.moveFavoriteTo(startName,
+                                                   ReorderLogic.commitSlot(from, final))
+                             : root.moveStationTo(from, startName, startHostname,
+                                                  ReorderLogic.commitSlot(from, final))
                     }
-                }
-                onCanceled: {
-                    const view = listItem.ListView.view
-                    if (view) { view.dropSlot = -1; view.dropFrom = -1 }
+                    if (!ok) view.model.move(final, from, 1)
                 }
             }
         }
@@ -415,12 +470,7 @@ PlasmaComponents3.ItemDelegate {
             visible: listItem.reorderable && model.index > 0
             enabledState: opacity > 0
             tooltipText: i18n("Move up")
-            onClicked: {
-                if (root.favoritesOnly)
-                    root.moveFavorite(model.name, -1)
-                else
-                    root.moveStation(listItem.targetIndex, model.name, model.hostname, -1)
-            }
+            onClicked: listItem._arrowStep(-1)
 
             Behavior on opacity {
                 NumberAnimation { duration: Kirigami.Units.shortDuration }
@@ -441,12 +491,7 @@ PlasmaComponents3.ItemDelegate {
                      && model.index < listItem.ListView.view.count - 1
             enabledState: opacity > 0
             tooltipText: i18n("Move down")
-            onClicked: {
-                if (root.favoritesOnly)
-                    root.moveFavorite(model.name, 1)
-                else
-                    root.moveStation(listItem.targetIndex, model.name, model.hostname, 1)
-            }
+            onClicked: listItem._arrowStep(1)
 
             Behavior on opacity {
                 NumberAnimation { duration: Kirigami.Units.shortDuration }
@@ -540,28 +585,11 @@ PlasmaComponents3.ItemDelegate {
         onTapped: listItem._activate()
     }
 
-    // The drop indicator: each row draws the slice of the line that belongs
-    // to it — a slot above this row, or (for the last row only) the
-    // below-everything slot. The dragged row itself dims, so the eye tracks
-    // what is moving.
-    Rectangle {
-        anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: -1 }
-        height: 2
-        radius: 1
-        color: Kirigami.Theme.highlightColor
-        visible: listItem.ListView.view && listItem.ListView.view.dropSlot === model.index
-        z: 10
-    }
-    Rectangle {
-        anchors { left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: -1 }
-        height: 2
-        radius: 1
-        color: Kirigami.Theme.highlightColor
-        visible: listItem.ListView.view
-                 && listItem.ListView.view.dropSlot === listItem.ListView.view.count
-                 && model.index === listItem.ListView.view.count - 1
-        z: 10
-    }
-    opacity: (ListView.view && ListView.view.dropFrom === model.index
-              && ListView.view.dropSlot >= 0) ? 0.45 : 1.0
+    // While dragged, the row rides its slot live under the finger — a
+    // slight lift over the neighbours is all the indication needed; the
+    // 2 px insertion line and the dimmed ghost this replaced asked the
+    // eye to map an abstract marker to a future position.
+    z: dragArea.pressed ? 2 : 0
+    scale: dragArea.pressed ? 1.02 : 1.0
+    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
 }
