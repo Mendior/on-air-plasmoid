@@ -1954,6 +1954,21 @@ PlasmaExtras.Representation {
             property bool showLiked: false
             spacing: 0
 
+            // The Recently-played / Liked list shares the page with the
+            // downloaded-files list below it, split by a drag divider. Its
+            // height is user-set (0 = auto, the first few rows), clamped so
+            // the files section below always keeps room. Remembered per config.
+            readonly property real _histRowH: Kirigami.Units.gridUnit * 2.3
+            readonly property int _histCount: showLiked ? likedModel.count : historyModel.count
+            property real _userHistH: 0
+            Component.onCompleted: _userHistH = Plasmoid.configuration.historyPanelHeight
+            readonly property real _histMaxH: Math.max(_histRowH,
+                libraryPage.height - Kirigami.Units.gridUnit * 11)
+            readonly property real _histH: _histCount === 0 ? 0
+                : Math.min(_histMaxH, _userHistH > 0
+                    ? Math.max(_histRowH, _userHistH)
+                    : Math.min(_histCount, 4) * _histRowH)
+
             FolderListModel {
                 id: musicFolder
                 // NOT bound to downloadDirPath directly: FolderListModel
@@ -2127,9 +2142,8 @@ PlasmaExtras.Representation {
 
             PlasmaComponents3.ScrollView {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min((libraryPage.showLiked ? likedModel.count : historyModel.count), 4)
-                                        * Kirigami.Units.gridUnit * 2.3
-                visible: (libraryPage.showLiked ? likedModel.count : historyModel.count) > 0
+                Layout.preferredHeight: libraryPage._histH
+                visible: libraryPage._histCount > 0
                 PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
                 contentItem: ListView {
@@ -2256,6 +2270,49 @@ PlasmaExtras.Representation {
                             anchors.fill: parent
                             mainText: i18n("Click = search on YouTube · ⬇ = download")
                         }
+                    }
+                }
+            }
+
+            // Drag divider: pull DOWN to see more recently-played rows, UP to
+            // give the downloaded files more room. Double-click resets to the
+            // default few rows. Only present when there is history to size.
+            // The cursor is tracked in SCREEN space (the grip moves as the
+            // list grows under it, so a local coordinate would feed back and
+            // the size would jump).
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Kirigami.Units.gridUnit
+                visible: libraryPage._histCount > 0
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: Kirigami.Units.gridUnit * 2.5
+                    height: 4
+                    radius: 2
+                    color: Qt.alpha(Kirigami.Theme.textColor,
+                        histGrip.pressed || histGrip.containsMouse ? 0.5 : 0.22)
+                }
+                MouseArea {
+                    id: histGrip
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.SizeVerCursor
+                    property real _startY: 0
+                    property real _startH: 0
+                    onPressed: (m) => {
+                        _startY = mapToGlobal(m.x, m.y).y
+                        _startH = libraryPage._histH
+                    }
+                    onPositionChanged: (m) => {
+                        if (!pressed) return
+                        var dy = mapToGlobal(m.x, m.y).y - _startY   // down = positive
+                        libraryPage._userHistH = Math.max(libraryPage._histRowH,
+                            Math.min(libraryPage._histMaxH, _startH + dy))
+                    }
+                    onReleased: Plasmoid.configuration.historyPanelHeight = Math.round(libraryPage._userHistH)
+                    onDoubleClicked: {
+                        libraryPage._userHistH = 0
+                        Plasmoid.configuration.historyPanelHeight = 0
                     }
                 }
             }

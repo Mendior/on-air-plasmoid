@@ -161,6 +161,10 @@
             <label>Remembered height of the output/volume menu in pixels (0 = auto-fit)</label>
             <default>0</default>
         </entry>
+        <entry name="historyPanelHeight" type="Int">
+            <label>Remembered height of the recently-played list in pixels (0 = auto)</label>
+            <default>0</default>
+        </entry>
         <entry name="reportClicks" type="bool">
             <label>Report an anonymous listening click to radio-browser.info when a station starts playing — opt-in: anything leaving the machine is the user's call</label>
             <default>false</default>
