@@ -1086,18 +1086,26 @@ PlasmoidItem {
         if (_podDownloadKey !== "") return;             // one at a time
         if (!PodcastLogic.urlAllowed(url)) return;
         _podDownloadKey = PodcastLogic.episodeKey(guid, url);
-        _podDownloadTitle = String(title || "").substring(0, 120);
-        var dir = (downloadDirPath + "/Podcasts").replace(/'/g, "'\''");
-        var fname = podcastFileName(title, url).replace(/'/g, "'\''");
-        var safeUrl = url.replace(/'/g, "'\''");
+        // The title reaches the notification body, which Plasma renders with
+        // markup — a feed's "<a href=…>tap</a>" would become a live phishing
+        // link. Strip markup and bidi/control chars, exactly as every LAN
+        // device name is stripped before it reaches a notification or a list.
+        _podDownloadTitle = _sanitizeDeviceName(title);
+        // Every word single-quoted through the ONE tested escaper — the URL
+        // is fully feed-controlled, so a hand-rolled inline escape is
+        // exactly where a mistyped backslash became command injection.
+        var part = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + podcastFileName(title, url) + ".part");
+        var dest = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + podcastFileName(title, url));
+        var dir = PodcastLogic.shQuote(downloadDirPath + "/Podcasts");
+        var safeUrl = PodcastLogic.shQuote(url);
         // Staged download: .part first, atomic rename on success — the
         // folder model never lists a half-written file as playable. The
         // size cap guards the disk; -f keeps HTTP errors out of the file.
-        executable.exec(": POD_DL; mkdir -p '" + dir + "' && "
+        executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.21' -o '" + dir + "/" + fname + ".part' '" + safeUrl + "' "
-            + "&& mv -f '" + dir + "/" + fname + ".part' '" + dir + "/" + fname + "' "
-            + "&& echo __POD_OK__ || { rm -f '" + dir + "/" + fname + ".part'; echo __POD_FAIL__; }; "
+            + "-A 'OnAir/2026.21' -o " + part + " " + safeUrl + " "
+            + "&& mv -f " + part + " " + dest + " "
+            + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
             + "true # " + nextSeq());
     }
 

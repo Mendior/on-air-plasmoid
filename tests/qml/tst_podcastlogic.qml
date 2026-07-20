@@ -159,6 +159,62 @@ TestCase {
         compare(PL.episodeKey("", "u1"), "u1")
     }
 
+    // A faithful POSIX single-quote reader: outside quotes it stops at the
+    // first shell metacharacter (so an escape break is caught as "the word
+    // ended early"), inside quotes everything is literal until the closing
+    // quote. Whatever it returns is what the shell would treat as ONE word.
+    function _shReadWord(s) {
+        var out = "", inq = false, i = 0
+        while (i < s.length) {
+            var c = s[i]
+            if (inq) {
+                if (c === "'") { inq = false; i++; continue }
+                out += c; i++
+            } else {
+                if (c === "'") { inq = true; i++; continue }
+                // An unquoted backslash escapes the next char literally —
+                // this is the '\'' idiom's own mechanism, not a break.
+                if (c === "\\" && i + 1 < s.length) { out += s[i + 1]; i += 2; continue }
+                // Any other unquoted metacharacter => the word is over; a
+                // correct escaper never lets one escape the quoting.
+                if ("$`;|&<>(){}\n\t \"*?[]#~".indexOf(c) !== -1) break
+                out += c; i++
+            }
+        }
+        return { word: out, consumedAll: i >= s.length }
+    }
+
+    function test_shQuote_makes_every_hostile_url_one_inert_word() {
+        var attacks = [
+            "https://evil.example/x'$(touch /tmp/PWNED)'.mp3",
+            "https://h/a';touch$IFS/tmp/pwned;'b.mp3",
+            "https://h/`reboot`.mp3",
+            "https://h/$(rm -rf ~).mp3",
+            "https://h/a\"b|c&d.mp3",
+            "plain-no-metachars",
+            "'",
+            "",
+            "a'b'c'd"
+        ]
+        for (var k = 0; k < attacks.length; k++) {
+            var q = PL.shQuote(attacks[k])
+            var r = _shReadWord(q)
+            // The shell consumes the ENTIRE quoted string as one word...
+            verify(r.consumedAll)
+            // ...and that word is exactly the original, byte for byte — no
+            // metacharacter ever reached an unquoted position.
+            compare(r.word, attacks[k])
+        }
+    }
+
+    function test_shQuote_uses_the_four_char_posix_escape() {
+        // The bug that shipped: "'\''" collapses to ''' and breaks out.
+        // The correct value has the backslash — assert it literally.
+        compare(PL.shQuote("a'b"), "'a'\\''b'")
+        compare(PL.shQuote("plain"), "'plain'")
+        compare(PL.shQuote(null), "''")
+    }
+
     function test_the_clock_reads_like_a_clock() {
         compare(PL.fmtTime(5), "0:05")
         compare(PL.fmtTime(65), "1:05")

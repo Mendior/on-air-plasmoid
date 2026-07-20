@@ -179,6 +179,19 @@ function episodeKey(guid, url) {
     return (guid && guid !== "") ? guid : (url || "")
 }
 
+// A string wrapped as ONE safe POSIX single-quoted shell word. The whole
+// value lives inside single quotes, and each embedded single quote is
+// closed, an escaped quote is emitted, and quoting reopens — the classic
+// '\'' idiom. Written as a JS literal the escaped quote is "'\\''" (FOUR
+// visible chars): a plain "'\''" collapses to ''' at runtime and lets a
+// feed-supplied URL break out of its quoting — the exact command-
+// injection this function exists to make impossible. Every shell word
+// built from untrusted input (feed URLs, titles, paths) goes through here.
+function shQuote(s) {
+    return "'" + String(s === undefined || s === null ? "" : s)
+                 .replace(/'/g, "'\\''") + "'"
+}
+
 // The resume map, kept honest: entries are {sec, dur, at}; the newest
 // `cap` survive. Returns a NEW map — the caller owns persistence.
 function prunePositions(map, cap) {
