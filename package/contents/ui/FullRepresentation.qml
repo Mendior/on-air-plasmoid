@@ -1282,18 +1282,34 @@ PlasmaExtras.Representation {
                 height: Math.max(implicitHeight, nowPlayingFlick.height)
                 spacing: Kirigami.Units.smallSpacing
 
-                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing; Layout.fillWidth: true }
+                // Top breather — a fillHeight twin sits below the controls, so
+                // the whole page stays vertically centred at any popup size.
+                Item { Layout.fillHeight: true; Layout.fillWidth: true }
 
                 Item {
                     id: artContainer
                     Layout.alignment: Qt.AlignHCenter
-                    // 10.5 gu at the default popup height (32 gu); extra height the
-                    // user drags out goes into the art — it never shrinks below that,
-                    // so the button rows can't get clipped at the default size.
-                    Layout.preferredWidth: Math.min(fullRepresentation.width - Kirigami.Units.largeSpacing * 4,
-                                                    Kirigami.Units.gridUnit * 10.5
-                                                    + Math.max(0, fullRepresentation.height - Kirigami.Units.gridUnit * 32))
-                    Layout.preferredHeight: Layout.preferredWidth
+                    // The cover is sized from what's LEFT after the controls
+                    // below take their real height — so the transport and
+                    // action rows always fit, at any popup size, and the art
+                    // fills the rest (square, capped by width and a ceiling).
+                    // implicitHeight, not height, keeps this free of a layout
+                    // feedback loop.
+                    readonly property real _reservedBelow:
+                        (pillsRow.visible ? pillsRow.implicitHeight : 0)
+                        + labelsCol.implicitHeight
+                        + transportRow.implicitHeight
+                        + (seekRow.visible ? seekRow.implicitHeight : 0)
+                        + actionsRow.implicitHeight
+                        // row spacings, per-row top margins and both breathers
+                        + Kirigami.Units.gridUnit * 2.5
+                    readonly property real _side: Math.max(
+                        Kirigami.Units.gridUnit * 7,
+                        Math.min(fullRepresentation.width - Kirigami.Units.largeSpacing * 4,
+                                 Kirigami.Units.gridUnit * 18,
+                                 nowPlayingFlick.height - _reservedBelow))
+                    Layout.preferredWidth: _side
+                    Layout.preferredHeight: _side
 
                     // Soft emerald glow behind the cover art
                     Rectangle {
@@ -1530,6 +1546,7 @@ PlasmaExtras.Representation {
 
                 // LIVE + bitrate pills
                 RowLayout {
+                    id: pillsRow
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Kirigami.Units.smallSpacing
                     spacing: Kirigami.Units.smallSpacing
@@ -1599,6 +1616,7 @@ PlasmaExtras.Representation {
                 }
 
                 ColumnLayout {
+                    id: labelsCol
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: Kirigami.Units.largeSpacing
@@ -1682,6 +1700,7 @@ PlasmaExtras.Representation {
                 }
 
                 RowLayout {
+                    id: transportRow
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Kirigami.Units.smallSpacing
                     spacing: Kirigami.Units.largeSpacing * 1.5
@@ -1745,6 +1764,7 @@ PlasmaExtras.Representation {
                 // tracks). A radio stream has no position to hold; the LIVE
                 // pill already owns that story.
                 RowLayout {
+                    id: seekRow
                     Layout.fillWidth: true
                     Layout.leftMargin: Kirigami.Units.largeSpacing * 2
                     Layout.rightMargin: Kirigami.Units.largeSpacing * 2
@@ -1781,6 +1801,7 @@ PlasmaExtras.Representation {
                 }
 
                 RowLayout {
+                    id: actionsRow
                     Layout.alignment: Qt.AlignHCenter
                     visible: root.currentStation !== ""
                     spacing: Kirigami.Units.largeSpacing
@@ -1920,7 +1941,9 @@ PlasmaExtras.Representation {
                     }
                 }
 
-                Item { Layout.fillHeight: true }
+                // Bottom breather — twin of the top one, so the content stays
+                // centred and any leftover height splits evenly above/below.
+                Item { Layout.fillHeight: true; Layout.fillWidth: true }
             }
         }
 
