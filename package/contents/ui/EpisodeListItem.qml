@@ -30,6 +30,7 @@ PlasmaComponents3.ItemDelegate {
     required property string guid
     required property double pubMs
     required property int durationSec
+    required property double sizeBytes
     required property string notes
     required property string image
 
@@ -63,6 +64,9 @@ PlasmaComponents3.ItemDelegate {
             parts.push(d.getDate() + "." + (d.getMonth() + 1) + "." + d.getFullYear())
         }
         if (durationSec > 0) parts.push(PodcastLogic.fmtTime(durationSec))
+        // The download size, but only while it is still a download — once the
+        // file is here the size is spent information.
+        if (!epItem.downloaded && sizeBytes > 0) parts.push(PodcastLogic.fmtSize(sizeBytes))
         if (resumeSec > 0) parts.push(i18n("%1 left", PodcastLogic.fmtTime(Math.max(0,
             (durationSec > 0 ? durationSec : resumeSec) - resumeSec))))
         return parts.join(" · ")

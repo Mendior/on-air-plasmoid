@@ -6,6 +6,7 @@
  */
 
 import Qt.labs.folderlistmodel
+import Qt.labs.platform as Labs
 import QtMultimedia
 import QtQuick
 import QtQuick.Controls as QQC2
@@ -2697,6 +2698,35 @@ PlasmaExtras.Representation {
                     autoAccept: true
                     placeholderText: i18n("Search podcasts… (e.g. history, technology)")
                     onTextChanged: podSearchDebounce.restart()
+                }
+                // OPML backup / migration — a real podcatcher, not a walled
+                // garden. Shown on the shows view, when not searching.
+                CircleButton {
+                    visible: !podcastPage.showingEpisodes && !podcastPage.searching
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "document-import"
+                    iconScale: 0.55
+                    opacity: 0.7
+                    tooltipText: i18n("Import subscriptions (OPML)")
+                    onClicked: opmlImportDialog.open()
+                }
+                CircleButton {
+                    visible: !podcastPage.showingEpisodes && !podcastPage.searching
+                             && podcastSubsModel.count > 0
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "document-export"
+                    iconScale: 0.55
+                    opacity: 0.7
+                    tooltipText: i18n("Export subscriptions (OPML)")
+                    onClicked: root.exportSubscriptions()
+                }
+                Labs.FileDialog {
+                    id: opmlImportDialog
+                    title: i18n("Import subscriptions")
+                    nameFilters: [i18n("OPML files (*.opml *.xml)"), i18n("All files (*)")]
+                    onAccepted: root.importSubscriptionsFromPath(file)
                 }
                 PlasmaComponents3.Label {
                     visible: podcastPage.showingEpisodes

@@ -19,6 +19,7 @@ import "AlarmLogic.js" as AlarmLogic
 import "FaviconLogic.js" as FaviconLogic
 import "EpisodeState.js" as EpisodeState
 import "HealLogic.js" as HealLogic
+import "OpmlLogic.js" as OpmlLogic
 import "PodcastLogic.js" as PodcastLogic
 import "PlaylistLogic.js" as PlaylistLogic
 
@@ -1004,6 +1005,52 @@ PlasmoidItem {
                 return;
             }
         }
+    }
+
+    // ── OPML — the universal subscription backup / migration format ───────
+    property string _opmlExportPath: ""
+    function exportSubscriptions() {
+        var subs = [];
+        for (var i = 0; i < podcastSubsModel.count; i++) {
+            var p = podcastSubsModel.get(i);
+            subs.push({ title: p.title, feedUrl: p.feedUrl });
+        }
+        if (subs.length === 0) {
+            notify(i18n("Nothing to export"), i18n("Subscribe to a show first."), "dialog-information");
+            return;
+        }
+        var opml = OpmlLogic.buildOpml(subs);
+        _opmlExportPath = downloadDirPath + "/onair-subscriptions.opml";
+        // The whole document goes through the one tested quoter — titles and
+        // feed URLs are user/feed data and must not reach the shell raw.
+        executable.exec(": OPML_EXPORT; mkdir -p " + PodcastLogic.shQuote(downloadDirPath)
+            + " && printf '%s' " + PodcastLogic.shQuote(opml)
+            + " > " + PodcastLogic.shQuote(_opmlExportPath)
+            + " && echo __OPML_OK__ || echo __OPML_FAIL__; true # " + nextSeq());
+    }
+    // Read an OPML file the user picked and subscribe to every feed in it.
+    // The file is read through the exec channel (a QML file:// XHR is
+    // sandboxed), parsed by the never-throws OpmlLogic, and every feedUrl
+    // still passes addPodcastSub's HostGuard gate + the 100-sub cap.
+    function importSubscriptionsFromPath(path) {
+        if (!path) return;
+        var p = path.toString().replace(/^file:\/\//, "");
+        try { p = decodeURIComponent(p); } catch (e) {}
+        executable.exec(": OPML_IMPORT; cat " + PodcastLogic.shQuote(p)
+            + " 2>/dev/null; true # " + nextSeq());
+    }
+    function _applyImportedOpml(xml) {
+        var subs = OpmlLogic.parseOpml(xml);
+        var added = 0;
+        for (var i = 0; i < subs.length; i++) {
+            if (addPodcastSub(subs[i].title, "", "", subs[i].feedUrl)) added++;
+        }
+        if (added > 0)
+            notify(i18n("Subscriptions imported"),
+                   i18np("%1 show added", "%1 shows added", added), "application-rss+xml");
+        else
+            notify(i18n("Nothing imported"),
+                   i18n("No new podcast feeds were found in that file."), "dialog-information");
     }
 
     // Show search via the iTunes directory — keyless, so no secret ever
@@ -5257,6 +5304,21 @@ PlasmoidItem {
                 }
                 root._podDownloadKey = "";
                 root._podDownloadTitle = "";
+                return;
+            }
+            // OPML export written (or not) — one honest word with the path.
+            if (cmd.indexOf(": OPML_EXPORT;") === 0) {
+                if ((stdout || "").indexOf("__OPML_OK__") !== -1)
+                    notify(i18n("Subscriptions exported"), root._opmlExportPath, "application-rss+xml");
+                else
+                    notify(i18n("Export failed"),
+                           i18n("Could not write the subscriptions file."), "dialog-error");
+                return;
+            }
+            // OPML import — the file's contents come back as stdout; parse
+            // and subscribe (each feed still gated by addPodcastSub).
+            if (cmd.indexOf(": OPML_IMPORT;") === 0) {
+                root._applyImportedOpml(stdout || "");
                 return;
             }
             // Music-library folder confirmed on disk → safe to load. Without

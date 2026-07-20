@@ -215,6 +215,15 @@ TestCase {
         compare(PL.shQuote(null), "''")
     }
 
+    function test_size_reads_human() {
+        compare(PL.fmtSize(0), "")
+        compare(PL.fmtSize(512), "512 B")
+        compare(PL.fmtSize(1536), "2 KB")            // 1.5 KB rounds
+        compare(PL.fmtSize(5 * 1024 * 1024), "5 MB")
+        compare(PL.fmtSize(55 * 1024 * 1024), "55 MB")
+        compare(PL.fmtSize(1610612736), "1.5 GB")    // 1.5 GiB
+    }
+
     function test_the_clock_reads_like_a_clock() {
         compare(PL.fmtTime(5), "0:05")
         compare(PL.fmtTime(65), "1:05")

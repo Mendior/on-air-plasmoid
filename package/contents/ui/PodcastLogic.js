@@ -322,6 +322,20 @@ function skipTarget(posMs, deltaSec, durMs) {
     return t
 }
 
+// A byte count as "12 MB" / "340 KB" / "1.2 GB" — the enclosure size on
+// the meta line so a download's cost is visible before the tap. 0 (a feed
+// that omitted length) reads as "".
+function fmtSize(bytes) {
+    var b = Number(bytes) || 0
+    if (b <= 0) return ""
+    if (b < 1024) return b + " B"
+    var kb = b / 1024
+    if (kb < 1024) return Math.round(kb) + " KB"
+    var mb = kb / 1024
+    if (mb < 1024) return (mb < 10 ? Math.round(mb * 10) / 10 : Math.round(mb)) + " MB"
+    return (Math.round(mb / 1024 * 10) / 10) + " GB"
+}
+
 // m:ss under an hour, h:mm:ss over it — the seek row's clock.
 function fmtTime(sec) {
     var s = Math.max(0, Math.round(sec))
