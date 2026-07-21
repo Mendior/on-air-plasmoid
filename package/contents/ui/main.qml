@@ -1362,23 +1362,27 @@ PlasmoidItem {
     property var _podDlQueue: []
 
     function _podEnqueueDownload(job) {
-        if (!job || !PodcastLogic.urlAllowed(job.url)) return;
+        if (!job || !PodcastLogic.urlAllowed(job.url)) return false;
         var key = PodcastLogic.episodeKey(job.guid, job.url);
-        if (_podDownloadKey === key) return;               // already fetching
+        if (_podDownloadKey === key) return true;          // already fetching
         for (var i = 0; i < _podDlQueue.length; i++)
             if (PodcastLogic.episodeKey(_podDlQueue[i].guid, _podDlQueue[i].url) === key)
-                return;                                    // already queued
+                return true;                               // already queued
         if (_podDownloadKey !== "") {
-            if (_podDlQueue.length >= 20) return;          // bounded line
+            if (_podDlQueue.length >= 20) return false;    // bounded line
             _podDlQueue.push(job);
             _podDlQueue = _podDlQueue;
-            return;
+            return true;
         }
         _podStartDownload(job);
+        return true;
     }
+
+    property bool _podDownloadAuto: false
 
     function _podStartDownload(job) {
         var title = job.title, url = job.url, guid = job.guid;
+        _podDownloadAuto = job.auto === true;
         _podDownloadKey = PodcastLogic.episodeKey(guid, url);
         // The title reaches the notification body, which Plasma renders with
         // markup — a feed's "<a href=…>tap</a>" would become a live phishing
@@ -1470,6 +1474,7 @@ PlasmoidItem {
         _podRefreshBusy = true;
         _podRefreshNews = [];
         _podRefreshDls = 0;
+        _podRefreshOkCount = 0;
         _podRefreshQueue = [];
         for (var i = 0; i < podcastSubsModel.count; i++) {
             var sub = podcastSubsModel.get(i);
@@ -1478,26 +1483,37 @@ PlasmoidItem {
         _podRefreshNext();
     }
 
+    property int _podRefreshOkCount: 0
+
     function _podRefreshNext() {
         if (_podRefreshQueue.length === 0) { _podRefreshFinish(); return; }
         var job = _podRefreshQueue.shift();
         _podFetchFeedSilent(job.feed, function(feed) {
+            if (feed && feed.ok) _podRefreshOkCount++;
             var newest = (feed && feed.ok && feed.episodes.length > 0) ? feed.episodes[0] : null;
             if (newest) {
-                var nk = PodcastLogic.episodeKey(newest.guid, newest.url);
+                // A guid-less feed whose enclosure URL wears a per-request
+                // token would read "new" on every fetch — the TITLE-derived
+                // filename is the stable identity to remember it by.
+                var nk = newest.guid !== "" ? PodcastLogic.episodeKey(newest.guid, newest.url)
+                                            : "t:" + podcastFileName(newest.title, newest.url);
                 var known = _podSeen[job.feed];
                 if (known === undefined) {
                     _podSeen[job.feed] = nk;      // first acquaintance: quiet
                 } else if (known !== nk) {
                     _podSeen[job.feed] = nk;
-                    _podRefreshNews.push(job.title || feed.title || "");
+                    _podRefreshNews.push(_sanitizeDeviceName(job.title || feed.title || ""));
+                    var epKey = PodcastLogic.episodeKey(newest.guid, newest.url);
                     var already = _podDownloads[podcastFileName(newest.title, newest.url)] !== undefined;
                     if (Plasmoid.configuration.podcastAutoDownload === true
-                        && !already && !isEpisodePlayed(nk)) {
-                        _podRefreshDls++;
-                        _podEnqueueDownload({ "title": newest.title, "url": newest.url,
-                            "guid": newest.guid, "show": job.title || feed.title || "",
-                            "art": job.art || feed.image || "", "feed": job.feed });
+                        && !already && !isEpisodePlayed(epKey)) {
+                        // Counted only when the queue actually TOOK it — a
+                        // full line must not inflate the aggregate's claim.
+                        if (_podEnqueueDownload({ "title": newest.title, "url": newest.url,
+                                "guid": newest.guid, "show": job.title || feed.title || "",
+                                "art": job.art || feed.image || "", "feed": job.feed,
+                                "auto": true }))
+                            _podRefreshDls++;
                     }
                 }
             }
@@ -1507,6 +1523,15 @@ PlasmoidItem {
 
     function _podRefreshFinish() {
         _podRefreshBusy = false;
+        // A cycle where NOTHING answered is not a refresh — a laptop that
+        // woke before its WiFi used to stamp the clock and skip the real
+        // check for twelve hours. No answer, no stamp: the half-hour tick
+        // simply tries again.
+        if (_podRefreshOkCount === 0 && podcastSubsModel.count > 0) {
+            _podRefreshOkCount = 0;
+            return;
+        }
+        _podRefreshOkCount = 0;
         Plasmoid.configuration.podcastLastRefresh = String(Date.now());
         // Unsubscribed shows leave the seen map with them.
         var live = {};
@@ -1566,6 +1591,15 @@ PlasmoidItem {
         xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
+    }
+
+    // A file URL the QUrl parser cannot mangle: '#' would become a
+    // fragment and '?' a query — "Episode #42.mp3" opened a truncated
+    // path on the raw-string road while the FolderListModel road (percent-
+    // encoded) worked, which is exactly the kind of split that ships.
+    function _podFileUrl(fileName) {
+        var pth = downloadDirPath + "/Podcasts/" + fileName;
+        return "file://" + pth.replace(/%/g, "%25").replace(/#/g, "%23").replace(/\?/g, "%3F");
     }
 
     // Ledger filename of a playing file:// URL ("" when it is not ours).
@@ -2827,31 +2861,59 @@ PlasmoidItem {
     // already keeps it off the cast branch).
     readonly property url _alarmToneUrl: Qt.resolvedUrl("../sounds/alarm-fallback.ogg")
 
+    // While the alarm road itself starts a local track, playLocalFile's
+    // "picking a track means I'm up" stand-down must hold its fire — the
+    // alarm is the one caller that is NOT the user being awake.
+    property bool _alarmFiring: false
+
     function _alarmFirePodcast(a) {
         cancelSleepTimer();
-        _volumeOverridePct = Math.max(15, Math.min(100, a.volumePct || 40));
         // A local file needs no heal roads — and yesterday's standing order
         // must not be able to replay a station over the morning episode.
         _wantsPlaying = false;
-        _standingOrderUrl = "";
+        _orphanOrder = null;
         healRetryTimer.stop();
         netResumeTimer.stop();
         lastPlay = -1;
+        // Stale cast state from the evening must not gag the chime: the
+        // wake-tone gate trusts only a FRESH device acknowledgement, and a
+        // podcast alarm plays locally by definition.
+        _alarmCastConfirmed = false;
+        _castCurrentUrl = "";
+        // The same two hardware guarantees the station road makes: the sink
+        // may have been muted overnight, and the volume floor must reach the
+        // fade target — playLocalFile is told not to stand either down.
+        executable.exec(": ALARM_UNMUTE; pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null; true # " + (++_execSeq));
+        _volumeOverridePct = Math.max(15, Math.min(100, a.volumePct || 40));
         var feed = a.url.substring(8);
         var f = PodcastLogic.newestForAlarm(_podDownloads, feed, _podPlayed);
-        _alarmFallbackArmed = true;
         if (f !== "") {
             var meta = _podDownloads[f];
+            var furl = _podFileUrl(f);
+            _alarmFiring = true;
+            try {
+                // Already on the air (fell asleep to it): playPodcastEpisode
+                // would TOGGLE it off — raise the floor instead and let it be.
+                if (!(isPlaying() && playMusic.source.toString() === furl))
+                    playPodcastEpisode(furl, meta.title || f, meta.key || "",
+                                       meta.show || a.station || "", meta.art || "",
+                                       meta.feed || "");
+                else
+                    playMusicOutput.volume = targetVolume();
+            } finally {
+                _alarmFiring = false;
+            }
+            // Armed AFTER the play call — playLocalFile stops this very
+            // timer on its way through, and a fallback armed before it was
+            // a fallback already disarmed.
+            _alarmFallbackArmed = true;
             alarmFallbackTimer.interval = 25000;
             alarmFallbackTimer.restart();
-            playPodcastEpisode("file://" + downloadDirPath + "/Podcasts/" + f,
-                               meta.title || f, meta.key || "",
-                               meta.show || a.station || "", meta.art || "",
-                               meta.feed || "");
             notify(i18n("Wake-up alarm"), meta.title || a.station, "clock");
         } else {
             // Nothing of the show on disk: the chime takes over almost at
             // once — 25 seconds of silence at 07:00 helps nobody.
+            _alarmFallbackArmed = true;
             alarmFallbackTimer.interval = 1200;
             alarmFallbackTimer.restart();
             notify(i18n("Wake-up alarm"),
@@ -2961,9 +3023,13 @@ PlasmoidItem {
         // Picking a track is as clear an "I'm up" as picking a station:
         // the alarm's volume floor and the fallback chime stand down here
         // too, or the whole My Music session plays at wake-up loudness.
-        _alarmFallbackArmed = false;
-        alarmFallbackTimer.stop();
-        _volumeOverridePct = -1;
+        // EXCEPT when the alarm itself is the caller — the one road where
+        // the track starting must not disarm the very net that guards it.
+        if (!root._alarmFiring) {
+            _alarmFallbackArmed = false;
+            alarmFallbackTimer.stop();
+            _volumeOverridePct = -1;
+        }
         // Look for the track's own cover: the hidden .covers/ subfolder
         // first (where downloads put sidecars), then beside the track
         // (hand-copied art, and sidecars from before the subfolder existed).
@@ -5864,11 +5930,16 @@ PlasmoidItem {
                         };
                         root._savePodDownloads();
                     }
-                    notify(i18n("Episode downloaded"), root._podDownloadTitle, "folder-music");
+                    // A night cycle's transfers stay quiet — the aggregate
+                    // already spoke for them; the user's own taps keep their
+                    // one honest word each.
+                    if (!root._podDownloadAuto)
+                        notify(i18n("Episode downloaded"), root._podDownloadTitle, "folder-music");
                 } else {
                     console.warn("[ARP] podcast download failed: "
                                  + (stderr || "").trim().split("\n").slice(-2).join(" "));
-                    notify(i18n("Episode download failed"), root._podDownloadTitle, "dialog-error");
+                    if (!root._podDownloadAuto)
+                        notify(i18n("Episode download failed"), root._podDownloadTitle, "dialog-error");
                 }
                 root._podDownloadKey = "";
                 root._podDownloadTitle = "";
@@ -6104,19 +6175,45 @@ PlasmoidItem {
             // Bluetooth: paired audio devices with their Connected state
             if (cmd.indexOf(": BT_LIST;") === 0) {
                 root._btListing = false;
-                btDevicesModel.clear();
+                // Reconciled IN PLACE, never clear+append: the menu's 5 s
+                // heartbeat re-lists while the user is LOOKING, and a model
+                // rebuild recreates every delegate — a visible flicker on
+                // each beat, and the row under a click could be destroyed
+                // mid-press. Rows update their fields, newcomers append,
+                // the departed leave; an unchanged list touches nothing.
+                var fresh = [];
                 var btLines = (stdout || "").split("\n");
                 for (var bti = 0; bti < btLines.length; bti++) {
                     if (btLines[bti].indexOf("BTDEV\t") !== 0) continue;
                     var btp = btLines[bti].split("\t");
                     if (btp.length < 4 || !_btValidMac(btp[1])) continue;
-                    btDevicesModel.append({
+                    fresh.push({
                         "mac": btp[1], "connected": btp[2] === "yes",
                         // A tab INSIDE the alias splits into extra fields —
                         // rejoin them so the name survives (tabs as spaces).
                         // Sanitized: the alias is device-supplied display text.
                         "name": _sanitizeDeviceName(btp.slice(3).join(" ").trim()) || btp[1]
                     });
+                }
+                for (var fi = 0; fi < fresh.length; fi++) {
+                    var found = -1;
+                    for (var mi = 0; mi < btDevicesModel.count; mi++)
+                        if (btDevicesModel.get(mi).mac === fresh[fi].mac) { found = mi; break; }
+                    if (found < 0) {
+                        btDevicesModel.append(fresh[fi]);
+                    } else {
+                        var row = btDevicesModel.get(found);
+                        if (row.connected !== fresh[fi].connected)
+                            btDevicesModel.setProperty(found, "connected", fresh[fi].connected);
+                        if (row.name !== fresh[fi].name)
+                            btDevicesModel.setProperty(found, "name", fresh[fi].name);
+                    }
+                }
+                for (var di = btDevicesModel.count - 1; di >= 0; di--) {
+                    var still = false;
+                    for (var si = 0; si < fresh.length; si++)
+                        if (fresh[si].mac === btDevicesModel.get(di).mac) { still = true; break; }
+                    if (!still) btDevicesModel.remove(di);
                 }
                 if (root._btListAgain) {
                     root._btListAgain = false;
@@ -6556,6 +6653,42 @@ PlasmoidItem {
             // the fallback or heal timers here used to restart playback
             // seconds after the user explicitly pressed Stop.
             if (fadeOutAnimation.running) return;
+            // A podcast FILE that errors is almost always gone — cleaned by
+            // hand outside the app while its ledger row stayed. Prune the
+            // row and continue the show with the next real file; only a
+            // show with nothing left surfaces the error.
+            var pfSrc = playMusic.source.toString();
+            if (pfSrc.indexOf("file://") === 0 && root._podPlayingKey !== ""
+                && pfSrc === root._podPlayingUrl) {
+                var deadKey = root._podPlayingKey;
+                var deadFeed = root._currentEpisodeFeed;
+                var deadFile = root._podFileOfUrl(pfSrc);
+                root._podPlayingKey = "";
+                root._podPlayingUrl = "";
+                root._podPlayingArt = "";
+                root._podPlayingShow = "";
+                root._podSilCur = [];
+                if (deadFile !== "") {
+                    delete root._podDownloads[deadFile];
+                    root._savePodDownloads();
+                }
+                if (Plasmoid.configuration.podcastContinuous !== false && deadFeed) {
+                    var aliveNext = PodcastLogic.nextUnplayed(root._podDownloads, deadFeed,
+                                                             root._podPlayed, deadKey);
+                    if (aliveNext !== "") {
+                        var anm = root._podDownloads[aliveNext];
+                        Qt.callLater(function() {
+                            root.playPodcastEpisode(root._podFileUrl(aliveNext),
+                                anm.title || aliveNext, anm.key || "",
+                                anm.show || "", anm.art || "", anm.feed || "");
+                        });
+                        return;
+                    }
+                }
+                isError = true;
+                errorTimer.restart();
+                return;
+            }
             isError = true;
             // restart, not start: a second error inside the 5 s window used
             // to inherit the first one's nearly-spent timer and blink away.
@@ -6721,8 +6854,7 @@ PlasmoidItem {
                         if (nextFile !== "") {
                             var nm = root._podDownloads[nextFile];
                             Qt.callLater(function() {
-                                root.playPodcastEpisode(
-                                    "file://" + root.downloadDirPath + "/Podcasts/" + nextFile,
+                                root.playPodcastEpisode(root._podFileUrl(nextFile),
                                     nm.title || nextFile, nm.key || "",
                                     nm.show || "", nm.art || "", nm.feed || "");
                             });

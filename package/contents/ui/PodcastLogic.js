@@ -446,11 +446,25 @@ function newestForAlarm(ledger, feed, playedMap) {
 function cleanCandidates(ledger, playedMap, nowMs, keepPerShow, maxAgeDays) {
     var keep = keepPerShow > 0 ? keepPerShow : 10
     var maxAge = (maxAgeDays > 0 ? maxAgeDays : 3) * 24 * 3600 * 1000
+    // The newest file of every show is untouchable, played or not: the
+    // podcast alarm's "everything heard -> the newest plays again" promise
+    // rests on it, and a weekly show would otherwise have NOTHING on disk
+    // by Thursday for a Friday alarm.
+    var newestOf = {}
+    for (var nf in (ledger || {})) {
+        var ne = ledger[nf]
+        if (!ne) continue
+        var nshow = ne.feed || ""
+        if (newestOf[nshow] === undefined
+            || (Number(ne.at) || 0) > (Number(ledger[newestOf[nshow]].at) || 0))
+            newestOf[nshow] = nf
+    }
     var byShow = {}
     var out = []
     for (var f in (ledger || {})) {
         var e = ledger[f]
         if (!e) continue
+        if (newestOf[e.feed || ""] === f) continue
         var played = !!(e.key && playedMap && playedMap[e.key] !== undefined)
         if (played && (Number(e.at) || 0) < nowMs - maxAge) { out.push(f); continue }
         var show = e.feed || ""

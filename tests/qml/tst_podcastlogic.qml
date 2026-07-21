@@ -262,6 +262,10 @@ TestCase {
         // fresh played stays under both rules
         var led2 = { "f.mp3": { key: "kf", feed: "F", at: now - 1000 } }
         compare(PL.cleanCandidates(led2, { kf: 1 }, now, 10, 3).length, 0)
+        // The newest file of a show is untouchable even when played and
+        // ancient — the podcast alarm's re-listen fallback stands on it.
+        var led3 = { "only.mp3": { key: "ko", feed: "W", at: now - 30 * 24 * 3600 * 1000 } }
+        compare(PL.cleanCandidates(led3, { ko: 1 }, now, 10, 3).length, 0)
     }
 
     function test_prune_survives_a_corrupted_null_entry() {

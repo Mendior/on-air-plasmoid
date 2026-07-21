@@ -5122,8 +5122,17 @@ PlasmaExtras.Representation {
                                     icon.name: "network-bluetooth"
                                     checked: btRow.connected
                                     enabled: root._btConnectingMac === "" && root._btPairingMac === ""
-                                    onToggled: btRow.connected ? root.btDisconnect(btRow.mac)
-                                                               : root.btConnect(btRow.mac, btRow.name)
+                                    onToggled: {
+                                        // The click itself severed the binding
+                                        // (the CheckDelegate wrote checked) —
+                                        // restore it FIRST, or the tick would
+                                        // flicker against every later model
+                                        // refresh instead of tracking it.
+                                        var wasConnected = btRow.connected
+                                        checked = Qt.binding(function() { return btRow.connected })
+                                        if (wasConnected) root.btDisconnect(btRow.mac)
+                                        else root.btConnect(btRow.mac, btRow.name)
+                                    }
                                 }
 
                                 // Forget: unpairs the device for real, the
