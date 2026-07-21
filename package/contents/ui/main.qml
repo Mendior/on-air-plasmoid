@@ -1199,16 +1199,32 @@ PlasmoidItem {
     }
 
     // One merged row, whatever directory it came from: gated, capped, deduped.
+    // fyyd's own image host 403s hotlinks (measured live: every UA refused),
+    // so its art is a dead cover walking — any twin's working art beats it.
+    readonly property var _podFyydArt: /^https?:\/\/img-\d+\.fyyd\.de\//i
+
     function _podAppendSearchRow(title, author, art, feed) {
         feed = String(feed || "").trim();
         if (!PodcastLogic.urlAllowed(feed)) return;
-        if (podcastSearchModel.count >= 50) return;
         // Cross-directory twins wear different coats for one address —
         // http vs https, a trailing slash, a shouting host. The canonical
-        // key sees through all three.
+        // key sees through all three. A twin does not vanish: it UPGRADES
+        // the row it duplicates — the fast directory used to win the slot
+        // with a missing (or dead-host) cover while the slow one arrived
+        // holding the real artwork, and the real artwork was thrown away.
         var fkey = PodcastLogic.feedKey(feed);
-        for (var i = 0; i < podcastSearchModel.count; i++)
-            if (PodcastLogic.feedKey(podcastSearchModel.get(i).feedUrl) === fkey) return;
+        for (var i = 0; i < podcastSearchModel.count; i++) {
+            if (PodcastLogic.feedKey(podcastSearchModel.get(i).feedUrl) !== fkey) continue;
+            var row = podcastSearchModel.get(i);
+            var artOk = PodcastLogic.urlAllowed(art);
+            if (artOk && (row.art === ""
+                          || (_podFyydArt.test(row.art) && !_podFyydArt.test(art))))
+                podcastSearchModel.setProperty(i, "art", String(art).substring(0, 2048));
+            if (row.author === "" && author)
+                podcastSearchModel.setProperty(i, "author", String(author).substring(0, 200));
+            return;
+        }
+        if (podcastSearchModel.count >= 50) return;
         podcastSearchModel.append({
             "title": String(title || "").substring(0, 200),
             "author": String(author || "").substring(0, 200),

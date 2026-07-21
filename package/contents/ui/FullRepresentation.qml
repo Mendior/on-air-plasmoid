@@ -3423,14 +3423,28 @@ PlasmaExtras.Representation {
                             anchors.rightMargin: Kirigami.Units.smallSpacing
 
                             Rectangle {
+                                id: showAvatar
                                 Layout.preferredWidth: Kirigami.Units.gridUnit * 2
                                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
                                 Layout.alignment: Qt.AlignVCenter
                                 radius: width * 0.2
-                                color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
+                                // The monogram floor: art that is missing OR
+                                // refuses to load (a hotlink-blocked CDN
+                                // serves 403s — a grey square either way)
+                                // gets the show's initials on its own tint,
+                                // same treatment the station rows earned.
+                                readonly property bool darkTheme: Kirigami.Theme.backgroundColor.hslLightness < 0.5
+                                readonly property string mono: root.monogramText(showRow.title)
+                                readonly property bool monogrammed: mono !== ""
+                                                                    && showArtImg.status !== Image.Ready
+                                color: monogrammed
+                                       ? Qt.hsla(root.monogramHue(showRow.title) / 360, 0.45,
+                                                 darkTheme ? 0.28 : 0.85, 1)
+                                       : Qt.alpha(Kirigami.Theme.textColor, 0.1)
                                 clip: true
 
                                 Image {
+                                    id: showArtImg
                                     anchors.fill: parent
                                     source: showRow.art
                                     sourceSize.width: 96
@@ -3439,13 +3453,23 @@ PlasmaExtras.Representation {
                                     asynchronous: true
                                     visible: status === Image.Ready
                                 }
+                                PlasmaComponents3.Label {
+                                    anchors.centerIn: parent
+                                    visible: showAvatar.monogrammed
+                                    text: showAvatar.mono
+                                    font.weight: Font.DemiBold
+                                    font.pixelSize: parent.height * 0.38
+                                    color: showAvatar.darkTheme ? Qt.alpha("#ffffff", 0.85)
+                                                                : Qt.alpha("#000000", 0.7)
+                                }
                                 Kirigami.Icon {
                                     anchors.centerIn: parent
                                     width: parent.width * 0.6
                                     height: width
                                     source: "application-rss+xml"
                                     opacity: 0.5
-                                    visible: showRow.art === ""
+                                    visible: !showAvatar.monogrammed
+                                             && showArtImg.status !== Image.Ready
                                 }
                             }
 
