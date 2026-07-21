@@ -1881,6 +1881,28 @@ PlasmaExtras.Representation {
                         tooltipText: i18n("Skip forward 30 seconds")
                         onClicked: root.podcastSkip(30)
                     }
+
+                    // Skip-silence toggle: dead air under the needle is
+                    // jumped, not sat through. Precomputed per file at
+                    // download time (ffmpeg), applied by seeking — no
+                    // resampling, no pitch games. Only shown for episodes
+                    // whose map exists (no ffmpeg → no chip, honestly).
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        visible: root._podPlayingKey !== "" && root._podSilCur.length > 0
+                        implicitWidth: Kirigami.Units.gridUnit * 2.2
+                        implicitHeight: implicitWidth
+                        iconName: "media-playback-paused-symbolic"
+                        iconScale: 0.5
+                        checkable: true
+                        checked: Plasmoid.configuration.podcastSkipSilence === true
+                        opacity: checked ? 1.0 : 0.6
+                        tooltipText: checked
+                                     ? i18n("Skipping silences — tap to keep them")
+                                     : i18n("Skip silences in this episode")
+                        onClicked: Plasmoid.configuration.podcastSkipSilence =
+                                       !(Plasmoid.configuration.podcastSkipSilence === true)
+                    }
                 }
 
                 RowLayout {
@@ -2929,6 +2951,85 @@ PlasmaExtras.Representation {
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
+                // ⏰ Wake with this show: a daily alarm that plays the
+                // newest unheard DOWNLOADED episode — fully offline, the
+                // wake-up no dead WiFi can silence. Toggling off removes it.
+                CircleButton {
+                    id: podAlarmBtn
+                    visible: podcastPage.showingEpisodes
+                    readonly property int alarmIdx: {
+                        for (var i = 0; i < root.alarms.length; i++)
+                            if (root.alarms[i].url === "podcast:" + root.podcastEpisodesFor)
+                                return i
+                        return -1
+                    }
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "clock"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: alarmIdx >= 0
+                    opacity: checked ? 1.0 : 0.7
+                    tooltipText: alarmIdx >= 0
+                                 ? i18n("Waking up with this show at %1 — tap to remove",
+                                        ("0" + root.alarms[alarmIdx].hh).slice(-2) + ":"
+                                        + ("0" + root.alarms[alarmIdx].mm).slice(-2))
+                                 : i18n("Wake up with this show")
+                    onClicked: {
+                        if (alarmIdx >= 0) root.removeAlarm(alarmIdx)
+                        else podAlarmPopup.open()
+                    }
+                }
+
+                QQC2.Popup {
+                    id: podAlarmPopup
+                    parent: podAlarmBtn
+                    y: podAlarmBtn.height + Kirigami.Units.smallSpacing
+                    x: -width + podAlarmBtn.width
+                    padding: Kirigami.Units.largeSpacing
+                    contentItem: ColumnLayout {
+                        spacing: Kirigami.Units.smallSpacing
+                        PlasmaComponents3.Label {
+                            text: i18n("Wake up with this show, daily")
+                            font.weight: Font.DemiBold
+                        }
+                        RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+                            QQC2.SpinBox {
+                                id: podAlarmHH
+                                from: 0; to: 23; value: 7
+                                textFromValue: function(v) { return ("0" + v).slice(-2) }
+                                Accessible.name: i18n("Hour")
+                            }
+                            PlasmaComponents3.Label { text: ":" }
+                            QQC2.SpinBox {
+                                id: podAlarmMM
+                                from: 0; to: 59; value: 0; stepSize: 5
+                                textFromValue: function(v) { return ("0" + v).slice(-2) }
+                                Accessible.name: i18n("Minute")
+                            }
+                            QQC2.Button {
+                                text: i18n("Set")
+                                onClicked: {
+                                    root.addAlarm(root.podcastEpisodesTitle || i18n("Podcast"),
+                                                  "podcast:" + root.podcastEpisodesFor,
+                                                  root.podcastEpisodesArt,
+                                                  podAlarmHH.value, podAlarmMM.value,
+                                                  "daily", 0, 40, false, "")
+                                    podAlarmPopup.close()
+                                }
+                            }
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.maximumWidth: Kirigami.Units.gridUnit * 14
+                            text: i18n("Plays the newest unheard downloaded episode — works with no network at all.")
+                            wrapMode: Text.WordWrap
+                            opacity: 0.7
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                    }
+                }
+
                 // Filter: All ⇄ Unplayed — hide what you have heard.
                 CircleButton {
                     visible: podcastPage.showingEpisodes

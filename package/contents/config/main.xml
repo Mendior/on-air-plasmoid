@@ -161,6 +161,34 @@
             <label>Downloaded-episode ledger (JSON map filename to {key, title, show, art, feed, at}) — the Downloaded view's join against the folder</label>
             <default>{}</default>
         </entry>
+        <entry name="podcastAutoRefreshHours" type="Int">
+            <label>How often the subscriptions are checked for new episodes, in hours (0 = never)</label>
+            <default>12</default>
+        </entry>
+        <entry name="podcastAutoDownload" type="bool">
+            <label>Download the newest episode of a show automatically when the refresh finds one</label>
+            <default>true</default>
+        </entry>
+        <entry name="podcastAutoClean" type="bool">
+            <label>Quietly remove PLAYED downloads that are old or past ten per show — unplayed files are never touched</label>
+            <default>true</default>
+        </entry>
+        <entry name="podcastContinuous" type="bool">
+            <label>When an episode ends, continue with the show's oldest unheard downloaded episode</label>
+            <default>true</default>
+        </entry>
+        <entry name="podcastSkipSilence" type="bool">
+            <label>Jump over stretches of dead air in episodes (per-file silence map, measured at download time)</label>
+            <default>false</default>
+        </entry>
+        <entry name="podcastSeen" type="String">
+            <label>Newest episode key seen per feed (JSON map) — what the refresh compares against</label>
+            <default>{}</default>
+        </entry>
+        <entry name="podcastLastRefresh" type="String">
+            <label>When the last subscription refresh ran (epoch ms as a string)</label>
+            <default>0</default>
+        </entry>
         <entry name="podcastSpeeds" type="String">
             <label>Playback speed per show (JSON map feedUrl to rate; "" key is the default)</label>
             <default>{}</default>

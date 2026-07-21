@@ -198,6 +198,72 @@ TestCase {
         compare(Object.keys(PL.prunePositions(map, 50)).length, 10)
     }
 
+    function test_silences_parse_only_closed_sane_pairs() {
+        var log = "[silencedetect] silence_start: 12.5\n"
+                + "[silencedetect] silence_end: 14.2 | silence_duration: 1.7\n"
+                + "silence_start: 20.0\nsilence_end: 20.4\n"   // too short
+                + "silence_end: 99.0\n"                        // end with no start
+                + "silence_start: 30.0\nsilence_end: 33.0\n"
+        var s = PL.parseSilences(log, 0.9)
+        compare(s.length, 2)
+        compare(s[0][0], 12.5); compare(s[0][1], 14.2)
+        compare(s[1][0], 30.0)
+        // hostile garbage never throws, never yields
+        compare(PL.parseSilences("<html>lol</html>", 0.9).length, 0)
+    }
+
+    function test_silence_at_respects_pads() {
+        var sil = [[10, 13]]
+        verify(PL.silenceAt(sil, 11.0, 0.25) !== null)
+        verify(PL.silenceAt(sil, 10.1, 0.25) === null)   // before entry pad
+        verify(PL.silenceAt(sil, 12.9, 0.25) === null)   // inside exit pad
+        verify(PL.silenceAt(null, 11.0, 0.25) === null)
+    }
+
+    function test_next_unplayed_plays_the_serial_forward() {
+        var led = {
+            "a.mp3": { key: "k1", feed: "F", at: 100 },
+            "b.mp3": { key: "k2", feed: "F", at: 200 },
+            "c.mp3": { key: "k3", feed: "F", at: 300 },
+            "x.mp3": { key: "k9", feed: "OTHER", at: 50 }
+        }
+        var played = { k1: 1 }
+        // oldest unplayed of the SAME show, never the one that just ended
+        compare(PL.nextUnplayed(led, "F", played, "k2"), "c.mp3")
+        compare(PL.nextUnplayed(led, "F", played, "k3"), "b.mp3")
+        compare(PL.nextUnplayed(led, "F", { k1:1, k2:1, k3:1 }, ""), "")
+    }
+
+    function test_alarm_prefers_unplayed_then_newest() {
+        var led = {
+            "old.mp3": { key: "k1", feed: "F", at: 100 },
+            "new.mp3": { key: "k2", feed: "F", at: 200 }
+        }
+        compare(PL.newestForAlarm(led, "F", {}), "new.mp3")
+        compare(PL.newestForAlarm(led, "F", { k2: 1 }), "old.mp3")
+        // everything heard -> newest anyway (re-listen beats a chime)
+        compare(PL.newestForAlarm(led, "F", { k1: 1, k2: 1 }), "new.mp3")
+        compare(PL.newestForAlarm(led, "G", {}), "")
+    }
+
+    function test_cleanup_never_touches_the_unplayed() {
+        var now = 1000 * 24 * 3600 * 1000
+        var led = {}, played = {}
+        // 12 downloads in one show, the 11 oldest played long ago
+        for (var i = 0; i < 12; i++) {
+            led["e" + i + ".mp3"] = { key: "k" + i, feed: "F", at: now - (12 - i) * 5 * 24 * 3600 * 1000 }
+            if (i < 11) played["k" + i] = 1
+        }
+        var out = PL.cleanCandidates(led, played, now, 10, 3)
+        // the unplayed newest survives every rule
+        verify(out.indexOf("e11.mp3") === -1)
+        // an old played one goes
+        verify(out.indexOf("e0.mp3") !== -1)
+        // fresh played stays under both rules
+        var led2 = { "f.mp3": { key: "kf", feed: "F", at: now - 1000 } }
+        compare(PL.cleanCandidates(led2, { kf: 1 }, now, 10, 3).length, 0)
+    }
+
     function test_prune_survives_a_corrupted_null_entry() {
         // A hand-edited config can hold {"key": null} — the comparator must
         // not throw the whole save away over it.

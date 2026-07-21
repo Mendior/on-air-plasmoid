@@ -366,3 +366,103 @@ function fmtTime(sec) {
     var mm = (m < 10 ? "0" : "") + m, rr = (r < 10 ? "0" : "") + r
     return h > 0 ? h + ":" + mm + ":" + rr : m + ":" + rr
 }
+
+// ── The podcatcher's housekeeping brains — pure, tested ─────────────────
+
+// ffmpeg silencedetect output → [[startSec, endSec], …]. Only closed pairs
+// (a start with its end), only stretches at least minLen long, capped at
+// 300 — a corrupt log must not balloon the ledger. Input is UNTRUSTED
+// process output: everything non-matching is ignored.
+function parseSilences(text, minLen) {
+    var lo = (minLen > 0 ? minLen : 0.9)
+    var out = []
+    var start = -1
+    var re = /silence_(start|end): ([0-9.]+)/g
+    var m
+    while ((m = re.exec(String(text || ""))) !== null && out.length < 300) {
+        var t = parseFloat(m[2])
+        if (!isFinite(t) || t < 0) continue
+        if (m[1] === "start") {
+            start = t
+        } else if (start >= 0) {
+            if (t - start >= lo) out.push([start, t])
+            start = -1
+        }
+    }
+    return out
+}
+
+// The silence interval the position sits INSIDE (with entry/exit pads so a
+// seek never lands back in the same stretch), or null. Linear is fine: the
+// list is capped and playback asks a few times a second.
+function silenceAt(silences, posSec, pad) {
+    var p = (pad > 0 ? pad : 0.25)
+    var arr = silences || []
+    for (var i = 0; i < arr.length; i++) {
+        var s = arr[i]
+        if (!s || s.length < 2) continue
+        if (posSec >= s[0] + p && posSec < s[1] - p) return s
+    }
+    return null
+}
+
+// The next episode continuous play should start when one ends: same show,
+// downloaded, unplayed, not the one that just finished — oldest first, so
+// a serial plays forward. Returns the ledger FILENAME or "".
+function nextUnplayed(ledger, feed, playedMap, exceptKey) {
+    var best = "", bestAt = Infinity
+    for (var f in (ledger || {})) {
+        var e = ledger[f]
+        if (!e || e.feed !== feed || !e.key || e.key === exceptKey) continue
+        if (playedMap && playedMap[e.key] !== undefined) continue
+        var at = Number(e.at) || 0
+        if (at < bestAt) { bestAt = at; best = f }
+    }
+    return best
+}
+
+// The episode a podcast ALARM wakes with: newest unplayed download of the
+// show; when everything is heard, the newest download at all — a re-listen
+// beats a chime. "" only when nothing of the show is on disk.
+function newestForAlarm(ledger, feed, playedMap) {
+    var bestUnplayed = "", bestUnplayedAt = -1
+    var bestAny = "", bestAnyAt = -1
+    for (var f in (ledger || {})) {
+        var e = ledger[f]
+        if (!e || e.feed !== feed) continue
+        var at = Number(e.at) || 0
+        if (at > bestAnyAt) { bestAnyAt = at; bestAny = f }
+        if (e.key && (!playedMap || playedMap[e.key] === undefined)
+            && at > bestUnplayedAt) { bestUnplayedAt = at; bestUnplayed = f }
+    }
+    return bestUnplayed !== "" ? bestUnplayed : bestAny
+}
+
+// Storage auto-care: which downloaded files may be deleted. Two rules,
+// both deliberately timid: a PLAYED episode older than maxAgeDays goes;
+// past keepPerShow files in one show, the oldest PLAYED ones go. An
+// unplayed download is never touched — a binge queued for a flight must
+// survive every cleanup.
+function cleanCandidates(ledger, playedMap, nowMs, keepPerShow, maxAgeDays) {
+    var keep = keepPerShow > 0 ? keepPerShow : 10
+    var maxAge = (maxAgeDays > 0 ? maxAgeDays : 3) * 24 * 3600 * 1000
+    var byShow = {}
+    var out = []
+    for (var f in (ledger || {})) {
+        var e = ledger[f]
+        if (!e) continue
+        var played = !!(e.key && playedMap && playedMap[e.key] !== undefined)
+        if (played && (Number(e.at) || 0) < nowMs - maxAge) { out.push(f); continue }
+        var show = e.feed || ""
+        if (!byShow[show]) byShow[show] = []
+        byShow[show].push({ f: f, at: Number(e.at) || 0, played: played })
+    }
+    for (var s in byShow) {
+        var rows = byShow[s]
+        if (rows.length <= keep) continue
+        rows.sort(function(a, b) { return b.at - a.at })   // newest first
+        for (var i = keep; i < rows.length; i++)
+            if (rows[i].played) out.push(rows[i].f)
+    }
+    return out
+}

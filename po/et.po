@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-21 07:31+0300\n"
+"POT-Creation-Date: 2026-07-21 08:13+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Estonian\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/FullRepresentation.qml:4142
+#: package/contents/ui/FullRepresentation.qml:4243
 msgid "Stations"
 msgstr "Jaamad"
 
@@ -46,8 +46,8 @@ msgid "Audio"
 msgstr "Heli"
 
 #: package/contents/ui/CompactRepresentation.qml:88
-#: package/contents/ui/FullRepresentation.qml:3732
-#: package/contents/ui/FullRepresentation.qml:4509
+#: package/contents/ui/FullRepresentation.qml:3833
+#: package/contents/ui/FullRepresentation.qml:4610
 msgid "Volume"
 msgstr "Helitugevus"
 
@@ -335,9 +335,9 @@ msgid "Max length:"
 msgstr "Maksimaalne pikkus:"
 
 #: package/contents/ui/config/configRecording.qml:53
-#: package/contents/ui/FullRepresentation.qml:3544
-#: package/contents/ui/FullRepresentation.qml:3826
-#: package/contents/ui/FullRepresentation.qml:3908
+#: package/contents/ui/FullRepresentation.qml:3645
+#: package/contents/ui/FullRepresentation.qml:3927
+#: package/contents/ui/FullRepresentation.qml:4009
 msgid "%1 min"
 msgstr "%1 min"
 
@@ -346,7 +346,7 @@ msgid "A hard safety cap for one recording — protects the disk if you forget t
 msgstr "Ühe salvestuse range pikkusepiir — kaitseb ketast, kui unustad salvestuse peatada."
 
 #: package/contents/ui/config/configRecording.qml:70
-#: package/contents/ui/FullRepresentation.qml:3795
+#: package/contents/ui/FullRepresentation.qml:3896
 msgid "Scheduled recordings"
 msgstr "Ajastatud salvestused"
 
@@ -490,12 +490,12 @@ msgid "Tags:"
 msgstr "Sildid:"
 
 #: package/contents/ui/config/configSearch.qml:877
-#: package/contents/ui/FullRepresentation.qml:4265
+#: package/contents/ui/FullRepresentation.qml:4366
 msgid "Error: %1"
 msgstr "Viga: %1"
 
 #: package/contents/ui/EpisodeListItem.qml:61
-#: package/contents/ui/FullRepresentation.qml:2814
+#: package/contents/ui/FullRepresentation.qml:2836
 msgid "Episode"
 msgstr "Episood"
 
@@ -508,12 +508,12 @@ msgid "%1 left"
 msgstr "%1 jäänud"
 
 #: package/contents/ui/EpisodeListItem.qml:292
-#: package/contents/ui/FullRepresentation.qml:2051
+#: package/contents/ui/FullRepresentation.qml:2073
 msgid "Mark as unplayed"
 msgstr "Märgi kuulamata"
 
 #: package/contents/ui/EpisodeListItem.qml:293
-#: package/contents/ui/FullRepresentation.qml:2052
+#: package/contents/ui/FullRepresentation.qml:2074
 msgid "Mark as played"
 msgstr "Märgi kuulatuks"
 
@@ -598,8 +598,8 @@ msgid "From the web"
 msgstr "Veebist"
 
 #: package/contents/ui/FullRepresentation.qml:1031
-#: package/contents/ui/FullRepresentation.qml:2297
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2319
+#: package/contents/ui/FullRepresentation.qml:2545
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
@@ -621,7 +621,7 @@ msgid "%1 kb/s"
 msgstr "%1 kb/s"
 
 #: package/contents/ui/FullRepresentation.qml:1203
-#: package/contents/ui/FullRepresentation.qml:1918
+#: package/contents/ui/FullRepresentation.qml:1940
 msgid "Add to my stations + favorites"
 msgstr "Lisa minu jaamadesse + lemmikutesse"
 
@@ -701,301 +701,346 @@ msgstr "Esituskiirus — vajuta muutmiseks"
 msgid "Skip forward 30 seconds"
 msgstr "Keri 30 sekundit edasi"
 
-#: package/contents/ui/FullRepresentation.qml:1904
+#: package/contents/ui/FullRepresentation.qml:1901
+msgid "Skipping silences — tap to keep them"
+msgstr "Vaikused jäetakse vahele — puuduta, et alles hoida"
+
+
+#: package/contents/ui/FullRepresentation.qml:1902
+msgid "Skip silences in this episode"
+msgstr "Jäta selle episoodi vaikused vahele"
+
+
+#: package/contents/ui/FullRepresentation.qml:1926
 msgid "Search this track on YouTube"
 msgstr "Otsi seda lugu YouTube'ist"
 
-#: package/contents/ui/FullRepresentation.qml:1919
+#: package/contents/ui/FullRepresentation.qml:1941
 #: package/contents/ui/MediaListItem.qml:497
 msgid "Remove from favorites"
 msgstr "Eemalda lemmikutest"
 
-#: package/contents/ui/FullRepresentation.qml:1919
+#: package/contents/ui/FullRepresentation.qml:1941
 #: package/contents/ui/MediaListItem.qml:497
 msgid "Add to favorites"
 msgstr "Lisa lemmikutesse"
 
-#: package/contents/ui/FullRepresentation.qml:1953
-#: package/contents/ui/FullRepresentation.qml:2444
+#: package/contents/ui/FullRepresentation.qml:1975
+#: package/contents/ui/FullRepresentation.qml:2466
 msgid "Remove from liked songs"
 msgstr "Eemalda meeldinud lugudest"
 
-#: package/contents/ui/FullRepresentation.qml:1954
+#: package/contents/ui/FullRepresentation.qml:1976
 msgid "Like this song (saved to My Music)"
 msgstr "Märgi lugu meeldivaks (salvestub Minu muusikasse)"
 
-#: package/contents/ui/FullRepresentation.qml:1973
+#: package/contents/ui/FullRepresentation.qml:1995
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Hääl saadetud — aitäh, et toetad jaama!"
 
-#: package/contents/ui/FullRepresentation.qml:1974
+#: package/contents/ui/FullRepresentation.qml:1996
 msgid "Sending the vote…"
 msgstr "Saadan häält…"
 
-#: package/contents/ui/FullRepresentation.qml:1975
+#: package/contents/ui/FullRepresentation.qml:1997
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Hääleta selle jaama poolt maailmakataloogis"
 
-#: package/contents/ui/FullRepresentation.qml:1994
-#: package/contents/ui/FullRepresentation.qml:4252
+#: package/contents/ui/FullRepresentation.qml:2016
+#: package/contents/ui/FullRepresentation.qml:4353
 #: package/contents/ui/MediaListItem.qml:527
 msgid "Downloading…"
 msgstr "Allalaadimine…"
 
-#: package/contents/ui/FullRepresentation.qml:1995
+#: package/contents/ui/FullRepresentation.qml:2017
 #: package/contents/ui/MediaListItem.qml:529
 msgid "Download this track (for offline listening)"
 msgstr "Laadi see lugu alla (võrguta kuulamiseks)"
 
-#: package/contents/ui/FullRepresentation.qml:2020
+#: package/contents/ui/FullRepresentation.qml:2042
 msgid "A scheduled recording is running (%1)"
 msgstr "Ajastatud salvestus käib (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2022
+#: package/contents/ui/FullRepresentation.qml:2044
 msgid "Recording %1 — click to stop"
 msgstr "Salvestan: %1 — peatamiseks klõpsa"
 
-#: package/contents/ui/FullRepresentation.qml:2024
-#: package/contents/ui/FullRepresentation.qml:3955
+#: package/contents/ui/FullRepresentation.qml:2046
+#: package/contents/ui/FullRepresentation.qml:4056
 msgid "This source cannot be recorded"
 msgstr "Seda allikat ei saa salvestada"
 
-#: package/contents/ui/FullRepresentation.qml:2025
+#: package/contents/ui/FullRepresentation.qml:2047
 msgid "Record this station (personal use only)"
 msgstr "Salvesta seda jaama (ainult isiklikuks kasutamiseks)"
 
-#: package/contents/ui/FullRepresentation.qml:2063
+#: package/contents/ui/FullRepresentation.qml:2085
 msgid "Go to this show"
 msgstr "Mine selle saate juurde"
 
-#: package/contents/ui/FullRepresentation.qml:2119
-#: package/contents/ui/FullRepresentation.qml:2140
+#: package/contents/ui/FullRepresentation.qml:2141
+#: package/contents/ui/FullRepresentation.qml:2162
 msgid "Podcast downloads (%1)"
 msgstr "Podcastide allalaadimised (%1)"
 
-
-#: package/contents/ui/FullRepresentation.qml:2221
+#: package/contents/ui/FullRepresentation.qml:2243
 msgid "Downloading: %1"
 msgstr "Laen alla: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2274
+#: package/contents/ui/FullRepresentation.qml:2296
 msgid "Stop recording"
 msgstr "Peata salvestamine"
 
-#: package/contents/ui/FullRepresentation.qml:2298
+#: package/contents/ui/FullRepresentation.qml:2320
 msgid "Liked songs"
 msgstr "Meeldinud lood"
 
-#: package/contents/ui/FullRepresentation.qml:2298
+#: package/contents/ui/FullRepresentation.qml:2320
 msgid "Recently played"
 msgstr "Hiljuti mängitud"
 
-#: package/contents/ui/FullRepresentation.qml:2313
+#: package/contents/ui/FullRepresentation.qml:2335
 msgid "Show play history"
 msgstr "Näita kuulamisajalugu"
 
-#: package/contents/ui/FullRepresentation.qml:2314
+#: package/contents/ui/FullRepresentation.qml:2336
 msgid "Show liked songs"
 msgstr "Näita meeldinud lugusid"
 
-#: package/contents/ui/FullRepresentation.qml:2324
+#: package/contents/ui/FullRepresentation.qml:2346
 msgid "Clear history"
 msgstr "Tühjenda ajalugu"
 
-#: package/contents/ui/FullRepresentation.qml:2354
+#: package/contents/ui/FullRepresentation.qml:2376
 msgid "Search YouTube for %1"
 msgstr "Otsi YouTube'ist: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2433
+#: package/contents/ui/FullRepresentation.qml:2455
 msgid "Download this track"
 msgstr "Laadi see lugu alla"
 
-#: package/contents/ui/FullRepresentation.qml:2457
+#: package/contents/ui/FullRepresentation.qml:2479
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klõps = otsi YouTube'ist · ⬇ = laadi alla"
 
-#: package/contents/ui/FullRepresentation.qml:2523
-#: package/contents/ui/FullRepresentation.qml:4168
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2739
+#: package/contents/ui/FullRepresentation.qml:2545
+#: package/contents/ui/FullRepresentation.qml:4269
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:3006
 msgid "My Music"
 msgstr "Minu muusika"
 
-#: package/contents/ui/FullRepresentation.qml:2532
+#: package/contents/ui/FullRepresentation.qml:2554
 msgid "Open folder in file manager"
 msgstr "Ava kaust failihalduris"
 
-#: package/contents/ui/FullRepresentation.qml:2574
+#: package/contents/ui/FullRepresentation.qml:2596
 msgid "Stop: %1"
 msgstr "Peata: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2574
+#: package/contents/ui/FullRepresentation.qml:2596
 msgid "Play: %1"
 msgstr "Esita: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2659
+#: package/contents/ui/FullRepresentation.qml:2681
 msgid "Click again to confirm delete"
 msgstr "Kustutamise kinnitamiseks klõpsa uuesti"
 
-#: package/contents/ui/FullRepresentation.qml:2659
+#: package/contents/ui/FullRepresentation.qml:2681
 msgid "Delete file"
 msgstr "Kustuta fail"
 
-#: package/contents/ui/FullRepresentation.qml:2715
+#: package/contents/ui/FullRepresentation.qml:2737
 msgid "Nothing here yet"
 msgstr "Siin pole veel midagi"
 
-#: package/contents/ui/FullRepresentation.qml:2726
+#: package/contents/ui/FullRepresentation.qml:2748
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Kui raadios mängib hea lugu, vajuta ⬇ — see salvestatakse siia võrguta kuulamiseks"
 
-#: package/contents/ui/FullRepresentation.qml:2834
+#: package/contents/ui/FullRepresentation.qml:2856
 msgid "Back to shows"
 msgstr "Tagasi saadete juurde"
 
-#: package/contents/ui/FullRepresentation.qml:2845
+#: package/contents/ui/FullRepresentation.qml:2867
 msgid "Search podcasts, or paste a feed URL…"
 msgstr "Otsi podcaste või kleebi feedi URL…"
 
-#: package/contents/ui/FullRepresentation.qml:2865
-#: package/contents/ui/FullRepresentation.qml:2885
+#: package/contents/ui/FullRepresentation.qml:2887
+#: package/contents/ui/FullRepresentation.qml:2907
 msgid "Back to my shows"
 msgstr "Tagasi minu saadete juurde"
 
-#: package/contents/ui/FullRepresentation.qml:2866
+#: package/contents/ui/FullRepresentation.qml:2888
 msgid "Popular now — worldwide charts"
 msgstr "Praegu populaarne — ülemaailmne edetabel"
 
-#: package/contents/ui/FullRepresentation.qml:2886
+#: package/contents/ui/FullRepresentation.qml:2908
 msgid "Downloaded episodes (%1)"
 msgstr "Alla laaditud episoodid (%1)"
 
-
-#: package/contents/ui/FullRepresentation.qml:2901
+#: package/contents/ui/FullRepresentation.qml:2923
 msgid "Import subscriptions (OPML)"
 msgstr "Impordi tellimused (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2912
+#: package/contents/ui/FullRepresentation.qml:2934
 msgid "Export subscriptions (OPML)"
 msgstr "Ekspordi tellimused (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2917
+#: package/contents/ui/FullRepresentation.qml:2939
 msgid "Import subscriptions"
 msgstr "Impordi tellimused"
 
-#: package/contents/ui/FullRepresentation.qml:2918
+#: package/contents/ui/FullRepresentation.qml:2940
 msgid "OPML files (*.opml *.xml)"
 msgstr "OPML-failid (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:2918
+#: package/contents/ui/FullRepresentation.qml:2940
 msgid "All files (*)"
 msgstr "Kõik failid (*)"
 
-#: package/contents/ui/FullRepresentation.qml:2924
+#: package/contents/ui/FullRepresentation.qml:2946
 msgid "Episodes"
 msgstr "Episoodid"
 
-#: package/contents/ui/FullRepresentation.qml:2943
+#: package/contents/ui/FullRepresentation.qml:2974
+msgid "Waking up with this show at %1 — tap to remove"
+msgstr "Ärkad selle saatega kell %1 — puuduta eemaldamiseks"
+
+
+#: package/contents/ui/FullRepresentation.qml:2977
+msgid "Wake up with this show"
+msgstr "Ärka selle saatega"
+
+
+#: package/contents/ui/FullRepresentation.qml:2993
+msgid "Wake up with this show, daily"
+msgstr "Ärka selle saatega, iga päev"
+
+
+#: package/contents/ui/FullRepresentation.qml:3002
+msgid "Hour"
+msgstr "Tund"
+
+
+#: package/contents/ui/FullRepresentation.qml:3009
+msgid "Minute"
+msgstr "Minut"
+
+
+#: package/contents/ui/FullRepresentation.qml:3012
+msgid "Set"
+msgstr "Sea"
+
+
+#: package/contents/ui/FullRepresentation.qml:3014
+msgid "Podcast"
+msgstr "Podcast"
+
+
+#: package/contents/ui/FullRepresentation.qml:3025
+msgid "Plays the newest unheard downloaded episode — works with no network at all."
+msgstr "Mängib uusima kuulamata alla laaditud episoodi — töötab täiesti ilma võrguta."
+
+
+#: package/contents/ui/FullRepresentation.qml:3044
 msgid "Showing unplayed — tap for all"
 msgstr "Näidatakse kuulamata — vajuta kõigi jaoks"
 
-#: package/contents/ui/FullRepresentation.qml:2944
+#: package/contents/ui/FullRepresentation.qml:3045
 msgid "Show only unplayed"
 msgstr "Näita ainult kuulamata"
 
-#: package/contents/ui/FullRepresentation.qml:2959
+#: package/contents/ui/FullRepresentation.qml:3060
 msgid "Mark all as played"
 msgstr "Märgi kõik kuulatuks"
 
-#: package/contents/ui/FullRepresentation.qml:2989
+#: package/contents/ui/FullRepresentation.qml:3090
 msgid "Unsubscribe from this show"
 msgstr "Lõpeta selle saate tellimus"
 
-#: package/contents/ui/FullRepresentation.qml:2990
+#: package/contents/ui/FullRepresentation.qml:3091
 msgid "Subscribe to this show"
 msgstr "Telli see saade"
 
-#: package/contents/ui/FullRepresentation.qml:3007
+#: package/contents/ui/FullRepresentation.qml:3108
 msgid "Refresh episodes"
 msgstr "Värskenda episoode"
 
-#: package/contents/ui/FullRepresentation.qml:3023
-#: package/contents/ui/FullRepresentation.qml:3034
+#: package/contents/ui/FullRepresentation.qml:3124
+#: package/contents/ui/FullRepresentation.qml:3135
 msgid "Open this feed"
 msgstr "Ava see feed"
 
-#: package/contents/ui/FullRepresentation.qml:3072
+#: package/contents/ui/FullRepresentation.qml:3173
 msgid "Loading episodes…"
 msgstr "Episoodide laadimine…"
 
-#: package/contents/ui/FullRepresentation.qml:3073
+#: package/contents/ui/FullRepresentation.qml:3174
 msgid "Searching…"
 msgstr "Otsimine…"
 
-#: package/contents/ui/FullRepresentation.qml:3074
+#: package/contents/ui/FullRepresentation.qml:3175
 msgid "Loading the charts…"
 msgstr "Laen edetabelit…"
 
-#: package/contents/ui/FullRepresentation.qml:3215
+#: package/contents/ui/FullRepresentation.qml:3316
 msgid "resume at %1"
 msgstr "jätka kohalt %1"
 
-
-#: package/contents/ui/FullRepresentation.qml:3237
+#: package/contents/ui/FullRepresentation.qml:3338
 msgid "Tap again to delete the file"
 msgstr "Puuduta veel kord, et fail kustutada"
 
-
-#: package/contents/ui/FullRepresentation.qml:3238
+#: package/contents/ui/FullRepresentation.qml:3339
 msgid "Delete the downloaded file"
 msgstr "Kustuta alla laaditud fail"
 
-
-#: package/contents/ui/FullRepresentation.qml:3379
+#: package/contents/ui/FullRepresentation.qml:3480
 msgid "Unsubscribe"
 msgstr "Lõpeta tellimus"
 
-#: package/contents/ui/FullRepresentation.qml:3380
+#: package/contents/ui/FullRepresentation.qml:3481
 msgid "Subscribe"
 msgstr "Telli"
 
-#: package/contents/ui/FullRepresentation.qml:3419
+#: package/contents/ui/FullRepresentation.qml:3520
 msgid "No shows found"
 msgstr "Saateid ei leitud"
 
-#: package/contents/ui/FullRepresentation.qml:3420
+#: package/contents/ui/FullRepresentation.qml:3521
 msgid "The charts did not answer — try again in a moment"
 msgstr "Edetabel ei vastanud — proovi hetke pärast uuesti"
 
-#: package/contents/ui/FullRepresentation.qml:3421
+#: package/contents/ui/FullRepresentation.qml:3522
 msgid "No subscriptions yet"
 msgstr "Tellimusi veel pole"
 
-#: package/contents/ui/FullRepresentation.qml:3433
+#: package/contents/ui/FullRepresentation.qml:3534
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Otsi ülalt saadet ja märgi see tärniga — episoodid laaditakse siia võrguta kuulamiseks"
 
-#: package/contents/ui/FullRepresentation.qml:3473
+#: package/contents/ui/FullRepresentation.qml:3574
 msgid "All caught up — no unplayed episodes"
 msgstr "Kõik järele kuulatud — kuulamata episoode pole"
 
-#: package/contents/ui/FullRepresentation.qml:3524
+#: package/contents/ui/FullRepresentation.qml:3625
 msgid "Sleep timer"
 msgstr "Unetaimer"
 
-#: package/contents/ui/FullRepresentation.qml:3530
-#: package/contents/ui/FullRepresentation.qml:4249
+#: package/contents/ui/FullRepresentation.qml:3631
+#: package/contents/ui/FullRepresentation.qml:4350
 msgid "Sleeping in %1"
 msgstr "Uinub %1 pärast"
 
-#: package/contents/ui/FullRepresentation.qml:3550
+#: package/contents/ui/FullRepresentation.qml:3651
 msgid "Cancel"
 msgstr "Loobu"
 
-#: package/contents/ui/FullRepresentation.qml:3558
+#: package/contents/ui/FullRepresentation.qml:3659
 msgid "Playback fades out and stops when the timer ends."
 msgstr "Taimeri lõppedes heli hääbub ja mängimine peatub."
 
-#: package/contents/ui/FullRepresentation.qml:3593
+#: package/contents/ui/FullRepresentation.qml:3694
 msgid "Wake-up alarms"
 msgstr "Äratused"
 
@@ -1007,389 +1052,389 @@ msgstr "Äratused"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Sun"
 msgstr "P"
 
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Mon"
 msgstr "E"
 
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Tue"
 msgstr "T"
 
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Wed"
 msgstr "K"
 
-#: package/contents/ui/FullRepresentation.qml:3619
-#: package/contents/ui/FullRepresentation.qml:3714
-#: package/contents/ui/FullRepresentation.qml:3821
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3720
+#: package/contents/ui/FullRepresentation.qml:3815
+#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:4030
 msgid "Thu"
 msgstr "N"
 
-#: package/contents/ui/FullRepresentation.qml:3619
-#: package/contents/ui/FullRepresentation.qml:3714
-#: package/contents/ui/FullRepresentation.qml:3821
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3720
+#: package/contents/ui/FullRepresentation.qml:3815
+#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:4030
 msgid "Fri"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:3619
-#: package/contents/ui/FullRepresentation.qml:3714
-#: package/contents/ui/FullRepresentation.qml:3821
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3720
+#: package/contents/ui/FullRepresentation.qml:3815
+#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:4030
 msgid "Sat"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:3621
-#: package/contents/ui/FullRepresentation.qml:3705
-#: package/contents/ui/FullRepresentation.qml:3823
-#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:3722
+#: package/contents/ui/FullRepresentation.qml:3806
+#: package/contents/ui/FullRepresentation.qml:3924
+#: package/contents/ui/FullRepresentation.qml:4022
 msgid "Daily"
 msgstr "Iga päev"
 
-#: package/contents/ui/FullRepresentation.qml:3622
-#: package/contents/ui/FullRepresentation.qml:3824
+#: package/contents/ui/FullRepresentation.qml:3723
+#: package/contents/ui/FullRepresentation.qml:3925
 msgid "Every %1"
 msgstr "Iga nädal: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3637
+#: package/contents/ui/FullRepresentation.qml:3738
 msgid "Remove this alarm"
 msgstr "Eemalda see äratus"
 
-#: package/contents/ui/FullRepresentation.qml:3645
+#: package/contents/ui/FullRepresentation.qml:3746
 msgid "No alarms yet — add one below."
 msgstr "Äratusi pole veel — lisa üks allpool."
 
-#: package/contents/ui/FullRepresentation.qml:3660
-#: package/contents/ui/FullRepresentation.qml:3862
+#: package/contents/ui/FullRepresentation.qml:3761
+#: package/contents/ui/FullRepresentation.qml:3963
 msgid "Station:"
 msgstr "Jaam:"
 
-#: package/contents/ui/FullRepresentation.qml:3668
-#: package/contents/ui/FullRepresentation.qml:3870
+#: package/contents/ui/FullRepresentation.qml:3769
+#: package/contents/ui/FullRepresentation.qml:3971
 msgid "Station"
 msgstr "Jaam"
 
-#: package/contents/ui/FullRepresentation.qml:3672
-#: package/contents/ui/FullRepresentation.qml:3874
+#: package/contents/ui/FullRepresentation.qml:3773
+#: package/contents/ui/FullRepresentation.qml:3975
 msgid "Start:"
 msgstr "Algus:"
 
-#: package/contents/ui/FullRepresentation.qml:3683
-#: package/contents/ui/FullRepresentation.qml:3885
+#: package/contents/ui/FullRepresentation.qml:3784
+#: package/contents/ui/FullRepresentation.qml:3986
 msgid "Start hour"
 msgstr "Algustund"
 
-#: package/contents/ui/FullRepresentation.qml:3693
-#: package/contents/ui/FullRepresentation.qml:3895
+#: package/contents/ui/FullRepresentation.qml:3794
+#: package/contents/ui/FullRepresentation.qml:3996
 msgid "Start minute"
 msgstr "Algusminut"
 
-#: package/contents/ui/FullRepresentation.qml:3698
-#: package/contents/ui/FullRepresentation.qml:3914
+#: package/contents/ui/FullRepresentation.qml:3799
+#: package/contents/ui/FullRepresentation.qml:4015
 msgid "Repeat:"
 msgstr "Kordus:"
 
-#: package/contents/ui/FullRepresentation.qml:3705
-#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:3806
+#: package/contents/ui/FullRepresentation.qml:4022
 msgid "Once"
 msgstr "Üks kord"
 
-#: package/contents/ui/FullRepresentation.qml:3705
-#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:3806
+#: package/contents/ui/FullRepresentation.qml:4022
 msgid "Weekly"
 msgstr "Iga nädal"
 
-#: package/contents/ui/FullRepresentation.qml:3707
-#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:3808
+#: package/contents/ui/FullRepresentation.qml:4023
 msgid "Repeat"
 msgstr "Kordus"
 
-#: package/contents/ui/FullRepresentation.qml:3716
-#: package/contents/ui/FullRepresentation.qml:3931
+#: package/contents/ui/FullRepresentation.qml:3817
+#: package/contents/ui/FullRepresentation.qml:4032
 msgid "Weekday"
 msgstr "Nädalapäev"
 
-#: package/contents/ui/FullRepresentation.qml:3721
+#: package/contents/ui/FullRepresentation.qml:3822
 msgid "Volume:"
 msgstr "Helitugevus:"
 
-#: package/contents/ui/FullRepresentation.qml:3743
+#: package/contents/ui/FullRepresentation.qml:3844
 msgid "Keep the computer awake until the alarm"
 msgstr "Hoia arvuti ärkvel kuni äratuseni"
 
-#: package/contents/ui/FullRepresentation.qml:3749
-#: package/contents/ui/FullRepresentation.qml:3967
+#: package/contents/ui/FullRepresentation.qml:3850
+#: package/contents/ui/FullRepresentation.qml:4068
 msgid "Add"
 msgstr "Lisa"
 
-#: package/contents/ui/FullRepresentation.qml:3839
+#: package/contents/ui/FullRepresentation.qml:3940
 msgid "Remove this schedule"
 msgstr "Eemalda see ajastus"
 
-#: package/contents/ui/FullRepresentation.qml:3847
+#: package/contents/ui/FullRepresentation.qml:3948
 msgid "No scheduled recordings yet — add one below."
 msgstr "Ajastatud salvestusi pole veel — lisa üks allpool."
 
-#: package/contents/ui/FullRepresentation.qml:3900
+#: package/contents/ui/FullRepresentation.qml:4001
 msgid "Duration:"
 msgstr "Kestus:"
 
-#: package/contents/ui/FullRepresentation.qml:3910
+#: package/contents/ui/FullRepresentation.qml:4011
 msgid "Duration in minutes"
 msgstr "Kestus minutites"
 
-#: package/contents/ui/FullRepresentation.qml:3942
+#: package/contents/ui/FullRepresentation.qml:4043
 msgid "Recordings are for personal use only."
 msgstr "Salvestused on ainult isiklikuks kasutamiseks."
 
-#: package/contents/ui/FullRepresentation.qml:4155
-#: package/contents/ui/FullRepresentation.qml:4273
+#: package/contents/ui/FullRepresentation.qml:4256
+#: package/contents/ui/FullRepresentation.qml:4374
 msgid "Playing"
 msgstr "Mängib"
 
-#: package/contents/ui/FullRepresentation.qml:4181
+#: package/contents/ui/FullRepresentation.qml:4282
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Podcastid"
 
-#: package/contents/ui/FullRepresentation.qml:4194
+#: package/contents/ui/FullRepresentation.qml:4295
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Taimerid"
 
-#: package/contents/ui/FullRepresentation.qml:4255
+#: package/contents/ui/FullRepresentation.qml:4356
 #: package/contents/ui/main.qml:70
 msgid "Casting to %1"
 msgstr "Mängib seadmes %1"
 
-#: package/contents/ui/FullRepresentation.qml:4258
+#: package/contents/ui/FullRepresentation.qml:4359
 msgid "Check internet connection…"
 msgstr "Kontrolli internetiühendust…"
 
-#: package/contents/ui/FullRepresentation.qml:4268
+#: package/contents/ui/FullRepresentation.qml:4369
 msgid "Bitrate: %1 kb/s"
 msgstr "Bitikiirus: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:4273
-#: package/contents/ui/FullRepresentation.qml:4276
+#: package/contents/ui/FullRepresentation.qml:4374
+#: package/contents/ui/FullRepresentation.qml:4377
 msgid "Connecting…"
 msgstr "Ühendumine…"
 
-#: package/contents/ui/FullRepresentation.qml:4278
+#: package/contents/ui/FullRepresentation.qml:4379
 msgid "Choose station and enjoy…"
 msgstr "Vali jaam ja naudi…"
 
-#: package/contents/ui/FullRepresentation.qml:4302
+#: package/contents/ui/FullRepresentation.qml:4403
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Mängib seadmes %1 — klõpsa valimiseks või peatamiseks"
 
-#: package/contents/ui/FullRepresentation.qml:4304
+#: package/contents/ui/FullRepresentation.qml:4405
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Helitugevus, väljund ja seadmed (Chromecast, TV, kõlar)"
 
-#: package/contents/ui/FullRepresentation.qml:4305
+#: package/contents/ui/FullRepresentation.qml:4406
 msgid "Volume and audio output"
 msgstr "Helitugevus ja heliväljund"
 
-#: package/contents/ui/FullRepresentation.qml:4467
+#: package/contents/ui/FullRepresentation.qml:4568
 msgid "Play on"
 msgstr "Mängi seadmes"
 
-#: package/contents/ui/FullRepresentation.qml:4495
+#: package/contents/ui/FullRepresentation.qml:4596
 msgid "Mute"
 msgstr "Vaigista"
 
-#: package/contents/ui/FullRepresentation.qml:4495
+#: package/contents/ui/FullRepresentation.qml:4596
 msgid "Unmute"
 msgstr "Taasta heli"
 
-#: package/contents/ui/FullRepresentation.qml:4527
+#: package/contents/ui/FullRepresentation.qml:4628
 msgid "This computer"
 msgstr "See arvuti"
 
-#: package/contents/ui/FullRepresentation.qml:4551
+#: package/contents/ui/FullRepresentation.qml:4652
 msgid "System default output"
 msgstr "Süsteemi vaikeväljund"
 
-#: package/contents/ui/FullRepresentation.qml:4578
+#: package/contents/ui/FullRepresentation.qml:4679
 msgid "All local outputs, in sync"
 msgstr "Kõik kohalikud väljundid, sünkroonis"
 
-#: package/contents/ui/FullRepresentation.qml:4608
+#: package/contents/ui/FullRepresentation.qml:4709
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Mängib korraga kõigis ühendatud kõlarites — juhtmega väljundeid viivitatakse, et need püsiksid Bluetoothiga samas taktis."
 
-#: package/contents/ui/FullRepresentation.qml:4624
-#: package/contents/ui/FullRepresentation.qml:4631
+#: package/contents/ui/FullRepresentation.qml:4725
+#: package/contents/ui/FullRepresentation.qml:4732
 msgid "Sync fine-tune"
 msgstr "Süngi peenhäälestus"
 
-#: package/contents/ui/FullRepresentation.qml:4665
+#: package/contents/ui/FullRepresentation.qml:4766
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Kui Bluetooth-kõlar jääb juhtmega kõlaritest ikka maha, tõsta seda, kuni nad mängivad koos."
 
-#: package/contents/ui/FullRepresentation.qml:4677
+#: package/contents/ui/FullRepresentation.qml:4778
 msgid "Sync delay in milliseconds"
 msgstr "Sünkroonviive millisekundites"
 
-#: package/contents/ui/FullRepresentation.qml:4699
+#: package/contents/ui/FullRepresentation.qml:4800
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Trüki täpne viive millisekundites — liugur liigub kümne kaupa."
 
-#: package/contents/ui/FullRepresentation.qml:4703
+#: package/contents/ui/FullRepresentation.qml:4804
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:4717
+#: package/contents/ui/FullRepresentation.qml:4818
 msgid "Calibrate with the microphone"
 msgstr "Kalibreeri mikrofoniga"
 
-#: package/contents/ui/FullRepresentation.qml:4722
+#: package/contents/ui/FullRepresentation.qml:4823
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Mängib igast kõlarist paar valju klõpsu ja mõõdab mikrofoniga, kui palju Bluetooth-kõlar maha jääb — viide seatakse automaatselt."
 
-#: package/contents/ui/FullRepresentation.qml:4737
+#: package/contents/ui/FullRepresentation.qml:4838
 msgid "Keep sync tuned automatically"
 msgstr "Hoia sünk automaatselt paigas"
 
-#: package/contents/ui/FullRepresentation.qml:4740
+#: package/contents/ui/FullRepresentation.qml:4841
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Kuulab iga paari minuti tagant mikrofoniga mängivat heli ja kontrollib sünki üle, kui kõlarid triivivad lahku. Heli töödeldakse ainult selles arvutis — ei salvestata ega saadeta kuhugi."
 
-#: package/contents/ui/FullRepresentation.qml:4777
+#: package/contents/ui/FullRepresentation.qml:4878
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 on sünki jaoks meeles — ühenda ta ja ta liitub automaatselt uuesti."
 
-#: package/contents/ui/FullRepresentation.qml:4800
+#: package/contents/ui/FullRepresentation.qml:4901
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Voor 1/2 — klõpsud läbi iga kõlari…"
 
-#: package/contents/ui/FullRepresentation.qml:4801
+#: package/contents/ui/FullRepresentation.qml:4902
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Voor 2/2 — vaikus, kontrollin tulemust…"
 
-#: package/contents/ui/FullRepresentation.qml:4839
+#: package/contents/ui/FullRepresentation.qml:4940
 msgid "%1 plays in the group"
 msgstr "%1 mängib grupis"
 
-#: package/contents/ui/FullRepresentation.qml:4852
+#: package/contents/ui/FullRepresentation.qml:4953
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Kas see kõlar mängib grupis — eemalda linnuke, et jätta ta mängust välja ilma ühendust katkestamata. Jäetakse seadmele meelde."
 
-#: package/contents/ui/FullRepresentation.qml:4861
+#: package/contents/ui/FullRepresentation.qml:4962
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (midagi pole ühendatud)"
 
-#: package/contents/ui/FullRepresentation.qml:4875
+#: package/contents/ui/FullRepresentation.qml:4976
 msgid "Balance of %1"
 msgstr "%1 balanss"
 
-#: package/contents/ui/FullRepresentation.qml:4884
+#: package/contents/ui/FullRepresentation.qml:4985
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Selle kõlari osa helitugevusest — balanss järgib iga üldnivoo liigutust ja jäetakse seadme jaoks meelde. See mõjutab ainult selle vidina enda heli; süsteemi heliseadete seadmepõhine helitugevus on eraldi, puutumata kiht — seepärast erinevadki sealsed numbrid nendest liuguritest."
 
-#: package/contents/ui/FullRepresentation.qml:4901
+#: package/contents/ui/FullRepresentation.qml:5002
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:4902
+#: package/contents/ui/FullRepresentation.qml:5003
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:4903
+#: package/contents/ui/FullRepresentation.qml:5004
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:4904
+#: package/contents/ui/FullRepresentation.qml:5005
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:4909
+#: package/contents/ui/FullRepresentation.qml:5010
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Millised kanalid see kõlar mängib: stereo, ainult vasak, ainult parem või mõlema mono-miks. Pane üks kõlar L-i ja teine R-i peale — saad tõelise stereopaari; jäetakse seadmele meelde."
 
-#: package/contents/ui/FullRepresentation.qml:4940
+#: package/contents/ui/FullRepresentation.qml:5041
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:4955
+#: package/contents/ui/FullRepresentation.qml:5056
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth on välja lülitatud või adapterit pole — kontrolli süsteemiseadeid."
 
-#: package/contents/ui/FullRepresentation.qml:4966
+#: package/contents/ui/FullRepresentation.qml:5067
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "Paardunud Bluetooth-heliseadmeid pole — kasuta all olevat „Paarda uus kõlar…“ või paarda korra Süsteemi seadetes."
 
-#: package/contents/ui/FullRepresentation.qml:4980
+#: package/contents/ui/FullRepresentation.qml:5081
 msgid "%1 — connecting…"
 msgstr "%1 — ühendumine…"
 
-#: package/contents/ui/FullRepresentation.qml:4998
+#: package/contents/ui/FullRepresentation.qml:5099
 msgid "%1 — pairing…"
 msgstr "%1 — seon…"
 
-#: package/contents/ui/FullRepresentation.qml:4999
+#: package/contents/ui/FullRepresentation.qml:5100
 msgid "%1 — new, click to pair"
 msgstr "%1 — uus, klõpsa sidumiseks"
 
-#: package/contents/ui/FullRepresentation.qml:5010
+#: package/contents/ui/FullRepresentation.qml:5111
 msgid "Pair a new speaker…"
 msgstr "Seo uus kõlar…"
 
-#: package/contents/ui/FullRepresentation.qml:5026
+#: package/contents/ui/FullRepresentation.qml:5127
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Otsin — pane kõlar sidumisrežiimi…"
 
-#: package/contents/ui/FullRepresentation.qml:5047
+#: package/contents/ui/FullRepresentation.qml:5148
 msgid "WiFi & network"
 msgstr "WiFi ja võrk"
 
-#: package/contents/ui/FullRepresentation.qml:5079
+#: package/contents/ui/FullRepresentation.qml:5180
 msgid "%1 (speaker group)"
 msgstr "%1 (kõlarigrupp)"
 
-#: package/contents/ui/FullRepresentation.qml:5107
+#: package/contents/ui/FullRepresentation.qml:5208
 msgid "Balance"
 msgstr "Tasakaal"
 
-#: package/contents/ui/FullRepresentation.qml:5121
+#: package/contents/ui/FullRepresentation.qml:5222
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Selle seadme osa helitugevusest — tasakaal järgib iga põhiliuguri liigutust ja jäetakse seadme jaoks meelde."
 
-#: package/contents/ui/FullRepresentation.qml:5143
+#: package/contents/ui/FullRepresentation.qml:5244
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Iga seade puhverdab voogu omaette, mistõttu ruumid võivad mängida mõne sekundi nihkega. Täpselt sünkroonis kõlarite jaoks loo Google Home'i äpis kõlarigrupp — grupp ilmub siia ühe seadmena."
 
-#: package/contents/ui/FullRepresentation.qml:5153
+#: package/contents/ui/FullRepresentation.qml:5254
 msgid "Stop casting everywhere"
 msgstr "Peata esitus kõigis seadmetes"
 
-#: package/contents/ui/FullRepresentation.qml:5171
+#: package/contents/ui/FullRepresentation.qml:5272
 msgid "Searching for devices…"
 msgstr "Otsin seadmeid…"
 
-#: package/contents/ui/FullRepresentation.qml:5180
+#: package/contents/ui/FullRepresentation.qml:5281
 msgid "No devices found on your network"
 msgstr "Võrgust ei leitud ühtegi seadet"
 
@@ -1447,224 +1492,245 @@ msgstr "See aadress ei ole podcasti voog."
 msgid "No playable episodes in this feed."
 msgstr "Selles voos pole esitatavaid episoode."
 
-#: package/contents/ui/main.qml:2155
+#: package/contents/ui/main.qml:1516
+msgid "%1 — the newest episodes are downloading."
+msgstr "%1 — uusimad episoodid laaditakse alla."
+
+
+#: package/contents/ui/main.qml:1518
+msgid "New podcast episodes"
+msgstr "Uued podcasti episoodid"
+
+
+#: package/contents/ui/main.qml:2383
 msgid "Scheduled recording started"
 msgstr "Ajastatud salvestus algas"
 
-#: package/contents/ui/main.qml:2275
+#: package/contents/ui/main.qml:2503
 msgid "Scheduled recording missed"
 msgstr "Ajastatud salvestus jäi vahele"
 
-#: package/contents/ui/main.qml:2281
+#: package/contents/ui/main.qml:2509
 msgid "Scheduled recording skipped"
 msgstr "Ajastatud salvestus jäeti vahele"
 
-#: package/contents/ui/main.qml:2282
+#: package/contents/ui/main.qml:2510
 msgid "%1 — another recording is already running."
 msgstr "%1 — teine salvestus juba käib."
 
-#: package/contents/ui/main.qml:2456
+#: package/contents/ui/main.qml:2684
 msgid "Wake-up alarm missed"
 msgstr "Äratus jäi vahele"
 
-#: package/contents/ui/main.qml:2457
+#: package/contents/ui/main.qml:2685
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 oli seatud kellaajale %2 — arvuti oli sel hetkel välja lülitatud või unerežiimis."
 
-#: package/contents/ui/main.qml:2491 package/contents/ui/main.qml:2571
-#: package/contents/ui/main.qml:2624 package/contents/ui/main.qml:2627
+#: package/contents/ui/main.qml:2719 package/contents/ui/main.qml:2804
+#: package/contents/ui/main.qml:2844 package/contents/ui/main.qml:2850
+#: package/contents/ui/main.qml:2891 package/contents/ui/main.qml:2894
 msgid "Wake-up alarm"
 msgstr "Äratus"
 
-#: package/contents/ui/main.qml:2492
+#: package/contents/ui/main.qml:2720
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 jõudis kätte samal ajal — selle asemel mängib %2."
 
-#: package/contents/ui/main.qml:2628
+#: package/contents/ui/main.qml:2852
+msgid "the show"
+msgstr "saade"
+
+
+#: package/contents/ui/main.qml:2851
+msgid "No downloaded episode of %1 was on disk — waking with the chime."
+msgstr "Ühtegi %1 alla laaditud episoodi polnud kettal — äratan helinaga."
+
+
+#: package/contents/ui/main.qml:2895
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Jaam ei käivitunud — mängib sisseehitatud äratustoon."
 
-#: package/contents/ui/main.qml:3344
+#: package/contents/ui/main.qml:3611
 msgid "%1 devices"
 msgstr "%1 seadet"
 
-#: package/contents/ui/main.qml:3785
+#: package/contents/ui/main.qml:4052
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-kõlar"
 
-#: package/contents/ui/main.qml:3784
+#: package/contents/ui/main.qml:4051
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 on ühendatud, aga heli ei jõudnud kohale"
 
-#: package/contents/ui/main.qml:3786
+#: package/contents/ui/main.qml:4053
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Lülita kõlar korraks välja ja uuesti sisse, siis ühenda uuesti."
 
-#: package/contents/ui/main.qml:4175
+#: package/contents/ui/main.qml:4442
 msgid "Station seems to be off the air"
 msgstr "Jaam paistab olevat eetrist väljas"
 
-#: package/contents/ui/main.qml:4176
+#: package/contents/ui/main.qml:4443
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 ei vasta ühelgi kataloogile teadaoleval aadressil. Jaam jääb sinu nimekirja — proovin taustal uuesti."
 
-#: package/contents/ui/main.qml:4248
+#: package/contents/ui/main.qml:4515
 msgid "Playing from a backup address"
 msgstr "Mängib varuaadressilt"
 
-#: package/contents/ui/main.qml:4249
+#: package/contents/ui/main.qml:4516
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Jaama salvestatud aadress ei vasta — praegu mängib kataloogi lähim vaste. Sinu salvestatud aadress jäi alles."
 
-#: package/contents/ui/main.qml:4289
+#: package/contents/ui/main.qml:4556
 msgid "Station found at a new address"
 msgstr "Jaam leitud uuelt aadressilt"
 
-#: package/contents/ui/main.qml:4290
+#: package/contents/ui/main.qml:4557
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 kolis — uus aadress salvestati sinu nimekirja."
 
-#: package/contents/ui/main.qml:5562
+#: package/contents/ui/main.qml:5830
 msgid "Episode downloaded"
 msgstr "Episood alla laaditud"
 
-#: package/contents/ui/main.qml:5566
+#: package/contents/ui/main.qml:5834
 msgid "Episode download failed"
 msgstr "Episoodi allalaadimine ebaõnnestus"
 
-#: package/contents/ui/main.qml:5579
+#: package/contents/ui/main.qml:5876
 msgid "Subscriptions exported"
 msgstr "Tellimused eksporditud"
 
-#: package/contents/ui/main.qml:5581
+#: package/contents/ui/main.qml:5878
 msgid "Export failed"
 msgstr "Eksport ebaõnnestus"
 
-#: package/contents/ui/main.qml:5582
+#: package/contents/ui/main.qml:5879
 msgid "Could not write the subscriptions file."
 msgstr "Tellimuste faili ei õnnestunud kirjutada."
 
-#: package/contents/ui/main.qml:5675
+#: package/contents/ui/main.qml:5972
 msgid "Casting needs python-chromecast"
 msgstr "Ülekanne vajab python-chromecasti"
 
-#: package/contents/ui/main.qml:5676
+#: package/contents/ui/main.qml:5973
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Seadmetesse ülekandmiseks paigalda python-chromecast."
 
-#: package/contents/ui/main.qml:5697
+#: package/contents/ui/main.qml:5994
 msgid "the device"
 msgstr "seade"
 
-#: package/contents/ui/main.qml:5697
+#: package/contents/ui/main.qml:5994
 msgid "Could not cast to %1"
 msgstr "Seadmesse %1 ei õnnestunud üle kanda"
 
-#: package/contents/ui/main.qml:5698
+#: package/contents/ui/main.qml:5995
 msgid "The device could not play this station."
 msgstr "Seade ei suutnud seda jaama esitada."
 
-#: package/contents/ui/main.qml:5744
+#: package/contents/ui/main.qml:6041
 msgid "Casting"
 msgstr "Edastamine"
 
-#: package/contents/ui/main.qml:5745
+#: package/contents/ui/main.qml:6042
 msgid "The device did not stop — it may still be playing."
 msgstr "Seade ei peatunud — see võib ikka veel mängida."
 
-#: package/contents/ui/main.qml:5801 package/contents/ui/main.qml:5903
+#: package/contents/ui/main.qml:6098 package/contents/ui/main.qml:6200
 msgid "the Bluetooth device"
 msgstr "Bluetooth-seadmega"
 
-#: package/contents/ui/main.qml:5800
+#: package/contents/ui/main.qml:6097
 msgid "Could not connect to %1"
 msgstr "Ei õnnestunud ühenduda: %1"
 
-#: package/contents/ui/main.qml:5802
+#: package/contents/ui/main.qml:6099
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Veendu, et kõlar on sisse lülitatud ja levialas."
 
-#: package/contents/ui/main.qml:5902
+#: package/contents/ui/main.qml:6199
 msgid "Could not pair with %1"
 msgstr "Sidumine ebaõnnestus: %1"
 
-#: package/contents/ui/main.qml:5904
+#: package/contents/ui/main.qml:6201
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Pane kõlar sidumisrežiimi (hoia selle Bluetooth-nuppu all) ja proovi uuesti."
 
-#: package/contents/ui/main.qml:6002
+#: package/contents/ui/main.qml:6299
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg pole paigaldatud"
 
-#: package/contents/ui/main.qml:6003
+#: package/contents/ui/main.qml:6300
 msgid "Install ffmpeg to record radio."
 msgstr "Raadio salvestamiseks paigalda ffmpeg."
 
-#: package/contents/ui/main.qml:6006
+#: package/contents/ui/main.qml:6303
 msgid "Not enough disk space for this recording"
 msgstr "Selle salvestuse jaoks pole piisavalt kettaruumi"
 
-#: package/contents/ui/main.qml:6007
+#: package/contents/ui/main.qml:6304
 msgid "Free some space in %1 and try again."
 msgstr "Vabasta ruumi kaustas %1 ja proovi uuesti."
 
-#: package/contents/ui/main.qml:6010
+#: package/contents/ui/main.qml:6307
 msgid "Recording saved ✓ (%1)"
 msgstr "Salvestus valmis ✓ (%1)"
 
-#: package/contents/ui/main.qml:6014
+#: package/contents/ui/main.qml:6311
 msgid "Recording interrupted (%1 captured)"
 msgstr "Salvestus katkes (%1 salvestatud)"
 
-#: package/contents/ui/main.qml:6016
+#: package/contents/ui/main.qml:6313
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — fail on oodatust palju väiksem."
 
-#: package/contents/ui/main.qml:6020
+#: package/contents/ui/main.qml:6317
 msgid "Recording failed"
 msgstr "Salvestamine ebaõnnestus"
 
-#: package/contents/ui/main.qml:6021
+#: package/contents/ui/main.qml:6318
 msgid "The stream could not be captured."
 msgstr "Voogu ei õnnestunud salvestada."
 
-#: package/contents/ui/main.qml:6107
+#: package/contents/ui/main.qml:6404
 msgid "Downloading again without the cover"
 msgstr "Laadin uuesti alla ilma kaanepildita"
 
-#: package/contents/ui/main.qml:6108
+#: package/contents/ui/main.qml:6405
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Siltide manustamiseks on vaja python-mutagen paketti — paigalda see, et kaanepildid failidesse saaksid."
 
-#: package/contents/ui/main.qml:6116
+#: package/contents/ui/main.qml:6413
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp pole paigaldatud"
 
-#: package/contents/ui/main.qml:6117
+#: package/contents/ui/main.qml:6414
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Lugude allalaadimiseks paigalda yt-dlp (ja ffmpeg)."
 
-#: package/contents/ui/main.qml:6120
+#: package/contents/ui/main.qml:6417
 msgid "Track downloaded ✓"
 msgstr "Lugu alla laaditud ✓"
 
-#: package/contents/ui/main.qml:6121
+#: package/contents/ui/main.qml:6418
 msgid "Saved to: %1"
 msgstr "Salvestatud: %1"
 
-#: package/contents/ui/main.qml:6124
+#: package/contents/ui/main.qml:6421
 msgid "Download failed"
 msgstr "Allalaadimine ebaõnnestus"
 
-#: package/contents/ui/main.qml:6125
+#: package/contents/ui/main.qml:6422
 msgid "Unknown error"
 msgstr "Tundmatu viga"
 
-#: package/contents/ui/main.qml:6427
+#: package/contents/ui/main.qml:6744
 msgid "Audio output changed"
 msgstr "Heliväljund muutus"
 
-#: package/contents/ui/main.qml:6428
+#: package/contents/ui/main.qml:6745
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Valitud väljundseade kadus — kasutusel on süsteemi vaikeväljund."
 

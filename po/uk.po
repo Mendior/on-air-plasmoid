@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-21 07:31+0300\n"
+"POT-Creation-Date: 2026-07-21 08:13+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Ukrainian\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/FullRepresentation.qml:4142
+#: package/contents/ui/FullRepresentation.qml:4243
 msgid "Stations"
 msgstr "Станції"
 
@@ -46,8 +46,8 @@ msgid "Audio"
 msgstr "Звук"
 
 #: package/contents/ui/CompactRepresentation.qml:88
-#: package/contents/ui/FullRepresentation.qml:3732
-#: package/contents/ui/FullRepresentation.qml:4509
+#: package/contents/ui/FullRepresentation.qml:3833
+#: package/contents/ui/FullRepresentation.qml:4610
 msgid "Volume"
 msgstr "Гучність"
 
@@ -335,9 +335,9 @@ msgid "Max length:"
 msgstr "Максимальна тривалість:"
 
 #: package/contents/ui/config/configRecording.qml:53
-#: package/contents/ui/FullRepresentation.qml:3544
-#: package/contents/ui/FullRepresentation.qml:3826
-#: package/contents/ui/FullRepresentation.qml:3908
+#: package/contents/ui/FullRepresentation.qml:3645
+#: package/contents/ui/FullRepresentation.qml:3927
+#: package/contents/ui/FullRepresentation.qml:4009
 msgid "%1 min"
 msgstr "%1 хв"
 
@@ -346,7 +346,7 @@ msgid "A hard safety cap for one recording — protects the disk if you forget t
 msgstr "Жорстке обмеження тривалості одного запису — захищає диск, якщо ви забудете зупинити."
 
 #: package/contents/ui/config/configRecording.qml:70
-#: package/contents/ui/FullRepresentation.qml:3795
+#: package/contents/ui/FullRepresentation.qml:3896
 msgid "Scheduled recordings"
 msgstr "Заплановані записи"
 
@@ -490,12 +490,12 @@ msgid "Tags:"
 msgstr "Мітки:"
 
 #: package/contents/ui/config/configSearch.qml:877
-#: package/contents/ui/FullRepresentation.qml:4265
+#: package/contents/ui/FullRepresentation.qml:4366
 msgid "Error: %1"
 msgstr "Помилка: %1"
 
 #: package/contents/ui/EpisodeListItem.qml:61
-#: package/contents/ui/FullRepresentation.qml:2814
+#: package/contents/ui/FullRepresentation.qml:2836
 msgid "Episode"
 msgstr "Епізод"
 
@@ -508,12 +508,12 @@ msgid "%1 left"
 msgstr "Залишилося %1"
 
 #: package/contents/ui/EpisodeListItem.qml:292
-#: package/contents/ui/FullRepresentation.qml:2051
+#: package/contents/ui/FullRepresentation.qml:2073
 msgid "Mark as unplayed"
 msgstr "Позначити як непрослухане"
 
 #: package/contents/ui/EpisodeListItem.qml:293
-#: package/contents/ui/FullRepresentation.qml:2052
+#: package/contents/ui/FullRepresentation.qml:2074
 msgid "Mark as played"
 msgstr "Позначити як прослухане"
 
@@ -598,8 +598,8 @@ msgid "From the web"
 msgstr "З інтернету"
 
 #: package/contents/ui/FullRepresentation.qml:1031
-#: package/contents/ui/FullRepresentation.qml:2297
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2319
+#: package/contents/ui/FullRepresentation.qml:2545
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
@@ -621,7 +621,7 @@ msgid "%1 kb/s"
 msgstr "%1 кбіт/с"
 
 #: package/contents/ui/FullRepresentation.qml:1203
-#: package/contents/ui/FullRepresentation.qml:1918
+#: package/contents/ui/FullRepresentation.qml:1940
 msgid "Add to my stations + favorites"
 msgstr "Додати до моїх станцій та улюблених"
 
@@ -701,301 +701,346 @@ msgstr "Швидкість відтворення — торкніться, що
 msgid "Skip forward 30 seconds"
 msgstr "Вперед на 30 секунд"
 
-#: package/contents/ui/FullRepresentation.qml:1904
+#: package/contents/ui/FullRepresentation.qml:1901
+msgid "Skipping silences — tap to keep them"
+msgstr "Пропуск тиші — торкніться, щоб залишити"
+
+
+#: package/contents/ui/FullRepresentation.qml:1902
+msgid "Skip silences in this episode"
+msgstr "Пропускати тишу в цьому епізоді"
+
+
+#: package/contents/ui/FullRepresentation.qml:1926
 msgid "Search this track on YouTube"
 msgstr "Шукати цю композицію на YouTube"
 
-#: package/contents/ui/FullRepresentation.qml:1919
+#: package/contents/ui/FullRepresentation.qml:1941
 #: package/contents/ui/MediaListItem.qml:497
 msgid "Remove from favorites"
 msgstr "Вилучити з улюблених"
 
-#: package/contents/ui/FullRepresentation.qml:1919
+#: package/contents/ui/FullRepresentation.qml:1941
 #: package/contents/ui/MediaListItem.qml:497
 msgid "Add to favorites"
 msgstr "Додати до улюблених"
 
-#: package/contents/ui/FullRepresentation.qml:1953
-#: package/contents/ui/FullRepresentation.qml:2444
+#: package/contents/ui/FullRepresentation.qml:1975
+#: package/contents/ui/FullRepresentation.qml:2466
 msgid "Remove from liked songs"
 msgstr "Вилучити з уподобаних пісень"
 
-#: package/contents/ui/FullRepresentation.qml:1954
+#: package/contents/ui/FullRepresentation.qml:1976
 msgid "Like this song (saved to My Music)"
 msgstr "Вподобати пісню (зберігається в Моїй музиці)"
 
-#: package/contents/ui/FullRepresentation.qml:1973
+#: package/contents/ui/FullRepresentation.qml:1995
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Голос надіслано — дякуємо за підтримку станції!"
 
-#: package/contents/ui/FullRepresentation.qml:1974
+#: package/contents/ui/FullRepresentation.qml:1996
 msgid "Sending the vote…"
 msgstr "Надсилання голосу…"
 
-#: package/contents/ui/FullRepresentation.qml:1975
+#: package/contents/ui/FullRepresentation.qml:1997
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Проголосуйте за цю станцію у світовому каталозі"
 
-#: package/contents/ui/FullRepresentation.qml:1994
-#: package/contents/ui/FullRepresentation.qml:4252
+#: package/contents/ui/FullRepresentation.qml:2016
+#: package/contents/ui/FullRepresentation.qml:4353
 #: package/contents/ui/MediaListItem.qml:527
 msgid "Downloading…"
 msgstr "Завантаження…"
 
-#: package/contents/ui/FullRepresentation.qml:1995
+#: package/contents/ui/FullRepresentation.qml:2017
 #: package/contents/ui/MediaListItem.qml:529
 msgid "Download this track (for offline listening)"
 msgstr "Завантажити цю композицію (для прослуховування офлайн)"
 
-#: package/contents/ui/FullRepresentation.qml:2020
+#: package/contents/ui/FullRepresentation.qml:2042
 msgid "A scheduled recording is running (%1)"
 msgstr "Триває запланований запис (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2022
+#: package/contents/ui/FullRepresentation.qml:2044
 msgid "Recording %1 — click to stop"
 msgstr "Запис: %1 — клацніть, щоб зупинити"
 
-#: package/contents/ui/FullRepresentation.qml:2024
-#: package/contents/ui/FullRepresentation.qml:3955
+#: package/contents/ui/FullRepresentation.qml:2046
+#: package/contents/ui/FullRepresentation.qml:4056
 msgid "This source cannot be recorded"
 msgstr "Це джерело неможливо записати"
 
-#: package/contents/ui/FullRepresentation.qml:2025
+#: package/contents/ui/FullRepresentation.qml:2047
 msgid "Record this station (personal use only)"
 msgstr "Записати цю станцію (лише для особистого користування)"
 
-#: package/contents/ui/FullRepresentation.qml:2063
+#: package/contents/ui/FullRepresentation.qml:2085
 msgid "Go to this show"
 msgstr "Перейти до цієї передачі"
 
-#: package/contents/ui/FullRepresentation.qml:2119
-#: package/contents/ui/FullRepresentation.qml:2140
+#: package/contents/ui/FullRepresentation.qml:2141
+#: package/contents/ui/FullRepresentation.qml:2162
 msgid "Podcast downloads (%1)"
 msgstr "Завантаження подкастів (%1)"
 
-
-#: package/contents/ui/FullRepresentation.qml:2221
+#: package/contents/ui/FullRepresentation.qml:2243
 msgid "Downloading: %1"
 msgstr "Завантаження: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2274
+#: package/contents/ui/FullRepresentation.qml:2296
 msgid "Stop recording"
 msgstr "Зупинити запис"
 
-#: package/contents/ui/FullRepresentation.qml:2298
+#: package/contents/ui/FullRepresentation.qml:2320
 msgid "Liked songs"
 msgstr "Уподобані пісні"
 
-#: package/contents/ui/FullRepresentation.qml:2298
+#: package/contents/ui/FullRepresentation.qml:2320
 msgid "Recently played"
 msgstr "Нещодавно відтворені"
 
-#: package/contents/ui/FullRepresentation.qml:2313
+#: package/contents/ui/FullRepresentation.qml:2335
 msgid "Show play history"
 msgstr "Показати історію відтворення"
 
-#: package/contents/ui/FullRepresentation.qml:2314
+#: package/contents/ui/FullRepresentation.qml:2336
 msgid "Show liked songs"
 msgstr "Показати вподобані пісні"
 
-#: package/contents/ui/FullRepresentation.qml:2324
+#: package/contents/ui/FullRepresentation.qml:2346
 msgid "Clear history"
 msgstr "Очистити журнал"
 
-#: package/contents/ui/FullRepresentation.qml:2354
+#: package/contents/ui/FullRepresentation.qml:2376
 msgid "Search YouTube for %1"
 msgstr "Шукати на YouTube: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2433
+#: package/contents/ui/FullRepresentation.qml:2455
 msgid "Download this track"
 msgstr "Завантажити цю композицію"
 
-#: package/contents/ui/FullRepresentation.qml:2457
+#: package/contents/ui/FullRepresentation.qml:2479
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Клац = шукати на YouTube · ⬇ = завантажити"
 
-#: package/contents/ui/FullRepresentation.qml:2523
-#: package/contents/ui/FullRepresentation.qml:4168
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2739
+#: package/contents/ui/FullRepresentation.qml:2545
+#: package/contents/ui/FullRepresentation.qml:4269
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:3006
 msgid "My Music"
 msgstr "Моя музика"
 
-#: package/contents/ui/FullRepresentation.qml:2532
+#: package/contents/ui/FullRepresentation.qml:2554
 msgid "Open folder in file manager"
 msgstr "Відкрити теку в менеджері файлів"
 
-#: package/contents/ui/FullRepresentation.qml:2574
+#: package/contents/ui/FullRepresentation.qml:2596
 msgid "Stop: %1"
 msgstr "Зупинити: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2574
+#: package/contents/ui/FullRepresentation.qml:2596
 msgid "Play: %1"
 msgstr "Відтворити: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2659
+#: package/contents/ui/FullRepresentation.qml:2681
 msgid "Click again to confirm delete"
 msgstr "Клацніть ще раз, щоб підтвердити вилучення"
 
-#: package/contents/ui/FullRepresentation.qml:2659
+#: package/contents/ui/FullRepresentation.qml:2681
 msgid "Delete file"
 msgstr "Вилучити файл"
 
-#: package/contents/ui/FullRepresentation.qml:2715
+#: package/contents/ui/FullRepresentation.qml:2737
 msgid "Nothing here yet"
 msgstr "Тут поки нічого немає"
 
-#: package/contents/ui/FullRepresentation.qml:2726
+#: package/contents/ui/FullRepresentation.qml:2748
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Коли по радіо грає гарна пісня, натисніть ⬇ — її буде збережено тут для прослуховування офлайн"
 
-#: package/contents/ui/FullRepresentation.qml:2834
+#: package/contents/ui/FullRepresentation.qml:2856
 msgid "Back to shows"
 msgstr "Назад до передач"
 
-#: package/contents/ui/FullRepresentation.qml:2845
+#: package/contents/ui/FullRepresentation.qml:2867
 msgid "Search podcasts, or paste a feed URL…"
 msgstr "Шукайте подкасти або вставте URL стрічки…"
 
-#: package/contents/ui/FullRepresentation.qml:2865
-#: package/contents/ui/FullRepresentation.qml:2885
+#: package/contents/ui/FullRepresentation.qml:2887
+#: package/contents/ui/FullRepresentation.qml:2907
 msgid "Back to my shows"
 msgstr "Назад до моїх передач"
 
-#: package/contents/ui/FullRepresentation.qml:2866
+#: package/contents/ui/FullRepresentation.qml:2888
 msgid "Popular now — worldwide charts"
 msgstr "Популярне зараз — світові чарти"
 
-#: package/contents/ui/FullRepresentation.qml:2886
+#: package/contents/ui/FullRepresentation.qml:2908
 msgid "Downloaded episodes (%1)"
 msgstr "Завантажені епізоди (%1)"
 
-
-#: package/contents/ui/FullRepresentation.qml:2901
+#: package/contents/ui/FullRepresentation.qml:2923
 msgid "Import subscriptions (OPML)"
 msgstr "Імпортувати підписки (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2912
+#: package/contents/ui/FullRepresentation.qml:2934
 msgid "Export subscriptions (OPML)"
 msgstr "Експортувати підписки (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2917
+#: package/contents/ui/FullRepresentation.qml:2939
 msgid "Import subscriptions"
 msgstr "Імпортувати підписки"
 
-#: package/contents/ui/FullRepresentation.qml:2918
+#: package/contents/ui/FullRepresentation.qml:2940
 msgid "OPML files (*.opml *.xml)"
 msgstr "Файли OPML (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:2918
+#: package/contents/ui/FullRepresentation.qml:2940
 msgid "All files (*)"
 msgstr "Усі файли (*)"
 
-#: package/contents/ui/FullRepresentation.qml:2924
+#: package/contents/ui/FullRepresentation.qml:2946
 msgid "Episodes"
 msgstr "Епізоди"
 
-#: package/contents/ui/FullRepresentation.qml:2943
+#: package/contents/ui/FullRepresentation.qml:2974
+msgid "Waking up with this show at %1 — tap to remove"
+msgstr "Будильник із цією передачею о %1 — торкніться, щоб прибрати"
+
+
+#: package/contents/ui/FullRepresentation.qml:2977
+msgid "Wake up with this show"
+msgstr "Прокидатися з цією передачею"
+
+
+#: package/contents/ui/FullRepresentation.qml:2993
+msgid "Wake up with this show, daily"
+msgstr "Прокидатися з цією передачею, щодня"
+
+
+#: package/contents/ui/FullRepresentation.qml:3002
+msgid "Hour"
+msgstr "Година"
+
+
+#: package/contents/ui/FullRepresentation.qml:3009
+msgid "Minute"
+msgstr "Хвилина"
+
+
+#: package/contents/ui/FullRepresentation.qml:3012
+msgid "Set"
+msgstr "Установити"
+
+
+#: package/contents/ui/FullRepresentation.qml:3014
+msgid "Podcast"
+msgstr "Подкаст"
+
+
+#: package/contents/ui/FullRepresentation.qml:3025
+msgid "Plays the newest unheard downloaded episode — works with no network at all."
+msgstr "Відтворює найновіший непрослуханий завантажений епізод — працює зовсім без мережі."
+
+
+#: package/contents/ui/FullRepresentation.qml:3044
 msgid "Showing unplayed — tap for all"
 msgstr "Показано непрослухані — торкніться для всіх"
 
-#: package/contents/ui/FullRepresentation.qml:2944
+#: package/contents/ui/FullRepresentation.qml:3045
 msgid "Show only unplayed"
 msgstr "Показати лише непрослухані"
 
-#: package/contents/ui/FullRepresentation.qml:2959
+#: package/contents/ui/FullRepresentation.qml:3060
 msgid "Mark all as played"
 msgstr "Позначити всі як прослухані"
 
-#: package/contents/ui/FullRepresentation.qml:2989
+#: package/contents/ui/FullRepresentation.qml:3090
 msgid "Unsubscribe from this show"
 msgstr "Відписатися від цієї передачі"
 
-#: package/contents/ui/FullRepresentation.qml:2990
+#: package/contents/ui/FullRepresentation.qml:3091
 msgid "Subscribe to this show"
 msgstr "Підписатися на цю передачу"
 
-#: package/contents/ui/FullRepresentation.qml:3007
+#: package/contents/ui/FullRepresentation.qml:3108
 msgid "Refresh episodes"
 msgstr "Оновити епізоди"
 
-#: package/contents/ui/FullRepresentation.qml:3023
-#: package/contents/ui/FullRepresentation.qml:3034
+#: package/contents/ui/FullRepresentation.qml:3124
+#: package/contents/ui/FullRepresentation.qml:3135
 msgid "Open this feed"
 msgstr "Відкрити цю стрічку"
 
-#: package/contents/ui/FullRepresentation.qml:3072
+#: package/contents/ui/FullRepresentation.qml:3173
 msgid "Loading episodes…"
 msgstr "Завантаження епізодів…"
 
-#: package/contents/ui/FullRepresentation.qml:3073
+#: package/contents/ui/FullRepresentation.qml:3174
 msgid "Searching…"
 msgstr "Пошук…"
 
-#: package/contents/ui/FullRepresentation.qml:3074
+#: package/contents/ui/FullRepresentation.qml:3175
 msgid "Loading the charts…"
 msgstr "Завантаження чартів…"
 
-#: package/contents/ui/FullRepresentation.qml:3215
+#: package/contents/ui/FullRepresentation.qml:3316
 msgid "resume at %1"
 msgstr "продовжити з %1"
 
-
-#: package/contents/ui/FullRepresentation.qml:3237
+#: package/contents/ui/FullRepresentation.qml:3338
 msgid "Tap again to delete the file"
 msgstr "Торкніться ще раз, щоб видалити файл"
 
-
-#: package/contents/ui/FullRepresentation.qml:3238
+#: package/contents/ui/FullRepresentation.qml:3339
 msgid "Delete the downloaded file"
 msgstr "Видалити завантажений файл"
 
-
-#: package/contents/ui/FullRepresentation.qml:3379
+#: package/contents/ui/FullRepresentation.qml:3480
 msgid "Unsubscribe"
 msgstr "Скасувати підписку"
 
-#: package/contents/ui/FullRepresentation.qml:3380
+#: package/contents/ui/FullRepresentation.qml:3481
 msgid "Subscribe"
 msgstr "Підписатися"
 
-#: package/contents/ui/FullRepresentation.qml:3419
+#: package/contents/ui/FullRepresentation.qml:3520
 msgid "No shows found"
 msgstr "Передач не знайдено"
 
-#: package/contents/ui/FullRepresentation.qml:3420
+#: package/contents/ui/FullRepresentation.qml:3521
 msgid "The charts did not answer — try again in a moment"
 msgstr "Чарти не відповіли — спробуйте ще раз за мить"
 
-#: package/contents/ui/FullRepresentation.qml:3421
+#: package/contents/ui/FullRepresentation.qml:3522
 msgid "No subscriptions yet"
 msgstr "Підписок ще немає"
 
-#: package/contents/ui/FullRepresentation.qml:3433
+#: package/contents/ui/FullRepresentation.qml:3534
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Знайдіть передачу вище і позначте зіркою — її епізоди завантажаться сюди для прослуховування офлайн"
 
-#: package/contents/ui/FullRepresentation.qml:3473
+#: package/contents/ui/FullRepresentation.qml:3574
 msgid "All caught up — no unplayed episodes"
 msgstr "Усе прослухано — немає непрослуханих епізодів"
 
-#: package/contents/ui/FullRepresentation.qml:3524
+#: package/contents/ui/FullRepresentation.qml:3625
 msgid "Sleep timer"
 msgstr "Таймер сну"
 
-#: package/contents/ui/FullRepresentation.qml:3530
-#: package/contents/ui/FullRepresentation.qml:4249
+#: package/contents/ui/FullRepresentation.qml:3631
+#: package/contents/ui/FullRepresentation.qml:4350
 msgid "Sleeping in %1"
 msgstr "Засинання через %1"
 
-#: package/contents/ui/FullRepresentation.qml:3550
+#: package/contents/ui/FullRepresentation.qml:3651
 msgid "Cancel"
 msgstr "Скасувати"
 
-#: package/contents/ui/FullRepresentation.qml:3558
+#: package/contents/ui/FullRepresentation.qml:3659
 msgid "Playback fades out and stops when the timer ends."
 msgstr "Відтворення затихає і зупиняється, коли таймер закінчується."
 
-#: package/contents/ui/FullRepresentation.qml:3593
+#: package/contents/ui/FullRepresentation.qml:3694
 msgid "Wake-up alarms"
 msgstr "Будильники"
 
@@ -1007,389 +1052,389 @@ msgstr "Будильники"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Sun"
 msgstr "нд"
 
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Mon"
 msgstr "пн"
 
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Tue"
 msgstr "вт"
 
-#: package/contents/ui/FullRepresentation.qml:3618
-#: package/contents/ui/FullRepresentation.qml:3713
-#: package/contents/ui/FullRepresentation.qml:3820
-#: package/contents/ui/FullRepresentation.qml:3928
+#: package/contents/ui/FullRepresentation.qml:3719
+#: package/contents/ui/FullRepresentation.qml:3814
+#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:4029
 msgid "Wed"
 msgstr "ср"
 
-#: package/contents/ui/FullRepresentation.qml:3619
-#: package/contents/ui/FullRepresentation.qml:3714
-#: package/contents/ui/FullRepresentation.qml:3821
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3720
+#: package/contents/ui/FullRepresentation.qml:3815
+#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:4030
 msgid "Thu"
 msgstr "чт"
 
-#: package/contents/ui/FullRepresentation.qml:3619
-#: package/contents/ui/FullRepresentation.qml:3714
-#: package/contents/ui/FullRepresentation.qml:3821
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3720
+#: package/contents/ui/FullRepresentation.qml:3815
+#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:4030
 msgid "Fri"
 msgstr "пт"
 
-#: package/contents/ui/FullRepresentation.qml:3619
-#: package/contents/ui/FullRepresentation.qml:3714
-#: package/contents/ui/FullRepresentation.qml:3821
-#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:3720
+#: package/contents/ui/FullRepresentation.qml:3815
+#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:4030
 msgid "Sat"
 msgstr "сб"
 
-#: package/contents/ui/FullRepresentation.qml:3621
-#: package/contents/ui/FullRepresentation.qml:3705
-#: package/contents/ui/FullRepresentation.qml:3823
-#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:3722
+#: package/contents/ui/FullRepresentation.qml:3806
+#: package/contents/ui/FullRepresentation.qml:3924
+#: package/contents/ui/FullRepresentation.qml:4022
 msgid "Daily"
 msgstr "Щодня"
 
-#: package/contents/ui/FullRepresentation.qml:3622
-#: package/contents/ui/FullRepresentation.qml:3824
+#: package/contents/ui/FullRepresentation.qml:3723
+#: package/contents/ui/FullRepresentation.qml:3925
 msgid "Every %1"
 msgstr "Щотижня: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3637
+#: package/contents/ui/FullRepresentation.qml:3738
 msgid "Remove this alarm"
 msgstr "Вилучити цей будильник"
 
-#: package/contents/ui/FullRepresentation.qml:3645
+#: package/contents/ui/FullRepresentation.qml:3746
 msgid "No alarms yet — add one below."
 msgstr "Будильників ще немає — додайте один нижче."
 
-#: package/contents/ui/FullRepresentation.qml:3660
-#: package/contents/ui/FullRepresentation.qml:3862
+#: package/contents/ui/FullRepresentation.qml:3761
+#: package/contents/ui/FullRepresentation.qml:3963
 msgid "Station:"
 msgstr "Станція:"
 
-#: package/contents/ui/FullRepresentation.qml:3668
-#: package/contents/ui/FullRepresentation.qml:3870
+#: package/contents/ui/FullRepresentation.qml:3769
+#: package/contents/ui/FullRepresentation.qml:3971
 msgid "Station"
 msgstr "Станція"
 
-#: package/contents/ui/FullRepresentation.qml:3672
-#: package/contents/ui/FullRepresentation.qml:3874
+#: package/contents/ui/FullRepresentation.qml:3773
+#: package/contents/ui/FullRepresentation.qml:3975
 msgid "Start:"
 msgstr "Початок:"
 
-#: package/contents/ui/FullRepresentation.qml:3683
-#: package/contents/ui/FullRepresentation.qml:3885
+#: package/contents/ui/FullRepresentation.qml:3784
+#: package/contents/ui/FullRepresentation.qml:3986
 msgid "Start hour"
 msgstr "Година початку"
 
-#: package/contents/ui/FullRepresentation.qml:3693
-#: package/contents/ui/FullRepresentation.qml:3895
+#: package/contents/ui/FullRepresentation.qml:3794
+#: package/contents/ui/FullRepresentation.qml:3996
 msgid "Start minute"
 msgstr "Хвилина початку"
 
-#: package/contents/ui/FullRepresentation.qml:3698
-#: package/contents/ui/FullRepresentation.qml:3914
+#: package/contents/ui/FullRepresentation.qml:3799
+#: package/contents/ui/FullRepresentation.qml:4015
 msgid "Repeat:"
 msgstr "Повторення:"
 
-#: package/contents/ui/FullRepresentation.qml:3705
-#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:3806
+#: package/contents/ui/FullRepresentation.qml:4022
 msgid "Once"
 msgstr "Одноразово"
 
-#: package/contents/ui/FullRepresentation.qml:3705
-#: package/contents/ui/FullRepresentation.qml:3921
+#: package/contents/ui/FullRepresentation.qml:3806
+#: package/contents/ui/FullRepresentation.qml:4022
 msgid "Weekly"
 msgstr "Щотижня"
 
-#: package/contents/ui/FullRepresentation.qml:3707
-#: package/contents/ui/FullRepresentation.qml:3922
+#: package/contents/ui/FullRepresentation.qml:3808
+#: package/contents/ui/FullRepresentation.qml:4023
 msgid "Repeat"
 msgstr "Повторення"
 
-#: package/contents/ui/FullRepresentation.qml:3716
-#: package/contents/ui/FullRepresentation.qml:3931
+#: package/contents/ui/FullRepresentation.qml:3817
+#: package/contents/ui/FullRepresentation.qml:4032
 msgid "Weekday"
 msgstr "День тижня"
 
-#: package/contents/ui/FullRepresentation.qml:3721
+#: package/contents/ui/FullRepresentation.qml:3822
 msgid "Volume:"
 msgstr "Гучність:"
 
-#: package/contents/ui/FullRepresentation.qml:3743
+#: package/contents/ui/FullRepresentation.qml:3844
 msgid "Keep the computer awake until the alarm"
 msgstr "Не давати комп'ютеру заснути до будильника"
 
-#: package/contents/ui/FullRepresentation.qml:3749
-#: package/contents/ui/FullRepresentation.qml:3967
+#: package/contents/ui/FullRepresentation.qml:3850
+#: package/contents/ui/FullRepresentation.qml:4068
 msgid "Add"
 msgstr "Додати"
 
-#: package/contents/ui/FullRepresentation.qml:3839
+#: package/contents/ui/FullRepresentation.qml:3940
 msgid "Remove this schedule"
 msgstr "Вилучити цей розклад"
 
-#: package/contents/ui/FullRepresentation.qml:3847
+#: package/contents/ui/FullRepresentation.qml:3948
 msgid "No scheduled recordings yet — add one below."
 msgstr "Запланованих записів ще немає — додайте нижче."
 
-#: package/contents/ui/FullRepresentation.qml:3900
+#: package/contents/ui/FullRepresentation.qml:4001
 msgid "Duration:"
 msgstr "Тривалість:"
 
-#: package/contents/ui/FullRepresentation.qml:3910
+#: package/contents/ui/FullRepresentation.qml:4011
 msgid "Duration in minutes"
 msgstr "Тривалість у хвилинах"
 
-#: package/contents/ui/FullRepresentation.qml:3942
+#: package/contents/ui/FullRepresentation.qml:4043
 msgid "Recordings are for personal use only."
 msgstr "Записи призначені лише для особистого користування."
 
-#: package/contents/ui/FullRepresentation.qml:4155
-#: package/contents/ui/FullRepresentation.qml:4273
+#: package/contents/ui/FullRepresentation.qml:4256
+#: package/contents/ui/FullRepresentation.qml:4374
 msgid "Playing"
 msgstr "Відтворення"
 
-#: package/contents/ui/FullRepresentation.qml:4181
+#: package/contents/ui/FullRepresentation.qml:4282
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Подкасти"
 
-#: package/contents/ui/FullRepresentation.qml:4194
+#: package/contents/ui/FullRepresentation.qml:4295
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Таймери"
 
-#: package/contents/ui/FullRepresentation.qml:4255
+#: package/contents/ui/FullRepresentation.qml:4356
 #: package/contents/ui/main.qml:70
 msgid "Casting to %1"
 msgstr "Трансляція на %1"
 
-#: package/contents/ui/FullRepresentation.qml:4258
+#: package/contents/ui/FullRepresentation.qml:4359
 msgid "Check internet connection…"
 msgstr "Перевірте з'єднання з інтернетом…"
 
-#: package/contents/ui/FullRepresentation.qml:4268
+#: package/contents/ui/FullRepresentation.qml:4369
 msgid "Bitrate: %1 kb/s"
 msgstr "Бітрейт: %1 кбіт/с"
 
-#: package/contents/ui/FullRepresentation.qml:4273
-#: package/contents/ui/FullRepresentation.qml:4276
+#: package/contents/ui/FullRepresentation.qml:4374
+#: package/contents/ui/FullRepresentation.qml:4377
 msgid "Connecting…"
 msgstr "З'єднання…"
 
-#: package/contents/ui/FullRepresentation.qml:4278
+#: package/contents/ui/FullRepresentation.qml:4379
 msgid "Choose station and enjoy…"
 msgstr "Оберіть станцію та насолоджуйтеся…"
 
-#: package/contents/ui/FullRepresentation.qml:4302
+#: package/contents/ui/FullRepresentation.qml:4403
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Трансляція на %1 — натисніть, щоб вибрати або зупинити"
 
-#: package/contents/ui/FullRepresentation.qml:4304
+#: package/contents/ui/FullRepresentation.qml:4405
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Гучність, вихід і пристрої (Chromecast, TV, динамік)"
 
-#: package/contents/ui/FullRepresentation.qml:4305
+#: package/contents/ui/FullRepresentation.qml:4406
 msgid "Volume and audio output"
 msgstr "Гучність і аудіовихід"
 
-#: package/contents/ui/FullRepresentation.qml:4467
+#: package/contents/ui/FullRepresentation.qml:4568
 msgid "Play on"
 msgstr "Відтворити на"
 
-#: package/contents/ui/FullRepresentation.qml:4495
+#: package/contents/ui/FullRepresentation.qml:4596
 msgid "Mute"
 msgstr "Вимкнути звук"
 
-#: package/contents/ui/FullRepresentation.qml:4495
+#: package/contents/ui/FullRepresentation.qml:4596
 msgid "Unmute"
 msgstr "Увімкнути звук"
 
-#: package/contents/ui/FullRepresentation.qml:4527
+#: package/contents/ui/FullRepresentation.qml:4628
 msgid "This computer"
 msgstr "Цей комп'ютер"
 
-#: package/contents/ui/FullRepresentation.qml:4551
+#: package/contents/ui/FullRepresentation.qml:4652
 msgid "System default output"
 msgstr "Системний вихід за замовчуванням"
 
-#: package/contents/ui/FullRepresentation.qml:4578
+#: package/contents/ui/FullRepresentation.qml:4679
 msgid "All local outputs, in sync"
 msgstr "Усі локальні виходи, синхронно"
 
-#: package/contents/ui/FullRepresentation.qml:4608
+#: package/contents/ui/FullRepresentation.qml:4709
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Грає одночасно на всіх під'єднаних колонках — дротові виходи затримуються, щоб іти в ногу з Bluetooth."
 
-#: package/contents/ui/FullRepresentation.qml:4624
-#: package/contents/ui/FullRepresentation.qml:4631
+#: package/contents/ui/FullRepresentation.qml:4725
+#: package/contents/ui/FullRepresentation.qml:4732
 msgid "Sync fine-tune"
 msgstr "Точне налаштування синхронізації"
 
-#: package/contents/ui/FullRepresentation.qml:4665
+#: package/contents/ui/FullRepresentation.qml:4766
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Якщо Bluetooth-колонка все ще відстає від дротових, збільшуйте це, доки вони не заграють разом."
 
-#: package/contents/ui/FullRepresentation.qml:4677
+#: package/contents/ui/FullRepresentation.qml:4778
 msgid "Sync delay in milliseconds"
 msgstr "Затримка синхронізації в мілісекундах"
 
-#: package/contents/ui/FullRepresentation.qml:4699
+#: package/contents/ui/FullRepresentation.qml:4800
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Введіть точну затримку в мілісекундах — повзунок рухається кроками по десять."
 
-#: package/contents/ui/FullRepresentation.qml:4703
+#: package/contents/ui/FullRepresentation.qml:4804
 msgid "ms"
 msgstr "мс"
 
-#: package/contents/ui/FullRepresentation.qml:4717
+#: package/contents/ui/FullRepresentation.qml:4818
 msgid "Calibrate with the microphone"
 msgstr "Калібрувати мікрофоном"
 
-#: package/contents/ui/FullRepresentation.qml:4722
+#: package/contents/ui/FullRepresentation.qml:4823
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Відтворює кілька гучних клацань через кожну колонку та вимірює мікрофоном, наскільки відстає Bluetooth-колонка — затримка встановлюється автоматично."
 
-#: package/contents/ui/FullRepresentation.qml:4737
+#: package/contents/ui/FullRepresentation.qml:4838
 msgid "Keep sync tuned automatically"
 msgstr "Автоматично підтримувати синхронізацію"
 
-#: package/contents/ui/FullRepresentation.qml:4740
+#: package/contents/ui/FullRepresentation.qml:4841
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Кожні кілька хвилин слухає відтворюваний звук мікрофоном і повторно перевіряє синхронізацію, коли колонки розходяться. Звук обробляється лише на цьому комп'ютері — ніколи не зберігається і нікуди не надсилається."
 
-#: package/contents/ui/FullRepresentation.qml:4777
+#: package/contents/ui/FullRepresentation.qml:4878
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 запам'ятовано для синхронізації — під'єднайте, і вона автоматично приєднається знову."
 
-#: package/contents/ui/FullRepresentation.qml:4800
+#: package/contents/ui/FullRepresentation.qml:4901
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Раунд 1 із 2 — клацання через кожен динамік…"
 
-#: package/contents/ui/FullRepresentation.qml:4801
+#: package/contents/ui/FullRepresentation.qml:4902
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Раунд 2 із 2 — тиша, перевіряю результат…"
 
-#: package/contents/ui/FullRepresentation.qml:4839
+#: package/contents/ui/FullRepresentation.qml:4940
 msgid "%1 plays in the group"
 msgstr "%1 грає в групі"
 
-#: package/contents/ui/FullRepresentation.qml:4852
+#: package/contents/ui/FullRepresentation.qml:4953
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Чи грає ця колонка в групі — зніміть позначку, щоб залишити її осторонь, не від'єднуючи. Запам'ятовується для пристрою."
 
-#: package/contents/ui/FullRepresentation.qml:4861
+#: package/contents/ui/FullRepresentation.qml:4962
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (нічого не підключено)"
 
-#: package/contents/ui/FullRepresentation.qml:4875
+#: package/contents/ui/FullRepresentation.qml:4976
 msgid "Balance of %1"
 msgstr "Баланс %1"
 
-#: package/contents/ui/FullRepresentation.qml:4884
+#: package/contents/ui/FullRepresentation.qml:4985
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Частка цього динаміка в гучності — баланс іде за кожним рухом головного регулятора й запам'ятовується для пристрою. Він впливає лише на те, що відтворює цей віджет; гучність пристрою в системних налаштуваннях звуку — окремий, недоторканий шар, тому ті числа відрізняються від цих повзунків."
 
-#: package/contents/ui/FullRepresentation.qml:4901
+#: package/contents/ui/FullRepresentation.qml:5002
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:4902
+#: package/contents/ui/FullRepresentation.qml:5003
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:4903
+#: package/contents/ui/FullRepresentation.qml:5004
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:4904
+#: package/contents/ui/FullRepresentation.qml:5005
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:4909
+#: package/contents/ui/FullRepresentation.qml:5010
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Які канали грає ця колонка: стерео, лише лівий, лише правий або моно-мікс обох. Поставте одну колонку на L, а іншу на R — отримаєте справжню стереопару; запам'ятовується для пристрою."
 
-#: package/contents/ui/FullRepresentation.qml:4940
+#: package/contents/ui/FullRepresentation.qml:5041
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:4955
+#: package/contents/ui/FullRepresentation.qml:5056
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth вимкнено або адаптер недоступний — перевірте Системні параметри."
 
-#: package/contents/ui/FullRepresentation.qml:4966
+#: package/contents/ui/FullRepresentation.qml:5067
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "Немає спарених аудіопристроїв Bluetooth — скористайтеся «Спарувати нову колонку…» нижче або спаруйте один раз у Системних параметрах."
 
-#: package/contents/ui/FullRepresentation.qml:4980
+#: package/contents/ui/FullRepresentation.qml:5081
 msgid "%1 — connecting…"
 msgstr "%1 — з'єднання…"
 
-#: package/contents/ui/FullRepresentation.qml:4998
+#: package/contents/ui/FullRepresentation.qml:5099
 msgid "%1 — pairing…"
 msgstr "%1 — спарювання…"
 
-#: package/contents/ui/FullRepresentation.qml:4999
+#: package/contents/ui/FullRepresentation.qml:5100
 msgid "%1 — new, click to pair"
 msgstr "%1 — новий, натисніть щоб спарувати"
 
-#: package/contents/ui/FullRepresentation.qml:5010
+#: package/contents/ui/FullRepresentation.qml:5111
 msgid "Pair a new speaker…"
 msgstr "Спарувати нову колонку…"
 
-#: package/contents/ui/FullRepresentation.qml:5026
+#: package/contents/ui/FullRepresentation.qml:5127
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Пошук — переведіть колонку в режим спарювання…"
 
-#: package/contents/ui/FullRepresentation.qml:5047
+#: package/contents/ui/FullRepresentation.qml:5148
 msgid "WiFi & network"
 msgstr "WiFi та мережа"
 
-#: package/contents/ui/FullRepresentation.qml:5079
+#: package/contents/ui/FullRepresentation.qml:5180
 msgid "%1 (speaker group)"
 msgstr "%1 (група динаміків)"
 
-#: package/contents/ui/FullRepresentation.qml:5107
+#: package/contents/ui/FullRepresentation.qml:5208
 msgid "Balance"
 msgstr "Баланс"
 
-#: package/contents/ui/FullRepresentation.qml:5121
+#: package/contents/ui/FullRepresentation.qml:5222
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Частка цього пристрою в гучності — баланс іде за кожним рухом головного повзунка й запам'ятовується для пристрою."
 
-#: package/contents/ui/FullRepresentation.qml:5143
+#: package/contents/ui/FullRepresentation.qml:5244
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Кожен пристрій буферизує потік самостійно, тому кімнати можуть грати з різницею в кілька секунд. Для ідеально синхронних динаміків згрупуйте їх у застосунку Google Home — група з'явиться тут як один пристрій."
 
-#: package/contents/ui/FullRepresentation.qml:5153
+#: package/contents/ui/FullRepresentation.qml:5254
 msgid "Stop casting everywhere"
 msgstr "Зупинити відтворення на всіх пристроях"
 
-#: package/contents/ui/FullRepresentation.qml:5171
+#: package/contents/ui/FullRepresentation.qml:5272
 msgid "Searching for devices…"
 msgstr "Пошук пристроїв…"
 
-#: package/contents/ui/FullRepresentation.qml:5180
+#: package/contents/ui/FullRepresentation.qml:5281
 msgid "No devices found on your network"
 msgstr "У вашій мережі не знайдено жодного пристрою"
 
@@ -1448,224 +1493,245 @@ msgstr "Ця адреса не є подкаст-стрічкою."
 msgid "No playable episodes in this feed."
 msgstr "У цій стрічці немає придатних до відтворення епізодів."
 
-#: package/contents/ui/main.qml:2155
+#: package/contents/ui/main.qml:1516
+msgid "%1 — the newest episodes are downloading."
+msgstr "%1 — найновіші епізоди завантажуються."
+
+
+#: package/contents/ui/main.qml:1518
+msgid "New podcast episodes"
+msgstr "Нові епізоди подкастів"
+
+
+#: package/contents/ui/main.qml:2383
 msgid "Scheduled recording started"
 msgstr "Запланований запис розпочато"
 
-#: package/contents/ui/main.qml:2275
+#: package/contents/ui/main.qml:2503
 msgid "Scheduled recording missed"
 msgstr "Запланований запис пропущено"
 
-#: package/contents/ui/main.qml:2281
+#: package/contents/ui/main.qml:2509
 msgid "Scheduled recording skipped"
 msgstr "Запланований запис пропущено"
 
-#: package/contents/ui/main.qml:2282
+#: package/contents/ui/main.qml:2510
 msgid "%1 — another recording is already running."
 msgstr "%1 — інший запис уже триває."
 
-#: package/contents/ui/main.qml:2456
+#: package/contents/ui/main.qml:2684
 msgid "Wake-up alarm missed"
 msgstr "Будильник пропущено"
 
-#: package/contents/ui/main.qml:2457
+#: package/contents/ui/main.qml:2685
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 було встановлено на %2 — комп'ютер у цей час був вимкнений або спав."
 
-#: package/contents/ui/main.qml:2491 package/contents/ui/main.qml:2571
-#: package/contents/ui/main.qml:2624 package/contents/ui/main.qml:2627
+#: package/contents/ui/main.qml:2719 package/contents/ui/main.qml:2804
+#: package/contents/ui/main.qml:2844 package/contents/ui/main.qml:2850
+#: package/contents/ui/main.qml:2891 package/contents/ui/main.qml:2894
 msgid "Wake-up alarm"
 msgstr "Будильник"
 
-#: package/contents/ui/main.qml:2492
+#: package/contents/ui/main.qml:2720
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 припав на той самий час — замість нього грає %2."
 
-#: package/contents/ui/main.qml:2628
+#: package/contents/ui/main.qml:2852
+msgid "the show"
+msgstr "передачі"
+
+
+#: package/contents/ui/main.qml:2851
+msgid "No downloaded episode of %1 was on disk — waking with the chime."
+msgstr "Жодного завантаженого епізоду %1 не було на диску — будильник із сигналом."
+
+
+#: package/contents/ui/main.qml:2895
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Станція не змогла запуститися — натомість грає вбудований сигнал."
 
-#: package/contents/ui/main.qml:3344
+#: package/contents/ui/main.qml:3611
 msgid "%1 devices"
 msgstr "%1 пристроїв"
 
-#: package/contents/ui/main.qml:3785
+#: package/contents/ui/main.qml:4052
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-колонка"
 
-#: package/contents/ui/main.qml:3784
+#: package/contents/ui/main.qml:4051
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 підключено, але звук так і не надійшов"
 
-#: package/contents/ui/main.qml:3786
+#: package/contents/ui/main.qml:4053
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Вимкніть і знову ввімкніть колонку, а потім підключіть її ще раз."
 
-#: package/contents/ui/main.qml:4175
+#: package/contents/ui/main.qml:4442
 msgid "Station seems to be off the air"
 msgstr "Схоже, станція не в ефірі"
 
-#: package/contents/ui/main.qml:4176
+#: package/contents/ui/main.qml:4443
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 не відповідає за жодною адресою, відомою каталогу. Вона лишається у вашому списку — спроби тривають у фоні."
 
-#: package/contents/ui/main.qml:4248
+#: package/contents/ui/main.qml:4515
 msgid "Playing from a backup address"
 msgstr "Відтворення з резервної адреси"
 
-#: package/contents/ui/main.qml:4249
+#: package/contents/ui/main.qml:4516
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Збережена адреса станції не відповідає — поки що грає найближчий збіг із каталогу. Вашу збережену адресу збережено."
 
-#: package/contents/ui/main.qml:4289
+#: package/contents/ui/main.qml:4556
 msgid "Station found at a new address"
 msgstr "Станцію знайдено за новою адресою"
 
-#: package/contents/ui/main.qml:4290
+#: package/contents/ui/main.qml:4557
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 переїхала — нову адресу збережено у вашому списку."
 
-#: package/contents/ui/main.qml:5562
+#: package/contents/ui/main.qml:5830
 msgid "Episode downloaded"
 msgstr "Епізод завантажено"
 
-#: package/contents/ui/main.qml:5566
+#: package/contents/ui/main.qml:5834
 msgid "Episode download failed"
 msgstr "Не вдалося завантажити епізод"
 
-#: package/contents/ui/main.qml:5579
+#: package/contents/ui/main.qml:5876
 msgid "Subscriptions exported"
 msgstr "Підписки експортовано"
 
-#: package/contents/ui/main.qml:5581
+#: package/contents/ui/main.qml:5878
 msgid "Export failed"
 msgstr "Не вдалося експортувати"
 
-#: package/contents/ui/main.qml:5582
+#: package/contents/ui/main.qml:5879
 msgid "Could not write the subscriptions file."
 msgstr "Не вдалося записати файл підписок."
 
-#: package/contents/ui/main.qml:5675
+#: package/contents/ui/main.qml:5972
 msgid "Casting needs python-chromecast"
 msgstr "Трансляція потребує python-chromecast"
 
-#: package/contents/ui/main.qml:5676
+#: package/contents/ui/main.qml:5973
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Встановіть пакунок python-chromecast, щоб транслювати на свої пристрої."
 
-#: package/contents/ui/main.qml:5697
+#: package/contents/ui/main.qml:5994
 msgid "the device"
 msgstr "пристрій"
 
-#: package/contents/ui/main.qml:5697
+#: package/contents/ui/main.qml:5994
 msgid "Could not cast to %1"
 msgstr "Не вдалося транслювати на %1"
 
-#: package/contents/ui/main.qml:5698
+#: package/contents/ui/main.qml:5995
 msgid "The device could not play this station."
 msgstr "Пристрій не зміг відтворити цю станцію."
 
-#: package/contents/ui/main.qml:5744
+#: package/contents/ui/main.qml:6041
 msgid "Casting"
 msgstr "Трансляція"
 
-#: package/contents/ui/main.qml:5745
+#: package/contents/ui/main.qml:6042
 msgid "The device did not stop — it may still be playing."
 msgstr "Пристрій не зупинився — можливо, він ще відтворює."
 
-#: package/contents/ui/main.qml:5801 package/contents/ui/main.qml:5903
+#: package/contents/ui/main.qml:6098 package/contents/ui/main.qml:6200
 msgid "the Bluetooth device"
 msgstr "пристроєм Bluetooth"
 
-#: package/contents/ui/main.qml:5800
+#: package/contents/ui/main.qml:6097
 msgid "Could not connect to %1"
 msgstr "Не вдалося з'єднатися з %1"
 
-#: package/contents/ui/main.qml:5802
+#: package/contents/ui/main.qml:6099
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Переконайтеся, що динамік увімкнено і він у межах досяжності."
 
-#: package/contents/ui/main.qml:5902
+#: package/contents/ui/main.qml:6199
 msgid "Could not pair with %1"
 msgstr "Не вдалося спарувати з %1"
 
-#: package/contents/ui/main.qml:5904
+#: package/contents/ui/main.qml:6201
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Переведіть колонку в режим спарювання (утримуйте кнопку Bluetooth) і спробуйте ще раз."
 
-#: package/contents/ui/main.qml:6002
+#: package/contents/ui/main.qml:6299
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg не встановлено"
 
-#: package/contents/ui/main.qml:6003
+#: package/contents/ui/main.qml:6300
 msgid "Install ffmpeg to record radio."
 msgstr "Встановіть ffmpeg, щоб записувати радіо."
 
-#: package/contents/ui/main.qml:6006
+#: package/contents/ui/main.qml:6303
 msgid "Not enough disk space for this recording"
 msgstr "Недостатньо місця на диску для цього запису"
 
-#: package/contents/ui/main.qml:6007
+#: package/contents/ui/main.qml:6304
 msgid "Free some space in %1 and try again."
 msgstr "Звільніть місце в %1 і спробуйте ще раз."
 
-#: package/contents/ui/main.qml:6010
+#: package/contents/ui/main.qml:6307
 msgid "Recording saved ✓ (%1)"
 msgstr "Запис збережено ✓ (%1)"
 
-#: package/contents/ui/main.qml:6014
+#: package/contents/ui/main.qml:6311
 msgid "Recording interrupted (%1 captured)"
 msgstr "Запис перервано (записано %1)"
 
-#: package/contents/ui/main.qml:6016
+#: package/contents/ui/main.qml:6313
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — файл значно менший, ніж очікувалося."
 
-#: package/contents/ui/main.qml:6020
+#: package/contents/ui/main.qml:6317
 msgid "Recording failed"
 msgstr "Не вдалося записати"
 
-#: package/contents/ui/main.qml:6021
+#: package/contents/ui/main.qml:6318
 msgid "The stream could not be captured."
 msgstr "Не вдалося захопити потік."
 
-#: package/contents/ui/main.qml:6107
+#: package/contents/ui/main.qml:6404
 msgid "Downloading again without the cover"
 msgstr "Завантажую знову без обкладинки"
 
-#: package/contents/ui/main.qml:6108
+#: package/contents/ui/main.qml:6405
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Для вбудовування теґів потрібен пакунок python-mutagen — встановіть його, щоб мати обкладинки у файлах."
 
-#: package/contents/ui/main.qml:6116
+#: package/contents/ui/main.qml:6413
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp не встановлено"
 
-#: package/contents/ui/main.qml:6117
+#: package/contents/ui/main.qml:6414
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Встановіть yt-dlp (і ffmpeg), щоб завантажувати композиції."
 
-#: package/contents/ui/main.qml:6120
+#: package/contents/ui/main.qml:6417
 msgid "Track downloaded ✓"
 msgstr "Композицію завантажено ✓"
 
-#: package/contents/ui/main.qml:6121
+#: package/contents/ui/main.qml:6418
 msgid "Saved to: %1"
 msgstr "Збережено до: %1"
 
-#: package/contents/ui/main.qml:6124
+#: package/contents/ui/main.qml:6421
 msgid "Download failed"
 msgstr "Не вдалося завантажити"
 
-#: package/contents/ui/main.qml:6125
+#: package/contents/ui/main.qml:6422
 msgid "Unknown error"
 msgstr "Невідома помилка"
 
-#: package/contents/ui/main.qml:6427
+#: package/contents/ui/main.qml:6744
 msgid "Audio output changed"
 msgstr "Аудіовихід змінено"
 
-#: package/contents/ui/main.qml:6428
+#: package/contents/ui/main.qml:6745
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Вибраний пристрій виводу зник — використовується типовий системний вихід."
 
