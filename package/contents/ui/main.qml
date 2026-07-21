@@ -1156,9 +1156,10 @@ PlasmoidItem {
         podcastSearchBusy = true;
         var seq = ++_podSearchSeq;
         podcastSearchModel.clear();
-        _podSearchPending = 2;
+        _podSearchPending = 3;
         _podSearchITunes(q, seq);
         _podSearchFyyd(q, seq);
+        _podSearchGpodder(q, seq);
     }
 
     // One merged row, whatever directory it came from: gated, capped, deduped.
@@ -1166,8 +1167,12 @@ PlasmoidItem {
         feed = String(feed || "").trim();
         if (!PodcastLogic.urlAllowed(feed)) return;
         if (podcastSearchModel.count >= 50) return;
+        // Cross-directory twins wear different coats for one address —
+        // http vs https, a trailing slash, a shouting host. The canonical
+        // key sees through all three.
+        var fkey = PodcastLogic.feedKey(feed);
         for (var i = 0; i < podcastSearchModel.count; i++)
-            if (podcastSearchModel.get(i).feedUrl === feed) return;
+            if (PodcastLogic.feedKey(podcastSearchModel.get(i).feedUrl) === fkey) return;
         podcastSearchModel.append({
             "title": String(title || "").substring(0, 200),
             "author": String(author || "").substring(0, 200),
@@ -1234,6 +1239,44 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
+        guard = _armXhrTimeout(xhr, 10000);
+        xhr.send();
+    }
+
+    // gpodder.net — the open-source directory, keyless like fyyd, with the
+    // feed URL first-class in every row. No author field; the show's own
+    // website host stands in so the row is not naked.
+    function _podSearchGpodder(q, seq) {
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        var aborted = false;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            if (guard) guard.stop();
+            if (seq !== root._podSearchSeq) return;
+            try {
+                var res = JSON.parse(xhr.responseText || "[]") || [];
+                for (var i = 0; i < res.length && i < 30; i++) {
+                    var r = res[i] || {};
+                    var hm = /^https?:\/\/([^\/?#:]+)/i.exec(String(r.website || ""));
+                    var host = hm ? hm[1] : "";
+                    root._podAppendSearchRow(r.title, host,
+                        String(r.logo_url || "").trim(), r.url);
+                }
+            } catch (e) {
+                console.log("[ARP] podcastSearch(gpodder): " + e);
+            }
+            root._podSearchSettle(seq);
+        };
+        xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
         xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();

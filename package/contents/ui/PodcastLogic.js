@@ -480,3 +480,15 @@ function cleanCandidates(ledger, playedMap, nowMs, keepPerShow, maxAgeDays) {
     }
     return out
 }
+
+// One canonical key per feed ADDRESS: scheme dropped (http and https twins
+// are the same show), host lowercased, default ports and trailing slashes
+// shed. Directories disagree about all three; the dedupe must not.
+function feedKey(url) {
+    var u = String(url || "").trim()
+    var m = /^https?:\/\/([^\/?#]+)([^?#]*)/i.exec(u)
+    if (!m) return u.toLowerCase()
+    var host = m[1].toLowerCase().replace(/:(80|443)$/, "")
+    var path = (m[2] || "").replace(/\/+$/, "")
+    return host + path
+}

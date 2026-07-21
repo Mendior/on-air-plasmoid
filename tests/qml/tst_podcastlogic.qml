@@ -268,6 +268,18 @@ TestCase {
         compare(PL.cleanCandidates(led3, { ko: 1 }, now, 10, 3).length, 0)
     }
 
+    function test_feed_key_sees_through_the_coats() {
+        // http vs https, trailing slash, shouting host, default ports —
+        // one show, one key, across every directory's spelling.
+        var k = PL.feedKey("https://Feeds.Example.com/show/rss/")
+        compare(PL.feedKey("http://feeds.example.com/show/rss"), k)
+        compare(PL.feedKey("https://feeds.example.com:443/show/rss"), k)
+        verify(PL.feedKey("https://feeds.example.com/other") !== k)
+        // Garbage stays distinct, never throws.
+        compare(PL.feedKey(""), "")
+        compare(PL.feedKey("not a url"), "not a url")
+    }
+
     function test_prune_survives_a_corrupted_null_entry() {
         // A hand-edited config can hold {"key": null} — the comparator must
         // not throw the whole save away over it.
