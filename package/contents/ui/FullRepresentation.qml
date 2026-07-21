@@ -5111,12 +5111,47 @@ PlasmaExtras.Representation {
                                 required property string name
                                 required property bool connected
                                 Layout.fillWidth: true
-                                spacing: 0
+                                spacing: Kirigami.Units.smallSpacing
+
+                                // One hover for the WHOLE row, gaps included:
+                                // per-child hover made the trash blink while
+                                // the pointer crossed the seam to the tick.
+                                HoverHandler { id: btRowHover }
+
+                                // Forget lives at the FAR LEFT, a full row
+                                // away from the tick — nobody should have to
+                                // guess which of two neighbouring targets
+                                // their click will land on. Two taps, because
+                                // the road back is a fresh pairing.
+                                CircleButton {
+                                    id: btForgetBtn
+                                    property bool armed: false
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+                                    Layout.alignment: Qt.AlignVCenter
+                                    iconName: armed ? "dialog-warning" : "user-trash"
+                                    iconScale: 0.5
+                                    baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
+                                    opacity: (btRowHover.hovered || armed) ? 0.75 : 0.0
+                                    visible: opacity > 0.0 && root._btConnectingMac === ""
+                                             && root._btPairingMac === ""
+                                    Behavior on opacity {
+                                        NumberAnimation { duration: Kirigami.Units.shortDuration }
+                                    }
+                                    tooltipText: armed
+                                                 ? i18n("Tap again to forget — pairing again is the only way back")
+                                                 : i18n("Forget this device (unpair)")
+                                    onClicked: {
+                                        if (!armed) { armed = true; btForgetDisarm.restart(); return }
+                                        armed = false
+                                        root.btForget(btRow.mac)
+                                    }
+                                    Timer { id: btForgetDisarm; interval: 3000; onTriggered: btForgetBtn.armed = false }
+                                }
 
                                 PlasmaComponents3.CheckDelegate {
                                     id: btRowDelegate
                                     Layout.fillWidth: true
-                                    hoverEnabled: true
                                     text: root._btConnectingMac === btRow.mac
                                           ? i18n("%1 — connecting…", btRow.name) : btRow.name
                                     icon.name: "network-bluetooth"
@@ -5133,33 +5168,6 @@ PlasmaExtras.Representation {
                                         if (wasConnected) root.btDisconnect(btRow.mac)
                                         else root.btConnect(btRow.mac, btRow.name)
                                     }
-                                }
-
-                                // Forget: unpairs the device for real, the
-                                // professional escape from a rotted pairing —
-                                // two taps, because the road back is a fresh
-                                // pairing via "Pair a new speaker…".
-                                CircleButton {
-                                    id: btForgetBtn
-                                    property bool armed: false
-                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
-                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
-                                    Layout.alignment: Qt.AlignVCenter
-                                    iconName: armed ? "dialog-warning" : "user-trash"
-                                    iconScale: 0.5
-                                    baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
-                                    opacity: (btRowDelegate.hovered || hovered || armed) ? 0.75 : 0.0
-                                    visible: opacity > 0.0 && root._btConnectingMac === ""
-                                             && root._btPairingMac === ""
-                                    tooltipText: armed
-                                                 ? i18n("Tap again to forget — pairing again is the only way back")
-                                                 : i18n("Forget this device (unpair)")
-                                    onClicked: {
-                                        if (!armed) { armed = true; btForgetDisarm.restart(); return }
-                                        armed = false
-                                        root.btForget(btRow.mac)
-                                    }
-                                    Timer { id: btForgetDisarm; interval: 3000; onTriggered: btForgetBtn.armed = false }
                                 }
                             }
                         }
