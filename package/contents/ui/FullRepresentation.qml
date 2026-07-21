@@ -5105,18 +5105,53 @@ PlasmaExtras.Representation {
 
                         Repeater {
                             model: btDevicesModel
-                            delegate: PlasmaComponents3.CheckDelegate {
+                            delegate: RowLayout {
+                                id: btRow
                                 required property string mac
                                 required property string name
                                 required property bool connected
                                 Layout.fillWidth: true
-                                text: root._btConnectingMac === mac
-                                      ? i18n("%1 — connecting…", name) : name
-                                icon.name: "network-bluetooth"
-                                checked: connected
-                                enabled: root._btConnectingMac === "" && root._btPairingMac === ""
-                                onToggled: connected ? root.btDisconnect(mac)
-                                                     : root.btConnect(mac, name)
+                                spacing: 0
+
+                                PlasmaComponents3.CheckDelegate {
+                                    id: btRowDelegate
+                                    Layout.fillWidth: true
+                                    hoverEnabled: true
+                                    text: root._btConnectingMac === btRow.mac
+                                          ? i18n("%1 — connecting…", btRow.name) : btRow.name
+                                    icon.name: "network-bluetooth"
+                                    checked: btRow.connected
+                                    enabled: root._btConnectingMac === "" && root._btPairingMac === ""
+                                    onToggled: btRow.connected ? root.btDisconnect(btRow.mac)
+                                                               : root.btConnect(btRow.mac, btRow.name)
+                                }
+
+                                // Forget: unpairs the device for real, the
+                                // professional escape from a rotted pairing —
+                                // two taps, because the road back is a fresh
+                                // pairing via "Pair a new speaker…".
+                                CircleButton {
+                                    id: btForgetBtn
+                                    property bool armed: false
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+                                    Layout.alignment: Qt.AlignVCenter
+                                    iconName: armed ? "dialog-warning" : "user-trash"
+                                    iconScale: 0.5
+                                    baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
+                                    opacity: (btRowDelegate.hovered || hovered || armed) ? 0.75 : 0.0
+                                    visible: opacity > 0.0 && root._btConnectingMac === ""
+                                             && root._btPairingMac === ""
+                                    tooltipText: armed
+                                                 ? i18n("Tap again to forget — pairing again is the only way back")
+                                                 : i18n("Forget this device (unpair)")
+                                    onClicked: {
+                                        if (!armed) { armed = true; btForgetDisarm.restart(); return }
+                                        armed = false
+                                        root.btForget(btRow.mac)
+                                    }
+                                    Timer { id: btForgetDisarm; interval: 3000; onTriggered: btForgetBtn.armed = false }
+                                }
                             }
                         }
 
@@ -5139,8 +5174,7 @@ PlasmaExtras.Representation {
 
                         PlasmaComponents3.ItemDelegate {
                             Layout.fillWidth: true
-                            visible: root._btAvailable && root._btControllerUp
-                                     && !root._btScanning
+                            visible: root._btAvailable && !root._btScanning
                             text: i18n("Pair a new speaker…")
                             icon.name: "edit-find"
                             onClicked: root.btScan()

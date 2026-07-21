@@ -3842,10 +3842,15 @@ PlasmoidItem {
     // LE-only random-address adverts carry none, which conveniently drops
     // the duplicate ghost entries speakers broadcast).
     function btScan() {
-        if (!_btAvailable || !_btControllerUp || _btScanning) return;
+        if (!_btAvailable || _btScanning) return;
         _btScanning = true;
         btFoundModel.clear();
-        executable.exec(": BT_SCAN; timeout 16 bluetoothctl --timeout 12 scan on >/dev/null 2>&1; "
+        // Same doorbell the connect rings: a tray-blocked adapter is
+        // unblocked and powered first — asking to PAIR is asking for
+        // Bluetooth just as loudly as asking to connect.
+        executable.exec(": BT_SCAN; rfkill unblock bluetooth 2>/dev/null;"
+            + " timeout 3 bluetoothctl power on >/dev/null 2>&1;"
+            + " timeout 16 bluetoothctl --timeout 12 scan on >/dev/null 2>&1; "
             + 'list=$(timeout 3 bluetoothctl devices 2>/dev/null '
             + "| sed 's/\\x1b\\[[0-9;]*m//g' | grep '^Device '); "
             + 'printf \'%s\\n\' "$list" | while read -r _ mac name; do '
@@ -4008,6 +4013,20 @@ PlasmoidItem {
     }
     // The one free repair a solo connect gets when the sink never appears.
     property string _btSoloKicked: ""
+
+    // The professional escape from a rotted pairing: unpair for real. The
+    // way back is a fresh pairing — the UI says so before the second tap.
+    function btForget(mac) {
+        if (!_btValidMac(mac) || _btConnectingMac !== "" || _btPairingMac !== "") return;
+        if (_btPendingSinkMac === mac) {
+            _btPendingSinkMac = "";
+            _btPendingSinkName = "";
+            btRouteTimeout.stop();
+        }
+        if (sync._btJoinWatchMac === mac) sync._btJoinWatchStop();
+        executable.exec(": BT_FORGET; timeout 8 bluetoothctl remove " + mac + " >/dev/null 2>&1;"
+                        + " true # " + (++_execSeq));
+    }
 
     Timer {
         id: btRouteTimeout
@@ -6184,6 +6203,10 @@ PlasmoidItem {
                 return;
             }
             if (cmd.indexOf(": BT_SOLOKICK;") === 0) {
+                btList();
+                return;
+            }
+            if (cmd.indexOf(": BT_FORGET;") === 0) {
                 btList();
                 return;
             }

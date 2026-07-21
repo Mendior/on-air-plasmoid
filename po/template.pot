@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-21 08:28+0300\n"
+"POT-Creation-Date: 2026-07-21 08:38+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1520,60 +1520,68 @@ msgid ""
 "pair once in System Settings."
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5114
+#: package/contents/ui/FullRepresentation.qml:5121
 msgid "%1 — connecting…"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5132
+#: package/contents/ui/FullRepresentation.qml:5146
+msgid "Tap again to forget — pairing again is the only way back"
+msgstr ""
+
+#: package/contents/ui/FullRepresentation.qml:5147
+msgid "Forget this device (unpair)"
+msgstr ""
+
+#: package/contents/ui/FullRepresentation.qml:5167
 msgid "%1 — pairing…"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5133
+#: package/contents/ui/FullRepresentation.qml:5168
 msgid "%1 — new, click to pair"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5144
+#: package/contents/ui/FullRepresentation.qml:5178
 msgid "Pair a new speaker…"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5160
+#: package/contents/ui/FullRepresentation.qml:5194
 msgid "Searching — put the speaker in pairing mode…"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5181
+#: package/contents/ui/FullRepresentation.qml:5215
 msgid "WiFi & network"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5213
+#: package/contents/ui/FullRepresentation.qml:5247
 msgid "%1 (speaker group)"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5241
+#: package/contents/ui/FullRepresentation.qml:5275
 msgid "Balance"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5255
+#: package/contents/ui/FullRepresentation.qml:5289
 msgid ""
 "This device's share of the volume — the balance follows every master move "
 "and is remembered for the device."
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5277
+#: package/contents/ui/FullRepresentation.qml:5311
 msgid ""
 "Each device buffers on its own, so rooms may play a few seconds apart. For "
 "perfectly synced speakers, group them in the Google Home app — the group "
 "appears here as a single device."
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5287
+#: package/contents/ui/FullRepresentation.qml:5321
 msgid "Stop casting everywhere"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5305
+#: package/contents/ui/FullRepresentation.qml:5339
 msgid "Searching for devices…"
 msgstr ""
 
-#: package/contents/ui/FullRepresentation.qml:5314
+#: package/contents/ui/FullRepresentation.qml:5348
 msgid "No devices found on your network"
 msgstr ""
 
@@ -1693,200 +1701,200 @@ msgstr ""
 msgid "%1 devices"
 msgstr ""
 
-#: package/contents/ui/main.qml:4070
+#: package/contents/ui/main.qml:4089
 msgid "The Bluetooth speaker"
 msgstr ""
 
-#: package/contents/ui/main.qml:4069
+#: package/contents/ui/main.qml:4088
 msgid "%1 is connected, but its sound never arrived"
 msgstr ""
 
-#: package/contents/ui/main.qml:4071
+#: package/contents/ui/main.qml:4090
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr ""
 
-#: package/contents/ui/main.qml:4460
+#: package/contents/ui/main.qml:4479
 msgid "Station seems to be off the air"
 msgstr ""
 
-#: package/contents/ui/main.qml:4461
+#: package/contents/ui/main.qml:4480
 msgid ""
 "%1 is not answering at any address the directory knows. It stays in your "
 "list — trying again in the background."
 msgstr ""
 
-#: package/contents/ui/main.qml:4533
+#: package/contents/ui/main.qml:4552
 msgid "Playing from a backup address"
 msgstr ""
 
-#: package/contents/ui/main.qml:4534
+#: package/contents/ui/main.qml:4553
 msgid ""
 "The station's saved address is not answering — playing the directory's "
 "closest match for now. Your saved address was kept."
 msgstr ""
 
-#: package/contents/ui/main.qml:4574
+#: package/contents/ui/main.qml:4593
 msgid "Station found at a new address"
 msgstr ""
 
-#: package/contents/ui/main.qml:4575
+#: package/contents/ui/main.qml:4594
 msgid "%1 moved — the new address was saved to your list."
 msgstr ""
 
-#: package/contents/ui/main.qml:5848
+#: package/contents/ui/main.qml:5867
 msgid "Episode downloaded"
 msgstr ""
 
-#: package/contents/ui/main.qml:5852
+#: package/contents/ui/main.qml:5871
 msgid "Episode download failed"
 msgstr ""
 
-#: package/contents/ui/main.qml:5906
+#: package/contents/ui/main.qml:5925
 msgid "Subscriptions exported"
 msgstr ""
 
-#: package/contents/ui/main.qml:5908
+#: package/contents/ui/main.qml:5927
 msgid "Export failed"
 msgstr ""
 
-#: package/contents/ui/main.qml:5909
+#: package/contents/ui/main.qml:5928
 msgid "Could not write the subscriptions file."
 msgstr ""
 
-#: package/contents/ui/main.qml:6002
+#: package/contents/ui/main.qml:6021
 msgid "Casting needs python-chromecast"
 msgstr ""
 
-#: package/contents/ui/main.qml:6003
+#: package/contents/ui/main.qml:6022
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr ""
 
-#: package/contents/ui/main.qml:6024
+#: package/contents/ui/main.qml:6043
 msgid "the device"
 msgstr ""
 
-#: package/contents/ui/main.qml:6024
+#: package/contents/ui/main.qml:6043
 msgid "Could not cast to %1"
 msgstr ""
 
-#: package/contents/ui/main.qml:6025
+#: package/contents/ui/main.qml:6044
 msgid "The device could not play this station."
 msgstr ""
 
-#: package/contents/ui/main.qml:6071
+#: package/contents/ui/main.qml:6090
 msgid "Casting"
 msgstr ""
 
-#: package/contents/ui/main.qml:6072
+#: package/contents/ui/main.qml:6091
 msgid "The device did not stop — it may still be playing."
 msgstr ""
 
-#: package/contents/ui/main.qml:6124
+#: package/contents/ui/main.qml:6143
 msgid "Bluetooth is switched off"
 msgstr ""
 
-#: package/contents/ui/main.qml:6125
+#: package/contents/ui/main.qml:6144
 msgid ""
 "The adapter would not turn on — check the system tray's Bluetooth switch or "
 "System Settings."
 msgstr ""
 
-#: package/contents/ui/main.qml:6144 package/contents/ui/main.qml:6246
+#: package/contents/ui/main.qml:6163 package/contents/ui/main.qml:6269
 msgid "the Bluetooth device"
 msgstr ""
 
-#: package/contents/ui/main.qml:6143
+#: package/contents/ui/main.qml:6162
 msgid "Could not connect to %1"
 msgstr ""
 
-#: package/contents/ui/main.qml:6145
+#: package/contents/ui/main.qml:6164
 msgid "Make sure the speaker is switched on and in range."
 msgstr ""
 
-#: package/contents/ui/main.qml:6245
+#: package/contents/ui/main.qml:6268
 msgid "Could not pair with %1"
 msgstr ""
 
-#: package/contents/ui/main.qml:6247
+#: package/contents/ui/main.qml:6270
 msgid ""
 "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr ""
 
-#: package/contents/ui/main.qml:6345
+#: package/contents/ui/main.qml:6368
 msgid "ffmpeg is not installed"
 msgstr ""
 
-#: package/contents/ui/main.qml:6346
+#: package/contents/ui/main.qml:6369
 msgid "Install ffmpeg to record radio."
 msgstr ""
 
-#: package/contents/ui/main.qml:6349
+#: package/contents/ui/main.qml:6372
 msgid "Not enough disk space for this recording"
 msgstr ""
 
-#: package/contents/ui/main.qml:6350
+#: package/contents/ui/main.qml:6373
 msgid "Free some space in %1 and try again."
 msgstr ""
 
-#: package/contents/ui/main.qml:6353
+#: package/contents/ui/main.qml:6376
 msgid "Recording saved ✓ (%1)"
 msgstr ""
 
-#: package/contents/ui/main.qml:6357
+#: package/contents/ui/main.qml:6380
 msgid "Recording interrupted (%1 captured)"
 msgstr ""
 
-#: package/contents/ui/main.qml:6359
+#: package/contents/ui/main.qml:6382
 msgid "%1 — the file is much smaller than expected."
 msgstr ""
 
-#: package/contents/ui/main.qml:6363
+#: package/contents/ui/main.qml:6386
 msgid "Recording failed"
 msgstr ""
 
-#: package/contents/ui/main.qml:6364
+#: package/contents/ui/main.qml:6387
 msgid "The stream could not be captured."
 msgstr ""
 
-#: package/contents/ui/main.qml:6450
+#: package/contents/ui/main.qml:6473
 msgid "Downloading again without the cover"
 msgstr ""
 
-#: package/contents/ui/main.qml:6451
+#: package/contents/ui/main.qml:6474
 msgid ""
 "Embedding tags needs the python-mutagen package — install it to get covers "
 "in your files."
 msgstr ""
 
-#: package/contents/ui/main.qml:6459
+#: package/contents/ui/main.qml:6482
 msgid "yt-dlp is not installed"
 msgstr ""
 
-#: package/contents/ui/main.qml:6460
+#: package/contents/ui/main.qml:6483
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr ""
 
-#: package/contents/ui/main.qml:6463
+#: package/contents/ui/main.qml:6486
 msgid "Track downloaded ✓"
 msgstr ""
 
-#: package/contents/ui/main.qml:6464
+#: package/contents/ui/main.qml:6487
 msgid "Saved to: %1"
 msgstr ""
 
-#: package/contents/ui/main.qml:6467
+#: package/contents/ui/main.qml:6490
 msgid "Download failed"
 msgstr ""
 
-#: package/contents/ui/main.qml:6468
+#: package/contents/ui/main.qml:6491
 msgid "Unknown error"
 msgstr ""
 
-#: package/contents/ui/main.qml:6790
+#: package/contents/ui/main.qml:6813
 msgid "Audio output changed"
 msgstr ""
 
-#: package/contents/ui/main.qml:6791
+#: package/contents/ui/main.qml:6814
 msgid ""
 "The chosen output device disappeared — using the system default instead."
 msgstr ""
