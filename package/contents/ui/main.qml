@@ -974,18 +974,25 @@ PlasmoidItem {
     // folder — the name must be bare, no path parts) and its ledger row.
     // Positions and played-marks stay: re-downloading resumes where the
     // listener left off, which is the whole promise of the position map.
+    property var _podRmByTok: ({})
+    property int _podRmTok: 0
+
     function deletePodcastDownload(fileName) {
         var name = (fileName || "").toString();
         if (name === "" || name.indexOf("/") !== -1 || name.indexOf("\\") !== -1
             || name.charAt(0) === ".") return;
-        executable.exec(": POD_RM; rm -f -- "
+        // The ledger row falls ONLY when the file is provably gone — the rm
+        // is asynchronous, and dropping the metadata up front turned a
+        // failed delete (read-only mount) into a bare-name row that had
+        // lost its cover and resume point. The token maps the ack back to
+        // the name without the name ever riding a shell sentinel.
+        var tok = ++_podRmTok;
+        _podRmByTok[tok] = name;
+        executable.exec(": POD_RM " + tok + "; rm -f -- "
             + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name)
             + " " + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name + ".part")
-            + "; true # " + nextSeq());
-        if (_podDownloads[name] !== undefined) {
-            delete _podDownloads[name];
-            _savePodDownloads();
-        }
+            + "; [ ! -e " + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name) + " ]"
+            + " && echo __POD_RM_OK__; true # " + nextSeq());
     }
     // Resume bookkeeping: the playing episode's key and the seek waiting
     // for the media to load.
@@ -3868,7 +3875,8 @@ PlasmoidItem {
         btRouteTimeout.restart();
         // Same verified-connect treatment as btConnect: the verdict is the
         // device's real Connected state, with one retry for sleepy speakers.
-        executable.exec(": BT_PAIRNEW; timeout 3 bluetoothctl power on >/dev/null 2>&1;"
+        executable.exec(": BT_PAIRNEW; rfkill unblock bluetooth 2>/dev/null;"
+                        + " timeout 3 bluetoothctl power on >/dev/null 2>&1;"
                         + " timeout 25 bluetoothctl pair " + mac
                         + " && timeout 5 bluetoothctl trust " + mac
                         + " && { timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
@@ -3932,7 +3940,16 @@ PlasmoidItem {
         // sleeping one still gets its wake-up on the second try.
         // `power on` first is idempotent and free: clicking a speaker in
         // OUR menu is the user asking for Bluetooth.
-        executable.exec(": BT_CONNECT; timeout 3 bluetoothctl power on >/dev/null 2>&1;"
+        // Clicking a speaker IS the user asking for Bluetooth: a tray-
+        // toggled rfkill soft-block is lifted first (measured here: bluez
+        // powers the adapter the moment the block goes), and only an
+        // adapter that STILL will not stand up earns the honest adapter
+        // verdict — the old road blamed the innocent speaker for it.
+        executable.exec(": BT_CONNECT; rfkill unblock bluetooth 2>/dev/null;"
+            + " timeout 3 bluetoothctl power on >/dev/null 2>&1;"
+            + " if ! timeout 3 bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then"
+            + " echo __BT_ADAPTER_OFF__;"
+            + " else"
             + " pactl list short sinks 2>/dev/null | grep bluez | grep -q RUNNING"
             + " || timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
             + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1;"
@@ -3940,7 +3957,8 @@ PlasmoidItem {
             + " || { timeout 7 bluetoothctl --timeout 5 scan on >/dev/null 2>&1;"
             + " timeout 15 bluetoothctl connect " + mac + " >/dev/null 2>&1; };"
             + " timeout 3 bluetoothctl info " + mac + " 2>/dev/null | grep -q 'Connected: yes'"
-            + " && echo __BT_CONN_OK__ || echo __BT_CONN_FAIL__; true"
+            + " && echo __BT_CONN_OK__ || echo __BT_CONN_FAIL__;"
+            + " fi; true"
             + " # " + (++_execSeq));
     }
 
@@ -5867,8 +5885,20 @@ PlasmoidItem {
                     root._podScanStart(root._podScanQueue.shift());
                 return;
             }
-            if (cmd.indexOf(": POD_RM;") === 0) {
-                return; // fire-and-forget — the folder model watches the dir
+            if (cmd.indexOf(": POD_RM") === 0) {
+                var rmTokM = cmd.match(/^: POD_RM (\d+);/);
+                var rmName = rmTokM ? root._podRmByTok[rmTokM[1]] : undefined;
+                if (rmTokM) delete root._podRmByTok[rmTokM[1]];
+                if (rmName !== undefined
+                    && (stdout || "").indexOf("__POD_RM_OK__") !== -1
+                    && root._podDownloads[rmName] !== undefined) {
+                    delete root._podDownloads[rmName];
+                    root._savePodDownloads();
+                } else if (rmName !== undefined
+                           && (stdout || "").indexOf("__POD_RM_OK__") === -1) {
+                    console.warn("[ARP] podcast delete: file still present — ledger kept for " + rmName);
+                }
+                return;
             }
             // OPML export written (or not) — one honest word with the path.
             if (cmd.indexOf(": OPML_EXPORT;") === 0) {
@@ -6082,6 +6112,22 @@ PlasmoidItem {
                 var connMac = root._btConnectingMac;
                 var connName = root._btPendingSinkName;
                 root._btConnectingMac = "";
+                // The adapter itself would not stand up (hard block, dead
+                // firmware): say THAT — the speaker is innocent, and the
+                // menu's off-label refreshes with the fresh probe.
+                if ((stdout || "").indexOf("__BT_ADAPTER_OFF__") !== -1) {
+                    btRouteTimeout.stop();
+                    root._btPendingSinkName = "";
+                    root._btPendingSinkMac = "";
+                    if (connMac !== "" && root.sync._btJoinWatchMac === connMac)
+                        root.sync._btJoinWatchStop();
+                    notify(i18n("Bluetooth is switched off"),
+                           i18n("The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."),
+                           "network-bluetooth");
+                    btProbe();
+                    btList();
+                    return;
+                }
                 // Verdict comes from the __BT_CONN_*__ sentinel (the device's
                 // real Connected state, post-retry) — bluetoothctl's own
                 // chatter is unreliable when the client gets timeout-killed.

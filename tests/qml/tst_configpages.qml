@@ -18,6 +18,7 @@ TestCase {
             "../../package/contents/ui/config/configAppearance.qml",
             "../../package/contents/ui/config/configRecording.qml",
             "../../package/contents/ui/config/configSearch.qml",
+            "../../package/contents/ui/config/configAutomation.qml",
         ]
         for (var i = 0; i < pages.length; i++) {
             var c = Qt.createComponent(Qt.resolvedUrl(pages[i]))

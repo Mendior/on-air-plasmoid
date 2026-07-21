@@ -36,6 +36,12 @@ Item {
         _loadDeviceChannels();
         _loadSyncExcluded();
         app.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
+        // A measurement whose shell died with a previous session leaves the
+        // python clicking into the room with nobody holding its leash — the
+        // one phantom no UI could stop. Orphans only (reparented to init):
+        // a run belonging to a LIVE session keeps its parent and is spared.
+        app.exec(": PW_ORPHANS; for p in $(pgrep -f 'python3 .*calibrate\\.py' 2>/dev/null); do"
+                 + " [ \"$(ps -o ppid= -p \"$p\" 2>/dev/null | tr -d ' ')\" = 1 ] && kill \"$p\" 2>/dev/null; done; true");
         // A session that died mid-measurement left its park levels (and the
         // verify's hardware mutes) behind — the restore file it never got
         // to delete puts the room back the way the user had it.
@@ -180,7 +186,8 @@ Item {
     function handleExec(cmd, stdout, stderr) {
         if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0
             || cmd.indexOf(": PW_TRIM;") === 0 || cmd.indexOf(": PW_STEALBACK;") === 0
-            || cmd.indexOf(": PW_RAMP;") === 0 || cmd.indexOf(": PW_PARKREST;") === 0) {
+            || cmd.indexOf(": PW_RAMP;") === 0 || cmd.indexOf(": PW_PARKREST;") === 0
+            || cmd.indexOf(": PW_CALIBKILL;") === 0 || cmd.indexOf(": PW_ORPHANS;") === 0) {
             return true; // fire-and-forget
         }
         // The kick-abort's own disconnect landed — only the menu wants to
@@ -1641,6 +1648,30 @@ Item {
     // Whether the calibration has both of its reference speakers IN the
     // group — the button grays out instead of silently doing nothing when
     // the only Bluetooth (or only wired) speaker was ticked out.
+    // The hand on the emergency brake: end a running calibration or verify
+    // NOW — clicks stop mattering, every speaker unmutes, the parked stream
+    // comes back. Same cancel the disable performs, without touching the
+    // sync's on/off state; the generation bump makes the run's in-flight
+    // shell ack stale, and the shell's own in-line restore still puts the
+    // parked sink levels back when it finally exits.
+    function calibrateCancel() {
+        if (!_calibrating && !_verifyPending) return;
+        _calibrating = false;
+        _verifyPending = false;
+        _verifyCorrected = false;
+        calibGuardTimer.stop();
+        verifySettleTimer.stop();
+        verifyGuardTimer.stop();
+        _verifyUnmuteAll();
+        _calibRestoreVolume();
+        _calibRunSeq++;
+        if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
+        // The measurement's own process must not keep clicking into the
+        // room after the state is gone — orphan-checked, ours only.
+        app.exec(": PW_CALIBKILL; for p in $(pgrep -f 'python3 .*calibrate\\.py' 2>/dev/null); do"
+                 + " kill \"$p\" 2>/dev/null; done; true # " + app.nextSeq());
+    }
+
     function calibPairReady() {
         void _exclRev;
         var sinks = _combineRealSinks();

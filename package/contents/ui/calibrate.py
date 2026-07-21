@@ -31,6 +31,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import wave
 
@@ -637,6 +638,21 @@ def cmd_verify(argv):
         # audio half muted — not ours to break. Convert it to a normal
         # exit so the unmutes always run.
         signal.signal(signal.SIGTERM, lambda s, f: (_ for _ in ()).throw(SystemExit(1)))
+
+        # The leash: if the session that launched this run dies (plasmashell
+        # restart, logout), the shell above dies with it and this process is
+        # reparented to init — from that moment it is a phantom clicking
+        # into a room where no UI can stop it. A watcher thread turns the
+        # orphaning into our own SIGTERM, which the handler above converts
+        # to SystemExit so every finally-block still restores the sinks.
+        def _watch_parent():
+            while True:
+                time.sleep(1)
+                if os.getppid() == 1:
+                    os.kill(os.getpid(), signal.SIGTERM)
+                    return
+
+        threading.Thread(target=_watch_parent, daemon=True).start()
         sink, mic = argv[0], argv[1]
         sinks = argv[2:2 + 8]
         # Same mic discipline as the calibration: a hardware-muted default

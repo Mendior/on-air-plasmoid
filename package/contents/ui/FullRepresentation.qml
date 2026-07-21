@@ -3279,7 +3279,12 @@ PlasmaExtras.Representation {
                                     anchors.margins: 1
                                     sourceSize.width: 64
                                     sourceSize.height: 64
-                                    source: podDlRow.meta && podDlRow.meta.art ? podDlRow.meta.art : ""
+                                    // Second gate at the render: the ledger
+                                    // is write-gated already, but an Image
+                                    // source is exactly where a hand-edited
+                                    // config would land — cheap to re-check.
+                                    source: podDlRow.meta && /^https?:\/\//i.test(podDlRow.meta.art || "")
+                                            ? podDlRow.meta.art : ""
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
                                     visible: status === Image.Ready
@@ -4824,6 +4829,21 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // A grey button with no word is a riddle: when the
+                        // pair is not there, say WHY the room cannot be
+                        // measured instead of leaving a dead control.
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2.2
+                            visible: root.sync._combineWantActive
+                                     && root.sync.calibPhase === ""
+                                     && !root.sync.calibPairReady()
+                            text: i18n("Calibration needs a Bluetooth speaker in the group — connect one and the button wakes up.")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.6
+                            wrapMode: Text.WordWrap
+                        }
+
                         // The opt-in caretaker: a passive microphone check
                         // on the playing audio every few minutes, one
                         // automatic click-verify when it confirms a drift.
@@ -4910,6 +4930,19 @@ PlasmaExtras.Representation {
                                 // the quiet gap means "done" and walks off
                                 // mid-measurement. Theme red, both schemes.
                                 color: Kirigami.Theme.negativeTextColor
+                            }
+                            // The way OUT. A measurement the user did not
+                            // ask for this minute (the caretaker's verify)
+                            // used to play its clicks with no control in
+                            // sight — the row is visible whenever a run is
+                            // on, even if the sync box was unticked mid-run.
+                            PlasmaComponents3.Button {
+                                icon.name: "process-stop"
+                                text: i18n("Stop")
+                                onClicked: root.sync.calibrateCancel()
+                                PlasmaComponents3.ToolTip {
+                                    text: i18n("Stops the measurement, unmutes every speaker and gives the music back.")
+                                }
                             }
                         }
 

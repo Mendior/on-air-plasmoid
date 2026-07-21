@@ -29,4 +29,9 @@ ConfigModel {
         icon: "search"
         source: "config/configSearch.qml"
     }
+    ConfigCategory {
+        name: i18n("Automation")
+        icon: "system-run"
+        source: "config/configAutomation.qml"
+    }
 }

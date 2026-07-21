@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-21 08:13+0300\n"
+"POT-Creation-Date: 2026-07-21 08:28+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Estonian\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/FullRepresentation.qml:4243
+#: package/contents/ui/FullRepresentation.qml:4248
 msgid "Stations"
 msgstr "Jaamad"
 
@@ -32,6 +32,11 @@ msgstr "Salvestamine"
 msgid "Search"
 msgstr "Otsing"
 
+#: package/contents/config/config.qml:33
+msgid "Automation"
+msgstr "Automaatika"
+
+
 #: package/contents/ui/CompactRepresentation.qml:51
 msgid "%1 — recording"
 msgstr "%1 — salvestab"
@@ -46,8 +51,8 @@ msgid "Audio"
 msgstr "Heli"
 
 #: package/contents/ui/CompactRepresentation.qml:88
-#: package/contents/ui/FullRepresentation.qml:3833
-#: package/contents/ui/FullRepresentation.qml:4610
+#: package/contents/ui/FullRepresentation.qml:3838
+#: package/contents/ui/FullRepresentation.qml:4615
 msgid "Volume"
 msgstr "Helitugevus"
 
@@ -204,6 +209,102 @@ msgstr "Keskklõps mängib/peatab viimase jaama"
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "Keskklõps paneeliikoonil mängib või peatab viimase jaama"
 
+#: package/contents/ui/config/configAutomation.qml:28
+#: package/contents/ui/FullRepresentation.qml:4287
+#: package/contents/ui/Heading.qml:25
+msgid "Podcasts"
+msgstr "Podcastid"
+
+#: package/contents/ui/config/configAutomation.qml:34
+msgid "Check the shows for new episodes:"
+msgstr "Kontrolli saadete uusi episoode:"
+
+
+#: package/contents/ui/config/configAutomation.qml:38
+msgid "Never"
+msgstr "Mitte kunagi"
+
+
+#: package/contents/ui/config/configAutomation.qml:39
+msgid "Every 6 hours"
+msgstr "Iga 6 tunni järel"
+
+
+#: package/contents/ui/config/configAutomation.qml:40
+msgid "Every 12 hours"
+msgstr "Iga 12 tunni järel"
+
+
+#: package/contents/ui/config/configAutomation.qml:41
+msgid "Once a day"
+msgstr "Kord päevas"
+
+
+#: package/contents/ui/config/configAutomation.qml:53
+msgid "New episodes:"
+msgstr "Uued episoodid:"
+
+
+#: package/contents/ui/config/configAutomation.qml:54
+msgid "Download the newest one automatically"
+msgstr "Laadi uusim automaatselt alla"
+
+
+#: package/contents/ui/config/configAutomation.qml:57
+msgid "When a check finds a show has something new, its newest episode is queued for download — ready before the commute, no taps needed."
+msgstr "Kui kontroll leiab saatel midagi uut, pannakse uusim episood allalaadimisjärjekorda — valmis enne hommikust teed, ilma ühegi puudutuseta."
+
+
+#: package/contents/ui/config/configAutomation.qml:66
+msgid "Storage:"
+msgstr "Salvestusruum:"
+
+
+#: package/contents/ui/config/configAutomation.qml:67
+msgid "Quietly remove old played downloads"
+msgstr "Eemalda vaikselt vanad kuulatud allalaadimised"
+
+
+#: package/contents/ui/config/configAutomation.qml:70
+msgid "Played episodes older than three days go, and past ten files per show the oldest played go. An unheard episode is never touched."
+msgstr "Kuulatud episoodid, mis on üle kolme päeva vanad, lähevad; üle kümne faili saate kohta lähevad vanimad kuulatud. Kuulamata episoodi ei puututa mitte kunagi."
+
+
+#: package/contents/ui/config/configAutomation.qml:79
+msgid "Listening:"
+msgstr "Kuulamine:"
+
+
+#: package/contents/ui/config/configAutomation.qml:80
+msgid "Continue the show when an episode ends"
+msgstr "Jätka saadet, kui episood lõpeb"
+
+
+#: package/contents/ui/config/configAutomation.qml:85
+msgid "Skip stretches of dead air in episodes"
+msgstr "Jäta episoodides surnud õhu lõigud vahele"
+
+
+#: package/contents/ui/config/configAutomation.qml:89
+msgid "Speaker sync"
+msgstr "Kõlarite sünk"
+
+
+#: package/contents/ui/config/configAutomation.qml:95
+msgid "Auto-care:"
+msgstr "Isehooldus:"
+
+
+#: package/contents/ui/config/configAutomation.qml:96
+#: package/contents/ui/FullRepresentation.qml:4858
+msgid "Keep sync tuned automatically"
+msgstr "Hoia sünk automaatselt paigas"
+
+#: package/contents/ui/config/configAutomation.qml:99
+msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. The check clicks audibly and pauses music for about a minute — the popup shows a Stop button whenever one runs. Audio never leaves this computer."
+msgstr "Kuulab mängivat heli mikrofoniga iga paari minuti järel ja kontrollib sünki uuesti, kui kõlarid triivivad lahku. Kontroll klõpsub kuuldavalt ja peatab muusika umbes minutiks — popup näitab jooksva kontrolli ajal Peata-nuppu. Heli ei lahku sellest arvutist mitte kunagi."
+
+
 #: package/contents/ui/config/configGeneral.qml:178
 msgid "All stations already have a logo."
 msgstr "Kõigil jaamadel on logo juba olemas."
@@ -335,9 +436,9 @@ msgid "Max length:"
 msgstr "Maksimaalne pikkus:"
 
 #: package/contents/ui/config/configRecording.qml:53
-#: package/contents/ui/FullRepresentation.qml:3645
-#: package/contents/ui/FullRepresentation.qml:3927
-#: package/contents/ui/FullRepresentation.qml:4009
+#: package/contents/ui/FullRepresentation.qml:3650
+#: package/contents/ui/FullRepresentation.qml:3932
+#: package/contents/ui/FullRepresentation.qml:4014
 msgid "%1 min"
 msgstr "%1 min"
 
@@ -346,7 +447,7 @@ msgid "A hard safety cap for one recording — protects the disk if you forget t
 msgstr "Ühe salvestuse range pikkusepiir — kaitseb ketast, kui unustad salvestuse peatada."
 
 #: package/contents/ui/config/configRecording.qml:70
-#: package/contents/ui/FullRepresentation.qml:3896
+#: package/contents/ui/FullRepresentation.qml:3901
 msgid "Scheduled recordings"
 msgstr "Ajastatud salvestused"
 
@@ -421,6 +522,7 @@ msgstr "Jaam on lisatud. Salvestamiseks klõpsa „Rakenda“."
 #: package/contents/ui/config/configSearch.qml:561
 #: package/contents/ui/EpisodeListItem.qml:336
 #: package/contents/ui/FullRepresentation.qml:1761
+#: package/contents/ui/FullRepresentation.qml:4941
 msgid "Stop"
 msgstr "Peata"
 
@@ -490,7 +592,7 @@ msgid "Tags:"
 msgstr "Sildid:"
 
 #: package/contents/ui/config/configSearch.qml:877
-#: package/contents/ui/FullRepresentation.qml:4366
+#: package/contents/ui/FullRepresentation.qml:4371
 msgid "Error: %1"
 msgstr "Viga: %1"
 
@@ -705,11 +807,9 @@ msgstr "Keri 30 sekundit edasi"
 msgid "Skipping silences — tap to keep them"
 msgstr "Vaikused jäetakse vahele — puuduta, et alles hoida"
 
-
 #: package/contents/ui/FullRepresentation.qml:1902
 msgid "Skip silences in this episode"
 msgstr "Jäta selle episoodi vaikused vahele"
-
 
 #: package/contents/ui/FullRepresentation.qml:1926
 msgid "Search this track on YouTube"
@@ -747,7 +847,7 @@ msgid "Vote for this station in the worldwide catalog"
 msgstr "Hääleta selle jaama poolt maailmakataloogis"
 
 #: package/contents/ui/FullRepresentation.qml:2016
-#: package/contents/ui/FullRepresentation.qml:4353
+#: package/contents/ui/FullRepresentation.qml:4358
 #: package/contents/ui/MediaListItem.qml:527
 msgid "Downloading…"
 msgstr "Allalaadimine…"
@@ -766,7 +866,7 @@ msgid "Recording %1 — click to stop"
 msgstr "Salvestan: %1 — peatamiseks klõpsa"
 
 #: package/contents/ui/FullRepresentation.qml:2046
-#: package/contents/ui/FullRepresentation.qml:4056
+#: package/contents/ui/FullRepresentation.qml:4061
 msgid "This source cannot be recorded"
 msgstr "Seda allikat ei saa salvestada"
 
@@ -824,8 +924,8 @@ msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klõps = otsi YouTube'ist · ⬇ = laadi alla"
 
 #: package/contents/ui/FullRepresentation.qml:2545
-#: package/contents/ui/FullRepresentation.qml:4269
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:3006
+#: package/contents/ui/FullRepresentation.qml:4274
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:3013
 msgid "My Music"
 msgstr "Minu muusika"
 
@@ -906,41 +1006,33 @@ msgstr "Episoodid"
 msgid "Waking up with this show at %1 — tap to remove"
 msgstr "Ärkad selle saatega kell %1 — puuduta eemaldamiseks"
 
-
 #: package/contents/ui/FullRepresentation.qml:2977
 msgid "Wake up with this show"
 msgstr "Ärka selle saatega"
-
 
 #: package/contents/ui/FullRepresentation.qml:2993
 msgid "Wake up with this show, daily"
 msgstr "Ärka selle saatega, iga päev"
 
-
 #: package/contents/ui/FullRepresentation.qml:3002
 msgid "Hour"
 msgstr "Tund"
-
 
 #: package/contents/ui/FullRepresentation.qml:3009
 msgid "Minute"
 msgstr "Minut"
 
-
 #: package/contents/ui/FullRepresentation.qml:3012
 msgid "Set"
 msgstr "Sea"
-
 
 #: package/contents/ui/FullRepresentation.qml:3014
 msgid "Podcast"
 msgstr "Podcast"
 
-
 #: package/contents/ui/FullRepresentation.qml:3025
 msgid "Plays the newest unheard downloaded episode — works with no network at all."
 msgstr "Mängib uusima kuulamata alla laaditud episoodi — töötab täiesti ilma võrguta."
-
 
 #: package/contents/ui/FullRepresentation.qml:3044
 msgid "Showing unplayed — tap for all"
@@ -983,64 +1075,64 @@ msgstr "Otsimine…"
 msgid "Loading the charts…"
 msgstr "Laen edetabelit…"
 
-#: package/contents/ui/FullRepresentation.qml:3316
+#: package/contents/ui/FullRepresentation.qml:3321
 msgid "resume at %1"
 msgstr "jätka kohalt %1"
 
-#: package/contents/ui/FullRepresentation.qml:3338
+#: package/contents/ui/FullRepresentation.qml:3343
 msgid "Tap again to delete the file"
 msgstr "Puuduta veel kord, et fail kustutada"
 
-#: package/contents/ui/FullRepresentation.qml:3339
+#: package/contents/ui/FullRepresentation.qml:3344
 msgid "Delete the downloaded file"
 msgstr "Kustuta alla laaditud fail"
 
-#: package/contents/ui/FullRepresentation.qml:3480
+#: package/contents/ui/FullRepresentation.qml:3485
 msgid "Unsubscribe"
 msgstr "Lõpeta tellimus"
 
-#: package/contents/ui/FullRepresentation.qml:3481
+#: package/contents/ui/FullRepresentation.qml:3486
 msgid "Subscribe"
 msgstr "Telli"
 
-#: package/contents/ui/FullRepresentation.qml:3520
+#: package/contents/ui/FullRepresentation.qml:3525
 msgid "No shows found"
 msgstr "Saateid ei leitud"
 
-#: package/contents/ui/FullRepresentation.qml:3521
+#: package/contents/ui/FullRepresentation.qml:3526
 msgid "The charts did not answer — try again in a moment"
 msgstr "Edetabel ei vastanud — proovi hetke pärast uuesti"
 
-#: package/contents/ui/FullRepresentation.qml:3522
+#: package/contents/ui/FullRepresentation.qml:3527
 msgid "No subscriptions yet"
 msgstr "Tellimusi veel pole"
 
-#: package/contents/ui/FullRepresentation.qml:3534
+#: package/contents/ui/FullRepresentation.qml:3539
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Otsi ülalt saadet ja märgi see tärniga — episoodid laaditakse siia võrguta kuulamiseks"
 
-#: package/contents/ui/FullRepresentation.qml:3574
+#: package/contents/ui/FullRepresentation.qml:3579
 msgid "All caught up — no unplayed episodes"
 msgstr "Kõik järele kuulatud — kuulamata episoode pole"
 
-#: package/contents/ui/FullRepresentation.qml:3625
+#: package/contents/ui/FullRepresentation.qml:3630
 msgid "Sleep timer"
 msgstr "Unetaimer"
 
-#: package/contents/ui/FullRepresentation.qml:3631
-#: package/contents/ui/FullRepresentation.qml:4350
+#: package/contents/ui/FullRepresentation.qml:3636
+#: package/contents/ui/FullRepresentation.qml:4355
 msgid "Sleeping in %1"
 msgstr "Uinub %1 pärast"
 
-#: package/contents/ui/FullRepresentation.qml:3651
+#: package/contents/ui/FullRepresentation.qml:3656
 msgid "Cancel"
 msgstr "Loobu"
 
-#: package/contents/ui/FullRepresentation.qml:3659
+#: package/contents/ui/FullRepresentation.qml:3664
 msgid "Playback fades out and stops when the timer ends."
 msgstr "Taimeri lõppedes heli hääbub ja mängimine peatub."
 
-#: package/contents/ui/FullRepresentation.qml:3694
+#: package/contents/ui/FullRepresentation.qml:3699
 msgid "Wake-up alarms"
 msgstr "Äratused"
 
@@ -1052,389 +1144,390 @@ msgstr "Äratused"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:3719
-#: package/contents/ui/FullRepresentation.qml:3814
-#: package/contents/ui/FullRepresentation.qml:3921
-#: package/contents/ui/FullRepresentation.qml:4029
+#: package/contents/ui/FullRepresentation.qml:3724
+#: package/contents/ui/FullRepresentation.qml:3819
+#: package/contents/ui/FullRepresentation.qml:3926
+#: package/contents/ui/FullRepresentation.qml:4034
 msgid "Sun"
 msgstr "P"
 
-#: package/contents/ui/FullRepresentation.qml:3719
-#: package/contents/ui/FullRepresentation.qml:3814
-#: package/contents/ui/FullRepresentation.qml:3921
-#: package/contents/ui/FullRepresentation.qml:4029
+#: package/contents/ui/FullRepresentation.qml:3724
+#: package/contents/ui/FullRepresentation.qml:3819
+#: package/contents/ui/FullRepresentation.qml:3926
+#: package/contents/ui/FullRepresentation.qml:4034
 msgid "Mon"
 msgstr "E"
 
-#: package/contents/ui/FullRepresentation.qml:3719
-#: package/contents/ui/FullRepresentation.qml:3814
-#: package/contents/ui/FullRepresentation.qml:3921
-#: package/contents/ui/FullRepresentation.qml:4029
+#: package/contents/ui/FullRepresentation.qml:3724
+#: package/contents/ui/FullRepresentation.qml:3819
+#: package/contents/ui/FullRepresentation.qml:3926
+#: package/contents/ui/FullRepresentation.qml:4034
 msgid "Tue"
 msgstr "T"
 
-#: package/contents/ui/FullRepresentation.qml:3719
-#: package/contents/ui/FullRepresentation.qml:3814
-#: package/contents/ui/FullRepresentation.qml:3921
-#: package/contents/ui/FullRepresentation.qml:4029
+#: package/contents/ui/FullRepresentation.qml:3724
+#: package/contents/ui/FullRepresentation.qml:3819
+#: package/contents/ui/FullRepresentation.qml:3926
+#: package/contents/ui/FullRepresentation.qml:4034
 msgid "Wed"
 msgstr "K"
 
-#: package/contents/ui/FullRepresentation.qml:3720
-#: package/contents/ui/FullRepresentation.qml:3815
-#: package/contents/ui/FullRepresentation.qml:3922
-#: package/contents/ui/FullRepresentation.qml:4030
+#: package/contents/ui/FullRepresentation.qml:3725
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3927
+#: package/contents/ui/FullRepresentation.qml:4035
 msgid "Thu"
 msgstr "N"
 
-#: package/contents/ui/FullRepresentation.qml:3720
-#: package/contents/ui/FullRepresentation.qml:3815
-#: package/contents/ui/FullRepresentation.qml:3922
-#: package/contents/ui/FullRepresentation.qml:4030
+#: package/contents/ui/FullRepresentation.qml:3725
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3927
+#: package/contents/ui/FullRepresentation.qml:4035
 msgid "Fri"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:3720
-#: package/contents/ui/FullRepresentation.qml:3815
-#: package/contents/ui/FullRepresentation.qml:3922
-#: package/contents/ui/FullRepresentation.qml:4030
+#: package/contents/ui/FullRepresentation.qml:3725
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3927
+#: package/contents/ui/FullRepresentation.qml:4035
 msgid "Sat"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:3722
-#: package/contents/ui/FullRepresentation.qml:3806
-#: package/contents/ui/FullRepresentation.qml:3924
-#: package/contents/ui/FullRepresentation.qml:4022
+#: package/contents/ui/FullRepresentation.qml:3727
+#: package/contents/ui/FullRepresentation.qml:3811
+#: package/contents/ui/FullRepresentation.qml:3929
+#: package/contents/ui/FullRepresentation.qml:4027
 msgid "Daily"
 msgstr "Iga päev"
 
-#: package/contents/ui/FullRepresentation.qml:3723
-#: package/contents/ui/FullRepresentation.qml:3925
+#: package/contents/ui/FullRepresentation.qml:3728
+#: package/contents/ui/FullRepresentation.qml:3930
 msgid "Every %1"
 msgstr "Iga nädal: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3738
+#: package/contents/ui/FullRepresentation.qml:3743
 msgid "Remove this alarm"
 msgstr "Eemalda see äratus"
 
-#: package/contents/ui/FullRepresentation.qml:3746
+#: package/contents/ui/FullRepresentation.qml:3751
 msgid "No alarms yet — add one below."
 msgstr "Äratusi pole veel — lisa üks allpool."
 
-#: package/contents/ui/FullRepresentation.qml:3761
-#: package/contents/ui/FullRepresentation.qml:3963
+#: package/contents/ui/FullRepresentation.qml:3766
+#: package/contents/ui/FullRepresentation.qml:3968
 msgid "Station:"
 msgstr "Jaam:"
 
-#: package/contents/ui/FullRepresentation.qml:3769
-#: package/contents/ui/FullRepresentation.qml:3971
+#: package/contents/ui/FullRepresentation.qml:3774
+#: package/contents/ui/FullRepresentation.qml:3976
 msgid "Station"
 msgstr "Jaam"
 
-#: package/contents/ui/FullRepresentation.qml:3773
-#: package/contents/ui/FullRepresentation.qml:3975
+#: package/contents/ui/FullRepresentation.qml:3778
+#: package/contents/ui/FullRepresentation.qml:3980
 msgid "Start:"
 msgstr "Algus:"
 
-#: package/contents/ui/FullRepresentation.qml:3784
-#: package/contents/ui/FullRepresentation.qml:3986
+#: package/contents/ui/FullRepresentation.qml:3789
+#: package/contents/ui/FullRepresentation.qml:3991
 msgid "Start hour"
 msgstr "Algustund"
 
-#: package/contents/ui/FullRepresentation.qml:3794
-#: package/contents/ui/FullRepresentation.qml:3996
+#: package/contents/ui/FullRepresentation.qml:3799
+#: package/contents/ui/FullRepresentation.qml:4001
 msgid "Start minute"
 msgstr "Algusminut"
 
-#: package/contents/ui/FullRepresentation.qml:3799
-#: package/contents/ui/FullRepresentation.qml:4015
+#: package/contents/ui/FullRepresentation.qml:3804
+#: package/contents/ui/FullRepresentation.qml:4020
 msgid "Repeat:"
 msgstr "Kordus:"
 
-#: package/contents/ui/FullRepresentation.qml:3806
-#: package/contents/ui/FullRepresentation.qml:4022
+#: package/contents/ui/FullRepresentation.qml:3811
+#: package/contents/ui/FullRepresentation.qml:4027
 msgid "Once"
 msgstr "Üks kord"
 
-#: package/contents/ui/FullRepresentation.qml:3806
-#: package/contents/ui/FullRepresentation.qml:4022
+#: package/contents/ui/FullRepresentation.qml:3811
+#: package/contents/ui/FullRepresentation.qml:4027
 msgid "Weekly"
 msgstr "Iga nädal"
 
-#: package/contents/ui/FullRepresentation.qml:3808
-#: package/contents/ui/FullRepresentation.qml:4023
+#: package/contents/ui/FullRepresentation.qml:3813
+#: package/contents/ui/FullRepresentation.qml:4028
 msgid "Repeat"
 msgstr "Kordus"
 
-#: package/contents/ui/FullRepresentation.qml:3817
-#: package/contents/ui/FullRepresentation.qml:4032
+#: package/contents/ui/FullRepresentation.qml:3822
+#: package/contents/ui/FullRepresentation.qml:4037
 msgid "Weekday"
 msgstr "Nädalapäev"
 
-#: package/contents/ui/FullRepresentation.qml:3822
+#: package/contents/ui/FullRepresentation.qml:3827
 msgid "Volume:"
 msgstr "Helitugevus:"
 
-#: package/contents/ui/FullRepresentation.qml:3844
+#: package/contents/ui/FullRepresentation.qml:3849
 msgid "Keep the computer awake until the alarm"
 msgstr "Hoia arvuti ärkvel kuni äratuseni"
 
-#: package/contents/ui/FullRepresentation.qml:3850
-#: package/contents/ui/FullRepresentation.qml:4068
+#: package/contents/ui/FullRepresentation.qml:3855
+#: package/contents/ui/FullRepresentation.qml:4073
 msgid "Add"
 msgstr "Lisa"
 
-#: package/contents/ui/FullRepresentation.qml:3940
+#: package/contents/ui/FullRepresentation.qml:3945
 msgid "Remove this schedule"
 msgstr "Eemalda see ajastus"
 
-#: package/contents/ui/FullRepresentation.qml:3948
+#: package/contents/ui/FullRepresentation.qml:3953
 msgid "No scheduled recordings yet — add one below."
 msgstr "Ajastatud salvestusi pole veel — lisa üks allpool."
 
-#: package/contents/ui/FullRepresentation.qml:4001
+#: package/contents/ui/FullRepresentation.qml:4006
 msgid "Duration:"
 msgstr "Kestus:"
 
-#: package/contents/ui/FullRepresentation.qml:4011
+#: package/contents/ui/FullRepresentation.qml:4016
 msgid "Duration in minutes"
 msgstr "Kestus minutites"
 
-#: package/contents/ui/FullRepresentation.qml:4043
+#: package/contents/ui/FullRepresentation.qml:4048
 msgid "Recordings are for personal use only."
 msgstr "Salvestused on ainult isiklikuks kasutamiseks."
 
-#: package/contents/ui/FullRepresentation.qml:4256
-#: package/contents/ui/FullRepresentation.qml:4374
+#: package/contents/ui/FullRepresentation.qml:4261
+#: package/contents/ui/FullRepresentation.qml:4379
 msgid "Playing"
 msgstr "Mängib"
 
-#: package/contents/ui/FullRepresentation.qml:4282
-#: package/contents/ui/Heading.qml:25
-msgid "Podcasts"
-msgstr "Podcastid"
-
-#: package/contents/ui/FullRepresentation.qml:4295
+#: package/contents/ui/FullRepresentation.qml:4300
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Taimerid"
 
-#: package/contents/ui/FullRepresentation.qml:4356
+#: package/contents/ui/FullRepresentation.qml:4361
 #: package/contents/ui/main.qml:70
 msgid "Casting to %1"
 msgstr "Mängib seadmes %1"
 
-#: package/contents/ui/FullRepresentation.qml:4359
+#: package/contents/ui/FullRepresentation.qml:4364
 msgid "Check internet connection…"
 msgstr "Kontrolli internetiühendust…"
 
-#: package/contents/ui/FullRepresentation.qml:4369
+#: package/contents/ui/FullRepresentation.qml:4374
 msgid "Bitrate: %1 kb/s"
 msgstr "Bitikiirus: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:4374
-#: package/contents/ui/FullRepresentation.qml:4377
+#: package/contents/ui/FullRepresentation.qml:4379
+#: package/contents/ui/FullRepresentation.qml:4382
 msgid "Connecting…"
 msgstr "Ühendumine…"
 
-#: package/contents/ui/FullRepresentation.qml:4379
+#: package/contents/ui/FullRepresentation.qml:4384
 msgid "Choose station and enjoy…"
 msgstr "Vali jaam ja naudi…"
 
-#: package/contents/ui/FullRepresentation.qml:4403
+#: package/contents/ui/FullRepresentation.qml:4408
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Mängib seadmes %1 — klõpsa valimiseks või peatamiseks"
 
-#: package/contents/ui/FullRepresentation.qml:4405
+#: package/contents/ui/FullRepresentation.qml:4410
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Helitugevus, väljund ja seadmed (Chromecast, TV, kõlar)"
 
-#: package/contents/ui/FullRepresentation.qml:4406
+#: package/contents/ui/FullRepresentation.qml:4411
 msgid "Volume and audio output"
 msgstr "Helitugevus ja heliväljund"
 
-#: package/contents/ui/FullRepresentation.qml:4568
+#: package/contents/ui/FullRepresentation.qml:4573
 msgid "Play on"
 msgstr "Mängi seadmes"
 
-#: package/contents/ui/FullRepresentation.qml:4596
+#: package/contents/ui/FullRepresentation.qml:4601
 msgid "Mute"
 msgstr "Vaigista"
 
-#: package/contents/ui/FullRepresentation.qml:4596
+#: package/contents/ui/FullRepresentation.qml:4601
 msgid "Unmute"
 msgstr "Taasta heli"
 
-#: package/contents/ui/FullRepresentation.qml:4628
+#: package/contents/ui/FullRepresentation.qml:4633
 msgid "This computer"
 msgstr "See arvuti"
 
-#: package/contents/ui/FullRepresentation.qml:4652
+#: package/contents/ui/FullRepresentation.qml:4657
 msgid "System default output"
 msgstr "Süsteemi vaikeväljund"
 
-#: package/contents/ui/FullRepresentation.qml:4679
+#: package/contents/ui/FullRepresentation.qml:4684
 msgid "All local outputs, in sync"
 msgstr "Kõik kohalikud väljundid, sünkroonis"
 
-#: package/contents/ui/FullRepresentation.qml:4709
+#: package/contents/ui/FullRepresentation.qml:4714
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Mängib korraga kõigis ühendatud kõlarites — juhtmega väljundeid viivitatakse, et need püsiksid Bluetoothiga samas taktis."
 
-#: package/contents/ui/FullRepresentation.qml:4725
-#: package/contents/ui/FullRepresentation.qml:4732
+#: package/contents/ui/FullRepresentation.qml:4730
+#: package/contents/ui/FullRepresentation.qml:4737
 msgid "Sync fine-tune"
 msgstr "Süngi peenhäälestus"
 
-#: package/contents/ui/FullRepresentation.qml:4766
+#: package/contents/ui/FullRepresentation.qml:4771
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Kui Bluetooth-kõlar jääb juhtmega kõlaritest ikka maha, tõsta seda, kuni nad mängivad koos."
 
-#: package/contents/ui/FullRepresentation.qml:4778
+#: package/contents/ui/FullRepresentation.qml:4783
 msgid "Sync delay in milliseconds"
 msgstr "Sünkroonviive millisekundites"
 
-#: package/contents/ui/FullRepresentation.qml:4800
+#: package/contents/ui/FullRepresentation.qml:4805
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Trüki täpne viive millisekundites — liugur liigub kümne kaupa."
 
-#: package/contents/ui/FullRepresentation.qml:4804
+#: package/contents/ui/FullRepresentation.qml:4809
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:4818
+#: package/contents/ui/FullRepresentation.qml:4823
 msgid "Calibrate with the microphone"
 msgstr "Kalibreeri mikrofoniga"
 
-#: package/contents/ui/FullRepresentation.qml:4823
+#: package/contents/ui/FullRepresentation.qml:4828
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Mängib igast kõlarist paar valju klõpsu ja mõõdab mikrofoniga, kui palju Bluetooth-kõlar maha jääb — viide seatakse automaatselt."
 
-#: package/contents/ui/FullRepresentation.qml:4838
-msgid "Keep sync tuned automatically"
-msgstr "Hoia sünk automaatselt paigas"
-
 #: package/contents/ui/FullRepresentation.qml:4841
+msgid "Calibration needs a Bluetooth speaker in the group — connect one and the button wakes up."
+msgstr "Kalibreerimine vajab grupis Bluetooth-kõlarit — ühenda üks ja nupp ärkab."
+
+
+#: package/contents/ui/FullRepresentation.qml:4861
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Kuulab iga paari minuti tagant mikrofoniga mängivat heli ja kontrollib sünki üle, kui kõlarid triivivad lahku. Heli töödeldakse ainult selles arvutis — ei salvestata ega saadeta kuhugi."
 
-#: package/contents/ui/FullRepresentation.qml:4878
+#: package/contents/ui/FullRepresentation.qml:4898
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 on sünki jaoks meeles — ühenda ta ja ta liitub automaatselt uuesti."
 
-#: package/contents/ui/FullRepresentation.qml:4901
+#: package/contents/ui/FullRepresentation.qml:4921
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Voor 1/2 — klõpsud läbi iga kõlari…"
 
-#: package/contents/ui/FullRepresentation.qml:4902
+#: package/contents/ui/FullRepresentation.qml:4922
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Voor 2/2 — vaikus, kontrollin tulemust…"
 
-#: package/contents/ui/FullRepresentation.qml:4940
+#: package/contents/ui/FullRepresentation.qml:4944
+msgid "Stops the measurement, unmutes every speaker and gives the music back."
+msgstr "Peatab mõõtmise, võtab kõigilt kõlaritelt vaigistuse maha ja annab muusika tagasi."
+
+
+#: package/contents/ui/FullRepresentation.qml:4973
 msgid "%1 plays in the group"
 msgstr "%1 mängib grupis"
 
-#: package/contents/ui/FullRepresentation.qml:4953
+#: package/contents/ui/FullRepresentation.qml:4986
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Kas see kõlar mängib grupis — eemalda linnuke, et jätta ta mängust välja ilma ühendust katkestamata. Jäetakse seadmele meelde."
 
-#: package/contents/ui/FullRepresentation.qml:4962
+#: package/contents/ui/FullRepresentation.qml:4995
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (midagi pole ühendatud)"
 
-#: package/contents/ui/FullRepresentation.qml:4976
+#: package/contents/ui/FullRepresentation.qml:5009
 msgid "Balance of %1"
 msgstr "%1 balanss"
 
-#: package/contents/ui/FullRepresentation.qml:4985
+#: package/contents/ui/FullRepresentation.qml:5018
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Selle kõlari osa helitugevusest — balanss järgib iga üldnivoo liigutust ja jäetakse seadme jaoks meelde. See mõjutab ainult selle vidina enda heli; süsteemi heliseadete seadmepõhine helitugevus on eraldi, puutumata kiht — seepärast erinevadki sealsed numbrid nendest liuguritest."
 
-#: package/contents/ui/FullRepresentation.qml:5002
+#: package/contents/ui/FullRepresentation.qml:5035
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:5003
+#: package/contents/ui/FullRepresentation.qml:5036
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:5004
+#: package/contents/ui/FullRepresentation.qml:5037
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:5005
+#: package/contents/ui/FullRepresentation.qml:5038
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:5010
+#: package/contents/ui/FullRepresentation.qml:5043
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Millised kanalid see kõlar mängib: stereo, ainult vasak, ainult parem või mõlema mono-miks. Pane üks kõlar L-i ja teine R-i peale — saad tõelise stereopaari; jäetakse seadmele meelde."
 
-#: package/contents/ui/FullRepresentation.qml:5041
+#: package/contents/ui/FullRepresentation.qml:5074
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:5056
+#: package/contents/ui/FullRepresentation.qml:5089
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth on välja lülitatud või adapterit pole — kontrolli süsteemiseadeid."
 
-#: package/contents/ui/FullRepresentation.qml:5067
+#: package/contents/ui/FullRepresentation.qml:5100
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "Paardunud Bluetooth-heliseadmeid pole — kasuta all olevat „Paarda uus kõlar…“ või paarda korra Süsteemi seadetes."
 
-#: package/contents/ui/FullRepresentation.qml:5081
+#: package/contents/ui/FullRepresentation.qml:5114
 msgid "%1 — connecting…"
 msgstr "%1 — ühendumine…"
 
-#: package/contents/ui/FullRepresentation.qml:5099
+#: package/contents/ui/FullRepresentation.qml:5132
 msgid "%1 — pairing…"
 msgstr "%1 — seon…"
 
-#: package/contents/ui/FullRepresentation.qml:5100
+#: package/contents/ui/FullRepresentation.qml:5133
 msgid "%1 — new, click to pair"
 msgstr "%1 — uus, klõpsa sidumiseks"
 
-#: package/contents/ui/FullRepresentation.qml:5111
+#: package/contents/ui/FullRepresentation.qml:5144
 msgid "Pair a new speaker…"
 msgstr "Seo uus kõlar…"
 
-#: package/contents/ui/FullRepresentation.qml:5127
+#: package/contents/ui/FullRepresentation.qml:5160
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Otsin — pane kõlar sidumisrežiimi…"
 
-#: package/contents/ui/FullRepresentation.qml:5148
+#: package/contents/ui/FullRepresentation.qml:5181
 msgid "WiFi & network"
 msgstr "WiFi ja võrk"
 
-#: package/contents/ui/FullRepresentation.qml:5180
+#: package/contents/ui/FullRepresentation.qml:5213
 msgid "%1 (speaker group)"
 msgstr "%1 (kõlarigrupp)"
 
-#: package/contents/ui/FullRepresentation.qml:5208
+#: package/contents/ui/FullRepresentation.qml:5241
 msgid "Balance"
 msgstr "Tasakaal"
 
-#: package/contents/ui/FullRepresentation.qml:5222
+#: package/contents/ui/FullRepresentation.qml:5255
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Selle seadme osa helitugevusest — tasakaal järgib iga põhiliuguri liigutust ja jäetakse seadme jaoks meelde."
 
-#: package/contents/ui/FullRepresentation.qml:5244
+#: package/contents/ui/FullRepresentation.qml:5277
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Iga seade puhverdab voogu omaette, mistõttu ruumid võivad mängida mõne sekundi nihkega. Täpselt sünkroonis kõlarite jaoks loo Google Home'i äpis kõlarigrupp — grupp ilmub siia ühe seadmena."
 
-#: package/contents/ui/FullRepresentation.qml:5254
+#: package/contents/ui/FullRepresentation.qml:5287
 msgid "Stop casting everywhere"
 msgstr "Peata esitus kõigis seadmetes"
 
-#: package/contents/ui/FullRepresentation.qml:5272
+#: package/contents/ui/FullRepresentation.qml:5305
 msgid "Searching for devices…"
 msgstr "Otsin seadmeid…"
 
-#: package/contents/ui/FullRepresentation.qml:5281
+#: package/contents/ui/FullRepresentation.qml:5314
 msgid "No devices found on your network"
 msgstr "Võrgust ei leitud ühtegi seadet"
 
@@ -1450,287 +1543,293 @@ msgstr "Salvestatud jaamade seadistus on vigane. Sinu andmeid ei muudetud; paran
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "Jaam ei vastanud — ta võib olla maas või sinu riigis kättesaamatu. Proovi mõnda teist tulemust."
 
-#: package/contents/ui/main.qml:1096
+#: package/contents/ui/main.qml:1103
 msgid "Nothing to export"
 msgstr "Pole midagi eksportida"
 
-#: package/contents/ui/main.qml:1096
+#: package/contents/ui/main.qml:1103
 msgid "Subscribe to a show first."
 msgstr "Telli esmalt mõni saade."
 
-#: package/contents/ui/main.qml:1126
+#: package/contents/ui/main.qml:1133
 msgid "Subscriptions imported"
 msgstr "Tellimused imporditud"
 
-#: package/contents/ui/main.qml:1127
+#: package/contents/ui/main.qml:1134
 msgid "%1 show added"
 msgid_plural "%1 shows added"
 msgstr[0] "%1 saade lisatud"
 msgstr[1] "%1 saadet lisatud"
 
-#: package/contents/ui/main.qml:1129
+#: package/contents/ui/main.qml:1136
 msgid "Nothing imported"
 msgstr "Midagi ei imporditud"
 
-#: package/contents/ui/main.qml:1130
+#: package/contents/ui/main.qml:1137
 msgid "No new podcast feeds were found in that file."
 msgstr "Sellest failist ei leitud uusi podcasti vooge."
 
-#: package/contents/ui/main.qml:1278
+#: package/contents/ui/main.qml:1285
 msgid "This feed address is not allowed."
 msgstr "See voo aadress ei ole lubatud."
 
-#: package/contents/ui/main.qml:1313
+#: package/contents/ui/main.qml:1320
 msgid "The feed did not answer (error %1)."
 msgstr "Voog ei vastanud (viga %1)."
 
-#: package/contents/ui/main.qml:1314
+#: package/contents/ui/main.qml:1321
 msgid "This address is not a podcast feed."
 msgstr "See aadress ei ole podcasti voog."
 
-#: package/contents/ui/main.qml:1326
+#: package/contents/ui/main.qml:1333
 msgid "No playable episodes in this feed."
 msgstr "Selles voos pole esitatavaid episoode."
 
-#: package/contents/ui/main.qml:1516
+#: package/contents/ui/main.qml:1523
 msgid "%1 — the newest episodes are downloading."
 msgstr "%1 — uusimad episoodid laaditakse alla."
 
-
-#: package/contents/ui/main.qml:1518
+#: package/contents/ui/main.qml:1525
 msgid "New podcast episodes"
 msgstr "Uued podcasti episoodid"
 
-
-#: package/contents/ui/main.qml:2383
+#: package/contents/ui/main.qml:2390
 msgid "Scheduled recording started"
 msgstr "Ajastatud salvestus algas"
 
-#: package/contents/ui/main.qml:2503
+#: package/contents/ui/main.qml:2510
 msgid "Scheduled recording missed"
 msgstr "Ajastatud salvestus jäi vahele"
 
-#: package/contents/ui/main.qml:2509
+#: package/contents/ui/main.qml:2516
 msgid "Scheduled recording skipped"
 msgstr "Ajastatud salvestus jäeti vahele"
 
-#: package/contents/ui/main.qml:2510
+#: package/contents/ui/main.qml:2517
 msgid "%1 — another recording is already running."
 msgstr "%1 — teine salvestus juba käib."
 
-#: package/contents/ui/main.qml:2684
+#: package/contents/ui/main.qml:2691
 msgid "Wake-up alarm missed"
 msgstr "Äratus jäi vahele"
 
-#: package/contents/ui/main.qml:2685
+#: package/contents/ui/main.qml:2692
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 oli seatud kellaajale %2 — arvuti oli sel hetkel välja lülitatud või unerežiimis."
 
-#: package/contents/ui/main.qml:2719 package/contents/ui/main.qml:2804
-#: package/contents/ui/main.qml:2844 package/contents/ui/main.qml:2850
-#: package/contents/ui/main.qml:2891 package/contents/ui/main.qml:2894
+#: package/contents/ui/main.qml:2726 package/contents/ui/main.qml:2811
+#: package/contents/ui/main.qml:2851 package/contents/ui/main.qml:2857
+#: package/contents/ui/main.qml:2898 package/contents/ui/main.qml:2901
 msgid "Wake-up alarm"
 msgstr "Äratus"
 
-#: package/contents/ui/main.qml:2720
+#: package/contents/ui/main.qml:2727
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 jõudis kätte samal ajal — selle asemel mängib %2."
 
-#: package/contents/ui/main.qml:2852
+#: package/contents/ui/main.qml:2859
 msgid "the show"
 msgstr "saade"
 
-
-#: package/contents/ui/main.qml:2851
+#: package/contents/ui/main.qml:2858
 msgid "No downloaded episode of %1 was on disk — waking with the chime."
 msgstr "Ühtegi %1 alla laaditud episoodi polnud kettal — äratan helinaga."
 
-
-#: package/contents/ui/main.qml:2895
+#: package/contents/ui/main.qml:2902
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Jaam ei käivitunud — mängib sisseehitatud äratustoon."
 
-#: package/contents/ui/main.qml:3611
+#: package/contents/ui/main.qml:3618
 msgid "%1 devices"
 msgstr "%1 seadet"
 
-#: package/contents/ui/main.qml:4052
+#: package/contents/ui/main.qml:4070
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-kõlar"
 
-#: package/contents/ui/main.qml:4051
+#: package/contents/ui/main.qml:4069
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 on ühendatud, aga heli ei jõudnud kohale"
 
-#: package/contents/ui/main.qml:4053
+#: package/contents/ui/main.qml:4071
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Lülita kõlar korraks välja ja uuesti sisse, siis ühenda uuesti."
 
-#: package/contents/ui/main.qml:4442
+#: package/contents/ui/main.qml:4460
 msgid "Station seems to be off the air"
 msgstr "Jaam paistab olevat eetrist väljas"
 
-#: package/contents/ui/main.qml:4443
+#: package/contents/ui/main.qml:4461
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 ei vasta ühelgi kataloogile teadaoleval aadressil. Jaam jääb sinu nimekirja — proovin taustal uuesti."
 
-#: package/contents/ui/main.qml:4515
+#: package/contents/ui/main.qml:4533
 msgid "Playing from a backup address"
 msgstr "Mängib varuaadressilt"
 
-#: package/contents/ui/main.qml:4516
+#: package/contents/ui/main.qml:4534
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Jaama salvestatud aadress ei vasta — praegu mängib kataloogi lähim vaste. Sinu salvestatud aadress jäi alles."
 
-#: package/contents/ui/main.qml:4556
+#: package/contents/ui/main.qml:4574
 msgid "Station found at a new address"
 msgstr "Jaam leitud uuelt aadressilt"
 
-#: package/contents/ui/main.qml:4557
+#: package/contents/ui/main.qml:4575
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 kolis — uus aadress salvestati sinu nimekirja."
 
-#: package/contents/ui/main.qml:5830
+#: package/contents/ui/main.qml:5848
 msgid "Episode downloaded"
 msgstr "Episood alla laaditud"
 
-#: package/contents/ui/main.qml:5834
+#: package/contents/ui/main.qml:5852
 msgid "Episode download failed"
 msgstr "Episoodi allalaadimine ebaõnnestus"
 
-#: package/contents/ui/main.qml:5876
+#: package/contents/ui/main.qml:5906
 msgid "Subscriptions exported"
 msgstr "Tellimused eksporditud"
 
-#: package/contents/ui/main.qml:5878
+#: package/contents/ui/main.qml:5908
 msgid "Export failed"
 msgstr "Eksport ebaõnnestus"
 
-#: package/contents/ui/main.qml:5879
+#: package/contents/ui/main.qml:5909
 msgid "Could not write the subscriptions file."
 msgstr "Tellimuste faili ei õnnestunud kirjutada."
 
-#: package/contents/ui/main.qml:5972
+#: package/contents/ui/main.qml:6002
 msgid "Casting needs python-chromecast"
 msgstr "Ülekanne vajab python-chromecasti"
 
-#: package/contents/ui/main.qml:5973
+#: package/contents/ui/main.qml:6003
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Seadmetesse ülekandmiseks paigalda python-chromecast."
 
-#: package/contents/ui/main.qml:5994
+#: package/contents/ui/main.qml:6024
 msgid "the device"
 msgstr "seade"
 
-#: package/contents/ui/main.qml:5994
+#: package/contents/ui/main.qml:6024
 msgid "Could not cast to %1"
 msgstr "Seadmesse %1 ei õnnestunud üle kanda"
 
-#: package/contents/ui/main.qml:5995
+#: package/contents/ui/main.qml:6025
 msgid "The device could not play this station."
 msgstr "Seade ei suutnud seda jaama esitada."
 
-#: package/contents/ui/main.qml:6041
+#: package/contents/ui/main.qml:6071
 msgid "Casting"
 msgstr "Edastamine"
 
-#: package/contents/ui/main.qml:6042
+#: package/contents/ui/main.qml:6072
 msgid "The device did not stop — it may still be playing."
 msgstr "Seade ei peatunud — see võib ikka veel mängida."
 
-#: package/contents/ui/main.qml:6098 package/contents/ui/main.qml:6200
+#: package/contents/ui/main.qml:6124
+msgid "Bluetooth is switched off"
+msgstr "Bluetooth on välja lülitatud"
+
+
+#: package/contents/ui/main.qml:6125
+msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
+msgstr "Adapter ei läinud tööle — vaata süsteemisalve Bluetoothi lülitit või Süsteemi seadeid."
+
+
+#: package/contents/ui/main.qml:6144 package/contents/ui/main.qml:6246
 msgid "the Bluetooth device"
 msgstr "Bluetooth-seadmega"
 
-#: package/contents/ui/main.qml:6097
+#: package/contents/ui/main.qml:6143
 msgid "Could not connect to %1"
 msgstr "Ei õnnestunud ühenduda: %1"
 
-#: package/contents/ui/main.qml:6099
+#: package/contents/ui/main.qml:6145
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Veendu, et kõlar on sisse lülitatud ja levialas."
 
-#: package/contents/ui/main.qml:6199
+#: package/contents/ui/main.qml:6245
 msgid "Could not pair with %1"
 msgstr "Sidumine ebaõnnestus: %1"
 
-#: package/contents/ui/main.qml:6201
+#: package/contents/ui/main.qml:6247
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Pane kõlar sidumisrežiimi (hoia selle Bluetooth-nuppu all) ja proovi uuesti."
 
-#: package/contents/ui/main.qml:6299
+#: package/contents/ui/main.qml:6345
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg pole paigaldatud"
 
-#: package/contents/ui/main.qml:6300
+#: package/contents/ui/main.qml:6346
 msgid "Install ffmpeg to record radio."
 msgstr "Raadio salvestamiseks paigalda ffmpeg."
 
-#: package/contents/ui/main.qml:6303
+#: package/contents/ui/main.qml:6349
 msgid "Not enough disk space for this recording"
 msgstr "Selle salvestuse jaoks pole piisavalt kettaruumi"
 
-#: package/contents/ui/main.qml:6304
+#: package/contents/ui/main.qml:6350
 msgid "Free some space in %1 and try again."
 msgstr "Vabasta ruumi kaustas %1 ja proovi uuesti."
 
-#: package/contents/ui/main.qml:6307
+#: package/contents/ui/main.qml:6353
 msgid "Recording saved ✓ (%1)"
 msgstr "Salvestus valmis ✓ (%1)"
 
-#: package/contents/ui/main.qml:6311
+#: package/contents/ui/main.qml:6357
 msgid "Recording interrupted (%1 captured)"
 msgstr "Salvestus katkes (%1 salvestatud)"
 
-#: package/contents/ui/main.qml:6313
+#: package/contents/ui/main.qml:6359
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — fail on oodatust palju väiksem."
 
-#: package/contents/ui/main.qml:6317
+#: package/contents/ui/main.qml:6363
 msgid "Recording failed"
 msgstr "Salvestamine ebaõnnestus"
 
-#: package/contents/ui/main.qml:6318
+#: package/contents/ui/main.qml:6364
 msgid "The stream could not be captured."
 msgstr "Voogu ei õnnestunud salvestada."
 
-#: package/contents/ui/main.qml:6404
+#: package/contents/ui/main.qml:6450
 msgid "Downloading again without the cover"
 msgstr "Laadin uuesti alla ilma kaanepildita"
 
-#: package/contents/ui/main.qml:6405
+#: package/contents/ui/main.qml:6451
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Siltide manustamiseks on vaja python-mutagen paketti — paigalda see, et kaanepildid failidesse saaksid."
 
-#: package/contents/ui/main.qml:6413
+#: package/contents/ui/main.qml:6459
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp pole paigaldatud"
 
-#: package/contents/ui/main.qml:6414
+#: package/contents/ui/main.qml:6460
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Lugude allalaadimiseks paigalda yt-dlp (ja ffmpeg)."
 
-#: package/contents/ui/main.qml:6417
+#: package/contents/ui/main.qml:6463
 msgid "Track downloaded ✓"
 msgstr "Lugu alla laaditud ✓"
 
-#: package/contents/ui/main.qml:6418
+#: package/contents/ui/main.qml:6464
 msgid "Saved to: %1"
 msgstr "Salvestatud: %1"
 
-#: package/contents/ui/main.qml:6421
+#: package/contents/ui/main.qml:6467
 msgid "Download failed"
 msgstr "Allalaadimine ebaõnnestus"
 
-#: package/contents/ui/main.qml:6422
+#: package/contents/ui/main.qml:6468
 msgid "Unknown error"
 msgstr "Tundmatu viga"
 
-#: package/contents/ui/main.qml:6744
+#: package/contents/ui/main.qml:6790
 msgid "Audio output changed"
 msgstr "Heliväljund muutus"
 
-#: package/contents/ui/main.qml:6745
+#: package/contents/ui/main.qml:6791
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Valitud väljundseade kadus — kasutusel on süsteemi vaikeväljund."
 
@@ -1746,164 +1845,164 @@ msgstr "Eemalda jaam nimekirjast"
 msgid "Waiting for track info…"
 msgstr "Ootan loo infot…"
 
-#: package/contents/ui/SyncEngine.qml:313
+#: package/contents/ui/SyncEngine.qml:320
 msgid "Could not combine the outputs"
 msgstr "Väljundite kombineerimine ebaõnnestus"
 
-#: package/contents/ui/SyncEngine.qml:314
+#: package/contents/ui/SyncEngine.qml:321
 msgid "pactl refused to create the combined output."
 msgstr "pactl keeldus kombineeritud väljundit loomast."
 
-#: package/contents/ui/SyncEngine.qml:604
+#: package/contents/ui/SyncEngine.qml:611
 msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
 msgstr "Bluetooth-kõlar jääb maha %1 ms ja kõlarite valjus ühtlustati mikrofoni järgi — kõik on seatud ja jäetud meelde."
 
-#: package/contents/ui/SyncEngine.qml:605
+#: package/contents/ui/SyncEngine.qml:612
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Bluetooth-kõlar jääb %1 ms maha — viide on seatud ja jääb sellele seadmele meelde."
 
-#: package/contents/ui/SyncEngine.qml:607
+#: package/contents/ui/SyncEngine.qml:614
 msgid "Balance levels set earlier were replaced by the measured ones."
 msgstr "Varem seatud balansitasemed asendati mõõdetud tasemetega."
 
-#: package/contents/ui/SyncEngine.qml:615
+#: package/contents/ui/SyncEngine.qml:622
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
 msgstr "Mikrofon läks %1 peal ülevõimendusse — see balanss jäi muutmata; keera kõlari heli vaiksemaks ja kalibreeri uuesti."
 
-#: package/contents/ui/SyncEngine.qml:621
+#: package/contents/ui/SyncEngine.qml:628
 msgid "Measured with %1 — the default microphone stayed silent."
 msgstr "Mõõdetud mikrofoniga %1 — vaikimisi mikrofon jäi vait."
 
-#: package/contents/ui/SyncEngine.qml:622
+#: package/contents/ui/SyncEngine.qml:629
 msgid "Speakers calibrated"
 msgstr "Kõlarid kalibreeritud"
 
-#: package/contents/ui/SyncEngine.qml:631
-#: package/contents/ui/SyncEngine.qml:667
+#: package/contents/ui/SyncEngine.qml:638
+#: package/contents/ui/SyncEngine.qml:674
 msgid "Calibration did not succeed"
 msgstr "Kalibratsioon ei õnnestunud"
 
-#: package/contents/ui/SyncEngine.qml:632
-#: package/contents/ui/SyncEngine.qml:779
+#: package/contents/ui/SyncEngine.qml:639
+#: package/contents/ui/SyncEngine.qml:786
 msgid "Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."
 msgstr "Iga mikrofon andis puhast vaikust. Mikrofoni enda vaigistusnupp on süsteemile nähtamatu — kontrolli tulukest mikrofoni peal või sea vaikimisi mikrofoniks töötav mikrofon."
 
-#: package/contents/ui/SyncEngine.qml:654
+#: package/contents/ui/SyncEngine.qml:661
 msgid "Calibration"
 msgstr "Kalibratsioon"
 
-#: package/contents/ui/SyncEngine.qml:655
+#: package/contents/ui/SyncEngine.qml:662
 msgid "The clicks were too quiet for this room — trying once more, louder."
 msgstr "Klikid jäid selle toa jaoks liiga vaikseks — proovin veel korra, valjemini."
 
-#: package/contents/ui/SyncEngine.qml:668
+#: package/contents/ui/SyncEngine.qml:675
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Veendu, et mikrofon pole kaetud ja mõlemat kõlarit on kuulda, siis proovi uuesti."
 
-#: package/contents/ui/SyncEngine.qml:724
+#: package/contents/ui/SyncEngine.qml:731
 msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
 msgstr "Kõlarid olid %1 ms vahega — korrigeerisin mõõtmise järgi, kontrollin veel korra."
 
-#: package/contents/ui/SyncEngine.qml:739
+#: package/contents/ui/SyncEngine.qml:746
 msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
 msgstr "Ühe kõlari tee oli %1 ms kinni kiilunud — loputasin selle, kontrollin veel korra."
 
-#: package/contents/ui/SyncEngine.qml:749
-#: package/contents/ui/SyncEngine.qml:769
-#: package/contents/ui/SyncEngine.qml:778
-#: package/contents/ui/SyncEngine.qml:806
-#: package/contents/ui/SyncEngine.qml:811
+#: package/contents/ui/SyncEngine.qml:756
+#: package/contents/ui/SyncEngine.qml:776
+#: package/contents/ui/SyncEngine.qml:785
+#: package/contents/ui/SyncEngine.qml:813
 #: package/contents/ui/SyncEngine.qml:818
-#: package/contents/ui/SyncEngine.qml:831
-#: package/contents/ui/SyncEngine.qml:902
+#: package/contents/ui/SyncEngine.qml:825
+#: package/contents/ui/SyncEngine.qml:838
+#: package/contents/ui/SyncEngine.qml:909
 msgid "Sync check"
 msgstr "Sünki kontroll"
 
-#: package/contents/ui/SyncEngine.qml:770
+#: package/contents/ui/SyncEngine.qml:777
 msgid "The room was not quiet enough to verify — pause other audio and calibrate once more."
 msgstr "Tuba ei olnud kontrolliks piisavalt vaikne — peata muu heli ja kalibreeri veel kord."
 
-#: package/contents/ui/SyncEngine.qml:807
+#: package/contents/ui/SyncEngine.qml:814
 msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
 msgstr "%1 püsis mõlemas voorus vait — see jäeti grupist välja. Linnukesega kõlarite nimekirjas saad ta igal hetkel tagasi."
 
-#: package/contents/ui/SyncEngine.qml:812
+#: package/contents/ui/SyncEngine.qml:819
 msgid "%1 made no sound the microphone could hear. If it stays silent on the next calibration too, it will be left out of the group."
 msgstr "%1 ei teinud ühtegi heli, mida mikrofon kuuleks. Kui ta jääb vait ka järgmisel kalibreerimisel, jäetakse ta grupist välja."
 
-#: package/contents/ui/SyncEngine.qml:819
+#: package/contents/ui/SyncEngine.qml:826
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "Kontrolli ajal ei olnud %1 kuulda — kõlar võib olla vaigistatud või väljas. Kalibratsioon jäi alles."
 
-#: package/contents/ui/SyncEngine.qml:827
+#: package/contents/ui/SyncEngine.qml:834
 msgid "Sync verified"
 msgstr "Sünk kinnitatud"
 
-#: package/contents/ui/SyncEngine.qml:828
+#: package/contents/ui/SyncEngine.qml:835
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Iga kõlar jõuab mikrofonini %1 ms sees — kõrva jaoks ühes taktis."
 
-#: package/contents/ui/SyncEngine.qml:832
+#: package/contents/ui/SyncEngine.qml:839
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Kõlarid saabuvad endiselt %1 ms vahega. Kalibreeri veel kord või nihuta viite liugurit."
 
-#: package/contents/ui/SyncEngine.qml:862
+#: package/contents/ui/SyncEngine.qml:869
 msgid "Auto-check %1: too quiet to tell"
 msgstr "Autokontroll %1: liiga vaikne, et öelda"
 
-#: package/contents/ui/SyncEngine.qml:868
+#: package/contents/ui/SyncEngine.qml:875
 msgid "Auto-check %1: in sync"
 msgstr "Autokontroll %1: sünkis"
 
-#: package/contents/ui/SyncEngine.qml:871
+#: package/contents/ui/SyncEngine.qml:878
 msgid "Auto-check %1: %2 ms apart"
 msgstr "Autokontroll %1: %2 ms lahus"
 
-#: package/contents/ui/SyncEngine.qml:903
+#: package/contents/ui/SyncEngine.qml:910
 msgid "Speakers drifted — checking sync. Music pauses for about a minute."
 msgstr "Kõlarid on triivinud — kontrollin sünkrooni. Muusika peatub umbes minutiks."
 
-#: package/contents/ui/SyncEngine.qml:907
+#: package/contents/ui/SyncEngine.qml:914
 msgid "Sync has drifted"
 msgstr "Sünk on triivinud"
 
-#: package/contents/ui/SyncEngine.qml:908
+#: package/contents/ui/SyncEngine.qml:915
 msgid "The speakers are audibly apart again — run Calibrate when convenient."
 msgstr "Kõlarid on taas kuuldavalt lahus — käivita kalibratsioon, kui mahti on."
 
-#: package/contents/ui/SyncEngine.qml:1004
+#: package/contents/ui/SyncEngine.qml:1011
 msgid "Speaker timing drifted"
 msgstr "Kõlari ajastus on triivinud"
 
-#: package/contents/ui/SyncEngine.qml:1005
+#: package/contents/ui/SyncEngine.qml:1012
 msgid "A Bluetooth speaker came back noticeably off its calibration — the sync compensated automatically. Recalibrate when convenient for exact ears."
 msgstr "Bluetooth-kõlar tuli tagasi märgatavalt oma kalibratsioonist väljas — sünk kompenseeris automaatselt. Kalibreeri uuesti, kui mahti on, et kõrv oleks täpne."
 
-#: package/contents/ui/SyncEngine.qml:1824
+#: package/contents/ui/SyncEngine.qml:1855
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Kaks klõpsuvooru, nende vahel vaikne kontroll — kokku umbes kaks minutit. Muusika püsib vait, kuni kontroll lõpeb."
 
-#: package/contents/ui/SyncEngine.qml:1826
+#: package/contents/ui/SyncEngine.qml:1857
 msgid "Skipped (empty jack): %1."
 msgstr "Vahele jäetud (tühi pesa): %1."
 
-#: package/contents/ui/SyncEngine.qml:1827
+#: package/contents/ui/SyncEngine.qml:1858
 msgid "Calibration started"
 msgstr "Kalibratsioon algas"
 
-#: package/contents/ui/SyncEngine.qml:1888
+#: package/contents/ui/SyncEngine.qml:1919
 msgid "All local outputs (On Air)"
 msgstr "Kõik kohalikud väljundid (On Air)"
 
-#: package/contents/ui/SyncEngine.qml:2650
+#: package/contents/ui/SyncEngine.qml:2681
 msgid "%1 did not join the sync"
 msgstr "%1 ei liitunud sünkrooniga"
 
-#: package/contents/ui/SyncEngine.qml:2652
+#: package/contents/ui/SyncEngine.qml:2683
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Kõlar on ühendatud, aga teda ei õnnestunud gruppi tuua — lülita sünk korraks välja ja uuesti sisse."
 
-#: package/contents/ui/SyncEngine.qml:2653
+#: package/contents/ui/SyncEngine.qml:2684
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Kõlar on ühendatud, aga selle heliväljundit ei tekkinud — lülita kõlar korraks välja ja sisse ning ühenda uuesti."
 
