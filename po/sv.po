@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-21 07:15+0300\n"
+"POT-Creation-Date: 2026-07-21 07:31+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Swedish\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/FullRepresentation.qml:3897
+#: package/contents/ui/FullRepresentation.qml:4142
 msgid "Stations"
 msgstr "Stationer"
 
@@ -46,8 +46,8 @@ msgid "Audio"
 msgstr "Ljud"
 
 #: package/contents/ui/CompactRepresentation.qml:88
-#: package/contents/ui/FullRepresentation.qml:3487
-#: package/contents/ui/FullRepresentation.qml:4264
+#: package/contents/ui/FullRepresentation.qml:3732
+#: package/contents/ui/FullRepresentation.qml:4509
 msgid "Volume"
 msgstr "Volym"
 
@@ -335,9 +335,9 @@ msgid "Max length:"
 msgstr "Maximal längd:"
 
 #: package/contents/ui/config/configRecording.qml:53
-#: package/contents/ui/FullRepresentation.qml:3299
-#: package/contents/ui/FullRepresentation.qml:3581
-#: package/contents/ui/FullRepresentation.qml:3663
+#: package/contents/ui/FullRepresentation.qml:3544
+#: package/contents/ui/FullRepresentation.qml:3826
+#: package/contents/ui/FullRepresentation.qml:3908
 msgid "%1 min"
 msgstr "%1 min"
 
@@ -346,7 +346,7 @@ msgid "A hard safety cap for one recording — protects the disk if you forget t
 msgstr "En hård längdgräns för en inspelning — skyddar disken om du glömmer att stoppa."
 
 #: package/contents/ui/config/configRecording.qml:70
-#: package/contents/ui/FullRepresentation.qml:3550
+#: package/contents/ui/FullRepresentation.qml:3795
 msgid "Scheduled recordings"
 msgstr "Schemalagda inspelningar"
 
@@ -490,19 +490,18 @@ msgid "Tags:"
 msgstr "Taggar:"
 
 #: package/contents/ui/config/configSearch.qml:877
-#: package/contents/ui/FullRepresentation.qml:4020
+#: package/contents/ui/FullRepresentation.qml:4265
 msgid "Error: %1"
 msgstr "Fel: %1"
 
 #: package/contents/ui/EpisodeListItem.qml:61
-#: package/contents/ui/FullRepresentation.qml:2759
+#: package/contents/ui/FullRepresentation.qml:2814
 msgid "Episode"
 msgstr "Avsnitt"
 
 #: package/contents/ui/EpisodeListItem.qml:73
 msgid "Downloaded"
 msgstr "Nedladdad"
-
 
 #: package/contents/ui/EpisodeListItem.qml:75
 msgid "%1 left"
@@ -599,8 +598,8 @@ msgid "From the web"
 msgstr "Från webben"
 
 #: package/contents/ui/FullRepresentation.qml:1031
-#: package/contents/ui/FullRepresentation.qml:2246
-#: package/contents/ui/FullRepresentation.qml:2472
+#: package/contents/ui/FullRepresentation.qml:2297
+#: package/contents/ui/FullRepresentation.qml:2523
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
@@ -717,7 +716,7 @@ msgid "Add to favorites"
 msgstr "Lägg till i favoriter"
 
 #: package/contents/ui/FullRepresentation.qml:1953
-#: package/contents/ui/FullRepresentation.qml:2393
+#: package/contents/ui/FullRepresentation.qml:2444
 msgid "Remove from liked songs"
 msgstr "Ta bort från gillade låtar"
 
@@ -738,7 +737,7 @@ msgid "Vote for this station in the worldwide catalog"
 msgstr "Rösta på den här stationen i den globala katalogen"
 
 #: package/contents/ui/FullRepresentation.qml:1994
-#: package/contents/ui/FullRepresentation.qml:4007
+#: package/contents/ui/FullRepresentation.qml:4252
 #: package/contents/ui/MediaListItem.qml:527
 msgid "Downloading…"
 msgstr "Laddar ner…"
@@ -757,7 +756,7 @@ msgid "Recording %1 — click to stop"
 msgstr "Spelar in: %1 — klicka för att stoppa"
 
 #: package/contents/ui/FullRepresentation.qml:2024
-#: package/contents/ui/FullRepresentation.qml:3710
+#: package/contents/ui/FullRepresentation.qml:3955
 msgid "This source cannot be recorded"
 msgstr "Den här källan kan inte spelas in"
 
@@ -769,216 +768,234 @@ msgstr "Spela in den här stationen (endast för personligt bruk)"
 msgid "Go to this show"
 msgstr "Gå till det här programmet"
 
+#: package/contents/ui/FullRepresentation.qml:2119
+#: package/contents/ui/FullRepresentation.qml:2140
+msgid "Podcast downloads (%1)"
+msgstr "Poddnedladdningar (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2170
+
+#: package/contents/ui/FullRepresentation.qml:2221
 msgid "Downloading: %1"
 msgstr "Laddar ner: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2223
+#: package/contents/ui/FullRepresentation.qml:2274
 msgid "Stop recording"
 msgstr "Stoppa inspelningen"
 
-#: package/contents/ui/FullRepresentation.qml:2247
+#: package/contents/ui/FullRepresentation.qml:2298
 msgid "Liked songs"
 msgstr "Gillade låtar"
 
-#: package/contents/ui/FullRepresentation.qml:2247
+#: package/contents/ui/FullRepresentation.qml:2298
 msgid "Recently played"
 msgstr "Nyligen spelat"
 
-#: package/contents/ui/FullRepresentation.qml:2262
+#: package/contents/ui/FullRepresentation.qml:2313
 msgid "Show play history"
 msgstr "Visa uppspelningshistorik"
 
-#: package/contents/ui/FullRepresentation.qml:2263
+#: package/contents/ui/FullRepresentation.qml:2314
 msgid "Show liked songs"
 msgstr "Visa gillade låtar"
 
-#: package/contents/ui/FullRepresentation.qml:2273
+#: package/contents/ui/FullRepresentation.qml:2324
 msgid "Clear history"
 msgstr "Rensa historiken"
 
-#: package/contents/ui/FullRepresentation.qml:2303
+#: package/contents/ui/FullRepresentation.qml:2354
 msgid "Search YouTube for %1"
 msgstr "Sök på YouTube efter %1"
 
-#: package/contents/ui/FullRepresentation.qml:2382
+#: package/contents/ui/FullRepresentation.qml:2433
 msgid "Download this track"
 msgstr "Ladda ner det här spåret"
 
-#: package/contents/ui/FullRepresentation.qml:2406
+#: package/contents/ui/FullRepresentation.qml:2457
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klick = sök på YouTube · ⬇ = ladda ner"
 
-#: package/contents/ui/FullRepresentation.qml:2472
-#: package/contents/ui/FullRepresentation.qml:3923
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2677
+#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:4168
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2739
 msgid "My Music"
 msgstr "Min musik"
 
-#: package/contents/ui/FullRepresentation.qml:2481
+#: package/contents/ui/FullRepresentation.qml:2532
 msgid "Open folder in file manager"
 msgstr "Öppna mappen i filhanteraren"
 
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2574
 msgid "Stop: %1"
 msgstr "Stoppa: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2574
 msgid "Play: %1"
 msgstr "Spela: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2608
+#: package/contents/ui/FullRepresentation.qml:2659
 msgid "Click again to confirm delete"
 msgstr "Klicka igen för att bekräfta borttagning"
 
-#: package/contents/ui/FullRepresentation.qml:2608
+#: package/contents/ui/FullRepresentation.qml:2659
 msgid "Delete file"
 msgstr "Ta bort filen"
 
-#: package/contents/ui/FullRepresentation.qml:2664
+#: package/contents/ui/FullRepresentation.qml:2715
 msgid "Nothing here yet"
 msgstr "Här finns inget ännu"
 
-#: package/contents/ui/FullRepresentation.qml:2675
+#: package/contents/ui/FullRepresentation.qml:2726
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "När en bra låt spelas på radion, tryck på ⬇ — den sparas här för lyssning offline"
 
-#: package/contents/ui/FullRepresentation.qml:2779
+#: package/contents/ui/FullRepresentation.qml:2834
 msgid "Back to shows"
 msgstr "Tillbaka till programmen"
 
-#: package/contents/ui/FullRepresentation.qml:2790
+#: package/contents/ui/FullRepresentation.qml:2845
 msgid "Search podcasts, or paste a feed URL…"
 msgstr "Sök poddar eller klistra in en flödes-URL…"
 
-
-#: package/contents/ui/FullRepresentation.qml:2810
+#: package/contents/ui/FullRepresentation.qml:2865
+#: package/contents/ui/FullRepresentation.qml:2885
 msgid "Back to my shows"
 msgstr "Tillbaka till mina program"
 
-
-#: package/contents/ui/FullRepresentation.qml:2811
+#: package/contents/ui/FullRepresentation.qml:2866
 msgid "Popular now — worldwide charts"
 msgstr "Populärt just nu — världstopplistor"
 
+#: package/contents/ui/FullRepresentation.qml:2886
+msgid "Downloaded episodes (%1)"
+msgstr "Nedladdade avsnitt (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2826
+
+#: package/contents/ui/FullRepresentation.qml:2901
 msgid "Import subscriptions (OPML)"
 msgstr "Importera prenumerationer (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2837
+#: package/contents/ui/FullRepresentation.qml:2912
 msgid "Export subscriptions (OPML)"
 msgstr "Exportera prenumerationer (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2842
+#: package/contents/ui/FullRepresentation.qml:2917
 msgid "Import subscriptions"
 msgstr "Importera prenumerationer"
 
-#: package/contents/ui/FullRepresentation.qml:2843
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "OPML files (*.opml *.xml)"
 msgstr "OPML-filer (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:2843
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "All files (*)"
 msgstr "Alla filer (*)"
 
-#: package/contents/ui/FullRepresentation.qml:2849
+#: package/contents/ui/FullRepresentation.qml:2924
 msgid "Episodes"
 msgstr "Avsnitt"
 
-#: package/contents/ui/FullRepresentation.qml:2868
+#: package/contents/ui/FullRepresentation.qml:2943
 msgid "Showing unplayed — tap for all"
 msgstr "Visar ospelade – tryck för alla"
 
-#: package/contents/ui/FullRepresentation.qml:2869
+#: package/contents/ui/FullRepresentation.qml:2944
 msgid "Show only unplayed"
 msgstr "Visa endast ospelade"
 
-#: package/contents/ui/FullRepresentation.qml:2884
+#: package/contents/ui/FullRepresentation.qml:2959
 msgid "Mark all as played"
 msgstr "Markera alla som spelade"
 
-#: package/contents/ui/FullRepresentation.qml:2914
+#: package/contents/ui/FullRepresentation.qml:2989
 msgid "Unsubscribe from this show"
 msgstr "Avsluta prenumerationen på det här programmet"
 
-
-#: package/contents/ui/FullRepresentation.qml:2915
+#: package/contents/ui/FullRepresentation.qml:2990
 msgid "Subscribe to this show"
 msgstr "Prenumerera på det här programmet"
 
-
-#: package/contents/ui/FullRepresentation.qml:2932
+#: package/contents/ui/FullRepresentation.qml:3007
 msgid "Refresh episodes"
 msgstr "Uppdatera avsnitt"
 
-#: package/contents/ui/FullRepresentation.qml:2948
-#: package/contents/ui/FullRepresentation.qml:2959
+#: package/contents/ui/FullRepresentation.qml:3023
+#: package/contents/ui/FullRepresentation.qml:3034
 msgid "Open this feed"
 msgstr "Öppna det här flödet"
 
-
-#: package/contents/ui/FullRepresentation.qml:2997
+#: package/contents/ui/FullRepresentation.qml:3072
 msgid "Loading episodes…"
 msgstr "Läser in avsnitt…"
 
-#: package/contents/ui/FullRepresentation.qml:2998
+#: package/contents/ui/FullRepresentation.qml:3073
 msgid "Searching…"
 msgstr "Söker…"
 
-#: package/contents/ui/FullRepresentation.qml:2999
+#: package/contents/ui/FullRepresentation.qml:3074
 msgid "Loading the charts…"
 msgstr "Läser in topplistorna…"
 
+#: package/contents/ui/FullRepresentation.qml:3215
+msgid "resume at %1"
+msgstr "återuppta vid %1"
 
-#: package/contents/ui/FullRepresentation.qml:3134
+
+#: package/contents/ui/FullRepresentation.qml:3237
+msgid "Tap again to delete the file"
+msgstr "Tryck igen för att ta bort filen"
+
+
+#: package/contents/ui/FullRepresentation.qml:3238
+msgid "Delete the downloaded file"
+msgstr "Ta bort den nedladdade filen"
+
+
+#: package/contents/ui/FullRepresentation.qml:3379
 msgid "Unsubscribe"
 msgstr "Avsluta prenumeration"
 
-#: package/contents/ui/FullRepresentation.qml:3135
+#: package/contents/ui/FullRepresentation.qml:3380
 msgid "Subscribe"
 msgstr "Prenumerera"
 
-#: package/contents/ui/FullRepresentation.qml:3174
+#: package/contents/ui/FullRepresentation.qml:3419
 msgid "No shows found"
 msgstr "Inga program hittades"
 
-#: package/contents/ui/FullRepresentation.qml:3175
+#: package/contents/ui/FullRepresentation.qml:3420
 msgid "The charts did not answer — try again in a moment"
 msgstr "Topplistorna svarade inte — försök igen om en stund"
 
-
-#: package/contents/ui/FullRepresentation.qml:3176
+#: package/contents/ui/FullRepresentation.qml:3421
 msgid "No subscriptions yet"
 msgstr "Inga prenumerationer ännu"
 
-#: package/contents/ui/FullRepresentation.qml:3188
+#: package/contents/ui/FullRepresentation.qml:3433
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Sök efter ett program ovan och stjärnmärk det — avsnitten laddas ner hit för lyssning offline"
 
-#: package/contents/ui/FullRepresentation.qml:3228
+#: package/contents/ui/FullRepresentation.qml:3473
 msgid "All caught up — no unplayed episodes"
 msgstr "Allt ikapp – inga ospelade avsnitt"
 
-#: package/contents/ui/FullRepresentation.qml:3279
+#: package/contents/ui/FullRepresentation.qml:3524
 msgid "Sleep timer"
 msgstr "Sovtimer"
 
-#: package/contents/ui/FullRepresentation.qml:3285
-#: package/contents/ui/FullRepresentation.qml:4004
+#: package/contents/ui/FullRepresentation.qml:3530
+#: package/contents/ui/FullRepresentation.qml:4249
 msgid "Sleeping in %1"
 msgstr "Somnar om %1"
 
-#: package/contents/ui/FullRepresentation.qml:3305
+#: package/contents/ui/FullRepresentation.qml:3550
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: package/contents/ui/FullRepresentation.qml:3313
+#: package/contents/ui/FullRepresentation.qml:3558
 msgid "Playback fades out and stops when the timer ends."
 msgstr "Uppspelningen tonas ut och stoppas när timern går ut."
 
-#: package/contents/ui/FullRepresentation.qml:3348
+#: package/contents/ui/FullRepresentation.qml:3593
 msgid "Wake-up alarms"
 msgstr "Väckarlarm"
 
@@ -990,389 +1007,389 @@ msgstr "Väckarlarm"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Sun"
 msgstr "sön"
 
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Mon"
 msgstr "mån"
 
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Tue"
 msgstr "tis"
 
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Wed"
 msgstr "ons"
 
-#: package/contents/ui/FullRepresentation.qml:3374
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/FullRepresentation.qml:3576
-#: package/contents/ui/FullRepresentation.qml:3684
+#: package/contents/ui/FullRepresentation.qml:3619
+#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3821
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Thu"
 msgstr "tors"
 
-#: package/contents/ui/FullRepresentation.qml:3374
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/FullRepresentation.qml:3576
-#: package/contents/ui/FullRepresentation.qml:3684
+#: package/contents/ui/FullRepresentation.qml:3619
+#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3821
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Fri"
 msgstr "fre"
 
-#: package/contents/ui/FullRepresentation.qml:3374
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/FullRepresentation.qml:3576
-#: package/contents/ui/FullRepresentation.qml:3684
+#: package/contents/ui/FullRepresentation.qml:3619
+#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3821
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Sat"
 msgstr "lör"
 
-#: package/contents/ui/FullRepresentation.qml:3376
-#: package/contents/ui/FullRepresentation.qml:3460
-#: package/contents/ui/FullRepresentation.qml:3578
-#: package/contents/ui/FullRepresentation.qml:3676
+#: package/contents/ui/FullRepresentation.qml:3621
+#: package/contents/ui/FullRepresentation.qml:3705
+#: package/contents/ui/FullRepresentation.qml:3823
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Daily"
 msgstr "Dagligen"
 
-#: package/contents/ui/FullRepresentation.qml:3377
-#: package/contents/ui/FullRepresentation.qml:3579
+#: package/contents/ui/FullRepresentation.qml:3622
+#: package/contents/ui/FullRepresentation.qml:3824
 msgid "Every %1"
 msgstr "Varje %1"
 
-#: package/contents/ui/FullRepresentation.qml:3392
+#: package/contents/ui/FullRepresentation.qml:3637
 msgid "Remove this alarm"
 msgstr "Ta bort det här larmet"
 
-#: package/contents/ui/FullRepresentation.qml:3400
+#: package/contents/ui/FullRepresentation.qml:3645
 msgid "No alarms yet — add one below."
 msgstr "Inga larm ännu — lägg till ett nedan."
 
-#: package/contents/ui/FullRepresentation.qml:3415
-#: package/contents/ui/FullRepresentation.qml:3617
+#: package/contents/ui/FullRepresentation.qml:3660
+#: package/contents/ui/FullRepresentation.qml:3862
 msgid "Station:"
 msgstr "Station:"
 
-#: package/contents/ui/FullRepresentation.qml:3423
-#: package/contents/ui/FullRepresentation.qml:3625
+#: package/contents/ui/FullRepresentation.qml:3668
+#: package/contents/ui/FullRepresentation.qml:3870
 msgid "Station"
 msgstr "Station"
 
-#: package/contents/ui/FullRepresentation.qml:3427
-#: package/contents/ui/FullRepresentation.qml:3629
+#: package/contents/ui/FullRepresentation.qml:3672
+#: package/contents/ui/FullRepresentation.qml:3874
 msgid "Start:"
 msgstr "Start:"
 
-#: package/contents/ui/FullRepresentation.qml:3438
-#: package/contents/ui/FullRepresentation.qml:3640
+#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3885
 msgid "Start hour"
 msgstr "Starttimme"
 
-#: package/contents/ui/FullRepresentation.qml:3448
-#: package/contents/ui/FullRepresentation.qml:3650
+#: package/contents/ui/FullRepresentation.qml:3693
+#: package/contents/ui/FullRepresentation.qml:3895
 msgid "Start minute"
 msgstr "Startminut"
 
-#: package/contents/ui/FullRepresentation.qml:3453
-#: package/contents/ui/FullRepresentation.qml:3669
+#: package/contents/ui/FullRepresentation.qml:3698
+#: package/contents/ui/FullRepresentation.qml:3914
 msgid "Repeat:"
 msgstr "Upprepning:"
 
-#: package/contents/ui/FullRepresentation.qml:3460
-#: package/contents/ui/FullRepresentation.qml:3676
+#: package/contents/ui/FullRepresentation.qml:3705
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Once"
 msgstr "En gång"
 
-#: package/contents/ui/FullRepresentation.qml:3460
-#: package/contents/ui/FullRepresentation.qml:3676
+#: package/contents/ui/FullRepresentation.qml:3705
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Weekly"
 msgstr "Varje vecka"
 
-#: package/contents/ui/FullRepresentation.qml:3462
-#: package/contents/ui/FullRepresentation.qml:3677
+#: package/contents/ui/FullRepresentation.qml:3707
+#: package/contents/ui/FullRepresentation.qml:3922
 msgid "Repeat"
 msgstr "Upprepning"
 
-#: package/contents/ui/FullRepresentation.qml:3471
-#: package/contents/ui/FullRepresentation.qml:3686
+#: package/contents/ui/FullRepresentation.qml:3716
+#: package/contents/ui/FullRepresentation.qml:3931
 msgid "Weekday"
 msgstr "Veckodag"
 
-#: package/contents/ui/FullRepresentation.qml:3476
+#: package/contents/ui/FullRepresentation.qml:3721
 msgid "Volume:"
 msgstr "Volym:"
 
-#: package/contents/ui/FullRepresentation.qml:3498
+#: package/contents/ui/FullRepresentation.qml:3743
 msgid "Keep the computer awake until the alarm"
 msgstr "Håll datorn vaken tills larmet går"
 
-#: package/contents/ui/FullRepresentation.qml:3504
-#: package/contents/ui/FullRepresentation.qml:3722
+#: package/contents/ui/FullRepresentation.qml:3749
+#: package/contents/ui/FullRepresentation.qml:3967
 msgid "Add"
 msgstr "Lägg till"
 
-#: package/contents/ui/FullRepresentation.qml:3594
+#: package/contents/ui/FullRepresentation.qml:3839
 msgid "Remove this schedule"
 msgstr "Ta bort det här schemat"
 
-#: package/contents/ui/FullRepresentation.qml:3602
+#: package/contents/ui/FullRepresentation.qml:3847
 msgid "No scheduled recordings yet — add one below."
 msgstr "Inga schemalagda inspelningar ännu — lägg till en nedan."
 
-#: package/contents/ui/FullRepresentation.qml:3655
+#: package/contents/ui/FullRepresentation.qml:3900
 msgid "Duration:"
 msgstr "Längd:"
 
-#: package/contents/ui/FullRepresentation.qml:3665
+#: package/contents/ui/FullRepresentation.qml:3910
 msgid "Duration in minutes"
 msgstr "Längd i minuter"
 
-#: package/contents/ui/FullRepresentation.qml:3697
+#: package/contents/ui/FullRepresentation.qml:3942
 msgid "Recordings are for personal use only."
 msgstr "Inspelningar är endast för personligt bruk."
 
-#: package/contents/ui/FullRepresentation.qml:3910
-#: package/contents/ui/FullRepresentation.qml:4028
+#: package/contents/ui/FullRepresentation.qml:4155
+#: package/contents/ui/FullRepresentation.qml:4273
 msgid "Playing"
 msgstr "Spelar"
 
-#: package/contents/ui/FullRepresentation.qml:3936
+#: package/contents/ui/FullRepresentation.qml:4181
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Poddar"
 
-#: package/contents/ui/FullRepresentation.qml:3949
+#: package/contents/ui/FullRepresentation.qml:4194
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Timrar"
 
-#: package/contents/ui/FullRepresentation.qml:4010
+#: package/contents/ui/FullRepresentation.qml:4255
 #: package/contents/ui/main.qml:70
 msgid "Casting to %1"
 msgstr "Castar till %1"
 
-#: package/contents/ui/FullRepresentation.qml:4013
+#: package/contents/ui/FullRepresentation.qml:4258
 msgid "Check internet connection…"
 msgstr "Kontrollera internetanslutningen…"
 
-#: package/contents/ui/FullRepresentation.qml:4023
+#: package/contents/ui/FullRepresentation.qml:4268
 msgid "Bitrate: %1 kb/s"
 msgstr "Bittakt: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:4028
-#: package/contents/ui/FullRepresentation.qml:4031
+#: package/contents/ui/FullRepresentation.qml:4273
+#: package/contents/ui/FullRepresentation.qml:4276
 msgid "Connecting…"
 msgstr "Ansluter…"
 
-#: package/contents/ui/FullRepresentation.qml:4033
+#: package/contents/ui/FullRepresentation.qml:4278
 msgid "Choose station and enjoy…"
 msgstr "Välj en station och njut…"
 
-#: package/contents/ui/FullRepresentation.qml:4057
+#: package/contents/ui/FullRepresentation.qml:4302
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Castar till %1 — klicka för att välja eller stoppa"
 
-#: package/contents/ui/FullRepresentation.qml:4059
+#: package/contents/ui/FullRepresentation.qml:4304
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Volym, utgång och enheter (Chromecast, TV, högtalare)"
 
-#: package/contents/ui/FullRepresentation.qml:4060
+#: package/contents/ui/FullRepresentation.qml:4305
 msgid "Volume and audio output"
 msgstr "Volym och ljudutgång"
 
-#: package/contents/ui/FullRepresentation.qml:4222
+#: package/contents/ui/FullRepresentation.qml:4467
 msgid "Play on"
 msgstr "Spela på"
 
-#: package/contents/ui/FullRepresentation.qml:4250
+#: package/contents/ui/FullRepresentation.qml:4495
 msgid "Mute"
 msgstr "Tysta"
 
-#: package/contents/ui/FullRepresentation.qml:4250
+#: package/contents/ui/FullRepresentation.qml:4495
 msgid "Unmute"
 msgstr "Slå på ljud"
 
-#: package/contents/ui/FullRepresentation.qml:4282
+#: package/contents/ui/FullRepresentation.qml:4527
 msgid "This computer"
 msgstr "Den här datorn"
 
-#: package/contents/ui/FullRepresentation.qml:4306
+#: package/contents/ui/FullRepresentation.qml:4551
 msgid "System default output"
 msgstr "Systemets standardutgång"
 
-#: package/contents/ui/FullRepresentation.qml:4333
+#: package/contents/ui/FullRepresentation.qml:4578
 msgid "All local outputs, in sync"
 msgstr "Alla lokala utgångar, i synk"
 
-#: package/contents/ui/FullRepresentation.qml:4363
+#: package/contents/ui/FullRepresentation.qml:4608
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Spelar på alla anslutna högtalare samtidigt — trådbundna utgångar fördröjs för att hålla takten med Bluetooth."
 
-#: package/contents/ui/FullRepresentation.qml:4379
-#: package/contents/ui/FullRepresentation.qml:4386
+#: package/contents/ui/FullRepresentation.qml:4624
+#: package/contents/ui/FullRepresentation.qml:4631
 msgid "Sync fine-tune"
 msgstr "Finjustera synk"
 
-#: package/contents/ui/FullRepresentation.qml:4420
+#: package/contents/ui/FullRepresentation.qml:4665
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Om Bluetooth-högtalaren fortfarande släpar efter de trådbundna, höj detta tills de spelar ihop."
 
-#: package/contents/ui/FullRepresentation.qml:4432
+#: package/contents/ui/FullRepresentation.qml:4677
 msgid "Sync delay in milliseconds"
 msgstr "Synkfördröjning i millisekunder"
 
-#: package/contents/ui/FullRepresentation.qml:4454
+#: package/contents/ui/FullRepresentation.qml:4699
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Skriv en exakt fördröjning i millisekunder — reglaget rör sig i steg om tio."
 
-#: package/contents/ui/FullRepresentation.qml:4458
+#: package/contents/ui/FullRepresentation.qml:4703
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:4472
+#: package/contents/ui/FullRepresentation.qml:4717
 msgid "Calibrate with the microphone"
 msgstr "Kalibrera med mikrofonen"
 
-#: package/contents/ui/FullRepresentation.qml:4477
+#: package/contents/ui/FullRepresentation.qml:4722
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Spelar några höga klick genom varje högtalare och mäter med mikrofonen hur mycket Bluetooth-högtalaren släpar efter — fördröjningen ställs in automatiskt."
 
-#: package/contents/ui/FullRepresentation.qml:4492
+#: package/contents/ui/FullRepresentation.qml:4737
 msgid "Keep sync tuned automatically"
 msgstr "Håll synkroniseringen justerad automatiskt"
 
-#: package/contents/ui/FullRepresentation.qml:4495
+#: package/contents/ui/FullRepresentation.qml:4740
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Lyssnar på det spelande ljudet med mikrofonen med några minuters mellanrum och kontrollerar synkroniseringen igen när högtalarna glider isär. Ljudet behandlas bara på den här datorn — sparas aldrig, skickas aldrig någonstans."
 
-#: package/contents/ui/FullRepresentation.qml:4532
+#: package/contents/ui/FullRepresentation.qml:4777
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 är ihågkommen för synkroniseringen — anslut den så återansluter den automatiskt."
 
-#: package/contents/ui/FullRepresentation.qml:4555
+#: package/contents/ui/FullRepresentation.qml:4800
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Omgång 1 av 2 — klick genom varje högtalare…"
 
-#: package/contents/ui/FullRepresentation.qml:4556
+#: package/contents/ui/FullRepresentation.qml:4801
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Omgång 2 av 2 — tyst, kontrollerar resultatet…"
 
-#: package/contents/ui/FullRepresentation.qml:4594
+#: package/contents/ui/FullRepresentation.qml:4839
 msgid "%1 plays in the group"
 msgstr "%1 spelar i gruppen"
 
-#: package/contents/ui/FullRepresentation.qml:4607
+#: package/contents/ui/FullRepresentation.qml:4852
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Om den här högtalaren spelar i gruppen — avmarkera för att lämna den utanför utan att koppla från den. Sparas för enheten."
 
-#: package/contents/ui/FullRepresentation.qml:4616
+#: package/contents/ui/FullRepresentation.qml:4861
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (inget anslutet)"
 
-#: package/contents/ui/FullRepresentation.qml:4630
+#: package/contents/ui/FullRepresentation.qml:4875
 msgid "Balance of %1"
 msgstr "Balans för %1"
 
-#: package/contents/ui/FullRepresentation.qml:4639
+#: package/contents/ui/FullRepresentation.qml:4884
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Den här högtalarens andel av volymen — balansen följer varje rörelse av huvudreglaget och kommer ihåg per enhet. Den påverkar bara det den här widgeten spelar; volymen per enhet i systemets ljudinställningar är ett eget, orört lager — därför skiljer sig de siffrorna från de här reglagen."
 
-#: package/contents/ui/FullRepresentation.qml:4656
+#: package/contents/ui/FullRepresentation.qml:4901
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:4657
+#: package/contents/ui/FullRepresentation.qml:4902
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:4658
+#: package/contents/ui/FullRepresentation.qml:4903
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:4659
+#: package/contents/ui/FullRepresentation.qml:4904
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:4664
+#: package/contents/ui/FullRepresentation.qml:4909
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Vilka kanaler den här högtalaren spelar: stereo, endast vänster, endast höger eller en monomix av båda. Sätt en högtalare på L och en annan på R för ett äkta stereopar — sparas för enheten."
 
-#: package/contents/ui/FullRepresentation.qml:4695
+#: package/contents/ui/FullRepresentation.qml:4940
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:4710
+#: package/contents/ui/FullRepresentation.qml:4955
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth är avstängt eller ingen adapter finns — kontrollera Systeminställningar."
 
-#: package/contents/ui/FullRepresentation.qml:4721
+#: package/contents/ui/FullRepresentation.qml:4966
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "Inga ihopparade Bluetooth-ljudenheter — använd „Para ihop en ny högtalare…” nedan, eller para ihop en gång i Systeminställningar."
 
-#: package/contents/ui/FullRepresentation.qml:4735
+#: package/contents/ui/FullRepresentation.qml:4980
 msgid "%1 — connecting…"
 msgstr "%1 — ansluter…"
 
-#: package/contents/ui/FullRepresentation.qml:4753
+#: package/contents/ui/FullRepresentation.qml:4998
 msgid "%1 — pairing…"
 msgstr "%1 — parkopplar…"
 
-#: package/contents/ui/FullRepresentation.qml:4754
+#: package/contents/ui/FullRepresentation.qml:4999
 msgid "%1 — new, click to pair"
 msgstr "%1 — ny, klicka för att parkoppla"
 
-#: package/contents/ui/FullRepresentation.qml:4765
+#: package/contents/ui/FullRepresentation.qml:5010
 msgid "Pair a new speaker…"
 msgstr "Parkoppla en ny högtalare…"
 
-#: package/contents/ui/FullRepresentation.qml:4781
+#: package/contents/ui/FullRepresentation.qml:5026
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Söker — sätt högtalaren i parkopplingsläge…"
 
-#: package/contents/ui/FullRepresentation.qml:4802
+#: package/contents/ui/FullRepresentation.qml:5047
 msgid "WiFi & network"
 msgstr "WiFi & nätverk"
 
-#: package/contents/ui/FullRepresentation.qml:4834
+#: package/contents/ui/FullRepresentation.qml:5079
 msgid "%1 (speaker group)"
 msgstr "%1 (högtalargrupp)"
 
-#: package/contents/ui/FullRepresentation.qml:4862
+#: package/contents/ui/FullRepresentation.qml:5107
 msgid "Balance"
 msgstr "Balans"
 
-#: package/contents/ui/FullRepresentation.qml:4876
+#: package/contents/ui/FullRepresentation.qml:5121
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Den här enhetens andel av volymen — balansen följer varje rörelse av huvudreglaget och sparas för enheten."
 
-#: package/contents/ui/FullRepresentation.qml:4898
+#: package/contents/ui/FullRepresentation.qml:5143
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Varje enhet buffrar strömmen för sig, så rummen kan spela några sekunder isär. För perfekt synkade högtalare, gruppera dem i Google Home-appen — gruppen visas här som en enda enhet."
 
-#: package/contents/ui/FullRepresentation.qml:4908
+#: package/contents/ui/FullRepresentation.qml:5153
 msgid "Stop casting everywhere"
 msgstr "Sluta casta på alla enheter"
 
-#: package/contents/ui/FullRepresentation.qml:4926
+#: package/contents/ui/FullRepresentation.qml:5171
 msgid "Searching for devices…"
 msgstr "Söker efter enheter…"
 
-#: package/contents/ui/FullRepresentation.qml:4935
+#: package/contents/ui/FullRepresentation.qml:5180
 msgid "No devices found on your network"
 msgstr "Inga enheter hittades i ditt nätverk"
 
@@ -1388,266 +1405,266 @@ msgstr "Den sparade stationskonfigurationen är felaktig. Dina data ändrades in
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "Stationen svarade inte — den kan vara nere eller inte tillgänglig i ditt land. Prova ett annat resultat."
 
-#: package/contents/ui/main.qml:1048
+#: package/contents/ui/main.qml:1096
 msgid "Nothing to export"
 msgstr "Inget att exportera"
 
-#: package/contents/ui/main.qml:1048
+#: package/contents/ui/main.qml:1096
 msgid "Subscribe to a show first."
 msgstr "Prenumerera på ett program först."
 
-#: package/contents/ui/main.qml:1078
+#: package/contents/ui/main.qml:1126
 msgid "Subscriptions imported"
 msgstr "Prenumerationer importerade"
 
-#: package/contents/ui/main.qml:1079
+#: package/contents/ui/main.qml:1127
 msgid "%1 show added"
 msgid_plural "%1 shows added"
 msgstr[0] "%1 program tillagt"
 msgstr[1] "%1 program tillagda"
 
-#: package/contents/ui/main.qml:1081
+#: package/contents/ui/main.qml:1129
 msgid "Nothing imported"
 msgstr "Inget importerades"
 
-#: package/contents/ui/main.qml:1082
+#: package/contents/ui/main.qml:1130
 msgid "No new podcast feeds were found in that file."
 msgstr "Inga nya poddflöden hittades i den filen."
 
-#: package/contents/ui/main.qml:1230
+#: package/contents/ui/main.qml:1278
 msgid "This feed address is not allowed."
 msgstr "Den här flödesadressen är inte tillåten."
 
-#: package/contents/ui/main.qml:1265
+#: package/contents/ui/main.qml:1313
 msgid "The feed did not answer (error %1)."
 msgstr "Flödet svarade inte (fel %1)."
 
-#: package/contents/ui/main.qml:1266
+#: package/contents/ui/main.qml:1314
 msgid "This address is not a podcast feed."
 msgstr "Den här adressen är inte ett poddflöde."
 
-#: package/contents/ui/main.qml:1278
+#: package/contents/ui/main.qml:1326
 msgid "No playable episodes in this feed."
 msgstr "Inga spelbara avsnitt i det här flödet."
 
-#: package/contents/ui/main.qml:2093
+#: package/contents/ui/main.qml:2155
 msgid "Scheduled recording started"
 msgstr "Schemalagd inspelning startade"
 
-#: package/contents/ui/main.qml:2213
+#: package/contents/ui/main.qml:2275
 msgid "Scheduled recording missed"
 msgstr "Schemalagd inspelning missades"
 
-#: package/contents/ui/main.qml:2219
+#: package/contents/ui/main.qml:2281
 msgid "Scheduled recording skipped"
 msgstr "Schemalagd inspelning hoppades över"
 
-#: package/contents/ui/main.qml:2220
+#: package/contents/ui/main.qml:2282
 msgid "%1 — another recording is already running."
 msgstr "%1 — en annan inspelning pågår redan."
 
-#: package/contents/ui/main.qml:2394
+#: package/contents/ui/main.qml:2456
 msgid "Wake-up alarm missed"
 msgstr "Missat väckarlarm"
 
-#: package/contents/ui/main.qml:2395
+#: package/contents/ui/main.qml:2457
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 var inställt på %2 — datorn var avstängd eller i viloläge då."
 
-#: package/contents/ui/main.qml:2429 package/contents/ui/main.qml:2509
-#: package/contents/ui/main.qml:2562 package/contents/ui/main.qml:2565
+#: package/contents/ui/main.qml:2491 package/contents/ui/main.qml:2571
+#: package/contents/ui/main.qml:2624 package/contents/ui/main.qml:2627
 msgid "Wake-up alarm"
 msgstr "Väckarlarm"
 
-#: package/contents/ui/main.qml:2430
+#: package/contents/ui/main.qml:2492
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 skulle gå av samtidigt — %2 spelas i stället."
 
-#: package/contents/ui/main.qml:2566
+#: package/contents/ui/main.qml:2628
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Stationen kunde inte starta — den inbyggda väckningstonen spelas i stället."
 
-#: package/contents/ui/main.qml:3282
+#: package/contents/ui/main.qml:3344
 msgid "%1 devices"
 msgstr "%1 enheter"
 
-#: package/contents/ui/main.qml:3723
+#: package/contents/ui/main.qml:3785
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-högtalaren"
 
-#: package/contents/ui/main.qml:3722
+#: package/contents/ui/main.qml:3784
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 är ansluten, men ljudet kom aldrig fram"
 
-#: package/contents/ui/main.qml:3724
+#: package/contents/ui/main.qml:3786
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Stäng av och sätt på högtalaren igen och anslut den sedan på nytt."
 
-#: package/contents/ui/main.qml:4113
+#: package/contents/ui/main.qml:4175
 msgid "Station seems to be off the air"
 msgstr "Stationen verkar inte sända"
 
-#: package/contents/ui/main.qml:4114
+#: package/contents/ui/main.qml:4176
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 svarar inte på någon adress katalogen känner till. Den ligger kvar i din lista — nya försök görs i bakgrunden."
 
-#: package/contents/ui/main.qml:4186
+#: package/contents/ui/main.qml:4248
 msgid "Playing from a backup address"
 msgstr "Spelar från en reservadress"
 
-#: package/contents/ui/main.qml:4187
+#: package/contents/ui/main.qml:4249
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Stationens sparade adress svarar inte — spelar tills vidare närmaste träff från katalogen. Din sparade adress behölls."
 
-#: package/contents/ui/main.qml:4227
+#: package/contents/ui/main.qml:4289
 msgid "Station found at a new address"
 msgstr "Stationen hittad på en ny adress"
 
-#: package/contents/ui/main.qml:4228
+#: package/contents/ui/main.qml:4290
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 har flyttat — den nya adressen sparades i din lista."
 
-#: package/contents/ui/main.qml:5488
+#: package/contents/ui/main.qml:5562
 msgid "Episode downloaded"
 msgstr "Avsnitt nedladdat"
 
-#: package/contents/ui/main.qml:5492
+#: package/contents/ui/main.qml:5566
 msgid "Episode download failed"
 msgstr "Nedladdningen av avsnittet misslyckades"
 
-#: package/contents/ui/main.qml:5501
+#: package/contents/ui/main.qml:5579
 msgid "Subscriptions exported"
 msgstr "Prenumerationer exporterade"
 
-#: package/contents/ui/main.qml:5503
+#: package/contents/ui/main.qml:5581
 msgid "Export failed"
 msgstr "Exporten misslyckades"
 
-#: package/contents/ui/main.qml:5504
+#: package/contents/ui/main.qml:5582
 msgid "Could not write the subscriptions file."
 msgstr "Kunde inte skriva prenumerationsfilen."
 
-#: package/contents/ui/main.qml:5597
+#: package/contents/ui/main.qml:5675
 msgid "Casting needs python-chromecast"
 msgstr "Casting kräver python-chromecast"
 
-#: package/contents/ui/main.qml:5598
+#: package/contents/ui/main.qml:5676
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Installera paketet python-chromecast för att casta till dina enheter."
 
-#: package/contents/ui/main.qml:5619
+#: package/contents/ui/main.qml:5697
 msgid "the device"
 msgstr "enheten"
 
-#: package/contents/ui/main.qml:5619
+#: package/contents/ui/main.qml:5697
 msgid "Could not cast to %1"
 msgstr "Kunde inte casta till %1"
 
-#: package/contents/ui/main.qml:5620
+#: package/contents/ui/main.qml:5698
 msgid "The device could not play this station."
 msgstr "Enheten kunde inte spela den här stationen."
 
-#: package/contents/ui/main.qml:5666
+#: package/contents/ui/main.qml:5744
 msgid "Casting"
 msgstr "Strömning"
 
-#: package/contents/ui/main.qml:5667
+#: package/contents/ui/main.qml:5745
 msgid "The device did not stop — it may still be playing."
 msgstr "Enheten stoppade inte — den kan fortfarande spela."
 
-#: package/contents/ui/main.qml:5723 package/contents/ui/main.qml:5825
+#: package/contents/ui/main.qml:5801 package/contents/ui/main.qml:5903
 msgid "the Bluetooth device"
 msgstr "Bluetooth-enheten"
 
-#: package/contents/ui/main.qml:5722
+#: package/contents/ui/main.qml:5800
 msgid "Could not connect to %1"
 msgstr "Kunde inte ansluta till %1"
 
-#: package/contents/ui/main.qml:5724
+#: package/contents/ui/main.qml:5802
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Kontrollera att högtalaren är på och inom räckhåll."
 
-#: package/contents/ui/main.qml:5824
+#: package/contents/ui/main.qml:5902
 msgid "Could not pair with %1"
 msgstr "Kunde inte parkoppla med %1"
 
-#: package/contents/ui/main.qml:5826
+#: package/contents/ui/main.qml:5904
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Sätt högtalaren i parkopplingsläge (håll in Bluetooth-knappen) och försök igen."
 
-#: package/contents/ui/main.qml:5924
+#: package/contents/ui/main.qml:6002
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg är inte installerat"
 
-#: package/contents/ui/main.qml:5925
+#: package/contents/ui/main.qml:6003
 msgid "Install ffmpeg to record radio."
 msgstr "Installera ffmpeg för att spela in radio."
 
-#: package/contents/ui/main.qml:5928
+#: package/contents/ui/main.qml:6006
 msgid "Not enough disk space for this recording"
 msgstr "Inte tillräckligt med diskutrymme för den här inspelningen"
 
-#: package/contents/ui/main.qml:5929
+#: package/contents/ui/main.qml:6007
 msgid "Free some space in %1 and try again."
 msgstr "Frigör utrymme i %1 och försök igen."
 
-#: package/contents/ui/main.qml:5932
+#: package/contents/ui/main.qml:6010
 msgid "Recording saved ✓ (%1)"
 msgstr "Inspelning sparad ✓ (%1)"
 
-#: package/contents/ui/main.qml:5936
+#: package/contents/ui/main.qml:6014
 msgid "Recording interrupted (%1 captured)"
 msgstr "Inspelningen avbröts (%1 inspelat)"
 
-#: package/contents/ui/main.qml:5938
+#: package/contents/ui/main.qml:6016
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — filen är mycket mindre än väntat."
 
-#: package/contents/ui/main.qml:5942
+#: package/contents/ui/main.qml:6020
 msgid "Recording failed"
 msgstr "Inspelningen misslyckades"
 
-#: package/contents/ui/main.qml:5943
+#: package/contents/ui/main.qml:6021
 msgid "The stream could not be captured."
 msgstr "Strömmen kunde inte spelas in."
 
-#: package/contents/ui/main.qml:6029
+#: package/contents/ui/main.qml:6107
 msgid "Downloading again without the cover"
 msgstr "Laddar ner igen utan omslag"
 
-#: package/contents/ui/main.qml:6030
+#: package/contents/ui/main.qml:6108
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Inbäddning av taggar kräver paketet python-mutagen — installera det för att få omslag i dina filer."
 
-#: package/contents/ui/main.qml:6038
+#: package/contents/ui/main.qml:6116
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp är inte installerat"
 
-#: package/contents/ui/main.qml:6039
+#: package/contents/ui/main.qml:6117
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installera yt-dlp (och ffmpeg) för att ladda ner spår."
 
-#: package/contents/ui/main.qml:6042
+#: package/contents/ui/main.qml:6120
 msgid "Track downloaded ✓"
 msgstr "Spår nedladdat ✓"
 
-#: package/contents/ui/main.qml:6043
+#: package/contents/ui/main.qml:6121
 msgid "Saved to: %1"
 msgstr "Sparad i: %1"
 
-#: package/contents/ui/main.qml:6046
+#: package/contents/ui/main.qml:6124
 msgid "Download failed"
 msgstr "Nedladdningen misslyckades"
 
-#: package/contents/ui/main.qml:6047
+#: package/contents/ui/main.qml:6125
 msgid "Unknown error"
 msgstr "Okänt fel"
 
-#: package/contents/ui/main.qml:6349
+#: package/contents/ui/main.qml:6427
 msgid "Audio output changed"
 msgstr "Ljudutgång ändrad"
 
-#: package/contents/ui/main.qml:6350
+#: package/contents/ui/main.qml:6428
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Den valda utgångsenheten försvann — systemets standard används i stället."
 

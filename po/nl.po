@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-07-21 07:15+0300\n"
+"POT-Creation-Date: 2026-07-21 07:31+0300\n"
 "PO-Revision-Date: 2026-07-12 11:12\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Dutch\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/FullRepresentation.qml:3897
+#: package/contents/ui/FullRepresentation.qml:4142
 msgid "Stations"
 msgstr "Zenders"
 
@@ -46,8 +46,8 @@ msgid "Audio"
 msgstr "Audio"
 
 #: package/contents/ui/CompactRepresentation.qml:88
-#: package/contents/ui/FullRepresentation.qml:3487
-#: package/contents/ui/FullRepresentation.qml:4264
+#: package/contents/ui/FullRepresentation.qml:3732
+#: package/contents/ui/FullRepresentation.qml:4509
 msgid "Volume"
 msgstr "Volume"
 
@@ -335,9 +335,9 @@ msgid "Max length:"
 msgstr "Maximale duur:"
 
 #: package/contents/ui/config/configRecording.qml:53
-#: package/contents/ui/FullRepresentation.qml:3299
-#: package/contents/ui/FullRepresentation.qml:3581
-#: package/contents/ui/FullRepresentation.qml:3663
+#: package/contents/ui/FullRepresentation.qml:3544
+#: package/contents/ui/FullRepresentation.qml:3826
+#: package/contents/ui/FullRepresentation.qml:3908
 msgid "%1 min"
 msgstr "%1 min"
 
@@ -346,7 +346,7 @@ msgid "A hard safety cap for one recording — protects the disk if you forget t
 msgstr "Een harde veiligheidslimiet voor één opname — beschermt de schijf als u vergeet te stoppen."
 
 #: package/contents/ui/config/configRecording.qml:70
-#: package/contents/ui/FullRepresentation.qml:3550
+#: package/contents/ui/FullRepresentation.qml:3795
 msgid "Scheduled recordings"
 msgstr "Geplande opnamen"
 
@@ -490,19 +490,18 @@ msgid "Tags:"
 msgstr "Labels:"
 
 #: package/contents/ui/config/configSearch.qml:877
-#: package/contents/ui/FullRepresentation.qml:4020
+#: package/contents/ui/FullRepresentation.qml:4265
 msgid "Error: %1"
 msgstr "Fout: %1"
 
 #: package/contents/ui/EpisodeListItem.qml:61
-#: package/contents/ui/FullRepresentation.qml:2759
+#: package/contents/ui/FullRepresentation.qml:2814
 msgid "Episode"
 msgstr "Aflevering"
 
 #: package/contents/ui/EpisodeListItem.qml:73
 msgid "Downloaded"
 msgstr "Gedownload"
-
 
 #: package/contents/ui/EpisodeListItem.qml:75
 msgid "%1 left"
@@ -599,8 +598,8 @@ msgid "From the web"
 msgstr "Van het web"
 
 #: package/contents/ui/FullRepresentation.qml:1031
-#: package/contents/ui/FullRepresentation.qml:2246
-#: package/contents/ui/FullRepresentation.qml:2472
+#: package/contents/ui/FullRepresentation.qml:2297
+#: package/contents/ui/FullRepresentation.qml:2523
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
@@ -717,7 +716,7 @@ msgid "Add to favorites"
 msgstr "Toevoegen aan favorieten"
 
 #: package/contents/ui/FullRepresentation.qml:1953
-#: package/contents/ui/FullRepresentation.qml:2393
+#: package/contents/ui/FullRepresentation.qml:2444
 msgid "Remove from liked songs"
 msgstr "Verwijderen uit gelikete nummers"
 
@@ -738,7 +737,7 @@ msgid "Vote for this station in the worldwide catalog"
 msgstr "Stem op deze zender in de wereldwijde catalogus"
 
 #: package/contents/ui/FullRepresentation.qml:1994
-#: package/contents/ui/FullRepresentation.qml:4007
+#: package/contents/ui/FullRepresentation.qml:4252
 #: package/contents/ui/MediaListItem.qml:527
 msgid "Downloading…"
 msgstr "Downloaden…"
@@ -757,7 +756,7 @@ msgid "Recording %1 — click to stop"
 msgstr "Opname van %1 — klik om te stoppen"
 
 #: package/contents/ui/FullRepresentation.qml:2024
-#: package/contents/ui/FullRepresentation.qml:3710
+#: package/contents/ui/FullRepresentation.qml:3955
 msgid "This source cannot be recorded"
 msgstr "Deze bron kan niet worden opgenomen"
 
@@ -769,216 +768,234 @@ msgstr "Dit station opnemen (alleen persoonlijk gebruik)"
 msgid "Go to this show"
 msgstr "Ga naar deze show"
 
+#: package/contents/ui/FullRepresentation.qml:2119
+#: package/contents/ui/FullRepresentation.qml:2140
+msgid "Podcast downloads (%1)"
+msgstr "Podcastdownloads (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2170
+
+#: package/contents/ui/FullRepresentation.qml:2221
 msgid "Downloading: %1"
 msgstr "Downloaden: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2223
+#: package/contents/ui/FullRepresentation.qml:2274
 msgid "Stop recording"
 msgstr "Opname stoppen"
 
-#: package/contents/ui/FullRepresentation.qml:2247
+#: package/contents/ui/FullRepresentation.qml:2298
 msgid "Liked songs"
 msgstr "Gelikete nummers"
 
-#: package/contents/ui/FullRepresentation.qml:2247
+#: package/contents/ui/FullRepresentation.qml:2298
 msgid "Recently played"
 msgstr "Onlangs afgespeeld"
 
-#: package/contents/ui/FullRepresentation.qml:2262
+#: package/contents/ui/FullRepresentation.qml:2313
 msgid "Show play history"
 msgstr "Afspeelgeschiedenis tonen"
 
-#: package/contents/ui/FullRepresentation.qml:2263
+#: package/contents/ui/FullRepresentation.qml:2314
 msgid "Show liked songs"
 msgstr "Gelikete nummers tonen"
 
-#: package/contents/ui/FullRepresentation.qml:2273
+#: package/contents/ui/FullRepresentation.qml:2324
 msgid "Clear history"
 msgstr "Geschiedenis wissen"
 
-#: package/contents/ui/FullRepresentation.qml:2303
+#: package/contents/ui/FullRepresentation.qml:2354
 msgid "Search YouTube for %1"
 msgstr "%1 zoeken op YouTube"
 
-#: package/contents/ui/FullRepresentation.qml:2382
+#: package/contents/ui/FullRepresentation.qml:2433
 msgid "Download this track"
 msgstr "Dit nummer downloaden"
 
-#: package/contents/ui/FullRepresentation.qml:2406
+#: package/contents/ui/FullRepresentation.qml:2457
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Klik = zoeken op YouTube · ⬇ = downloaden"
 
-#: package/contents/ui/FullRepresentation.qml:2472
-#: package/contents/ui/FullRepresentation.qml:3923
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2677
+#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:4168
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2739
 msgid "My Music"
 msgstr "Mijn muziek"
 
-#: package/contents/ui/FullRepresentation.qml:2481
+#: package/contents/ui/FullRepresentation.qml:2532
 msgid "Open folder in file manager"
 msgstr "Map openen in bestandsbeheer"
 
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2574
 msgid "Stop: %1"
 msgstr "Stoppen: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2574
 msgid "Play: %1"
 msgstr "Afspelen: %1"
 
-#: package/contents/ui/FullRepresentation.qml:2608
+#: package/contents/ui/FullRepresentation.qml:2659
 msgid "Click again to confirm delete"
 msgstr "Klik nogmaals om het verwijderen te bevestigen"
 
-#: package/contents/ui/FullRepresentation.qml:2608
+#: package/contents/ui/FullRepresentation.qml:2659
 msgid "Delete file"
 msgstr "Bestand verwijderen"
 
-#: package/contents/ui/FullRepresentation.qml:2664
+#: package/contents/ui/FullRepresentation.qml:2715
 msgid "Nothing here yet"
 msgstr "Nog niets hier"
 
-#: package/contents/ui/FullRepresentation.qml:2675
+#: package/contents/ui/FullRepresentation.qml:2726
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Als er een goed nummer op de radio komt, druk op ⬇ — het wordt hier opgeslagen voor offline luisteren"
 
-#: package/contents/ui/FullRepresentation.qml:2779
+#: package/contents/ui/FullRepresentation.qml:2834
 msgid "Back to shows"
 msgstr "Terug naar programma's"
 
-#: package/contents/ui/FullRepresentation.qml:2790
+#: package/contents/ui/FullRepresentation.qml:2845
 msgid "Search podcasts, or paste a feed URL…"
 msgstr "Zoek podcasts of plak een feed-URL…"
 
-
-#: package/contents/ui/FullRepresentation.qml:2810
+#: package/contents/ui/FullRepresentation.qml:2865
+#: package/contents/ui/FullRepresentation.qml:2885
 msgid "Back to my shows"
 msgstr "Terug naar mijn shows"
 
-
-#: package/contents/ui/FullRepresentation.qml:2811
+#: package/contents/ui/FullRepresentation.qml:2866
 msgid "Popular now — worldwide charts"
 msgstr "Nu populair — wereldwijde hitlijsten"
 
+#: package/contents/ui/FullRepresentation.qml:2886
+msgid "Downloaded episodes (%1)"
+msgstr "Gedownloade afleveringen (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2826
+
+#: package/contents/ui/FullRepresentation.qml:2901
 msgid "Import subscriptions (OPML)"
 msgstr "Abonnementen importeren (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2837
+#: package/contents/ui/FullRepresentation.qml:2912
 msgid "Export subscriptions (OPML)"
 msgstr "Abonnementen exporteren (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:2842
+#: package/contents/ui/FullRepresentation.qml:2917
 msgid "Import subscriptions"
 msgstr "Abonnementen importeren"
 
-#: package/contents/ui/FullRepresentation.qml:2843
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "OPML files (*.opml *.xml)"
 msgstr "OPML-bestanden (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:2843
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "All files (*)"
 msgstr "Alle bestanden (*)"
 
-#: package/contents/ui/FullRepresentation.qml:2849
+#: package/contents/ui/FullRepresentation.qml:2924
 msgid "Episodes"
 msgstr "Afleveringen"
 
-#: package/contents/ui/FullRepresentation.qml:2868
+#: package/contents/ui/FullRepresentation.qml:2943
 msgid "Showing unplayed — tap for all"
 msgstr "Niet-afgespeelde getoond — tik voor alle"
 
-#: package/contents/ui/FullRepresentation.qml:2869
+#: package/contents/ui/FullRepresentation.qml:2944
 msgid "Show only unplayed"
 msgstr "Alleen niet-afgespeelde tonen"
 
-#: package/contents/ui/FullRepresentation.qml:2884
+#: package/contents/ui/FullRepresentation.qml:2959
 msgid "Mark all as played"
 msgstr "Alles als afgespeeld markeren"
 
-#: package/contents/ui/FullRepresentation.qml:2914
+#: package/contents/ui/FullRepresentation.qml:2989
 msgid "Unsubscribe from this show"
 msgstr "Abonnement op deze show opzeggen"
 
-
-#: package/contents/ui/FullRepresentation.qml:2915
+#: package/contents/ui/FullRepresentation.qml:2990
 msgid "Subscribe to this show"
 msgstr "Abonneer op deze show"
 
-
-#: package/contents/ui/FullRepresentation.qml:2932
+#: package/contents/ui/FullRepresentation.qml:3007
 msgid "Refresh episodes"
 msgstr "Afleveringen verversen"
 
-#: package/contents/ui/FullRepresentation.qml:2948
-#: package/contents/ui/FullRepresentation.qml:2959
+#: package/contents/ui/FullRepresentation.qml:3023
+#: package/contents/ui/FullRepresentation.qml:3034
 msgid "Open this feed"
 msgstr "Deze feed openen"
 
-
-#: package/contents/ui/FullRepresentation.qml:2997
+#: package/contents/ui/FullRepresentation.qml:3072
 msgid "Loading episodes…"
 msgstr "Afleveringen laden…"
 
-#: package/contents/ui/FullRepresentation.qml:2998
+#: package/contents/ui/FullRepresentation.qml:3073
 msgid "Searching…"
 msgstr "Zoeken…"
 
-#: package/contents/ui/FullRepresentation.qml:2999
+#: package/contents/ui/FullRepresentation.qml:3074
 msgid "Loading the charts…"
 msgstr "Hitlijsten laden…"
 
+#: package/contents/ui/FullRepresentation.qml:3215
+msgid "resume at %1"
+msgstr "hervat bij %1"
 
-#: package/contents/ui/FullRepresentation.qml:3134
+
+#: package/contents/ui/FullRepresentation.qml:3237
+msgid "Tap again to delete the file"
+msgstr "Tik nogmaals om het bestand te verwijderen"
+
+
+#: package/contents/ui/FullRepresentation.qml:3238
+msgid "Delete the downloaded file"
+msgstr "Verwijder het gedownloade bestand"
+
+
+#: package/contents/ui/FullRepresentation.qml:3379
 msgid "Unsubscribe"
 msgstr "Abonnement opzeggen"
 
-#: package/contents/ui/FullRepresentation.qml:3135
+#: package/contents/ui/FullRepresentation.qml:3380
 msgid "Subscribe"
 msgstr "Abonneren"
 
-#: package/contents/ui/FullRepresentation.qml:3174
+#: package/contents/ui/FullRepresentation.qml:3419
 msgid "No shows found"
 msgstr "Geen programma's gevonden"
 
-#: package/contents/ui/FullRepresentation.qml:3175
+#: package/contents/ui/FullRepresentation.qml:3420
 msgid "The charts did not answer — try again in a moment"
 msgstr "De hitlijsten antwoordden niet — probeer het zo weer"
 
-
-#: package/contents/ui/FullRepresentation.qml:3176
+#: package/contents/ui/FullRepresentation.qml:3421
 msgid "No subscriptions yet"
 msgstr "Nog geen abonnementen"
 
-#: package/contents/ui/FullRepresentation.qml:3188
+#: package/contents/ui/FullRepresentation.qml:3433
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Zoek hierboven een programma en geef het een ster — de afleveringen worden hier gedownload om offline te luisteren"
 
-#: package/contents/ui/FullRepresentation.qml:3228
+#: package/contents/ui/FullRepresentation.qml:3473
 msgid "All caught up — no unplayed episodes"
 msgstr "Helemaal bij — geen niet-afgespeelde afleveringen"
 
-#: package/contents/ui/FullRepresentation.qml:3279
+#: package/contents/ui/FullRepresentation.qml:3524
 msgid "Sleep timer"
 msgstr "Slaaptimer"
 
-#: package/contents/ui/FullRepresentation.qml:3285
-#: package/contents/ui/FullRepresentation.qml:4004
+#: package/contents/ui/FullRepresentation.qml:3530
+#: package/contents/ui/FullRepresentation.qml:4249
 msgid "Sleeping in %1"
 msgstr "Slaapt over %1"
 
-#: package/contents/ui/FullRepresentation.qml:3305
+#: package/contents/ui/FullRepresentation.qml:3550
 msgid "Cancel"
 msgstr "Annuleren"
 
-#: package/contents/ui/FullRepresentation.qml:3313
+#: package/contents/ui/FullRepresentation.qml:3558
 msgid "Playback fades out and stops when the timer ends."
 msgstr "Het afspelen vervaagt en stopt wanneer de timer afloopt."
 
-#: package/contents/ui/FullRepresentation.qml:3348
+#: package/contents/ui/FullRepresentation.qml:3593
 msgid "Wake-up alarms"
 msgstr "Wekkers"
 
@@ -990,389 +1007,389 @@ msgstr "Wekkers"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Sun"
 msgstr "zo"
 
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Mon"
 msgstr "ma"
 
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Tue"
 msgstr "di"
 
-#: package/contents/ui/FullRepresentation.qml:3373
-#: package/contents/ui/FullRepresentation.qml:3468
-#: package/contents/ui/FullRepresentation.qml:3575
-#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3618
+#: package/contents/ui/FullRepresentation.qml:3713
+#: package/contents/ui/FullRepresentation.qml:3820
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Wed"
 msgstr "wo"
 
-#: package/contents/ui/FullRepresentation.qml:3374
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/FullRepresentation.qml:3576
-#: package/contents/ui/FullRepresentation.qml:3684
+#: package/contents/ui/FullRepresentation.qml:3619
+#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3821
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Thu"
 msgstr "do"
 
-#: package/contents/ui/FullRepresentation.qml:3374
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/FullRepresentation.qml:3576
-#: package/contents/ui/FullRepresentation.qml:3684
+#: package/contents/ui/FullRepresentation.qml:3619
+#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3821
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Fri"
 msgstr "vr"
 
-#: package/contents/ui/FullRepresentation.qml:3374
-#: package/contents/ui/FullRepresentation.qml:3469
-#: package/contents/ui/FullRepresentation.qml:3576
-#: package/contents/ui/FullRepresentation.qml:3684
+#: package/contents/ui/FullRepresentation.qml:3619
+#: package/contents/ui/FullRepresentation.qml:3714
+#: package/contents/ui/FullRepresentation.qml:3821
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Sat"
 msgstr "za"
 
-#: package/contents/ui/FullRepresentation.qml:3376
-#: package/contents/ui/FullRepresentation.qml:3460
-#: package/contents/ui/FullRepresentation.qml:3578
-#: package/contents/ui/FullRepresentation.qml:3676
+#: package/contents/ui/FullRepresentation.qml:3621
+#: package/contents/ui/FullRepresentation.qml:3705
+#: package/contents/ui/FullRepresentation.qml:3823
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Daily"
 msgstr "Dagelijks"
 
-#: package/contents/ui/FullRepresentation.qml:3377
-#: package/contents/ui/FullRepresentation.qml:3579
+#: package/contents/ui/FullRepresentation.qml:3622
+#: package/contents/ui/FullRepresentation.qml:3824
 msgid "Every %1"
 msgstr "Elke %1"
 
-#: package/contents/ui/FullRepresentation.qml:3392
+#: package/contents/ui/FullRepresentation.qml:3637
 msgid "Remove this alarm"
 msgstr "Verwijder deze wekker"
 
-#: package/contents/ui/FullRepresentation.qml:3400
+#: package/contents/ui/FullRepresentation.qml:3645
 msgid "No alarms yet — add one below."
 msgstr "Nog geen wekkers — voeg er hieronder een toe."
 
-#: package/contents/ui/FullRepresentation.qml:3415
-#: package/contents/ui/FullRepresentation.qml:3617
+#: package/contents/ui/FullRepresentation.qml:3660
+#: package/contents/ui/FullRepresentation.qml:3862
 msgid "Station:"
 msgstr "Station:"
 
-#: package/contents/ui/FullRepresentation.qml:3423
-#: package/contents/ui/FullRepresentation.qml:3625
+#: package/contents/ui/FullRepresentation.qml:3668
+#: package/contents/ui/FullRepresentation.qml:3870
 msgid "Station"
 msgstr "Station"
 
-#: package/contents/ui/FullRepresentation.qml:3427
-#: package/contents/ui/FullRepresentation.qml:3629
+#: package/contents/ui/FullRepresentation.qml:3672
+#: package/contents/ui/FullRepresentation.qml:3874
 msgid "Start:"
 msgstr "Start:"
 
-#: package/contents/ui/FullRepresentation.qml:3438
-#: package/contents/ui/FullRepresentation.qml:3640
+#: package/contents/ui/FullRepresentation.qml:3683
+#: package/contents/ui/FullRepresentation.qml:3885
 msgid "Start hour"
 msgstr "Startuur"
 
-#: package/contents/ui/FullRepresentation.qml:3448
-#: package/contents/ui/FullRepresentation.qml:3650
+#: package/contents/ui/FullRepresentation.qml:3693
+#: package/contents/ui/FullRepresentation.qml:3895
 msgid "Start minute"
 msgstr "Startminuut"
 
-#: package/contents/ui/FullRepresentation.qml:3453
-#: package/contents/ui/FullRepresentation.qml:3669
+#: package/contents/ui/FullRepresentation.qml:3698
+#: package/contents/ui/FullRepresentation.qml:3914
 msgid "Repeat:"
 msgstr "Herhalen:"
 
-#: package/contents/ui/FullRepresentation.qml:3460
-#: package/contents/ui/FullRepresentation.qml:3676
+#: package/contents/ui/FullRepresentation.qml:3705
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Once"
 msgstr "Eenmalig"
 
-#: package/contents/ui/FullRepresentation.qml:3460
-#: package/contents/ui/FullRepresentation.qml:3676
+#: package/contents/ui/FullRepresentation.qml:3705
+#: package/contents/ui/FullRepresentation.qml:3921
 msgid "Weekly"
 msgstr "Wekelijks"
 
-#: package/contents/ui/FullRepresentation.qml:3462
-#: package/contents/ui/FullRepresentation.qml:3677
+#: package/contents/ui/FullRepresentation.qml:3707
+#: package/contents/ui/FullRepresentation.qml:3922
 msgid "Repeat"
 msgstr "Herhalen"
 
-#: package/contents/ui/FullRepresentation.qml:3471
-#: package/contents/ui/FullRepresentation.qml:3686
+#: package/contents/ui/FullRepresentation.qml:3716
+#: package/contents/ui/FullRepresentation.qml:3931
 msgid "Weekday"
 msgstr "Weekdag"
 
-#: package/contents/ui/FullRepresentation.qml:3476
+#: package/contents/ui/FullRepresentation.qml:3721
 msgid "Volume:"
 msgstr "Volume:"
 
-#: package/contents/ui/FullRepresentation.qml:3498
+#: package/contents/ui/FullRepresentation.qml:3743
 msgid "Keep the computer awake until the alarm"
 msgstr "Houd de computer wakker tot de wekker"
 
-#: package/contents/ui/FullRepresentation.qml:3504
-#: package/contents/ui/FullRepresentation.qml:3722
+#: package/contents/ui/FullRepresentation.qml:3749
+#: package/contents/ui/FullRepresentation.qml:3967
 msgid "Add"
 msgstr "Toevoegen"
 
-#: package/contents/ui/FullRepresentation.qml:3594
+#: package/contents/ui/FullRepresentation.qml:3839
 msgid "Remove this schedule"
 msgstr "Deze planning verwijderen"
 
-#: package/contents/ui/FullRepresentation.qml:3602
+#: package/contents/ui/FullRepresentation.qml:3847
 msgid "No scheduled recordings yet — add one below."
 msgstr "Nog geen geplande opnamen — voeg er hieronder een toe."
 
-#: package/contents/ui/FullRepresentation.qml:3655
+#: package/contents/ui/FullRepresentation.qml:3900
 msgid "Duration:"
 msgstr "Duur:"
 
-#: package/contents/ui/FullRepresentation.qml:3665
+#: package/contents/ui/FullRepresentation.qml:3910
 msgid "Duration in minutes"
 msgstr "Duur in minuten"
 
-#: package/contents/ui/FullRepresentation.qml:3697
+#: package/contents/ui/FullRepresentation.qml:3942
 msgid "Recordings are for personal use only."
 msgstr "Opnamen zijn alleen voor persoonlijk gebruik."
 
-#: package/contents/ui/FullRepresentation.qml:3910
-#: package/contents/ui/FullRepresentation.qml:4028
+#: package/contents/ui/FullRepresentation.qml:4155
+#: package/contents/ui/FullRepresentation.qml:4273
 msgid "Playing"
 msgstr "Speelt af"
 
-#: package/contents/ui/FullRepresentation.qml:3936
+#: package/contents/ui/FullRepresentation.qml:4181
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Podcasts"
 
-#: package/contents/ui/FullRepresentation.qml:3949
+#: package/contents/ui/FullRepresentation.qml:4194
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Timers"
 
-#: package/contents/ui/FullRepresentation.qml:4010
+#: package/contents/ui/FullRepresentation.qml:4255
 #: package/contents/ui/main.qml:70
 msgid "Casting to %1"
 msgstr "Casten naar %1"
 
-#: package/contents/ui/FullRepresentation.qml:4013
+#: package/contents/ui/FullRepresentation.qml:4258
 msgid "Check internet connection…"
 msgstr "Controleer de internetverbinding…"
 
-#: package/contents/ui/FullRepresentation.qml:4023
+#: package/contents/ui/FullRepresentation.qml:4268
 msgid "Bitrate: %1 kb/s"
 msgstr "Bitrate: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:4028
-#: package/contents/ui/FullRepresentation.qml:4031
+#: package/contents/ui/FullRepresentation.qml:4273
+#: package/contents/ui/FullRepresentation.qml:4276
 msgid "Connecting…"
 msgstr "Verbinden…"
 
-#: package/contents/ui/FullRepresentation.qml:4033
+#: package/contents/ui/FullRepresentation.qml:4278
 msgid "Choose station and enjoy…"
 msgstr "Kies een station en geniet…"
 
-#: package/contents/ui/FullRepresentation.qml:4057
+#: package/contents/ui/FullRepresentation.qml:4302
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Casten naar %1 — klik om te kiezen of te stoppen"
 
-#: package/contents/ui/FullRepresentation.qml:4059
+#: package/contents/ui/FullRepresentation.qml:4304
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Volume, uitvoer en apparaten (Chromecast, tv, luidspreker)"
 
-#: package/contents/ui/FullRepresentation.qml:4060
+#: package/contents/ui/FullRepresentation.qml:4305
 msgid "Volume and audio output"
 msgstr "Volume en audio-uitvoer"
 
-#: package/contents/ui/FullRepresentation.qml:4222
+#: package/contents/ui/FullRepresentation.qml:4467
 msgid "Play on"
 msgstr "Afspelen op"
 
-#: package/contents/ui/FullRepresentation.qml:4250
+#: package/contents/ui/FullRepresentation.qml:4495
 msgid "Mute"
 msgstr "Dempen"
 
-#: package/contents/ui/FullRepresentation.qml:4250
+#: package/contents/ui/FullRepresentation.qml:4495
 msgid "Unmute"
 msgstr "Dempen opheffen"
 
-#: package/contents/ui/FullRepresentation.qml:4282
+#: package/contents/ui/FullRepresentation.qml:4527
 msgid "This computer"
 msgstr "Deze computer"
 
-#: package/contents/ui/FullRepresentation.qml:4306
+#: package/contents/ui/FullRepresentation.qml:4551
 msgid "System default output"
 msgstr "Standaard systeemuitvoer"
 
-#: package/contents/ui/FullRepresentation.qml:4333
+#: package/contents/ui/FullRepresentation.qml:4578
 msgid "All local outputs, in sync"
 msgstr "Alle lokale uitgangen, synchroon"
 
-#: package/contents/ui/FullRepresentation.qml:4363
+#: package/contents/ui/FullRepresentation.qml:4608
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Speelt tegelijk op elke aangesloten luidspreker — bekabelde uitgangen worden vertraagd om gelijk te lopen met Bluetooth."
 
-#: package/contents/ui/FullRepresentation.qml:4379
-#: package/contents/ui/FullRepresentation.qml:4386
+#: package/contents/ui/FullRepresentation.qml:4624
+#: package/contents/ui/FullRepresentation.qml:4631
 msgid "Sync fine-tune"
 msgstr "Sync-fijnafstelling"
 
-#: package/contents/ui/FullRepresentation.qml:4420
+#: package/contents/ui/FullRepresentation.qml:4665
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Loopt de Bluetooth-luidspreker nog achter op de bekabelde, verhoog dit tot ze samen spelen."
 
-#: package/contents/ui/FullRepresentation.qml:4432
+#: package/contents/ui/FullRepresentation.qml:4677
 msgid "Sync delay in milliseconds"
 msgstr "Synchronisatievertraging in milliseconden"
 
-#: package/contents/ui/FullRepresentation.qml:4454
+#: package/contents/ui/FullRepresentation.qml:4699
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Typ een exacte vertraging in milliseconden — de schuifregelaar beweegt in stappen van tien."
 
-#: package/contents/ui/FullRepresentation.qml:4458
+#: package/contents/ui/FullRepresentation.qml:4703
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:4472
+#: package/contents/ui/FullRepresentation.qml:4717
 msgid "Calibrate with the microphone"
 msgstr "Kalibreren met de microfoon"
 
-#: package/contents/ui/FullRepresentation.qml:4477
+#: package/contents/ui/FullRepresentation.qml:4722
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Speelt een paar luide klikken door elke luidspreker en meet met de microfoon hoeveel de Bluetooth-luidspreker achterloopt — de vertraging wordt automatisch ingesteld."
 
-#: package/contents/ui/FullRepresentation.qml:4492
+#: package/contents/ui/FullRepresentation.qml:4737
 msgid "Keep sync tuned automatically"
 msgstr "Synchronisatie automatisch bijstellen"
 
-#: package/contents/ui/FullRepresentation.qml:4495
+#: package/contents/ui/FullRepresentation.qml:4740
 msgid "Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Luistert elke paar minuten met de microfoon naar het spelende geluid en controleert de synchronisatie opnieuw wanneer de luidsprekers uit elkaar lopen. Audio wordt alleen op deze computer verwerkt — nooit opgeslagen, nooit ergens naartoe gestuurd."
 
-#: package/contents/ui/FullRepresentation.qml:4532
+#: package/contents/ui/FullRepresentation.qml:4777
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 is onthouden voor de synchronisatie — verbind hem en hij sluit automatisch weer aan."
 
-#: package/contents/ui/FullRepresentation.qml:4555
+#: package/contents/ui/FullRepresentation.qml:4800
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Ronde 1 van 2 — klikken door elke luidspreker…"
 
-#: package/contents/ui/FullRepresentation.qml:4556
+#: package/contents/ui/FullRepresentation.qml:4801
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Ronde 2 van 2 — stil, resultaat wordt gecontroleerd…"
 
-#: package/contents/ui/FullRepresentation.qml:4594
+#: package/contents/ui/FullRepresentation.qml:4839
 msgid "%1 plays in the group"
 msgstr "%1 speelt in de groep"
 
-#: package/contents/ui/FullRepresentation.qml:4607
+#: package/contents/ui/FullRepresentation.qml:4852
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Of deze luidspreker in de groep meespeelt — vink uit om hem over te slaan zonder de verbinding te verbreken. Onthouden voor het apparaat."
 
-#: package/contents/ui/FullRepresentation.qml:4616
+#: package/contents/ui/FullRepresentation.qml:4861
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (niets aangesloten)"
 
-#: package/contents/ui/FullRepresentation.qml:4630
+#: package/contents/ui/FullRepresentation.qml:4875
 msgid "Balance of %1"
 msgstr "Balans van %1"
 
-#: package/contents/ui/FullRepresentation.qml:4639
+#: package/contents/ui/FullRepresentation.qml:4884
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Het aandeel van deze luidspreker in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden. Hij werkt alleen op wat deze widget afspeelt; het volume per apparaat in de systeeminstellingen is een aparte, onaangeroerde laag — daarom wijken die getallen af van deze schuifregelaars."
 
-#: package/contents/ui/FullRepresentation.qml:4656
+#: package/contents/ui/FullRepresentation.qml:4901
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:4657
+#: package/contents/ui/FullRepresentation.qml:4902
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:4658
+#: package/contents/ui/FullRepresentation.qml:4903
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:4659
+#: package/contents/ui/FullRepresentation.qml:4904
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:4664
+#: package/contents/ui/FullRepresentation.qml:4909
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Welke kanalen deze luidspreker speelt: stereo, alleen links, alleen rechts of een monomix van beide. Zet één luidspreker op L en een andere op R voor een echt stereopaar — onthouden voor het apparaat."
 
-#: package/contents/ui/FullRepresentation.qml:4695
+#: package/contents/ui/FullRepresentation.qml:4940
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:4710
+#: package/contents/ui/FullRepresentation.qml:4955
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth staat uit of er is geen adapter beschikbaar — controleer Systeeminstellingen."
 
-#: package/contents/ui/FullRepresentation.qml:4721
+#: package/contents/ui/FullRepresentation.qml:4966
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "Geen gekoppelde Bluetooth-audioapparaten — gebruik hieronder „Nieuwe luidspreker koppelen…” of koppel eenmalig in Systeeminstellingen."
 
-#: package/contents/ui/FullRepresentation.qml:4735
+#: package/contents/ui/FullRepresentation.qml:4980
 msgid "%1 — connecting…"
 msgstr "%1 — verbinden…"
 
-#: package/contents/ui/FullRepresentation.qml:4753
+#: package/contents/ui/FullRepresentation.qml:4998
 msgid "%1 — pairing…"
 msgstr "%1 — koppelen…"
 
-#: package/contents/ui/FullRepresentation.qml:4754
+#: package/contents/ui/FullRepresentation.qml:4999
 msgid "%1 — new, click to pair"
 msgstr "%1 — nieuw, klik om te koppelen"
 
-#: package/contents/ui/FullRepresentation.qml:4765
+#: package/contents/ui/FullRepresentation.qml:5010
 msgid "Pair a new speaker…"
 msgstr "Nieuwe luidspreker koppelen…"
 
-#: package/contents/ui/FullRepresentation.qml:4781
+#: package/contents/ui/FullRepresentation.qml:5026
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Zoeken — zet de luidspreker in koppelmodus…"
 
-#: package/contents/ui/FullRepresentation.qml:4802
+#: package/contents/ui/FullRepresentation.qml:5047
 msgid "WiFi & network"
 msgstr "WiFi & netwerk"
 
-#: package/contents/ui/FullRepresentation.qml:4834
+#: package/contents/ui/FullRepresentation.qml:5079
 msgid "%1 (speaker group)"
 msgstr "%1 (luidsprekergroep)"
 
-#: package/contents/ui/FullRepresentation.qml:4862
+#: package/contents/ui/FullRepresentation.qml:5107
 msgid "Balance"
 msgstr "Balans"
 
-#: package/contents/ui/FullRepresentation.qml:4876
+#: package/contents/ui/FullRepresentation.qml:5121
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Het aandeel van dit apparaat in het volume — de balans volgt elke beweging van de hoofdregelaar en wordt voor het apparaat onthouden."
 
-#: package/contents/ui/FullRepresentation.qml:4898
+#: package/contents/ui/FullRepresentation.qml:5143
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Elk apparaat buffert de stream zelf, waardoor kamers enkele seconden uit elkaar kunnen lopen. Groepeer luidsprekers in de Google Home-app voor perfecte synchronisatie — de groep verschijnt hier als één apparaat."
 
-#: package/contents/ui/FullRepresentation.qml:4908
+#: package/contents/ui/FullRepresentation.qml:5153
 msgid "Stop casting everywhere"
 msgstr "Casten overal stoppen"
 
-#: package/contents/ui/FullRepresentation.qml:4926
+#: package/contents/ui/FullRepresentation.qml:5171
 msgid "Searching for devices…"
 msgstr "Zoeken naar apparaten…"
 
-#: package/contents/ui/FullRepresentation.qml:4935
+#: package/contents/ui/FullRepresentation.qml:5180
 msgid "No devices found on your network"
 msgstr "Geen apparaten gevonden in uw netwerk"
 
@@ -1388,266 +1405,266 @@ msgstr "De opgeslagen zenderconfiguratie is beschadigd. Je gegevens zijn niet ge
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "De zender antwoordde niet — hij is mogelijk offline of niet beschikbaar in jouw land. Probeer een ander resultaat."
 
-#: package/contents/ui/main.qml:1048
+#: package/contents/ui/main.qml:1096
 msgid "Nothing to export"
 msgstr "Niets te exporteren"
 
-#: package/contents/ui/main.qml:1048
+#: package/contents/ui/main.qml:1096
 msgid "Subscribe to a show first."
 msgstr "Abonneer je eerst op een programma."
 
-#: package/contents/ui/main.qml:1078
+#: package/contents/ui/main.qml:1126
 msgid "Subscriptions imported"
 msgstr "Abonnementen geïmporteerd"
 
-#: package/contents/ui/main.qml:1079
+#: package/contents/ui/main.qml:1127
 msgid "%1 show added"
 msgid_plural "%1 shows added"
 msgstr[0] "%1 programma toegevoegd"
 msgstr[1] "%1 programma's toegevoegd"
 
-#: package/contents/ui/main.qml:1081
+#: package/contents/ui/main.qml:1129
 msgid "Nothing imported"
 msgstr "Niets geïmporteerd"
 
-#: package/contents/ui/main.qml:1082
+#: package/contents/ui/main.qml:1130
 msgid "No new podcast feeds were found in that file."
 msgstr "Geen nieuwe podcastfeeds gevonden in dat bestand."
 
-#: package/contents/ui/main.qml:1230
+#: package/contents/ui/main.qml:1278
 msgid "This feed address is not allowed."
 msgstr "Dit feedadres is niet toegestaan."
 
-#: package/contents/ui/main.qml:1265
+#: package/contents/ui/main.qml:1313
 msgid "The feed did not answer (error %1)."
 msgstr "De feed antwoordde niet (fout %1)."
 
-#: package/contents/ui/main.qml:1266
+#: package/contents/ui/main.qml:1314
 msgid "This address is not a podcast feed."
 msgstr "Dit adres is geen podcastfeed."
 
-#: package/contents/ui/main.qml:1278
+#: package/contents/ui/main.qml:1326
 msgid "No playable episodes in this feed."
 msgstr "Geen afspeelbare afleveringen in deze feed."
 
-#: package/contents/ui/main.qml:2093
+#: package/contents/ui/main.qml:2155
 msgid "Scheduled recording started"
 msgstr "Geplande opname gestart"
 
-#: package/contents/ui/main.qml:2213
+#: package/contents/ui/main.qml:2275
 msgid "Scheduled recording missed"
 msgstr "Geplande opname gemist"
 
-#: package/contents/ui/main.qml:2219
+#: package/contents/ui/main.qml:2281
 msgid "Scheduled recording skipped"
 msgstr "Geplande opname overgeslagen"
 
-#: package/contents/ui/main.qml:2220
+#: package/contents/ui/main.qml:2282
 msgid "%1 — another recording is already running."
 msgstr "%1 — er loopt al een andere opname."
 
-#: package/contents/ui/main.qml:2394
+#: package/contents/ui/main.qml:2456
 msgid "Wake-up alarm missed"
 msgstr "Wekker gemist"
 
-#: package/contents/ui/main.qml:2395
+#: package/contents/ui/main.qml:2457
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 stond ingesteld op %2 — de computer was op dat moment uit of in slaapstand."
 
-#: package/contents/ui/main.qml:2429 package/contents/ui/main.qml:2509
-#: package/contents/ui/main.qml:2562 package/contents/ui/main.qml:2565
+#: package/contents/ui/main.qml:2491 package/contents/ui/main.qml:2571
+#: package/contents/ui/main.qml:2624 package/contents/ui/main.qml:2627
 msgid "Wake-up alarm"
 msgstr "Wekker"
 
-#: package/contents/ui/main.qml:2430
+#: package/contents/ui/main.qml:2492
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 was op hetzelfde moment aan de beurt — in plaats daarvan speelt %2."
 
-#: package/contents/ui/main.qml:2566
+#: package/contents/ui/main.qml:2628
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "De zender kon niet starten — in plaats daarvan speelt de ingebouwde wektoon."
 
-#: package/contents/ui/main.qml:3282
+#: package/contents/ui/main.qml:3344
 msgid "%1 devices"
 msgstr "%1 apparaten"
 
-#: package/contents/ui/main.qml:3723
+#: package/contents/ui/main.qml:3785
 msgid "The Bluetooth speaker"
 msgstr "De Bluetooth-speaker"
 
-#: package/contents/ui/main.qml:3722
+#: package/contents/ui/main.qml:3784
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 is verbonden, maar het geluid kwam nooit aan"
 
-#: package/contents/ui/main.qml:3724
+#: package/contents/ui/main.qml:3786
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Zet de speaker uit en weer aan en verbind hem opnieuw."
 
-#: package/contents/ui/main.qml:4113
+#: package/contents/ui/main.qml:4175
 msgid "Station seems to be off the air"
 msgstr "De zender lijkt uit de lucht te zijn"
 
-#: package/contents/ui/main.qml:4114
+#: package/contents/ui/main.qml:4176
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 antwoordt op geen enkel adres dat de gids kent. De zender blijft in je lijst — op de achtergrond wordt het opnieuw geprobeerd."
 
-#: package/contents/ui/main.qml:4186
+#: package/contents/ui/main.qml:4248
 msgid "Playing from a backup address"
 msgstr "Speelt af via een reserveadres"
 
-#: package/contents/ui/main.qml:4187
+#: package/contents/ui/main.qml:4249
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Het opgeslagen adres van de zender antwoordt niet — voorlopig speelt de dichtstbijzijnde treffer uit de gids. Je opgeslagen adres is bewaard."
 
-#: package/contents/ui/main.qml:4227
+#: package/contents/ui/main.qml:4289
 msgid "Station found at a new address"
 msgstr "Zender gevonden op een nieuw adres"
 
-#: package/contents/ui/main.qml:4228
+#: package/contents/ui/main.qml:4290
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 is verhuisd — het nieuwe adres is in je lijst opgeslagen."
 
-#: package/contents/ui/main.qml:5488
+#: package/contents/ui/main.qml:5562
 msgid "Episode downloaded"
 msgstr "Aflevering gedownload"
 
-#: package/contents/ui/main.qml:5492
+#: package/contents/ui/main.qml:5566
 msgid "Episode download failed"
 msgstr "Downloaden van aflevering mislukt"
 
-#: package/contents/ui/main.qml:5501
+#: package/contents/ui/main.qml:5579
 msgid "Subscriptions exported"
 msgstr "Abonnementen geëxporteerd"
 
-#: package/contents/ui/main.qml:5503
+#: package/contents/ui/main.qml:5581
 msgid "Export failed"
 msgstr "Exporteren mislukt"
 
-#: package/contents/ui/main.qml:5504
+#: package/contents/ui/main.qml:5582
 msgid "Could not write the subscriptions file."
 msgstr "Kon het abonnementenbestand niet schrijven."
 
-#: package/contents/ui/main.qml:5597
+#: package/contents/ui/main.qml:5675
 msgid "Casting needs python-chromecast"
 msgstr "Casten vereist python-chromecast"
 
-#: package/contents/ui/main.qml:5598
+#: package/contents/ui/main.qml:5676
 msgid "Install the python-chromecast package to cast to your devices."
 msgstr "Installeer het pakket python-chromecast om naar uw apparaten te casten."
 
-#: package/contents/ui/main.qml:5619
+#: package/contents/ui/main.qml:5697
 msgid "the device"
 msgstr "het apparaat"
 
-#: package/contents/ui/main.qml:5619
+#: package/contents/ui/main.qml:5697
 msgid "Could not cast to %1"
 msgstr "Kon niet casten naar %1"
 
-#: package/contents/ui/main.qml:5620
+#: package/contents/ui/main.qml:5698
 msgid "The device could not play this station."
 msgstr "Het apparaat kon dit station niet afspelen."
 
-#: package/contents/ui/main.qml:5666
+#: package/contents/ui/main.qml:5744
 msgid "Casting"
 msgstr "Casten"
 
-#: package/contents/ui/main.qml:5667
+#: package/contents/ui/main.qml:5745
 msgid "The device did not stop — it may still be playing."
 msgstr "Het apparaat stopte niet — mogelijk speelt het nog."
 
-#: package/contents/ui/main.qml:5723 package/contents/ui/main.qml:5825
+#: package/contents/ui/main.qml:5801 package/contents/ui/main.qml:5903
 msgid "the Bluetooth device"
 msgstr "het Bluetooth-apparaat"
 
-#: package/contents/ui/main.qml:5722
+#: package/contents/ui/main.qml:5800
 msgid "Could not connect to %1"
 msgstr "Kon geen verbinding maken met %1"
 
-#: package/contents/ui/main.qml:5724
+#: package/contents/ui/main.qml:5802
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Controleer of de luidspreker aanstaat en binnen bereik is."
 
-#: package/contents/ui/main.qml:5824
+#: package/contents/ui/main.qml:5902
 msgid "Could not pair with %1"
 msgstr "Koppelen met %1 mislukt"
 
-#: package/contents/ui/main.qml:5826
+#: package/contents/ui/main.qml:5904
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Zet de luidspreker in koppelmodus (houd de Bluetooth-knop ingedrukt) en probeer opnieuw."
 
-#: package/contents/ui/main.qml:5924
+#: package/contents/ui/main.qml:6002
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg is niet geïnstalleerd"
 
-#: package/contents/ui/main.qml:5925
+#: package/contents/ui/main.qml:6003
 msgid "Install ffmpeg to record radio."
 msgstr "Installeer ffmpeg om radio op te nemen."
 
-#: package/contents/ui/main.qml:5928
+#: package/contents/ui/main.qml:6006
 msgid "Not enough disk space for this recording"
 msgstr "Onvoldoende schijfruimte voor deze opname"
 
-#: package/contents/ui/main.qml:5929
+#: package/contents/ui/main.qml:6007
 msgid "Free some space in %1 and try again."
 msgstr "Maak ruimte vrij in %1 en probeer het opnieuw."
 
-#: package/contents/ui/main.qml:5932
+#: package/contents/ui/main.qml:6010
 msgid "Recording saved ✓ (%1)"
 msgstr "Opname opgeslagen ✓ (%1)"
 
-#: package/contents/ui/main.qml:5936
+#: package/contents/ui/main.qml:6014
 msgid "Recording interrupted (%1 captured)"
 msgstr "Opname onderbroken (%1 vastgelegd)"
 
-#: package/contents/ui/main.qml:5938
+#: package/contents/ui/main.qml:6016
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — het bestand is veel kleiner dan verwacht."
 
-#: package/contents/ui/main.qml:5942
+#: package/contents/ui/main.qml:6020
 msgid "Recording failed"
 msgstr "Opname mislukt"
 
-#: package/contents/ui/main.qml:5943
+#: package/contents/ui/main.qml:6021
 msgid "The stream could not be captured."
 msgstr "De stream kon niet worden vastgelegd."
 
-#: package/contents/ui/main.qml:6029
+#: package/contents/ui/main.qml:6107
 msgid "Downloading again without the cover"
 msgstr "Opnieuw downloaden zonder de hoes"
 
-#: package/contents/ui/main.qml:6030
+#: package/contents/ui/main.qml:6108
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Voor het insluiten van tags is het pakket python-mutagen nodig — installeer het om hoezen in je bestanden te krijgen."
 
-#: package/contents/ui/main.qml:6038
+#: package/contents/ui/main.qml:6116
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp is niet geïnstalleerd"
 
-#: package/contents/ui/main.qml:6039
+#: package/contents/ui/main.qml:6117
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installeer yt-dlp (en ffmpeg) om nummers te downloaden."
 
-#: package/contents/ui/main.qml:6042
+#: package/contents/ui/main.qml:6120
 msgid "Track downloaded ✓"
 msgstr "Nummer gedownload ✓"
 
-#: package/contents/ui/main.qml:6043
+#: package/contents/ui/main.qml:6121
 msgid "Saved to: %1"
 msgstr "Opgeslagen in: %1"
 
-#: package/contents/ui/main.qml:6046
+#: package/contents/ui/main.qml:6124
 msgid "Download failed"
 msgstr "Download mislukt"
 
-#: package/contents/ui/main.qml:6047
+#: package/contents/ui/main.qml:6125
 msgid "Unknown error"
 msgstr "Onbekende fout"
 
-#: package/contents/ui/main.qml:6349
+#: package/contents/ui/main.qml:6427
 msgid "Audio output changed"
 msgstr "Audio-uitvoer gewijzigd"
 
-#: package/contents/ui/main.qml:6350
+#: package/contents/ui/main.qml:6428
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Het gekozen uitvoerapparaat is verdwenen — in plaats daarvan wordt de systeemstandaard gebruikt."
 

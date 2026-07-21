@@ -2104,6 +2104,57 @@ PlasmaExtras.Representation {
                     ? Math.max(_histRowH, _userHistH)
                     : Math.min(_histCount, 4) * _histRowH)
 
+            // The bridge to the podcast downloads: episodes land in their
+            // own Podcasts/ folder, which this page's file list deliberately
+            // does not walk — without this row a fresh download looked like
+            // it went nowhere. One tap opens the Downloaded view over there.
+            PlasmaComponents3.ItemDelegate {
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                visible: podcastFolder.count > 0
+                implicitHeight: Kirigami.Units.gridUnit * 2.2
+                hoverEnabled: true
+                Accessible.name: i18n("Podcast downloads (%1)", podcastFolder.count)
+                Accessible.role: Accessible.Button
+                background: Rectangle {
+                    anchors.fill: parent
+                    radius: Kirigami.Units.smallSpacing * 1.5
+                    color: parent.hovered ? Qt.alpha(root.accent, 0.10)
+                                          : Qt.alpha(Kirigami.Theme.textColor, 0.045)
+                    border.width: 1
+                    border.color: Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                }
+                contentItem: RowLayout {
+                    spacing: Kirigami.Units.smallSpacing * 1.5
+                    Kirigami.Icon {
+                        Layout.leftMargin: Kirigami.Units.smallSpacing * 1.5
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                        source: "folder-download"
+                        opacity: 0.8
+                    }
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Podcast downloads (%1)", podcastFolder.count)
+                        elide: Text.ElideRight
+                    }
+                    Kirigami.Icon {
+                        Layout.rightMargin: Kirigami.Units.smallSpacing
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                        source: "go-next"
+                        opacity: 0.6
+                    }
+                }
+                onClicked: {
+                    podcastPage.downloadsMode = true
+                    podcastPage.trendingMode = false
+                    root.view = 3
+                }
+            }
+
             FolderListModel {
                 id: musicFolder
                 // NOT bound to downloadDirPath directly: FolderListModel
@@ -2699,6 +2750,10 @@ PlasmaExtras.Representation {
             // Charts mode: the shows view lists the worldwide hot list
             // instead of the subscriptions. Typing a search overrides it.
             property bool trendingMode: false
+            // Downloaded mode: the cross-show collection of every episode
+            // file on disk — the answer to "where did my download go".
+            // Exclusive with the charts; typing a search overrides both.
+            property bool downloadsMode: false
             // Episode filter: 0 = all, 1 = unplayed (fresh + in-progress).
             // Applied at feed-load and on an explicit filter change, NOT on
             // every played-mark, so a row never vanishes under a mid-scroll.
@@ -2811,7 +2866,27 @@ PlasmaExtras.Representation {
                                  : i18n("Popular now — worldwide charts")
                     onClicked: {
                         podcastPage.trendingMode = !podcastPage.trendingMode
+                        podcastPage.downloadsMode = false
                         if (podcastPage.trendingMode) root.podcastLoadTrending(false)
+                    }
+                }
+                // Downloaded — every episode file on disk, across all shows.
+                CircleButton {
+                    visible: !podcastPage.showingEpisodes && !podcastPage.searching
+                             && podcastFolder.count > 0
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "folder-download"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: podcastPage.downloadsMode
+                    opacity: checked ? 1.0 : 0.7
+                    tooltipText: podcastPage.downloadsMode
+                                 ? i18n("Back to my shows")
+                                 : i18n("Downloaded episodes (%1)", podcastFolder.count)
+                    onClicked: {
+                        podcastPage.downloadsMode = !podcastPage.downloadsMode
+                        podcastPage.trendingMode = false
                     }
                 }
                 // OPML backup / migration — a real podcatcher, not a walled
@@ -3006,11 +3081,181 @@ PlasmaExtras.Representation {
                 }
             }
 
+            // ── Downloaded episodes — the cross-show collection ──────────
+            // The folder is the truth (a file is a download), the ledger is
+            // the memory (which episode that file was): rows join the two,
+            // so a file the ledger never met still lists — by its name.
+            PlasmaComponents3.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: !podcastPage.showingEpisodes && podcastPage.downloadsMode
+                         && !podcastPage.searching
+                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
+
+                contentItem: ListView {
+                    id: podDownloadsView
+                    leftMargin: Kirigami.Units.smallSpacing
+                    rightMargin: Kirigami.Units.smallSpacing
+                    model: podcastFolder
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+                    spacing: 2
+
+                    delegate: PlasmaComponents3.ItemDelegate {
+                        id: podDlRow
+
+                        required property int index
+                        required property string fileName
+                        required property url fileUrl
+                        required property double fileSize
+
+                        // The ledger row, if the download was made by us —
+                        // re-read when downloads land or rows are deleted.
+                        readonly property var meta: {
+                            void root._podDlRev
+                            return root.podcastDownloadMeta(fileName)
+                        }
+                        readonly property string epTitle: meta && meta.title ? meta.title : fileName
+                        readonly property int resumeSec: meta && meta.key
+                                                         ? root.podcastPositionSec(meta.key) : 0
+                        readonly property bool isThisPlaying: isPlaying()
+                                    && playMusic.source.toString() === fileUrl.toString()
+
+                        width: podDownloadsView.width - podDownloadsView.leftMargin
+                               - podDownloadsView.rightMargin
+                        height: Kirigami.Units.gridUnit * 3
+                        padding: 0
+                        hoverEnabled: true
+                        Accessible.name: epTitle
+                        Accessible.role: Accessible.Button
+
+                        function _activate() {
+                            if (meta && meta.key)
+                                root.playPodcastEpisode(fileUrl, epTitle, meta.key,
+                                                        meta.show || "", meta.art || "",
+                                                        meta.feed || "")
+                            else
+                                root.playLocalFile(fileUrl, epTitle)
+                        }
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                                || event.key === Qt.Key_Space) {
+                                podDlRow._activate()
+                                event.accepted = true
+                            }
+                        }
+                        Accessible.onPressAction: podDlRow._activate()
+
+                        background: Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing / 2
+                            radius: Kirigami.Units.smallSpacing * 1.5
+                            color: podDlRow.isThisPlaying
+                                   ? Qt.alpha(root.accent, 0.15)
+                                   : podDlRow.hovered ? Qt.alpha(root.accent, 0.07)
+                                                   : Qt.alpha(Kirigami.Theme.textColor, 0.045)
+                            border.width: 1
+                            border.color: podDlRow.isThisPlaying
+                                          ? Qt.alpha(root.accent, 0.55)
+                                          : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                        }
+
+                        contentItem: RowLayout {
+                            spacing: Kirigami.Units.smallSpacing * 1.5
+                            anchors.fill: parent
+                            anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
+                            anchors.rightMargin: Kirigami.Units.smallSpacing
+
+                            Rectangle {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: width * 0.32
+                                color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    anchors.margins: 1
+                                    sourceSize.width: 64
+                                    sourceSize.height: 64
+                                    source: podDlRow.meta && podDlRow.meta.art ? podDlRow.meta.art : ""
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                    visible: status === Image.Ready
+                                }
+                                Kirigami.Icon {
+                                    anchors.centerIn: parent
+                                    width: parent.width * 0.6
+                                    height: width
+                                    source: "audio-x-generic"
+                                    opacity: 0.5
+                                    visible: !(podDlRow.meta && podDlRow.meta.art)
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    text: podDlRow.epTitle
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    font.weight: podDlRow.isThisPlaying ? Font.DemiBold : Font.Normal
+                                }
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: {
+                                        var bits = []
+                                        if (podDlRow.meta && podDlRow.meta.show) bits.push(podDlRow.meta.show)
+                                        bits.push(PodcastLogic.fmtSize(podDlRow.fileSize))
+                                        if (podDlRow.resumeSec > 0)
+                                            bits.push(i18n("resume at %1", PodcastLogic.fmtTime(podDlRow.resumeSec)))
+                                        return bits.join(" · ")
+                                    }
+                                    opacity: 0.7
+                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                }
+                            }
+
+                            // Two-step delete, same manner as the station rows:
+                            // first tap arms red, second removes file + ledger.
+                            CircleButton {
+                                property bool armed: false
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+                                Layout.alignment: Qt.AlignVCenter
+                                iconName: armed ? "dialog-warning" : "edit-delete"
+                                iconScale: 0.55
+                                baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
+                                opacity: (podDlRow.hovered || armed) ? 0.85 : 0.0
+                                visible: opacity > 0.0
+                                tooltipText: armed ? i18n("Tap again to delete the file")
+                                                   : i18n("Delete the downloaded file")
+                                onClicked: {
+                                    if (!armed) { armed = true; disarm.restart(); return }
+                                    armed = false
+                                    root.deletePodcastDownload(podDlRow.fileName)
+                                }
+                                Timer { id: disarm; interval: 3000; onTriggered: parent.armed = false }
+                            }
+                        }
+
+                        TapHandler { onTapped: podDlRow._activate() }
+                    }
+                }
+            }
+
             // ── Shows (subscriptions, or search results while typing) ────
             PlasmaComponents3.ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: !podcastPage.showingEpisodes
+                         && !(podcastPage.downloadsMode && !podcastPage.searching)
                 PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
                 contentItem: ListView {

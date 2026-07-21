@@ -157,6 +157,10 @@
             <label>Podcast resume positions (JSON map episode-key to {sec, dur, at})</label>
             <default>{}</default>
         </entry>
+        <entry name="podcastDownloads" type="String">
+            <label>Downloaded-episode ledger (JSON map filename to {key, title, show, art, feed, at}) — the Downloaded view's join against the folder</label>
+            <default>{}</default>
+        </entry>
         <entry name="podcastSpeeds" type="String">
             <label>Playback speed per show (JSON map feedUrl to rate; "" key is the default)</label>
             <default>{}</default>

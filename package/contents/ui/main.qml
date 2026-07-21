@@ -939,6 +939,54 @@ PlasmoidItem {
     // One download at a time — deterministic, and the status line stays honest.
     property string _podDownloadKey: ""
     property string _podDownloadTitle: ""
+    // The download in flight, remembered in full: the OK ack writes this
+    // into the downloads ledger so the Downloaded view can show the episode
+    // as an EPISODE — show, cover, resume — not as a bare file name.
+    property var _podDownloadMeta: null
+    // filename → { key, title, show, art, feed, at }. The ledger behind the
+    // Downloaded view; entries whose file is gone simply never render, and
+    // the same at-based pruner the positions use caps it.
+    property var _podDownloads: ({})
+    property int _podDlRev: 0
+
+    function _loadPodDownloads() {
+        try {
+            var m = JSON.parse(Plasmoid.configuration.podcastDownloads || "{}");
+            _podDownloads = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+        } catch (e) {
+            _podDownloads = {};
+        }
+    }
+
+    function _savePodDownloads() {
+        _podDownloads = PodcastLogic.prunePositions(_podDownloads, 500);
+        Plasmoid.configuration.podcastDownloads = JSON.stringify(_podDownloads);
+        _podDlRev++;
+    }
+
+    function podcastDownloadMeta(fileName) {
+        void _podDlRev;
+        var e = _podDownloads[fileName];
+        return (e && typeof e === "object") ? e : null;
+    }
+
+    // Remove one downloaded episode: the FILE (guarded to the Podcasts
+    // folder — the name must be bare, no path parts) and its ledger row.
+    // Positions and played-marks stay: re-downloading resumes where the
+    // listener left off, which is the whole promise of the position map.
+    function deletePodcastDownload(fileName) {
+        var name = (fileName || "").toString();
+        if (name === "" || name.indexOf("/") !== -1 || name.indexOf("\\") !== -1
+            || name.charAt(0) === ".") return;
+        executable.exec(": POD_RM; rm -f -- "
+            + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name)
+            + " " + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name + ".part")
+            + "; true # " + nextSeq());
+        if (_podDownloads[name] !== undefined) {
+            delete _podDownloads[name];
+            _savePodDownloads();
+        }
+    }
     // Resume bookkeeping: the playing episode's key and the seek waiting
     // for the media to load.
     property string _podPlayingKey: ""
@@ -1305,6 +1353,18 @@ PlasmoidItem {
         var dest = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + podcastFileName(title, url));
         var dir = PodcastLogic.shQuote(downloadDirPath + "/Podcasts");
         var safeUrl = PodcastLogic.shQuote(url);
+        // The episode's identity, held until the OK ack writes the ledger:
+        // the download always starts from an OPEN show, so its title, cover
+        // and feed are on the root right now — and only now.
+        _podDownloadMeta = {
+            "file": podcastFileName(title, url),
+            "key": _podDownloadKey,
+            "title": _podDownloadTitle,
+            "show": String(podcastEpisodesTitle || "").substring(0, 200),
+            "art": PodcastLogic.urlAllowed(podcastEpisodesArt)
+                   ? String(podcastEpisodesArt).substring(0, 2048) : "",
+            "feed": String(podcastEpisodesFor || "").substring(0, 2048)
+        };
         // Staged download: .part first, atomic rename on success — the
         // folder model never lists a half-written file as playable. The
         // size cap guards the disk; -f keeps HTTP errors out of the file.
@@ -1382,8 +1442,10 @@ PlasmoidItem {
         _currentEpisodeFeed = "";
     }
 
-    function playPodcastEpisode(fileUrl, title, key) {
-        var feed = podcastEpisodesFor || "";   // the open show
+    function playPodcastEpisode(fileUrl, title, key, showTitle, showArt, feedUrl) {
+        // Context comes from the OPEN show — or, on the Downloaded view's
+        // road, from the ledger row riding in as the optional trailing args.
+        var feed = (feedUrl !== undefined ? feedUrl : podcastEpisodesFor) || "";
         var resume = podcastPositionSec(key || "");
         // Tapping the episode that is ALREADY playing means "stop" —
         // playLocalFile handles the stop; re-arming the tracking fields
@@ -1398,8 +1460,8 @@ PlasmoidItem {
         // Carry the show's cover into the now-playing panel — the downloaded
         // file has no embedded art, so without this an episode would spin the
         // generic vinyl. Cleared on handoff so it never leaks onto a station.
-        _podPlayingArt = podcastEpisodesArt;
-        _podPlayingShow = podcastEpisodesTitle;
+        _podPlayingArt = showArt !== undefined ? showArt : podcastEpisodesArt;
+        _podPlayingShow = showTitle !== undefined ? showTitle : podcastEpisodesTitle;
         // The show's remembered speed (or the global default) takes effect
         // once the media loads — playbackRate resets on every source change.
         podcastRate = PodcastLogic.clampRate(_podSpeedFor(feed));
@@ -5341,6 +5403,7 @@ PlasmoidItem {
         _ensureMusicDir();
         _loadPodcastSubs();
         _loadPodPositions();
+        _loadPodDownloads();
         _loadPodSpeeds();
         _loadPodPlayed();
         _applyAudioOutputDevice();
@@ -5485,6 +5548,17 @@ PlasmoidItem {
             if (cmd.indexOf(": POD_DL;") === 0) {
                 var podOk = (stdout || "").indexOf("__POD_OK__") !== -1;
                 if (podOk) {
+                    // The ledger row, written only on a landed file: the
+                    // Downloaded view joins the folder against this to show
+                    // an EPISODE — show, cover, resume — not a bare name.
+                    var pdm = root._podDownloadMeta;
+                    if (pdm && pdm.file) {
+                        root._podDownloads[pdm.file] = {
+                            "key": pdm.key, "title": pdm.title, "show": pdm.show,
+                            "art": pdm.art, "feed": pdm.feed, "at": Date.now()
+                        };
+                        root._savePodDownloads();
+                    }
                     notify(i18n("Episode downloaded"), root._podDownloadTitle, "folder-music");
                 } else {
                     console.warn("[ARP] podcast download failed: "
@@ -5493,7 +5567,11 @@ PlasmoidItem {
                 }
                 root._podDownloadKey = "";
                 root._podDownloadTitle = "";
+                root._podDownloadMeta = null;
                 return;
+            }
+            if (cmd.indexOf(": POD_RM;") === 0) {
+                return; // fire-and-forget — the folder model watches the dir
             }
             // OPML export written (or not) — one honest word with the path.
             if (cmd.indexOf(": OPML_EXPORT;") === 0) {
