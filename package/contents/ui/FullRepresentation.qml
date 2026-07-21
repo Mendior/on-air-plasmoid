@@ -48,6 +48,9 @@ PlasmaExtras.Representation {
 
     readonly property string _bestArtUrl: {
         var broken = _brokenArtUrls
+        // A playing podcast episode: its show cover comes first (the file
+        // carries no embedded art). Non-empty only while an episode plays.
+        if (root._podPlayingArt && !broken[root._podPlayingArt]) return root._podPlayingArt
         if (root.albumArtUrl && !broken[root.albumArtUrl]) return root.albumArtUrl
         if (root.imageurl && !broken[root.imageurl]) return root.imageurl
         if (root.currentStationFavicon) {
@@ -79,6 +82,12 @@ PlasmaExtras.Representation {
     // A local track is playback too, but it is not an "eter": no LIVE pill,
     // no "Connecting…" — it plays from disk or it does not play at all.
     readonly property bool _localPlayback: playMusic.source.toString().indexOf("file://") === 0
+    // A podcast episode is playing (as opposed to a station or a plain My
+    // Music track): the transport and action rows swap to episode-appropriate
+    // controls, since "previous station" or "download this track" are noise
+    // for a file that is already on disk and belongs to a show.
+    readonly property bool _podcastPlaying: root._podPlayingUrl !== ""
+                                            && playMusic.source.toString() === root._podPlayingUrl
 
     readonly property int _nowBitrate: {
         if (!_streamActive) return 0
@@ -1303,7 +1312,8 @@ PlasmaExtras.Representation {
                         + transportRow.implicitHeight
                         + (seekRow.visible ? seekRow.implicitHeight : 0)
                         + (episodeControls.visible ? episodeControls.implicitHeight : 0)
-                        + actionsRow.implicitHeight
+                        + (actionsRow.visible ? actionsRow.implicitHeight : 0)
+                        + (podcastActionsRow.visible ? podcastActionsRow.implicitHeight : 0)
                         // row spacings, per-row top margins and both breathers
                         + Kirigami.Units.gridUnit * 2.5
                     readonly property real _side: Math.max(
@@ -1631,8 +1641,12 @@ PlasmaExtras.Representation {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
-                        text: root.currentStation
-                        // Untrusted (station-controlled) — never interpret as HTML
+                        // For a podcast the heading below carries the episode
+                        // title, so this line frames it with the SHOW name
+                        // ("Show › Episode") instead of repeating the title.
+                        text: fullRepresentation._podcastPlaying && root._podPlayingShow !== ""
+                              ? root._podPlayingShow : root.currentStation
+                        // Untrusted (station/feed-controlled) — never interpret as HTML
                         textFormat: Text.PlainText
                         visible: text !== ""
                         opacity: 0.6
@@ -1714,6 +1728,10 @@ PlasmaExtras.Representation {
                         implicitHeight: implicitWidth
                         iconName: "media-skip-backward"
                         iconScale: 0.5
+                        // A podcast episode is a file, not a dial position —
+                        // "previous station" here would yank the listener onto
+                        // the radio. The ±skip row below owns episode movement.
+                        visible: !fullRepresentation._podcastPlaying
                         enabledState: stationsModel.count > 1
                         tooltipText: i18n("Previous station")
                         onClicked: {
@@ -1752,6 +1770,7 @@ PlasmaExtras.Representation {
                         implicitHeight: implicitWidth
                         iconName: "media-skip-forward"
                         iconScale: 0.5
+                        visible: !fullRepresentation._podcastPlaying
                         enabledState: stationsModel.count > 1
                         tooltipText: i18n("Next station")
                         onClicked: {
@@ -1860,7 +1879,11 @@ PlasmaExtras.Representation {
                 RowLayout {
                     id: actionsRow
                     Layout.alignment: Qt.AlignHCenter
-                    visible: root.currentStation !== ""
+                    // Station/track actions — favourite, vote, YouTube, record.
+                    // None of them fit a podcast episode (you don't "favourite"
+                    // or "record" a downloaded file, and it has no station to
+                    // vote for), so a playing episode shows its own row instead.
+                    visible: root.currentStation !== "" && !fullRepresentation._podcastPlaying
                     spacing: Kirigami.Units.largeSpacing
 
                     // Search the currently playing track on YouTube
@@ -1995,6 +2018,51 @@ PlasmaExtras.Representation {
                             return i18n("Record this station (personal use only)")
                         }
                         onClicked: root.recording ? root.recStop() : root.recStartCurrent()
+                    }
+                }
+
+                // Episode actions — shown in place of the station row when a
+                // podcast plays: mark heard, and jump to the show it belongs to.
+                RowLayout {
+                    id: podcastActionsRow
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: fullRepresentation._podcastPlaying
+                    spacing: Kirigami.Units.largeSpacing
+
+                    CircleButton {
+                        readonly property bool heard: {
+                            root._podPlayedRev
+                            return root._podPlayingKey !== ""
+                                   && root.isEpisodePlayed(root._podPlayingKey)
+                        }
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: heard ? "edit-undo" : "checkmark"
+                        iconScale: 0.55
+                        enabledState: root._podPlayingKey !== ""
+                        tooltipText: heard ? i18n("Mark as unplayed")
+                                           : i18n("Mark as played")
+                        onClicked: root.toggleEpisodePlayed(root._podPlayingKey)
+                    }
+
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 2.4
+                        implicitHeight: implicitWidth
+                        iconName: "application-rss+xml"
+                        iconScale: 0.55
+                        enabledState: root._currentEpisodeFeed !== ""
+                        tooltipText: i18n("Go to this show")
+                        onClicked: {
+                            // Open the Podcasts tab; load the show if it is not
+                            // already the one on screen (title/art fill in from
+                            // the feed). Already open → just switch tabs.
+                            if (root._currentEpisodeFeed !== ""
+                                && root.podcastEpisodesFor !== root._currentEpisodeFeed)
+                                root.loadPodcastFeed(root._currentEpisodeFeed, "", "")
+                            root.view = 3
+                        }
                     }
                 }
 
@@ -2613,6 +2681,10 @@ PlasmaExtras.Representation {
 
             readonly property bool showingEpisodes: root.podcastEpisodesFor !== ""
             readonly property bool searching: podSearchField.text.trim() !== ""
+            // The query is a feed URL, not directory text: iTunes is skipped
+            // and the shows view offers to open the feed directly — so any
+            // podcast reachable by its RSS address works, not just iTunes hits.
+            readonly property bool searchIsUrl: /^https?:\/\//i.test(podSearchField.text.trim())
             // Episode filter: 0 = all, 1 = unplayed (fresh + in-progress).
             // Applied at feed-load and on an explicit filter change, NOT on
             // every played-mark, so a row never vanishes under a mid-scroll.
@@ -2701,7 +2773,7 @@ PlasmaExtras.Representation {
                     visible: !podcastPage.showingEpisodes
                     Layout.fillWidth: true
                     autoAccept: true
-                    placeholderText: i18n("Search podcasts… (e.g. history, technology)")
+                    placeholderText: i18n("Search podcasts, or paste a feed URL…")
                     onTextChanged: podSearchDebounce.restart()
                 }
                 // OPML backup / migration — a real podcatcher, not a walled
@@ -2778,6 +2850,29 @@ PlasmaExtras.Representation {
                         podcastPage.rebuildEpisodes()
                     }
                 }
+                // Subscribe / unsubscribe to the open show — works however it
+                // was reached (an iTunes hit OR a pasted feed URL), so a
+                // hand-typed feed is a first-class subscription too.
+                CircleButton {
+                    readonly property bool subd: {
+                        podcastSubsModel.count   // re-check on subscribe/unsubscribe
+                        return root.isPodcastSubscribed(root.podcastEpisodesFor)
+                    }
+                    visible: podcastPage.showingEpisodes && root.podcastEpisodesFor !== ""
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: subd ? "favorite" : "non-starred-symbolic"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: subd
+                    tooltipText: subd ? i18n("Unsubscribe from this show")
+                                      : i18n("Subscribe to this show")
+                    onClicked: {
+                        if (subd) root.removePodcastSub(root.podcastEpisodesFor)
+                        else root.addPodcastSub(root.podcastEpisodesTitle, "",
+                                                root.podcastEpisodesArt, root.podcastEpisodesFor)
+                    }
+                }
                 CircleButton {
                     visible: podcastPage.showingEpisodes
                     implicitWidth: Kirigami.Units.gridUnit * 2.4
@@ -2785,8 +2880,36 @@ PlasmaExtras.Representation {
                     iconName: "view-refresh"
                     iconScale: 0.55
                     tooltipText: i18n("Refresh episodes")
-                    onClicked: root.loadPodcastFeed(root.podcastEpisodesFor, root.podcastEpisodesTitle)
+                    onClicked: root.loadPodcastFeed(root.podcastEpisodesFor, root.podcastEpisodesTitle, root.podcastEpisodesArt)
                 }
+            }
+
+            // Paste-a-feed-URL affordance: shown on the shows view the moment
+            // the query looks like an address. One tap opens it — any podcast
+            // with a public RSS feed works, iTunes-listed or not.
+            PlasmaComponents3.ItemDelegate {
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                visible: !podcastPage.showingEpisodes && podcastPage.searchIsUrl
+                contentItem: RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+                    Kirigami.Icon {
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                        source: "application-rss+xml"
+                        color: root.accent
+                    }
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Open this feed")
+                        color: root.accent
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
+                    }
+                }
+                onClicked: root.loadPodcastFeed(podSearchField.text.trim(), "", "")
             }
 
             Timer {
@@ -2954,15 +3077,18 @@ PlasmaExtras.Representation {
                         }
 
                         TapHandler {
-                            onTapped: root.loadPodcastFeed(showRow.feedUrl, showRow.title)
+                            onTapped: root.loadPodcastFeed(showRow.feedUrl, showRow.title, showRow.art)
                         }
                     }
 
-                    // Empty states, honest per mode.
+                    // Empty states, honest per mode. Suppressed while a feed
+                    // URL is typed — the "Open this feed" row above is the
+                    // answer, not "no shows found".
                     Column {
                         anchors.centerIn: parent
                         width: parent.width - Kirigami.Units.largeSpacing * 2
                         visible: showsView.count === 0 && !root.podcastSearchBusy
+                                 && !podcastPage.searchIsUrl
                         spacing: Kirigami.Units.smallSpacing
 
                         Kirigami.Icon {
@@ -3017,6 +3143,7 @@ PlasmaExtras.Representation {
                             podcastFolder.count   // re-check when files change
                             return podcastPage.localEpisodeUrl(title, url)
                         }
+                        showArt: root.podcastEpisodesArt
                         expanded: podcastPage.expandedEpisodeKey === epKey
                         onDetailsToggled: podcastPage.expandedEpisodeKey =
                             (podcastPage.expandedEpisodeKey === epKey ? "" : epKey)

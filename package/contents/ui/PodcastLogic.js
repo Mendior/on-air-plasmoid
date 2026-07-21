@@ -186,6 +186,17 @@ function parseFeed(xml, maxItems) {
     var firstItem = text.search(/<item[\s>]/i)
     var head = firstItem === -1 ? text : text.substring(0, firstItem)
     out.title = _cleanText(_tagBody(head, "title"))
+    // The show's own artwork: the itunes:image href, else the plain RSS
+    // <image><url>. This is fallback art for episodes carrying none, and the
+    // ONLY art a hand-typed feed URL brings (no iTunes row stands behind it).
+    // Gated by the same http(s)-and-not-private rule as every fetched URL.
+    var chImg = /<itunes:image\b[^>]*>/i.exec(head)
+    var showImg = chImg ? _attr(chImg[0], "href").trim() : ""
+    if (showImg === "") {
+        var rssImg = /<image\b[^>]*>([\s\S]*?)<\/image>/i.exec(head)
+        if (rssImg) showImg = _cleanText(_tagBody(rssImg[1], "url"))
+    }
+    out.image = urlAllowed(showImg) ? showImg : ""
     var itemRe = /<item[\s>][\s\S]*?<\/item>/gi
     var m
     while ((m = itemRe.exec(text)) !== null && out.episodes.length < cap) {

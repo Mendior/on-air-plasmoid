@@ -36,6 +36,9 @@ PlasmaComponents3.ItemDelegate {
 
     // Supplied by the page: file URL under Podcasts/ when downloaded.
     property string localUrl: ""
+    // The show's cover, supplied by the page as a fallback for episodes that
+    // carry no artwork of their own. Already http(s)-gated upstream.
+    property string showArt: ""
     // The page owns which row is expanded (one at a time); the row asks it
     // to toggle through this signal.
     property bool expanded: false
@@ -132,11 +135,53 @@ PlasmaComponents3.ItemDelegate {
         anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
         anchors.rightMargin: Kirigami.Units.smallSpacing
 
+        // Cover tile — the episode's own art, or the show's as a fallback.
+        // This is a STATUS column, never a second action: it shows the cover
+        // (dimmed when heard), bars over it while playing, and a small offline
+        // badge when the file is on disk — so a row never shows two play
+        // triangles, and "already downloaded" reads at a glance.
         Item {
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+            id: artTile
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 2.2
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 2.2
             Layout.alignment: Qt.AlignVCenter
 
+            readonly property string artUrl: epItem.image !== "" ? epItem.image
+                                                                 : epItem.showArt
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Kirigami.Units.smallSpacing
+                color: Qt.alpha(Kirigami.Theme.textColor, 0.08)
+                clip: true
+
+                Image {
+                    id: artImg
+                    anchors.fill: parent
+                    source: artTile.artUrl
+                    asynchronous: true
+                    cache: true
+                    fillMode: Image.PreserveAspectCrop
+                    // Feed art can be a pixel-flood — cap the decode; the tile
+                    // is only a couple of grid units wide.
+                    sourceSize.width: 128
+                    sourceSize.height: 128
+                    visible: status === Image.Ready
+                    opacity: epItem.isThisPlaying ? 0.35
+                             : (epItem.played ? 0.5 : 1.0)
+                }
+                // No art (or it failed): a quiet RSS glyph placeholder.
+                Kirigami.Icon {
+                    anchors.centerIn: parent
+                    width: parent.width * 0.5
+                    height: width
+                    visible: artImg.status !== Image.Ready && !epItem.isThisPlaying
+                    source: "application-rss+xml"
+                    opacity: 0.45
+                }
+            }
+
+            // Now-playing: bars over the (dimmed) cover.
             EqBars {
                 anchors.centerIn: parent
                 visible: epItem.isThisPlaying
@@ -144,16 +189,31 @@ PlasmaComponents3.ItemDelegate {
                 bars: 3
                 barWidth: 3
                 minHeight: 4
-                maxHeight: parent.height * 0.6
-                barColor: root.accent
+                maxHeight: parent.height * 0.45
+                barColor: root.accentBright
             }
-            Kirigami.Icon {
-                anchors.fill: parent
-                anchors.margins: 2
-                visible: !epItem.isThisPlaying
-                source: epItem.downloaded ? "media-playback-start"
-                                          : "application-rss+xml"
-                opacity: epItem.downloaded ? 0.85 : 0.45
+
+            // Offline badge — a quiet mark that the file is on disk, so the
+            // absent download button reads as "already here", not "gone".
+            Rectangle {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 1
+                width: Kirigami.Units.iconSizes.small
+                height: width
+                radius: width / 2
+                color: root.accent
+                visible: epItem.downloaded && !epItem.isThisPlaying
+                Kirigami.Icon {
+                    anchors.centerIn: parent
+                    width: parent.width * 0.68
+                    height: width
+                    // Symbolic (tints cleanly to white); the downward-arrow
+                    // badge is the established "downloaded / available offline"
+                    // convention, distinct from the played checkmark.
+                    source: "download"
+                    color: "white"
+                }
             }
         }
 

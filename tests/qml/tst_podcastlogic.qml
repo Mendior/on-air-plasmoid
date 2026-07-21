@@ -78,6 +78,39 @@ TestCase {
         compare(f.episodes[0].title, "EP")
     }
 
+    function test_channel_image_itunes_and_rss_and_gated() {
+        // itunes:image href (self-closing) — the common case.
+        var a = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<itunes:image href="https://cdn.example.com/show.jpg"/>'
+            + '<item><title>E</title><enclosure url="https://x.example/a.mp3"/></item>'
+            + '</channel></rss>', 10)
+        compare(a.image, "https://cdn.example.com/show.jpg")
+
+        // Plain RSS <image><url> — used when there is no itunes:image.
+        var b = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<image><url>https://cdn.example.com/rss.png</url><title>T</title></image>'
+            + '<item><title>E</title><enclosure url="https://x.example/a.mp3"/></item>'
+            + '</channel></rss>', 10)
+        compare(b.image, "https://cdn.example.com/rss.png")
+
+        // A private/LAN image URL is rejected like any other fetched URL.
+        var c = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<itunes:image href="http://192.168.1.5/logo.png"/>'
+            + '<item><title>E</title><enclosure url="https://x.example/a.mp3"/></item>'
+            + '</channel></rss>', 10)
+        compare(c.image, "")
+
+        // The channel image comes from BEFORE the first item — an episode's
+        // own itunes:image can never masquerade as the show cover.
+        var d = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<item><title>E</title><itunes:image href="https://x.example/ep.jpg"/>'
+            + '<enclosure url="https://x.example/a.mp3"/></item>'
+            + '</channel></rss>', 10)
+        compare(d.image, "")
+        // ...but the episode still keeps its own art.
+        compare(d.episodes[0].image, "https://x.example/ep.jpg")
+    }
+
     function test_not_a_feed_says_so() {
         verify(!PL.parseFeed("<html><body><h1>404</h1></body></html>", 10).ok)
         verify(!PL.parseFeed('{"error": "nope"}', 10).ok)

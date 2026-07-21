@@ -924,6 +924,10 @@ PlasmoidItem {
     property int _podSearchSeq: 0
     property string podcastEpisodesFor: ""   // feedUrl the episodes model shows
     property string podcastEpisodesTitle: ""
+    // The open show's artwork — the subscription/search row's art if it has
+    // one, else the feed's own channel image. Fallback cover for episode rows
+    // and the now-playing panel; always http(s)-gated before it is shown.
+    property string podcastEpisodesArt: ""
     property bool podcastFeedLoading: false
     property string podcastFeedError: ""
     property int _podFeedSeq: 0
@@ -944,6 +948,14 @@ PlasmoidItem {
     // file:// alarm chime playing over a stale _podPlayingKey would stamp
     // and mark the WRONG episode (the key is not cleared on every stop).
     property string _podPlayingUrl: ""
+    // Cover for the episode currently playing — the show art captured when it
+    // started. Non-empty ONLY while a podcast plays (cleared on handoff), so
+    // it never overrides a station's own art. Feeds the now-playing panel.
+    property string _podPlayingArt: ""
+    // The playing episode's show name — shown small above the episode title,
+    // the way every podcast app frames "Show › Episode". Same lifecycle as
+    // _podPlayingArt (set on play, cleared on handoff/stop).
+    property string _podPlayingShow: ""
     // Playback speed for local playback. Remembered per show (feedUrl of the
     // playing episode) over a global default; pitch-corrected where the
     // backend can, so voices don't chipmunk. A radio stream always plays 1x.
@@ -1064,6 +1076,9 @@ PlasmoidItem {
     function podcastSearch(term) {
         var q = (term || "").trim();
         if (q === "") { podcastSearchModel.clear(); podcastSearchBusy = false; return; }
+        // A pasted feed URL is not a directory query — the shows view offers a
+        // direct "open this feed" action for it, so no iTunes round-trip here.
+        if (/^https?:\/\//i.test(q)) { podcastSearchModel.clear(); podcastSearchBusy = false; return; }
         podcastSearchBusy = true;
         var seq = ++_podSearchSeq;
         var xhr = new XMLHttpRequest();
@@ -1099,7 +1114,7 @@ PlasmoidItem {
         xhr.send();
     }
 
-    function loadPodcastFeed(feedUrl, showTitle) {
+    function loadPodcastFeed(feedUrl, showTitle, showArt) {
         if (!PodcastLogic.urlAllowed(feedUrl)) {
             podcastFeedError = i18n("This feed address is not allowed.");
             return;
@@ -1107,6 +1122,9 @@ PlasmoidItem {
         var seq = ++_podFeedSeq;
         podcastEpisodesFor = feedUrl;
         podcastEpisodesTitle = showTitle || "";
+        // The row's own art up front (instant cover); the feed's channel image
+        // fills in below only when the row brought none (a hand-typed URL).
+        podcastEpisodesArt = PodcastLogic.urlAllowed(showArt) ? showArt : "";
         podcastFeedLoading = true;
         podcastFeedError = "";
         podcastEpisodesModel.clear();
@@ -1138,6 +1156,10 @@ PlasmoidItem {
             }
             if (root.podcastEpisodesTitle === "" && feed.title !== "")
                 root.podcastEpisodesTitle = feed.title.substring(0, 200);
+            // A hand-typed feed URL brings no row art — adopt the show's own
+            // channel image so its episodes get a cover too.
+            if (root.podcastEpisodesArt === "" && feed.image !== "")
+                root.podcastEpisodesArt = feed.image;
             for (var i = 0; i < feed.episodes.length; i++)
                 podcastEpisodesModel.append(feed.episodes[i]);
             if (feed.episodes.length === 0)
@@ -1240,6 +1262,8 @@ PlasmoidItem {
         _flushPodPositions();
         _podPlayingKey = "";
         _podPlayingUrl = "";
+        _podPlayingArt = "";
+        _podPlayingShow = "";
         _podPendingSeekUrl = "";
         // A plain My Music track (played through playLocalFile without an
         // episode) belongs to no show — it uses the global default speed.
@@ -1253,6 +1277,11 @@ PlasmoidItem {
         _currentEpisodeFeed = feed;            // ...re-set to this episode's show
         _podPlayingKey = key || "";
         _podPlayingUrl = fileUrl.toString();
+        // Carry the show's cover into the now-playing panel — the downloaded
+        // file has no embedded art, so without this an episode would spin the
+        // generic vinyl. Cleared on handoff so it never leaks onto a station.
+        _podPlayingArt = podcastEpisodesArt;
+        _podPlayingShow = podcastEpisodesTitle;
         // The show's remembered speed (or the global default) takes effect
         // once the media loads — playbackRate resets on every source change.
         podcastRate = PodcastLogic.clampRate(_podSpeedFor(feed));
@@ -4367,6 +4396,8 @@ PlasmoidItem {
         // (an alarm chime, a My Music track) is mistaken for it.
         _podPlayingKey = "";
         _podPlayingUrl = "";
+        _podPlayingArt = "";
+        _podPlayingShow = "";
         infoTimer.stop();
         connectWatchdog.stop();
         // A stop DURING a stall must retire the stall clock too — its
@@ -6102,6 +6133,8 @@ PlasmoidItem {
                     root.markEpisodePlayed(root._podPlayingKey);
                     root._podPlayingKey = "";
                     root._podPlayingUrl = "";
+                    root._podPlayingArt = "";
+                    root._podPlayingShow = "";
                 }
                 playMusic.source = "";
                 root.title = Plasmoid.title;
