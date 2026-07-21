@@ -68,8 +68,10 @@ PlasmaComponents3.ItemDelegate {
         }
         if (durationSec > 0) parts.push(PodcastLogic.fmtTime(durationSec))
         // The download size, but only while it is still a download — once the
-        // file is here the size is spent information.
-        if (!epItem.downloaded && sizeBytes > 0) parts.push(PodcastLogic.fmtSize(sizeBytes))
+        // file is here it SAYS so instead: the play-shaped action button alone
+        // read as "the download option disappeared" to real users.
+        if (epItem.downloaded) parts.push(i18n("Downloaded"))
+        else if (sizeBytes > 0) parts.push(PodcastLogic.fmtSize(sizeBytes))
         if (resumeSec > 0) parts.push(i18n("%1 left", PodcastLogic.fmtTime(Math.max(0,
             (durationSec > 0 ? durationSec : resumeSec) - resumeSec))))
         return parts.join(" · ")
@@ -181,7 +183,17 @@ PlasmaComponents3.ItemDelegate {
                 }
             }
 
-            // Now-playing: bars over the (dimmed) cover.
+            // Now-playing: bars over the cover, on their own dark scrim —
+            // accent-bright bars straight on a light cover (or the light
+            // theme's tile) were nearly invisible.
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.66
+                height: width
+                radius: Kirigami.Units.smallSpacing
+                color: Qt.alpha("black", 0.45)
+                visible: epItem.isThisPlaying
+            }
             EqBars {
                 anchors.centerIn: parent
                 visible: epItem.isThisPlaying
@@ -208,11 +220,11 @@ PlasmaComponents3.ItemDelegate {
                     anchors.centerIn: parent
                     width: parent.width * 0.68
                     height: width
-                    // Symbolic (tints cleanly to white); the downward-arrow
-                    // badge is the established "downloaded / available offline"
-                    // convention, distinct from the played checkmark.
+                    // Symbolic download arrow — the established "available
+                    // offline" mark. Ink follows the accent's own on-color
+                    // (white on emerald was ~1.9:1, unreadable).
                     source: "download"
-                    color: "white"
+                    color: root.accentTextOn
                 }
             }
         }

@@ -100,6 +100,17 @@ TestCase {
             + '</channel></rss>', 10)
         compare(c.image, "")
 
+        // XML-escaped hrefs decode exactly once — &amp; in a legal
+        // attribute must reach the fetcher as a bare &.
+        var e = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<itunes:image href="https://cdn.example.com/a.jpg?x=1&amp;y=2"/>'
+            + '<item><title>E</title>'
+            + '<itunes:image href="https://x.example/ep.jpg?a=1&amp;b=2"/>'
+            + '<enclosure url="https://x.example/a.mp3"/></item>'
+            + '</channel></rss>', 10)
+        compare(e.image, "https://cdn.example.com/a.jpg?x=1&y=2")
+        compare(e.episodes[0].image, "https://x.example/ep.jpg?a=1&b=2")
+
         // The channel image comes from BEFORE the first item — an episode's
         // own itunes:image can never masquerade as the show cover.
         var d = PL.parseFeed('<rss><channel><title>T</title>'

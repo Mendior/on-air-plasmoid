@@ -190,8 +190,10 @@ function parseFeed(xml, maxItems) {
     // <image><url>. This is fallback art for episodes carrying none, and the
     // ONLY art a hand-typed feed URL brings (no iTunes row stands behind it).
     // Gated by the same http(s)-and-not-private rule as every fetched URL.
+    // Entity-decoded like the enclosure URL — a legal XML href carries
+    // &amp; where the fetched address needs a bare &.
     var chImg = /<itunes:image\b[^>]*>/i.exec(head)
-    var showImg = chImg ? _attr(chImg[0], "href").trim() : ""
+    var showImg = chImg ? decodeEntities(_attr(chImg[0], "href")).trim() : ""
     if (showImg === "") {
         var rssImg = /<image\b[^>]*>([\s\S]*?)<\/image>/i.exec(head)
         if (rssImg) showImg = _cleanText(_tagBody(rssImg[1], "url"))
@@ -218,7 +220,7 @@ function parseFeed(xml, maxItems) {
         // so read the attribute off the tag itself), kept only if it passes
         // the same http(s)-and-not-private gate as every other fetched URL.
         var imgTag = /<itunes:image\b[^>]*>/i.exec(item)
-        var img = imgTag ? _attr(imgTag[0], "href").trim() : ""
+        var img = imgTag ? decodeEntities(_attr(imgTag[0], "href")).trim() : ""
         // No i18n here — a .pragma library has no QML context; an
         // untitled episode ships as "" and the delegate names it.
         out.episodes.push({

@@ -49,8 +49,12 @@ PlasmaExtras.Representation {
     readonly property string _bestArtUrl: {
         var broken = _brokenArtUrls
         // A playing podcast episode: its show cover comes first (the file
-        // carries no embedded art). Non-empty only while an episode plays.
-        if (root._podPlayingArt && !broken[root._podPlayingArt]) return root._podPlayingArt
+        // carries no embedded art). Gated on the SOURCE-EXACT _podcastPlaying,
+        // not bare truthiness — an alarm firing over an episode, or a stop
+        // that left the tracking fields to the fade, must show its own art,
+        // never yesterday's show cover.
+        if (_podcastPlaying && root._podPlayingArt && !broken[root._podPlayingArt])
+            return root._podPlayingArt
         if (root.albumArtUrl && !broken[root.albumArtUrl]) return root.albumArtUrl
         if (root.imageurl && !broken[root.imageurl]) return root.imageurl
         if (root.currentStationFavicon) {
@@ -1644,7 +1648,10 @@ PlasmaExtras.Representation {
                         // For a podcast the heading below carries the episode
                         // title, so this line frames it with the SHOW name
                         // ("Show › Episode") instead of repeating the title.
-                        text: fullRepresentation._podcastPlaying && root._podPlayingShow !== ""
+                        // A show with no name shows NOTHING here — falling
+                        // back to currentStation would print the episode
+                        // title twice, stacked.
+                        text: fullRepresentation._podcastPlaying
                               ? root._podPlayingShow : root.currentStation
                         // Untrusted (station/feed-controlled) — never interpret as HTML
                         textFormat: Text.PlainText
@@ -2056,11 +2063,14 @@ PlasmaExtras.Representation {
                         tooltipText: i18n("Go to this show")
                         onClicked: {
                             // Open the Podcasts tab; load the show if it is not
-                            // already the one on screen (title/art fill in from
-                            // the feed). Already open → just switch tabs.
+                            // already the one on screen. The playing episode
+                            // already KNOWS its show name and cover — hand them
+                            // over, so the header doesn't regress to
+                            // placeholders while the feed reloads.
                             if (root._currentEpisodeFeed !== ""
                                 && root.podcastEpisodesFor !== root._currentEpisodeFeed)
-                                root.loadPodcastFeed(root._currentEpisodeFeed, "", "")
+                                root.loadPodcastFeed(root._currentEpisodeFeed,
+                                                     root._podPlayingShow, root._podPlayingArt)
                             root.view = 3
                         }
                     }
@@ -2681,10 +2691,14 @@ PlasmaExtras.Representation {
 
             readonly property bool showingEpisodes: root.podcastEpisodesFor !== ""
             readonly property bool searching: podSearchField.text.trim() !== ""
-            // The query is a feed URL, not directory text: iTunes is skipped
-            // and the shows view offers to open the feed directly — so any
-            // podcast reachable by its RSS address works, not just iTunes hits.
+            // The query is a feed URL, not directory text: the directories are
+            // skipped and the shows view offers to open the feed directly — so
+            // any podcast reachable by its RSS address works, not just
+            // directory hits.
             readonly property bool searchIsUrl: /^https?:\/\//i.test(podSearchField.text.trim())
+            // Charts mode: the shows view lists the worldwide hot list
+            // instead of the subscriptions. Typing a search overrides it.
+            property bool trendingMode: false
             // Episode filter: 0 = all, 1 = unplayed (fresh + in-progress).
             // Applied at feed-load and on an explicit filter change, NOT on
             // every played-mark, so a row never vanishes under a mid-scroll.
@@ -2774,7 +2788,31 @@ PlasmaExtras.Representation {
                     Layout.fillWidth: true
                     autoAccept: true
                     placeholderText: i18n("Search podcasts, or paste a feed URL…")
-                    onTextChanged: podSearchDebounce.restart()
+                    onTextChanged: {
+                        // A new query retires the previous attempt's error —
+                        // it was about an address no longer in the field.
+                        root.podcastFeedError = ""
+                        podSearchDebounce.restart()
+                    }
+                }
+                // Popular now — the worldwide hot list, one tap of discovery
+                // next to the search field. Star a chart row to subscribe.
+                CircleButton {
+                    visible: !podcastPage.showingEpisodes && !podcastPage.searching
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "view-statistics"
+                    iconScale: 0.55
+                    checkable: true
+                    checked: podcastPage.trendingMode
+                    opacity: checked ? 1.0 : 0.7
+                    tooltipText: podcastPage.trendingMode
+                                 ? i18n("Back to my shows")
+                                 : i18n("Popular now — worldwide charts")
+                    onClicked: {
+                        podcastPage.trendingMode = !podcastPage.trendingMode
+                        if (podcastPage.trendingMode) root.podcastLoadTrending(false)
+                    }
                 }
                 // OPML backup / migration — a real podcatcher, not a walled
                 // garden. Shown on the shows view, when not searching.
@@ -2832,8 +2870,12 @@ PlasmaExtras.Representation {
                     onClicked: podcastPage.episodeFilter = podcastPage.episodeFilter === 1 ? 0 : 1
                 }
                 // Mark every listed episode played — "I've caught up".
+                // The header carries five buttons; on a narrow popup this one
+                // steps aside first (its job survives via per-row marks), so
+                // the show title never gets crushed to a few characters.
                 CircleButton {
                     visible: podcastPage.showingEpisodes
+                             && fullRepresentation.width >= Kirigami.Units.gridUnit * 22
                     implicitWidth: Kirigami.Units.gridUnit * 2.4
                     implicitHeight: implicitWidth
                     iconName: "checkmark"
@@ -2865,12 +2907,20 @@ PlasmaExtras.Representation {
                     iconScale: 0.55
                     checkable: true
                     checked: subd
+                    // While the feed still loads the title/art are ""; a star
+                    // tapped in that window would persist a nameless
+                    // subscription. Unsubscribing needs no metadata.
+                    enabledState: subd || !root.podcastFeedLoading
                     tooltipText: subd ? i18n("Unsubscribe from this show")
                                       : i18n("Subscribe to this show")
                     onClicked: {
                         if (subd) root.removePodcastSub(root.podcastEpisodesFor)
-                        else root.addPodcastSub(root.podcastEpisodesTitle, "",
-                                                root.podcastEpisodesArt, root.podcastEpisodesFor)
+                        else root.addPodcastSub(
+                                 // A feed with no channel title still gets a
+                                 // readable row: its address names it.
+                                 root.podcastEpisodesTitle !== ""
+                                 ? root.podcastEpisodesTitle : root.podcastEpisodesFor,
+                                 "", root.podcastEpisodesArt, root.podcastEpisodesFor)
                     }
                 }
                 CircleButton {
@@ -2893,6 +2943,9 @@ PlasmaExtras.Representation {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 Layout.topMargin: Kirigami.Units.smallSpacing
                 visible: !podcastPage.showingEpisodes && podcastPage.searchIsUrl
+                // The label lives inside a custom contentItem — the delegate's
+                // own text stays empty, so the screen reader needs this name.
+                Accessible.name: i18n("Open this feed")
                 contentItem: RowLayout {
                     spacing: Kirigami.Units.smallSpacing
                     Kirigami.Icon {
@@ -2924,8 +2977,12 @@ PlasmaExtras.Representation {
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing * 2
                 Layout.rightMargin: Kirigami.Units.smallSpacing * 2
+                // The error shows WHEREVER it happened — a rejected "Open this
+                // feed" (blocked address) errors on the shows view, and a
+                // silent no would read as a dead button.
                 visible: root.podcastSearchBusy || root.podcastFeedLoading
-                         || (podcastPage.showingEpisodes && root.podcastFeedError !== "")
+                         || root.podcastTrendingBusy
+                         || root.podcastFeedError !== ""
                 spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents3.BusyIndicator {
@@ -2933,11 +2990,13 @@ PlasmaExtras.Representation {
                     Layout.preferredHeight: Kirigami.Units.gridUnit * 1.2
                     running: visible
                     visible: root.podcastSearchBusy || root.podcastFeedLoading
+                             || root.podcastTrendingBusy
                 }
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
                     text: root.podcastFeedLoading ? i18n("Loading episodes…")
                         : root.podcastSearchBusy ? i18n("Searching…")
+                        : root.podcastTrendingBusy ? i18n("Loading the charts…")
                         : root.podcastFeedError
                     color: root.podcastFeedError !== "" && !root.podcastFeedLoading
                            ? "#E0463C" : Kirigami.Theme.textColor
@@ -2958,7 +3017,15 @@ PlasmaExtras.Representation {
                     id: showsView
                     leftMargin: Kirigami.Units.smallSpacing
                     rightMargin: Kirigami.Units.smallSpacing
-                    model: podcastPage.searching ? podcastSearchModel : podcastSubsModel
+                    // A pasted URL shows the subscriptions (the "Open this
+                    // feed" row above is the answer) — never a previous text
+                    // query's leftover directory hits. Otherwise: search
+                    // results while typing, the charts in trending mode, the
+                    // subscriptions at rest.
+                    model: podcastPage.searching && !podcastPage.searchIsUrl
+                           ? podcastSearchModel
+                           : (podcastPage.trendingMode ? podcastTrendingModel
+                                                       : podcastSubsModel)
                     boundsBehavior: Flickable.StopAtBounds
                     clip: true
                     spacing: 2
@@ -3088,6 +3155,7 @@ PlasmaExtras.Representation {
                         anchors.centerIn: parent
                         width: parent.width - Kirigami.Units.largeSpacing * 2
                         visible: showsView.count === 0 && !root.podcastSearchBusy
+                                 && !root.podcastTrendingBusy
                                  && !podcastPage.searchIsUrl
                         spacing: Kirigami.Units.smallSpacing
 
@@ -3104,7 +3172,8 @@ PlasmaExtras.Representation {
                             width: parent.width
                             wrapMode: Text.Wrap
                             text: podcastPage.searching ? i18n("No shows found")
-                                                        : i18n("No subscriptions yet")
+                                : podcastPage.trendingMode ? i18n("The charts did not answer — try again in a moment")
+                                : i18n("No subscriptions yet")
                             font.weight: Font.DemiBold
                             opacity: 0.7
                         }
@@ -3113,7 +3182,7 @@ PlasmaExtras.Representation {
                             horizontalAlignment: Text.AlignHCenter
                             width: parent.width
                             wrapMode: Text.Wrap
-                            visible: !podcastPage.searching
+                            visible: !podcastPage.searching && !podcastPage.trendingMode
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             opacity: 0.55
                             text: i18n("Search for a show above, star it, and its episodes download here for offline listening")
