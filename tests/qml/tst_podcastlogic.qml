@@ -198,6 +198,18 @@ TestCase {
         compare(Object.keys(PL.prunePositions(map, 50)).length, 10)
     }
 
+    function test_prune_survives_a_corrupted_null_entry() {
+        // A hand-edited config can hold {"key": null} — the comparator must
+        // not throw the whole save away over it.
+        var map = { good: { sec: 5, at: 9 } }
+        map.bad = null
+        map.odd = 7            // not an object either
+        for (var i = 0; i < 4; i++) map["k" + i] = { sec: 1, at: i }
+        var out = PL.prunePositions(map, 2)
+        compare(Object.keys(out).length, 2)
+        verify(out.good !== undefined)  // highest at survives
+    }
+
     function test_episode_key_prefers_the_guid() {
         compare(PL.episodeKey("g1", "u1"), "g1")
         compare(PL.episodeKey("", "u1"), "u1")

@@ -291,7 +291,12 @@ function shQuote(s) {
 function prunePositions(map, cap) {
     var keys = Object.keys(map || {})
     if (keys.length <= cap) return map || {}
-    keys.sort(function(a, b) { return (map[b].at || 0) - (map[a].at || 0) })
+    // Null-tolerant reads: the map comes from a persisted config a hand
+    // edit can corrupt, and one {"key": null} entry must not throw the
+    // whole save away.
+    keys.sort(function(a, b) {
+        return (((map[b] || {}).at || 0)) - (((map[a] || {}).at || 0))
+    })
     var out = {}
     for (var i = 0; i < cap; i++) out[keys[i]] = map[keys[i]]
     return out

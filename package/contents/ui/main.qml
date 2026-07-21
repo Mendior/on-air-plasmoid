@@ -1009,6 +1009,11 @@ PlasmoidItem {
 
     function addPodcastSub(title, author, art, feedUrl) {
         if (!PodcastLogic.urlAllowed(feedUrl) || isPodcastSubscribed(feedUrl)) return false;
+        // The cap the loader enforces, enforced at the door too: an OPML
+        // with a thousand feeds used to bloat the config past what the next
+        // start would silently drop at 100 — everything past the cap looked
+        // imported and then vanished on restart.
+        if (podcastSubsModel.count >= 100) return false;
         podcastSubsModel.append({
             "title": String(title || "").substring(0, 200),
             "author": String(author || "").substring(0, 200),
@@ -5358,6 +5363,11 @@ PlasmoidItem {
 
     Component.onDestruction: {
         _flushHistory();
+        // The podcast position rides a 5 s stamp and a 3 s persist debounce —
+        // a teardown mid-episode used to eat up to eight seconds of "where
+        // was I". Stamp and write now, same one-last-word the history gets.
+        if (_podPlayingKey !== "") _stampPodPosition();
+        _savePodPositions();
         recStop();
         _mprisStop();
         // The keep-awake holder is a DETACHED process group (setsid) that

@@ -113,6 +113,27 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       [ -e "$po" ] || continue
       msgfmt --check -o /dev/null "$po" || { echo "lint FAILED: $po"; exit 1; }
     done
+    # Catalog FRESHNESS: the committed template.pot must carry every i18n()
+    # string the QML actually uses. A feature commit that skips `dev.sh i18n`
+    # ships its new strings English-only in all eleven languages — it
+    # happened, nothing caught it, so now this does. Same extraction as the
+    # i18n task, msgids compared as sets (references/line numbers move
+    # freely and must not fail the gate).
+    if command -v xgettext >/dev/null 2>&1; then
+      potfresh="$(mktemp)"; potlist="$(mktemp)"
+      ( cd "$REPO_DIR" && find "package/contents" -name '*.qml' | sort > "$potlist" \
+        && xgettext --from-code=UTF-8 -C -kde -ci18n -ki18n:1 -ki18nc:1c,2 -ki18np:1,2 -ki18ncp:1c,2,3 \
+          --no-wrap -o "$potfresh" --files-from="$potlist" 2>/dev/null )
+      fresh_ids="$(msgattrib --no-wrap --no-obsolete "$potfresh" 2>/dev/null | grep '^msgid ' | sort -u)"
+      have_ids="$(msgattrib --no-wrap --no-obsolete "$REPO_DIR/po/template.pot" 2>/dev/null | grep '^msgid ' | sort -u)"
+      missing="$(comm -23 <(printf '%s\n' "$fresh_ids") <(printf '%s\n' "$have_ids"))"
+      rm -f "$potfresh" "$potlist"
+      if [ -n "$missing" ]; then
+        echo "lint FAILED: template.pot is stale — run scripts/dev.sh i18n. Missing:"
+        printf '%s\n' "$missing" | head -10
+        exit 1
+      fi
+    fi
     # Static rules distilled from shipped regressions — qmllint and the
     # runtime smoke are both blind to these classes.
     #
