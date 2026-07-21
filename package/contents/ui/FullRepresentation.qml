@@ -4588,21 +4588,43 @@ PlasmaExtras.Representation {
                             Layout.rightMargin: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
 
+                            // ONE knob per room: whenever playback hangs off
+                            // the default sink (sync on, or follow-default
+                            // routing) this row IS the system volume — the
+                            // same one the keyboard's volume keys turn, so
+                            // the knob and the slider finally mirror each
+                            // other. Pinned-device routing keeps the old
+                            // stream-volume semantics, where the system
+                            // default is somebody else's business.
+                            readonly property bool roomMode:
+                                root.sync._combineWantActive || root.sync._combineActive
+                                || (Plasmoid.configuration.audioOutputDevice || "") === ""
+                            readonly property real shownVol:
+                                roomMode && root._sinkMasterPct >= 0
+                                ? Math.min(1, root._sinkMasterPct / 100.0)
+                                : playMusicOutput.volume
+                            readonly property bool shownMuted:
+                                roomMode ? (root._sinkMasterMuted || shownVol <= 0)
+                                         : playMusicOutput.volume <= 0
+
                             CircleButton {
                                 implicitWidth: Kirigami.Units.gridUnit * 2
                                 implicitHeight: implicitWidth
                                 iconName: {
-                                    if (playMusicOutput.volume <= 0) return "audio-volume-muted"
-                                    if (playMusicOutput.volume <= 0.33) return "audio-volume-low"
-                                    if (playMusicOutput.volume <= 0.66) return "audio-volume-medium"
+                                    if (parent.shownMuted) return "audio-volume-muted"
+                                    if (parent.shownVol <= 0.33) return "audio-volume-low"
+                                    if (parent.shownVol <= 0.66) return "audio-volume-medium"
                                     return "audio-volume-high"
                                 }
                                 iconScale: 0.5
-                                tooltipText: playMusicOutput.volume > 0 ? i18n("Mute") : i18n("Unmute")
+                                tooltipText: parent.shownMuted ? i18n("Unmute") : i18n("Mute")
                                 // Absolute gesture (mute/unmute names its level)
                                 // — no step flag, so the auto-care park folds it
                                 // as spoken rather than as a delta.
-                                onClicked: root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+                                onClicked: {
+                                    if (parent.roomMode) root.toggleSinkMasterMute()
+                                    else root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+                                }
                             }
                             PlasmaComponents3.Slider {
                                 id: masterVolumeSlider
@@ -4610,12 +4632,15 @@ PlasmaExtras.Representation {
                                 from: 0
                                 to: 1
                                 stepSize: 0.05
-                                value: playMusicOutput.volume
-                                onMoved: root.setUserVolume(value)
+                                value: parent.shownVol
+                                onMoved: {
+                                    if (parent.roomMode) root.setSinkMaster(value * 100)
+                                    else root.setUserVolume(value)
+                                }
                                 Accessible.name: i18n("Volume")
                             }
                             PlasmaComponents3.Label {
-                                text: Math.round(playMusicOutput.volume * 100) + "%"
+                                text: Math.round(parent.shownVol * 100) + "%"
                                 opacity: 0.7
                                 Layout.minimumWidth: Kirigami.Units.gridUnit * 2
                                 horizontalAlignment: Text.AlignRight

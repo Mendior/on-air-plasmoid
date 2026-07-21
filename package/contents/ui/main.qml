@@ -876,6 +876,42 @@ PlasmoidItem {
         }
     }
 
+    // ── The room's ONE volume ────────────────────────────────────────────
+    // The hub's master slider and the keyboard's volume knob must be the
+    // same knob when the room hangs off the default sink (sync on, or
+    // follow-default routing): the knob moves @DEFAULT_SINK@, so the
+    // slider reads and writes @DEFAULT_SINK@ — polled while the popup is
+    // open, mirrored the moment either side moves. -1 = not known yet.
+    property int _sinkMasterPct: -1
+    property bool _sinkMasterMuted: false
+
+    Timer {
+        id: sinkMasterPoll
+        interval: 2000
+        repeat: true
+        running: root.expanded
+        triggeredOnStart: true
+        onTriggered: executable.exec(": SINKVOL;"
+            + " v=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
+            + " m=$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | grep -o 'yes\\|no');"
+            + " echo \"SINKVOL ${v:--1} ${m:-no}\"; true # " + (++_execSeq))
+    }
+
+    function setSinkMaster(pct) {
+        var p = Math.max(0, Math.min(100, Math.round(pct)));
+        _sinkMasterPct = p;                       // optimistic — the poll confirms
+        executable.exec(": SINKSET; pactl set-sink-volume @DEFAULT_SINK@ " + p + "% 2>/dev/null;"
+            + (p > 0 ? " pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null;" : "")
+            + " true # " + (++_execSeq));
+        if (p > 0) _sinkMasterMuted = false;
+    }
+
+    function toggleSinkMasterMute() {
+        _sinkMasterMuted = !_sinkMasterMuted;
+        executable.exec(": SINKSET; pactl set-sink-mute @DEFAULT_SINK@ "
+            + (_sinkMasterMuted ? "1" : "0") + " 2>/dev/null; true # " + (++_execSeq));
+    }
+
     onExpandedChanged: {
         if (!root.expanded) {
             _flushHistory();
@@ -6344,6 +6380,18 @@ PlasmoidItem {
             }
             if (cmd.indexOf(": BT_SOLOKICK;") === 0) {
                 btList();
+                return;
+            }
+            if (cmd.indexOf(": SINKSET;") === 0) {
+                return; // fire-and-forget — the poll reads the result back
+            }
+            if (cmd.indexOf(": SINKVOL;") === 0) {
+                var svM = (stdout || "").match(/SINKVOL (-?\d+) (yes|no)/);
+                if (svM) {
+                    var sv = parseInt(svM[1], 10);
+                    if (sv >= 0 && sv <= 200) root._sinkMasterPct = sv;
+                    root._sinkMasterMuted = svM[2] === "yes";
+                }
                 return;
             }
             if (cmd.indexOf(": BT_FORGET;") === 0) {
