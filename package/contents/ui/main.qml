@@ -1375,11 +1375,12 @@ PlasmoidItem {
         xhr.send();
     }
 
-    function loadPodcastFeed(feedUrl, showTitle, showArt) {
+    function loadPodcastFeed(feedUrl, showTitle, showArt, noRescue) {
         if (!PodcastLogic.urlAllowed(feedUrl)) {
             podcastFeedError = i18n("This feed address is not allowed.");
             return;
         }
+        _podFeedNoRescue = noRescue === true;
         var seq = ++_podFeedSeq;
         podcastEpisodesFor = feedUrl;
         podcastEpisodesTitle = showTitle || "";
@@ -1393,13 +1394,18 @@ PlasmoidItem {
         var xhr = new XMLHttpRequest();
         var guard = null;
         var aborted = false;
+        var partial = "";
         xhr.onreadystatechange = function() {
             // 4 MB cap: a mega-feed must not balloon plasmashell. Abort is
             // DEFERRED — aborting inside the handler re-enters the dying
             // reply and has crashed the shell before (the probe lesson).
+            // The body is SAVED first: abort clears responseText, and a
+            // 7 MB libsyn feed (measured live, perfectly valid RSS) used to
+            // parse as emptiness and earn a false 'not a podcast feed'.
             if (xhr.readyState === XMLHttpRequest.LOADING) {
                 if (!aborted && (xhr.responseText || "").length > 4 * 1024 * 1024) {
                     aborted = true;
+                    partial = xhr.responseText;
                     Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
                 }
                 return;
@@ -1409,8 +1415,18 @@ PlasmoidItem {
             if (seq !== root._podFeedSeq) return;
             root.podcastFeedLoading = false;
             // A capped body still parses — RSS carries the newest items first.
-            var feed = PodcastLogic.parseFeed(xhr.responseText || "", 50);
+            var feed = PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50);
             if (!feed.ok) {
+                // Directory rot is ordinary: fyyd and gpodder carry
+                // addresses their crawlers last saw months ago. Before the
+                // honest error, one rescue — the same cure the stations
+                // have: ask iTunes for the show BY TITLE and follow where
+                // it lives today. A subscribed show heals PERMANENTLY.
+                if (!root._podFeedNoRescue && (showTitle || "") !== "") {
+                    root._podFeedRescue(seq, feedUrl, showTitle, showArt || "",
+                                        xhr.status);
+                    return;
+                }
                 root.podcastFeedError = xhr.status >= 400
                     ? i18n("The feed did not answer (error %1).", xhr.status)
                     : i18n("This address is not a podcast feed.");
@@ -1430,6 +1446,62 @@ PlasmoidItem {
         xhr.open("GET", feedUrl);
         xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
         guard = _armXhrTimeout(xhr, 15000);
+        xhr.send();
+    }
+
+    property bool _podFeedNoRescue: false
+
+    function _podFeedRescue(seq, deadFeed, showTitle, showArt, deadStatus) {
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            if (guard) guard.stop();
+            if (seq !== root._podFeedSeq) return;
+            var fresh = "";
+            try {
+                var res = JSON.parse(xhr.responseText || "{}").results || [];
+                var want = String(showTitle).replace(/\s+/g, " ").trim().toLowerCase();
+                var deadKey = PodcastLogic.feedKey(deadFeed);
+                for (var i = 0; i < res.length; i++) {
+                    var r = res[i] || {};
+                    var cand = String(r.feedUrl || "").trim();
+                    if (!PodcastLogic.urlAllowed(cand)) continue;
+                    if (PodcastLogic.feedKey(cand) === deadKey) continue;
+                    var rn = String(r.collectionName || "").replace(/\s+/g, " ").trim().toLowerCase();
+                    if (rn !== want) continue;      // identity, not resemblance
+                    fresh = cand;
+                    break;
+                }
+            } catch (e) {}
+            if (fresh === "") {
+                root.podcastFeedLoading = false;
+                root.podcastFeedError = deadStatus >= 400
+                    ? i18n("The feed did not answer (error %1).", deadStatus)
+                    : i18n("This address is not a podcast feed.");
+                return;
+            }
+            console.log("[ARP] podcast feed heal: " + deadFeed + " -> " + fresh);
+            // A subscribed show follows its feed for good — the seen map
+            // and the per-show speed move with it, so nothing re-announces
+            // and the remembered pace survives the move.
+            for (var si = 0; si < podcastSubsModel.count; si++) {
+                if (podcastSubsModel.get(si).feedUrl !== deadFeed) continue;
+                podcastSubsModel.setProperty(si, "feedUrl", fresh);
+                _savePodcastSubs();
+                if (_podSeen[deadFeed] !== undefined) {
+                    _podSeen[fresh] = _podSeen[deadFeed];
+                    delete _podSeen[deadFeed];
+                    _savePodSeen();
+                }
+                break;
+            }
+            loadPodcastFeed(fresh, showTitle, showArt, true);
+        };
+        xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
+                        + encodeURIComponent(showTitle));
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
+        guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
 
@@ -1668,11 +1740,13 @@ PlasmoidItem {
         var xhr = new XMLHttpRequest();
         var guard = null;
         var aborted = false;
+        var partial = "";
         var done = false;
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.LOADING) {
                 if (!aborted && (xhr.responseText || "").length > 4 * 1024 * 1024) {
                     aborted = true;
+                    partial = xhr.responseText;
                     Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
                 }
                 return;
@@ -1680,7 +1754,7 @@ PlasmoidItem {
             if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
             done = true;
             if (guard) guard.stop();
-            cb(PodcastLogic.parseFeed(xhr.responseText || "", 50));
+            cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
         xhr.setRequestHeader("User-Agent", "OnAir/2026.21");
