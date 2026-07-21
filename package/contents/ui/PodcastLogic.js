@@ -492,3 +492,48 @@ function feedKey(url) {
     var path = (m[2] || "").replace(/\/+$/, "")
     return host + path
 }
+
+// ffprobe -show_chapters json → [[startSec, title], …]. Untrusted process
+// output: bad json yields [], titles are stripped to one plain line and
+// capped, times must be finite and ascending-ish (duplicates dropped).
+function parseChapters(text, cap) {
+    var lim = cap > 0 ? cap : 100
+    var out = []
+    var seen = {}
+    try {
+        var arr = (JSON.parse(String(text || "")) || {}).chapters || []
+        for (var i = 0; i < arr.length && out.length < lim; i++) {
+            var c = arr[i] || {}
+            var t = parseFloat(c.start_time)
+            if (!isFinite(t) || t < 0) continue
+            var sec = Math.floor(t)
+            if (seen[sec]) continue
+            seen[sec] = true
+            var title = String((c.tags || {}).title || "")
+                .replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().substring(0, 80)
+            out.push([sec, title])
+        }
+    } catch (e) {
+        return []
+    }
+    out.sort(function(a, b) { return a[0] - b[0] })
+    return out
+}
+
+// The Up-next queue's pure halves: find by key, add-with-cap (a full queue
+// sheds its OLDEST pick — the listener's newest word wins).
+function upNextIndex(list, key) {
+    var a = list || []
+    for (var i = 0; i < a.length; i++)
+        if (a[i] && a[i].key === key) return i
+    return -1
+}
+
+function upNextAdd(list, entry, cap) {
+    var a = (list || []).slice()
+    var lim = cap > 0 ? cap : 50
+    if (!entry || !entry.key || upNextIndex(a, entry.key) >= 0) return a
+    a.push(entry)
+    while (a.length > lim) a.shift()
+    return a
+}

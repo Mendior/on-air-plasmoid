@@ -1602,6 +1602,8 @@ PlasmoidItem {
     property var _podScanQueue: []
     // The playing file's silence map, cached for the skip timer.
     property var _podSilCur: []
+    // The playing file's chapters ([[sec, title], …]) for the seek menu.
+    property var _podChaptersCur: []
 
     function _loadPodSeen() {
         try {
@@ -1762,6 +1764,78 @@ PlasmoidItem {
         xhr.send();
     }
 
+    // ── Up next — the listener's own cross-show queue ────────────────────
+    // Explicit picks beat every automatic road. Entries carry the whole
+    // identity (key, title, show, art, feed, enclosure url), so the head
+    // plays from disk when the file exists and STREAMS when it does not.
+    property var _podUpNext: []
+    property int _podUpNextRev: 0
+
+    function _loadPodUpNext() {
+        try {
+            var a = JSON.parse(Plasmoid.configuration.podcastUpNext || "[]");
+            _podUpNext = Array.isArray(a) ? a.slice(0, 50) : [];
+        } catch (e) {
+            _podUpNext = [];
+        }
+        _podUpNextRev++;
+    }
+
+    function _savePodUpNext() {
+        Plasmoid.configuration.podcastUpNext = JSON.stringify(_podUpNext);
+        _podUpNextRev++;
+    }
+
+    function podcastQueueHas(key) {
+        void _podUpNextRev;
+        return PodcastLogic.upNextIndex(_podUpNext, key) >= 0;
+    }
+
+    // One tap queues, the second unqueues — entries are gated the same as
+    // every other feed-fed row before they persist.
+    function podcastQueueToggle(entry) {
+        if (!entry || !entry.key) return;
+        var idx = PodcastLogic.upNextIndex(_podUpNext, entry.key);
+        if (idx >= 0) {
+            _podUpNext.splice(idx, 1);
+        } else {
+            if (!PodcastLogic.urlAllowed(entry.url)) return;
+            _podUpNext = PodcastLogic.upNextAdd(_podUpNext, {
+                "key": String(entry.key),
+                "title": String(entry.title || "").substring(0, 200),
+                "show": String(entry.show || "").substring(0, 200),
+                "art": PodcastLogic.urlAllowed(entry.art)
+                       ? String(entry.art).substring(0, 2048) : "",
+                "feed": String(entry.feed || "").substring(0, 2048),
+                "url": String(entry.url).substring(0, 2048),
+                "fileTitle": String(entry.fileTitle || entry.title || "").substring(0, 200)
+            }, 50);
+        }
+        _savePodUpNext();
+    }
+
+    // Pop and play the head. Disk first — the download may have landed
+    // after the queueing; the stream road is the fallback, not the habit.
+    function _podPlayUpNextHead() {
+        while (_podUpNext.length > 0) {
+            var e = _podUpNext.shift();
+            _savePodUpNext();
+            if (!e || !e.key) continue;
+            var fname = podcastFileName(e.fileTitle || e.title || "", e.url || "");
+            var onDisk = _podDownloads[fname] !== undefined;
+            var src = onDisk ? _podFileUrl(fname) : String(e.url || "");
+            if (!onDisk && !PodcastLogic.urlAllowed(src)) continue;
+            (function(pe, psrc) {
+                Qt.callLater(function() {
+                    root.playPodcastEpisode(psrc, pe.title || "", pe.key,
+                                            pe.show || "", pe.art || "", pe.feed || "");
+                });
+            })(e, src);
+            return true;
+        }
+        return false;
+    }
+
     // A file URL the QUrl parser cannot mangle: '#' would become a
     // fragment and '?' a query — "Episode #42.mp3" opened a truncated
     // path on the raw-string road while the FolderListModel road (percent-
@@ -1789,7 +1863,11 @@ PlasmoidItem {
         executable.exec(": POD_SCAN; command -v ffmpeg >/dev/null 2>&1 && "
             + "timeout 180 ffmpeg -hide_banner -nostats -i " + full
             + " -af silencedetect=noise=-35dB:d=0.9 -f null - 2>&1"
-            + " | grep -E 'silence_(start|end)' | head -600; true # " + nextSeq());
+            + " | grep -E 'silence_(start|end)' | head -600;"
+            + " echo __CHAPTERS__;"
+            + " command -v ffprobe >/dev/null 2>&1 && "
+            + "timeout 60 ffprobe -v quiet -print_format json -show_chapters " + full
+            + " 2>/dev/null | head -c 200000; true # " + nextSeq());
     }
 
     // Skip-silence: while a podcast plays and the map knows a stretch of
@@ -1891,10 +1969,14 @@ PlasmoidItem {
         _currentEpisodeFeed = feed;            // ...re-set to this episode's show
         _podPlayingKey = key || "";
         _podPlayingUrl = fileUrl.toString();
-        // The skip timer reads this file's silence map from here on.
+        // The skip timer reads this file's silence map from here on; the
+        // chapter menu reads its chapters the same way. A STREAMED episode
+        // has no file row — both stay empty, honestly.
         var silF = _podFileOfUrl(_podPlayingUrl);
         _podSilCur = (silF !== "" && _podDownloads[silF] && _podDownloads[silF].sil)
                      ? _podDownloads[silF].sil : [];
+        _podChaptersCur = (silF !== "" && _podDownloads[silF] && _podDownloads[silF].ch)
+                          ? _podDownloads[silF].ch : [];
         // Carry the show's cover into the now-playing panel — the downloaded
         // file has no embedded art, so without this an episode would spin the
         // generic vinyl. Cleared on handoff so it never leaks onto a station.
@@ -5944,6 +6026,7 @@ PlasmoidItem {
         _loadPodPositions();
         _loadPodDownloads();
         _loadPodSeen();
+        _loadPodUpNext();
         _loadPodSpeeds();
         _loadPodPlayed();
         _applyAudioOutputDevice();
@@ -6131,13 +6214,19 @@ PlasmoidItem {
                 var sf = root._podScanFile;
                 root._podScanFile = "";
                 if (sf !== "" && root._podDownloads[sf] !== undefined) {
-                    var sil = PodcastLogic.parseSilences(stdout || "", 0.9);
-                    if (sil.length > 0) {
-                        root._podDownloads[sf].sil = sil;
+                    var scanParts = (stdout || "").split("__CHAPTERS__");
+                    var sil = PodcastLogic.parseSilences(scanParts[0] || "", 0.9);
+                    var chs = PodcastLogic.parseChapters(scanParts[1] || "", 100);
+                    var dirty = false;
+                    if (sil.length > 0) { root._podDownloads[sf].sil = sil; dirty = true; }
+                    if (chs.length > 0) { root._podDownloads[sf].ch = chs; dirty = true; }
+                    if (dirty) {
                         root._savePodDownloads();
                         if (root._podPlayingUrl !== ""
-                            && root._podFileOfUrl(root._podPlayingUrl) === sf)
-                            root._podSilCur = sil;
+                            && root._podFileOfUrl(root._podPlayingUrl) === sf) {
+                            if (sil.length > 0) root._podSilCur = sil;
+                            if (chs.length > 0) root._podChaptersCur = chs;
+                        }
                     }
                 }
                 if (root._podScanQueue.length > 0)
@@ -7008,15 +7097,21 @@ PlasmoidItem {
                 // outage, not a finished track: send it down the heal road
                 // like any other death. A local file legitimately ends.
                 var endedSrc = playMusic.source.toString();
-                var wasStream = endedSrc !== "" && endedSrc.indexOf("file://") !== 0
+                // The PODCAST identity wins over the scheme: a streamed
+                // episode (played straight off its enclosure URL, no
+                // download) ends over http, and the old file-only guard sent
+                // it down the STATION-heal road instead of marking it heard.
+                var wasPodcast = root._podPlayingKey !== ""
+                                 && endedSrc === root._podPlayingUrl;
+                var wasStream = !wasPodcast && endedSrc !== ""
+                                && endedSrc.indexOf("file://") !== 0
                                 && endedSrc !== root._alarmToneUrl.toString();
                 // A finished podcast episode is DONE: remember it as played
                 // (which also retires its bookmark), so the row reads "heard"
                 // and the unplayed filter hides it. Guarded on the exact
-                // tracked source, so only the real episode file counts — a
-                // radio outage, the alarm tone or any other file never does.
-                if (!wasStream && root._podPlayingKey !== ""
-                    && endedSrc === root._podPlayingUrl) {
+                // tracked source, so only the real episode counts — a radio
+                // outage, the alarm tone or any other source never does.
+                if (wasPodcast) {
                     var endedKey = root._podPlayingKey;
                     var endedFeed = root._currentEpisodeFeed;
                     root.markEpisodePlayed(endedKey);
@@ -7025,10 +7120,14 @@ PlasmoidItem {
                     root._podPlayingArt = "";
                     root._podPlayingShow = "";
                     root._podSilCur = [];
-                    // Continuous listening: the show goes on by itself —
-                    // oldest unplayed DOWNLOAD of the same show next, so a
-                    // serial plays forward and a one-file show simply ends.
-                    if (Plasmoid.configuration.podcastContinuous !== false
+                    root._podChaptersCur = [];
+                    // What plays next, in order of the listener's own word:
+                    // the Up-next queue first (their explicit picks, across
+                    // shows), then continuous listening — oldest unheard
+                    // DOWNLOAD of the same show, so a serial plays forward
+                    // and a one-file show simply ends.
+                    if (!root._podPlayUpNextHead()
+                        && Plasmoid.configuration.podcastContinuous !== false
                         && endedFeed) {
                         var nextFile = PodcastLogic.nextUnplayed(
                             root._podDownloads, endedFeed, root._podPlayed, endedKey);

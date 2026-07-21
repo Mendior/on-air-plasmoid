@@ -185,6 +185,10 @@
             <label>Newest episode key seen per feed (JSON map) — what the refresh compares against</label>
             <default>{}</default>
         </entry>
+        <entry name="podcastUpNext" type="String">
+            <label>The listener's cross-show Up-next queue (JSON array of episode identities)</label>
+            <default>[]</default>
+        </entry>
         <entry name="podcastLastRefresh" type="String">
             <label>When the last subscription refresh ran (epoch ms as a string)</label>
             <default>0</default>

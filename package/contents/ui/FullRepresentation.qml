@@ -1882,6 +1882,30 @@ PlasmaExtras.Representation {
                         onClicked: root.podcastSkip(30)
                     }
 
+                    // Chapters — the episode's own table of contents, read
+                    // from the file at download time. A compact menu: pick a
+                    // chapter, the needle jumps there.
+                    PlasmaComponents3.ComboBox {
+                        visible: root._podPlayingKey !== "" && root._podChaptersCur.length > 0
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.maximumWidth: Kirigami.Units.gridUnit * 11
+                        displayText: i18n("Chapters")
+                        Accessible.name: i18n("Chapters")
+                        model: {
+                            var rows = []
+                            for (var i = 0; i < root._podChaptersCur.length; i++) {
+                                var c = root._podChaptersCur[i]
+                                rows.push(PodcastLogic.fmtTime(c[0])
+                                          + (c[1] !== "" ? "  " + c[1] : ""))
+                            }
+                            return rows
+                        }
+                        onActivated: (idx) => {
+                            var c = root._podChaptersCur[idx]
+                            if (c) playMusic.position = c[0] * 1000
+                        }
+                    }
+
                     // Skip-silence toggle: dead air under the needle is
                     // jumped, not sat through. Precomputed per file at
                     // download time (ffmpeg), applied by seeking — no
@@ -2892,6 +2916,27 @@ PlasmaExtras.Representation {
                         if (podcastPage.trendingMode) root.podcastLoadTrending(false)
                     }
                 }
+                // Up next — the queue's heartbeat: how many picks wait,
+                // who is next, and one tap starts the head right now.
+                CircleButton {
+                    visible: !podcastPage.showingEpisodes && !podcastPage.searching
+                             && root._podUpNext.length > 0
+                    implicitWidth: Kirigami.Units.gridUnit * 2.4
+                    implicitHeight: implicitWidth
+                    iconName: "media-playlist-play"
+                    iconScale: 0.55
+                    opacity: 0.85
+                    tooltipText: {
+                        void root._podUpNextRev
+                        var names = []
+                        for (var i = 0; i < Math.min(3, root._podUpNext.length); i++)
+                            names.push(root._podUpNext[i].title || "")
+                        return i18n("Up next (%1) — tap to play: %2",
+                                    root._podUpNext.length, names.join(" · "))
+                    }
+                    onClicked: root._podPlayUpNextHead()
+                }
+
                 // Downloaded — every episode file on disk, across all shows.
                 CircleButton {
                     visible: !podcastPage.showingEpisodes && !podcastPage.searching

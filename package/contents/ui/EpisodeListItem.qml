@@ -88,11 +88,16 @@ PlasmaComponents3.ItemDelegate {
     Accessible.name: shownTitle
     Accessible.role: Accessible.Button
 
+    // The row plays. Downloaded plays the file; not-downloaded STREAMS the
+    // enclosure right now — 'listen' must never cost a wait it does not
+    // have to. The ⬇ button remains the explicit take-it-offline word.
     function primaryAction() {
         if (epItem.downloaded)
             root.playPodcastEpisode(epItem.localUrl, epItem.shownTitle, epItem.epKey)
-        else if (!epItem.isDownloading)
-            root.downloadEpisode(epItem.shownTitle, epItem.url, epItem.guid)
+        else
+            root.playPodcastEpisode(epItem.url, epItem.shownTitle, epItem.epKey,
+                                    root.podcastEpisodesTitle, root.podcastEpisodesArt,
+                                    root.podcastEpisodesFor)
     }
 
     Keys.onPressed: (event) => {
@@ -279,6 +284,33 @@ PlasmaComponents3.ItemDelegate {
         }
 
         // Mark heard / unheard — a hover toggle so catching up needs no menu.
+        // Up next: the listener's own cross-show queue. One tap in, the
+        // second out; the tick lights while the episode waits its turn.
+        CircleButton {
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+            Layout.alignment: Qt.AlignVCenter
+            readonly property bool queued: {
+                void root._podUpNextRev
+                return root.podcastQueueHas(epItem.epKey)
+            }
+            iconName: "media-playlist-append"
+            iconScale: 0.5
+            checked: queued
+            opacity: (queued || epItem.hovered || epItem.activeFocus
+                      || Kirigami.Settings.tabletMode) ? (queued ? 0.95 : 0.7) : 0.0
+            enabledState: opacity > 0
+            visible: !epItem.isDownloading && !epItem.isThisPlaying
+            tooltipText: queued ? i18n("Remove from Up next")
+                                : i18n("Play next (add to the queue)")
+            onClicked: root.podcastQueueToggle({
+                "key": epItem.epKey, "title": epItem.shownTitle,
+                "show": root.podcastEpisodesTitle, "art": root.podcastEpisodesArt,
+                "feed": root.podcastEpisodesFor, "url": epItem.url,
+                "fileTitle": epItem.shownTitle
+            })
+        }
+
         CircleButton {
             Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
             Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8

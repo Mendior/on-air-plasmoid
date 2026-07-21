@@ -280,6 +280,37 @@ TestCase {
         compare(PL.feedKey("not a url"), "not a url")
     }
 
+    function test_chapters_parse_the_probe_and_refuse_garbage() {
+        var probe = JSON.stringify({ chapters: [
+            { start_time: "0.000000", end_time: "10", tags: { title: "Intro" } },
+            { start_time: "125.5", tags: { title: "  Teema\n  kaks\t " } },
+            { start_time: "125.9", tags: { title: "duplikaat-sekund" } },
+            { start_time: "-5", tags: { title: "negatiivne" } },
+            { start_time: "abc", tags: { title: "praak" } }
+        ]})
+        var ch = PL.parseChapters(probe, 100)
+        compare(ch.length, 2)
+        compare(ch[0][0], 0); compare(ch[0][1], "Intro")
+        compare(ch[1][0], 125); compare(ch[1][1], "Teema kaks")
+        compare(PL.parseChapters("<html>ei ole json</html>", 100).length, 0)
+        compare(PL.parseChapters("", 100).length, 0)
+    }
+
+    function test_up_next_keeps_the_newest_word() {
+        var q = []
+        q = PL.upNextAdd(q, { key: "a", title: "A" }, 3)
+        q = PL.upNextAdd(q, { key: "b" }, 3)
+        q = PL.upNextAdd(q, { key: "a" }, 3)          // dupe: no-op
+        compare(q.length, 2)
+        q = PL.upNextAdd(q, { key: "c" }, 3)
+        q = PL.upNextAdd(q, { key: "d" }, 3)          // cap: oldest sheds
+        compare(q.length, 3)
+        compare(q[0].key, "b")
+        compare(PL.upNextIndex(q, "d"), 2)
+        compare(PL.upNextIndex(q, "a"), -1)
+        compare(PL.upNextIndex(null, "x"), -1)
+    }
+
     function test_prune_survives_a_corrupted_null_entry() {
         // A hand-edited config can hold {"key": null} — the comparator must
         // not throw the whole save away over it.
