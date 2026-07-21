@@ -52,8 +52,10 @@ PlasmaComponents3.ItemDelegate {
 
     readonly property string epKey: PodcastLogic.episodeKey(guid, url)
     readonly property bool downloaded: localUrl !== ""
-    readonly property bool isThisPlaying: downloaded && isPlaying()
-                                          && playMusic.source.toString() === localUrl
+        readonly property bool isThisPlaying: (root._podPlayingRawUrl !== ""
+                                           && (root._podPlayingRawUrl === epItem.localUrl
+                                               || root._podPlayingRawUrl === epItem.url))
+                                          && (isPlaying() || root._casting)
     readonly property bool isDownloading: root._podDownloadKey === epItem.epKey
     // The maps are mutated in place; the rev ticks are their change signals.
     readonly property int resumeSec: { root._podPosRev; return root.podcastPositionSec(epKey) }
@@ -372,7 +374,16 @@ PlasmaComponents3.ItemDelegate {
                            : i18n("Play episode")
                 return i18n("Download episode for offline listening")
             }
-            onClicked: epItem.primaryAction()
+            onClicked: {
+                // Three honest roles: stop what plays, play the file, or
+                // TAKE IT OFFLINE — the row tap is the listen-now word
+                // (streaming when no file), this button is the download.
+                if (epItem.isThisPlaying) root.stopWithFade()
+                else if (epItem.downloaded)
+                    root.playPodcastEpisode(epItem.localUrl, epItem.shownTitle, epItem.epKey)
+                else
+                    root.downloadEpisode(epItem.shownTitle, epItem.url, epItem.guid)
+            }
         }
 
         // Tapping the main row plays/downloads; the details area below has

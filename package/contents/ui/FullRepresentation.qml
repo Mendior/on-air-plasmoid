@@ -86,6 +86,8 @@ PlasmaExtras.Representation {
     // A local track is playback too, but it is not an "eter": no LIVE pill,
     // no "Connecting…" — it plays from disk or it does not play at all.
     readonly property bool _localPlayback: playMusic.source.toString().indexOf("file://") === 0
+                                           || (root._podPlayingKey !== ""
+                                               && playMusic.source.toString() === root._podPlayingUrl)
     // A podcast episode is playing (as opposed to a station or a plain My
     // Music track): the transport and action rows swap to episode-appropriate
     // controls, since "previous station" or "download this track" are noise
@@ -1902,7 +1904,14 @@ PlasmaExtras.Representation {
                         }
                         onActivated: (idx) => {
                             var c = root._podChaptersCur[idx]
-                            if (c) playMusic.position = c[0] * 1000
+                            if (!c) return
+                            // Clamped: a bogus mark past the end must not
+                            // slam the needle into EndOfMedia and "finish"
+                            // the episode.
+                            var t = c[0] * 1000
+                            if (playMusic.duration > 0)
+                                t = Math.min(t, Math.max(0, playMusic.duration - 2000))
+                            playMusic.position = t
                         }
                     }
 

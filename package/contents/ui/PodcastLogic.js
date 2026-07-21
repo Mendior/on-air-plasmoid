@@ -510,7 +510,8 @@ function parseChapters(text, cap) {
             if (seen[sec]) continue
             seen[sec] = true
             var title = String((c.tags || {}).title || "")
-                .replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().substring(0, 80)
+                .replace(/[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, " ")
+                .replace(/\s+/g, " ").trim().substring(0, 80)
             out.push([sec, title])
         }
     } catch (e) {

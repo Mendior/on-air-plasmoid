@@ -1602,6 +1602,11 @@ PlasmoidItem {
     property var _podScanQueue: []
     // The playing file's silence map, cached for the skip timer.
     property var _podSilCur: []
+    // The enclosure exactly as the ROW spelled it (identity for the row
+    // ticks) — _podPlayingUrl carries the player's normalized spelling.
+    property string _podPlayingRawUrl: ""
+    // True while a podcast start rolls through the generic play roads.
+    property bool _podStarting: false
     // The playing file's chapters ([[sec, title], …]) for the seek menu.
     property var _podChaptersCur: []
 
@@ -1774,7 +1779,12 @@ PlasmoidItem {
     function _loadPodUpNext() {
         try {
             var a = JSON.parse(Plasmoid.configuration.podcastUpNext || "[]");
-            _podUpNext = Array.isArray(a) ? a.slice(0, 50) : [];
+            _podUpNext = Array.isArray(a)
+                ? a.filter(function(e) {
+                      return e && typeof e === "object" && typeof e.key === "string"
+                             && e.key !== "";
+                  }).slice(0, 50)
+                : [];
         } catch (e) {
             _podUpNext = [];
         }
@@ -1782,6 +1792,9 @@ PlasmoidItem {
     }
 
     function _savePodUpNext() {
+        // Reassign, never just persist: in-place splices are invisible to
+        // the chip's length binding, and a "gone" queue kept its button.
+        _podUpNext = _podUpNext.slice();
         Plasmoid.configuration.podcastUpNext = JSON.stringify(_podUpNext);
         _podUpNextRev++;
     }
@@ -1802,8 +1815,8 @@ PlasmoidItem {
             if (!PodcastLogic.urlAllowed(entry.url)) return;
             _podUpNext = PodcastLogic.upNextAdd(_podUpNext, {
                 "key": String(entry.key),
-                "title": String(entry.title || "").substring(0, 200),
-                "show": String(entry.show || "").substring(0, 200),
+                "title": _sanitizeDeviceName(String(entry.title || "")).substring(0, 200),
+                "show": _sanitizeDeviceName(String(entry.show || "")).substring(0, 200),
                 "art": PodcastLogic.urlAllowed(entry.art)
                        ? String(entry.art).substring(0, 2048) : "",
                 "feed": String(entry.feed || "").substring(0, 2048),
@@ -1821,8 +1834,14 @@ PlasmoidItem {
             var e = _podUpNext.shift();
             _savePodUpNext();
             if (!e || !e.key) continue;
-            var fname = podcastFileName(e.fileTitle || e.title || "", e.url || "");
-            var onDisk = _podDownloads[fname] !== undefined;
+            // The ledger is searched BY KEY — the filename recomputed from
+            // the queued title can drift from what the download actually
+            // wrote (feeds retitle), and the key never does.
+            var fname = "";
+            for (var lf in _podDownloads) {
+                if (_podDownloads[lf] && _podDownloads[lf].key === e.key) { fname = lf; break; }
+            }
+            var onDisk = fname !== "";
             var src = onDisk ? _podFileUrl(fname) : String(e.url || "");
             if (!onDisk && !PodcastLogic.urlAllowed(src)) continue;
             (function(pe, psrc) {
@@ -1848,6 +1867,10 @@ PlasmoidItem {
     // Ledger filename of a playing file:// URL ("" when it is not ours).
     function _podFileOfUrl(url) {
         var u = (url || "").toString();
+        // file:// only: a REMOTE enclosure whose basename happens to match
+        // a ledger row must not inherit that file's silence map, chapters
+        // or delete road — the wild is full of "episode.mp3".
+        if (u.indexOf("file://") !== 0) return "";
         var base = u.split("/").pop();
         try { base = decodeURIComponent(base); } catch (e) {}
         return _podDownloads[base] !== undefined ? base : "";
@@ -1867,7 +1890,7 @@ PlasmoidItem {
             + " echo __CHAPTERS__;"
             + " command -v ffprobe >/dev/null 2>&1 && "
             + "timeout 60 ffprobe -v quiet -print_format json -show_chapters " + full
-            + " 2>/dev/null | head -c 200000; true # " + nextSeq());
+            + " 2>/dev/null | head -c 400000; true # " + nextSeq());
     }
 
     // Skip-silence: while a podcast plays and the map knows a stretch of
@@ -1912,10 +1935,11 @@ PlasmoidItem {
     // at the credits.
     function _stampPodPosition() {
         if (_podPlayingKey === "") return;
-        if (!isPlaying() || playMusic.source.toString().indexOf("file://") !== 0) return;
-        // Only the tracked episode's own file counts — never a chime, a
-        // My Music track or another episode that took the player over.
-        if (playMusic.source.toString() !== _podPlayingUrl) return;
+        // The gate is the EPISODE's identity, never the URL's scheme — a
+        // streamed episode earns its bookmark exactly like a downloaded
+        // one. Only the tracked episode's own source counts: never a
+        // chime, a My Music track or another episode that took over.
+        if (!isPlaying() || playMusic.source.toString() !== _podPlayingUrl) return;
         var dur = Math.round(playMusic.duration / 1000);
         var sec = Math.round(playMusic.position / 1000);
         if (EpisodeState.isNearEnd(sec, dur)) {
@@ -1959,16 +1983,35 @@ PlasmoidItem {
         // road, from the ledger row riding in as the optional trailing args.
         var feed = (feedUrl !== undefined ? feedUrl : podcastEpisodesFor) || "";
         var resume = podcastPositionSec(key || "");
-        // Tapping the episode that is ALREADY playing means "stop" —
-        // playLocalFile handles the stop; re-arming the tracking fields
-        // after it would dress a stopped player in this episode's clothes.
+        var raw = fileUrl.toString();
+        // Tapping the episode that is ALREADY playing means "stop". The
+        // comparison must survive QUrl's hand: the player normalizes
+        // %-escapes, so the raw enclosure string and the source's
+        // toString() disagree on exactly the URLs the wild is full of —
+        // either spelling matching means it is ours, and a toggle.
         var wasThisPlaying = isPlaying()
-                             && playMusic.source.toString() === fileUrl.toString();
-        playLocalFile(fileUrl, title);         // clears _currentEpisodeFeed
-        if (wasThisPlaying) return;
+                             && (playMusic.source.toString() === raw
+                                 || (_podPlayingRawUrl !== "" && _podPlayingRawUrl === raw));
+        if (wasThisPlaying) { stopWithFade(); return; }
+        // A podcast start must not be misread as a radio station anywhere
+        // downstream (cast routing, ICY polling, history) — the flag holds
+        // while the start rolls through the generic play roads.
+        _podStarting = true;
+        try {
+            playLocalFile(fileUrl, title);     // clears _currentEpisodeFeed
+        } finally {
+            _podStarting = false;
+        }
+        // The listener's explicit pick retires its own queue slot — a
+        // hand-played queued episode must not replay in full later.
+        if (key && podcastQueueHas(key)) {
+            var qi = PodcastLogic.upNextIndex(_podUpNext, key);
+            if (qi >= 0) { _podUpNext.splice(qi, 1); _savePodUpNext(); }
+        }
         _currentEpisodeFeed = feed;            // ...re-set to this episode's show
         _podPlayingKey = key || "";
-        _podPlayingUrl = fileUrl.toString();
+        _podPlayingRawUrl = raw;
+        _podPlayingUrl = playMusic.source.toString();   // the player's spelling
         // The skip timer reads this file's silence map from here on; the
         // chapter menu reads its chapters the same way. A STREAMED episode
         // has no file row — both stay empty, honestly.
@@ -1987,7 +2030,7 @@ PlasmoidItem {
         podcastRate = PodcastLogic.clampRate(_podSpeedFor(feed));
         if (resume > 8) {
             // Rewind a touch: the seconds around the bookmark restitch memory.
-            _podPendingSeekUrl = fileUrl.toString();
+            _podPendingSeekUrl = playMusic.source.toString();
             _podPendingSeekSec = Math.max(0, resume - 3);
         }
     }
@@ -2026,7 +2069,8 @@ PlasmoidItem {
         // built-in alarm chime (a file:// URL too) always play at 1x — a
         // wake-up must never ring at a leftover 2x, pitch-shifted.
         var src = playMusic.source.toString();
-        var local = src.indexOf("file://") === 0
+        var local = (src.indexOf("file://") === 0
+                     || (root._podPlayingKey !== "" && src === root._podPlayingUrl))
                     && src !== _alarmToneUrl.toString();
         playMusic.playbackRate = local ? PodcastLogic.clampRate(podcastRate) : 1.0;
         // Preserve pitch where the backend offers it; AlwaysOn needs no
@@ -2048,7 +2092,11 @@ PlasmoidItem {
         setPodcastRate(PodcastLogic.nextRate(podcastRate));
     }
     function podcastSkip(deltaSec) {
-        if (playMusic.source.toString().indexOf("file://") !== 0) return;
+        // A seekable EPISODE skips whatever its scheme — a streamed one is
+        // as skippable as the file it would have been.
+        var skipSrc = playMusic.source.toString();
+        if (skipSrc.indexOf("file://") !== 0
+            && !(root._podPlayingKey !== "" && skipSrc === root._podPlayingUrl)) return;
         playMusic.position = PodcastLogic.skipTarget(playMusic.position, deltaSec,
                                                      playMusic.duration);
     }
@@ -5302,7 +5350,7 @@ PlasmoidItem {
         // multi-room mode, in addition to) decoding it locally. Local files
         // can't be cast (the devices can't reach file://), so those still
         // play only on this computer.
-        if (_castTargets.length > 0 && station.hostname
+        if (_castTargets.length > 0 && station.hostname && !root._podStarting
             && station.hostname.toString().indexOf("file://") !== 0) {
             var castUrl = station.hostname.toString();
             // A local resume of the stream already on the devices (multi-room
@@ -5376,7 +5424,9 @@ PlasmoidItem {
             fadeInAnimation.target = playMusicOutput;
             fadeInAnimation.restart();
         }
-        infoTimer.restart();
+        // No ICY polling for an episode: reader.py would re-download the
+        // enclosure's head over and over hunting titles a FILE cannot have.
+        if (!root._podStarting) infoTimer.restart();
     }
 
     function getStreamInfo(streamUrl, metadata) {
@@ -6928,20 +6978,25 @@ PlasmoidItem {
             // row and continue the show with the next real file; only a
             // show with nothing left surfaces the error.
             var pfSrc = playMusic.source.toString();
-            if (pfSrc.indexOf("file://") === 0 && root._podPlayingKey !== ""
-                && pfSrc === root._podPlayingUrl) {
+            if (root._podPlayingKey !== "" && pfSrc === root._podPlayingUrl) {
                 var deadKey = root._podPlayingKey;
                 var deadFeed = root._currentEpisodeFeed;
+                // A dead FILE prunes its ledger row; a dead STREAM keeps
+                // everything (the bookmark survives, the row's next tap
+                // retries) — both continue with the queue, then the show.
                 var deadFile = root._podFileOfUrl(pfSrc);
                 root._podPlayingKey = "";
                 root._podPlayingUrl = "";
+                root._podPlayingRawUrl = "";
                 root._podPlayingArt = "";
                 root._podPlayingShow = "";
                 root._podSilCur = [];
+                root._podChaptersCur = [];
                 if (deadFile !== "") {
                     delete root._podDownloads[deadFile];
                     root._savePodDownloads();
                 }
+                if (root._podPlayUpNextHead()) return;
                 if (Plasmoid.configuration.podcastContinuous !== false && deadFeed) {
                     var aliveNext = PodcastLogic.nextUnplayed(root._podDownloads, deadFeed,
                                                              root._podPlayed, deadKey);
@@ -7017,6 +7072,10 @@ PlasmoidItem {
         onMetaDataChanged: {
             // On many streams the Qt FFmpeg backend provides the ICY StreamTitle
             // directly — then no reader.py processes need to be spawned at all.
+            // An EPISODE's ID3 title is not track metadata: it must not feed
+            // the radio history, the Deezer art lookup or the MPRIS track
+            // line — the podcast state already names what plays.
+            if (root._podPlayingKey !== "") return;
             if (!isPlaying()) return;
             var t = metaData.value(MediaMetaData.Title);
             if (t === undefined || t === null) return;
@@ -7114,9 +7173,42 @@ PlasmoidItem {
                 if (wasPodcast) {
                     var endedKey = root._podPlayingKey;
                     var endedFeed = root._currentEpisodeFeed;
+                    // A LOCAL file's EndOfMedia is always the real end; an
+                    // http stream also reports it when the server cuts the
+                    // cord mid-episode. Only a needle near the end proves
+                    // completion — an interruption keeps the bookmark, the
+                    // unheard status and the queue exactly where they were.
+                    var podDur = playMusic.duration;
+                    var podCut = endedSrc.indexOf("file://") !== 0 && podDur > 0
+                                 && playMusic.position < podDur - Math.max(3000, podDur * 0.03);
+                    if (podCut) {
+                        var cutSec = Math.round(playMusic.position / 1000);
+                        if (cutSec > 8 && endedKey) {
+                            root._podPositions[endedKey] = {
+                                "sec": cutSec,
+                                "dur": Math.round(podDur / 1000),
+                                "at": Date.now()
+                            };
+                            root._podPosRev++;
+                            podPositionsPersist.restart();
+                        }
+                        root._podPlayingKey = "";
+                        root._podPlayingUrl = "";
+                        root._podPlayingRawUrl = "";
+                        root._podPlayingArt = "";
+                        root._podPlayingShow = "";
+                        root._podSilCur = [];
+                        root._podChaptersCur = [];
+                        isError = true;
+                        errorTimer.restart();
+                        playMusic.source = "";
+                        root.title = Plasmoid.title;
+                        return;
+                    }
                     root.markEpisodePlayed(endedKey);
                     root._podPlayingKey = "";
                     root._podPlayingUrl = "";
+                    root._podPlayingRawUrl = "";
                     root._podPlayingArt = "";
                     root._podPlayingShow = "";
                     root._podSilCur = [];
@@ -7426,6 +7518,29 @@ PlasmoidItem {
         // Counter is reset to 0 in onMediaStatusChanged once playback buffers.
         interval: Math.min(300000, 15000 * Math.pow(2, root._stallAttempts))
         onTriggered: {
+            // A stalled PODCAST stream is not a dying station: remember the
+            // needle, restart the same episode AT the bookmark, and never
+            // walk the station-heal road on its behalf.
+            if (root._podPlayingKey !== "") {
+                var stSec = Math.round(playMusic.position / 1000);
+                if (stSec > 8) {
+                    root._podPositions[root._podPlayingKey] = {
+                        "sec": stSec,
+                        "dur": Math.round(playMusic.duration / 1000),
+                        "at": Date.now()
+                    };
+                    root._podPosRev++;
+                    podPositionsPersist.restart();
+                }
+                root._podPendingSeekUrl = playMusic.source.toString();
+                root._podPendingSeekSec = Math.max(0, stSec - 3);
+                var stSrc = playMusic.source;
+                playMusic.stop();
+                playMusic.source = "";
+                playMusic.source = stSrc;
+                playMusic.play();
+                return;
+            }
             if (playMusic.mediaStatus === MediaPlayer.StalledMedia) {
                 // Three stalls with growing patience is not a hiccup — a
                 // stream that cannot carry itself is dead in every way that
@@ -7484,6 +7599,22 @@ PlasmoidItem {
             if (!isPlaying()) return;
             console.log("[ARP] connect watchdog: no data after "
                         + Math.round(interval / 1000) + " s from " + src);
+            // A starving PODCAST stream stops honestly where it stood —
+            // the bookmark survives (the stamp timer wrote it), the row's
+            // next tap resumes, and no station road gets to touch it.
+            if (root._podPlayingKey !== "") {
+                playMusic.stop();
+                root._podPlayingKey = "";
+                root._podPlayingUrl = "";
+                root._podPlayingRawUrl = "";
+                root._podPlayingArt = "";
+                root._podPlayingShow = "";
+                root._podSilCur = [];
+                root._podChaptersCur = [];
+                isError = true;
+                errorTimer.restart();
+                return;
+            }
             var wasAudition = (root._healPendingUrl !== "" && src === root._healPendingUrl);
             playMusic.stop();
             isError = true;
