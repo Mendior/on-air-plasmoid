@@ -2,7 +2,11 @@
 
 **A beautiful internet radio widget for KDE Plasma 6** — worldwide station search, one-click track downloads, offline library, media keys, and a 2026-grade UI.
 
-![On Air](screenshots/onair.png)
+| | |
+|---|---|
+| ![Stations](screenshots/stations.png) | ![Playing](screenshots/playing.png) |
+| ![Podcasts](screenshots/podcasts.png) | ![My Music](screenshots/my-music.png) |
+| ![Timers](screenshots/timers.png) | ![Automation settings](screenshots/settings-automation.png) |
 
 ## Features
 
@@ -23,7 +27,7 @@
 - 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, off by default — one switch in settings turns them on) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
 - ↕️ **Reorder stations right in the list** — drag a row and it rides your finger, or use the hover arrows / Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
-- 🎙️ **Podcasts** — search the directory, subscribe to a show, and download episodes for offline listening; each episode remembers where you stopped and resumes there, with a seek bar for scrubbing
+- 🎙️ **A full podcatcher** — search three directories at once (Apple Podcasts, fyyd, gpodder.net), subscribe, and either stream an episode instantly or download it for offline; every episode remembers where you stopped, with chapters, show notes, playback speed, dead-air skip and an Up-next queue. New episodes check themselves in on a schedule, the newest one downloads itself, old played files quietly make room (all switchable in Settings → Automation), OPML import/export moves your subscriptions in and out — and a wake-up alarm can play the newest episode of your favorite show
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
@@ -52,6 +56,7 @@ Besides the streams you play, the widget talks to:
 
 - **radio-browser.info** — station catalog search; self-healing of dead saved stream URLs; the optional auto-bitrate upgrade; mirror discovery at startup; logo lookup for saved stations that are missing one.
 - **Deezer / iTunes** — cover-art lookup for the playing track (its own switch in settings).
+- **Apple Podcasts / fyyd.de / gpodder.net** — podcast search; feeds, episodes and artwork come straight from each show's own servers.
 - **Station click reporting** — opt-in, off by default; sends the station id only.
 - **AI title cleanup** — opt-in; runs the local `claude` CLI, which talks to its own API.
 
@@ -65,7 +70,7 @@ Like any web server, these services see ordinary request metadata (your IP addre
 ```bash
 kpackagetool6 --type Plasma/Applet --install package
 # or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.21.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.22.plasmoid
 ```
 
 ## Usage tips
