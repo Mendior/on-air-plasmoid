@@ -10,24 +10,27 @@
 
 ## Features
 
-- 🎨 **Modern 2026 UI** — animated aurora backdrop, spinning vinyl fallback art, cascading list animations, LIVE & bitrate pills, pulsing equalizers, emerald accent design
+- 🎨 **Modern 2026 UI** — five labeled tabs (Stations · Playing · My Music · Podcasts · Timers) map the whole widget, with an animated aurora backdrop, spinning vinyl fallback art, cascading list animations, LIVE & bitrate pills, pulsing equalizers and emerald accent design
 - 🌍 **Worldwide station search** — type a country name ("Finland") or genre ("jazz") and discover stations from the radio-browser.info catalogue (~50 000 stations). Click to preview, ⭐ to keep
 - 🎵 **Live track info** — artist & title from ICY metadata or the Qt FFmpeg backend, with album art lookup (iTunes/Deezer)
 - ⏺ **Stream recording** — one click records the station you're listening to as a bit-exact copy (no re-encoding), straight into your library, with a track-list sidecar. **Scheduled recordings** capture a show once, daily or weekly — even while nothing is playing
-- ⬇ **One-click track downloads** — grab the song that's playing right now at maximum quality (original audio, no re-encoding) via `yt-dlp`. Optional AI title cleanup via Claude CLI
-- 📚 **My Music** — built-in offline library page for your downloaded tracks and recordings
+- ⬇ **One-click track downloads** — grab the song that's playing right now via `yt-dlp`: original audio with no re-encoding by default (maximum quality), or MP3 / Opus / even the music video as MP4, selectable in Settings. Optional AI title cleanup via Claude CLI
+- 📚 **My Music** — built-in offline library page for your downloaded tracks and recordings, with a one-tap bridge to the podcast Downloaded shelf: every episode file on disk with art and size, played with one tap, deleted with two — the second tap is the confirmation
 - 🕐 **Recently played history** — the last 30 tracks with timestamps; download a song you missed half an hour ago
-- ⏰ **Sleep timer** with progress ring and gentle 30-second fade-out
-- ⏰ **Wake-up alarms** — wake to a station of your choice, once, daily or weekly, at your volume; a built-in chime takes over if the station can't start, and the widget can keep the computer awake until it's time
+- ⏰ **Sleep timer** — one tap on the Timers tab, a live countdown in the footer, and a gentle 30-second fade-out
+- ⏰ **Wake-up alarms** — wake to a station, or to the newest downloaded episode of a subscribed show (fetched overnight by the auto-download, so it plays without touching the network) — once, daily or weekly, at your volume; a built-in chime takes over if nothing can start, and the widget can keep the computer awake until it's time
 - 🎹 **MPRIS integration** — media keys and the Plasma media controls just work
 - 📺 **Cast to TVs, soundbars & network speakers** — Chromecast/Nest and any DLNA renderer (Samsung/LG/Sony TVs, Bose/Sonos soundbars, WiFi speakers). The stream goes straight to the device, which does the decoding, so your PC stays quiet and cool (a real help on older machines). Volume and station switching stay in the widget. DLNA needs no extra packages at all. Google Home speaker groups appear as one device and play in perfect sync
-- 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up
-- 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a live fine-tune slider, so nothing echoes; works on PipeWire and plain PulseAudio alike. Each speaker carries its own balance, can play stereo, left, right or a mono mix (two speakers on L and R make a true stereo pair), and any speaker can sit an evening out with one tick — all remembered per device
+- 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up — and a Forget button on the far side of the row retires a rotted pairing (tap twice, no accidents), so System Settings stays out of the loop in both directions
+- 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a fine-tune slider that applies when you let go — one drag, one adjustment, plus a field for an exact millisecond value — so nothing echoes; works on PipeWire and plain PulseAudio alike. Each speaker carries its own balance, can play stereo, left, right or a mono mix (two speakers on L and R make a true stereo pair), and any speaker can sit an evening out with one tick — all remembered per device. After fifteen idle minutes the whole sync graph parks itself (no CPU cost, no held Bluetooth link) and comes straight back on the next play or wake-up alarm, the switch untouched
 - 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker and the microphone does the rest: the Bluetooth lag is timed and set automatically, and every speaker's loudness is matched at the listening position — both remembered per device
+- 🩺 **The sync looks after itself** — an opt-in caretaker listens along every few minutes while music plays and, when two checks agree the speakers have audibly drifted apart, runs one automatic re-calibration; every Bluetooth reconnect also silently re-compensates the delay from the link's real reported latency, so a re-buffered speaker can't drag the room out of sync. Off by default, and audio never leaves the computer
 - 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, off by default — one switch in settings turns them on) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
+- 🪪 **Every station gets a face** — a station saved without a logo looks one up in the directory and keeps the find, a broken cached logo heals on sight, and a station with no obtainable logo wears its initials on its own fixed color, in the list and on the vinyl label — initials that speak Latin, Greek, Cyrillic, Hebrew, Arabic, kana, CJK and Hangul
 - ↕️ **Reorder stations right in the list** — drag a row and it rides your finger, or use the hover arrows / Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
-- 🎙️ **A full podcatcher** — search three directories at once (Apple Podcasts, fyyd, gpodder.net), subscribe, and either stream an episode instantly or download it for offline; every episode remembers where you stopped, with chapters, show notes, playback speed, dead-air skip and an Up-next queue. New episodes check themselves in on a schedule, the newest one downloads itself, old played files quietly make room (all switchable in Settings → Automation), OPML import/export moves your subscriptions in and out — and a wake-up alarm can play the newest episode of your favorite show
+- 🎙️ **A full podcatcher** — search three directories at once (Apple Podcasts, fyyd, gpodder.net), browse the worldwide popular charts or paste any RSS address directly, subscribe, and either stream an episode instantly or download it for offline; every episode remembers where you stopped, with chapters, show notes, playback speed, dead-air skip and an Up-next queue. New episodes check themselves in on a schedule, the newest one downloads itself, old played files quietly make room (all switchable in Settings → Automation), OPML import/export moves your subscriptions in and out — and a wake-up alarm can play the newest episode of your favorite show
+- 🛡️ **Hardened like it faces the internet — because it does** — podcast feeds are parsed as hostile input (size caps, entity bombs, script in show notes, injected file names — all closed and tested), outbound probes refuse private-network addresses in every spelling, and a device name arriving from the LAN or Bluetooth can never render as markup; 350+ automated checks pin it all in place
 - 🌐 **11 languages** — English, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
@@ -43,9 +46,10 @@ Optional (features degrade gracefully without them):
 |---|---|
 | `python-requests` | ICY track titles on streams the Qt backend can't read |
 | `python-dbus`, `python-gobject` | MPRIS media keys / media controls |
-| `ffmpeg` | Stream recording (instant + scheduled) |
+| `ffmpeg` | Stream recording (instant + scheduled); podcast dead-air skip and chapter menus |
 | `yt-dlp` + `ffmpeg` | Track downloads |
-| `curl` | Podcast episode downloads (present on virtually every system) |
+| `python-mutagen` | Covers & tags embedded inside downloaded files (downloads work without it) |
+| `curl` | Podcast episode downloads and station logo caching (present on virtually every system) |
 | `inotify-tools` | Zero-polling MPRIS command channel |
 | `python-chromecast` (pychromecast) | Cast to Chromecast / Nest devices (DLNA TVs and speakers work without it) |
 | `claude` (Claude Code CLI) | Optional AI cleanup of messy radio titles |
@@ -76,10 +80,10 @@ kpackagetool6 --type Plasma/Applet --install on-air-2026.22.plasmoid
 ## Usage tips
 
 - **Click** a search result to preview it — **⭐** adds it to your stations & favorites
-- **Hover** a station row for the ⭐, 🗑 and ↑/↓ reorder buttons (removal asks twice — no accidents); Ctrl+Up/Down moves the focused row
+- **Hover** a station row for the ⭐, 🗑, the drag handle and the ↑/↓ reorder buttons (removal asks twice — no accidents); Ctrl+Up/Down moves the focused row
 - In the **favorites view** the arrows reorder your favorites list itself — your order, not the main list's
-- **Scroll** on the volume button or the panel icon to change volume
-- The **⬇ button** on the **Playing** tab downloads the current track to `~/Music/OnAir`
+- **Scroll** on the panel icon to change volume — in the popup, the master volume slider lives in the output hub next to routing, sync and per-speaker balance
+- The **⬇ button** on the **Playing** tab downloads the current track to `~/Music/OnAir` (folder changeable in Settings)
 - The **My Music** tab is your offline library and play history; the **Timers** tab holds the sleep timer, wake-up alarms and scheduled recordings; the **Podcasts** tab searches, subscribes and downloads episodes for offline listening
 
 ## Multi-room playback and sync
