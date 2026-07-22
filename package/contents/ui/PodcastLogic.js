@@ -302,6 +302,27 @@ function prunePositions(map, cap) {
     return out
 }
 
+// The per-show speed map, bounded. Entries are bare numbers (feed -> rate),
+// so there is no timestamp to sort on; the global "" default is always kept,
+// and beyond the cap the most-recently-inserted feeds win (JS preserves key
+// insertion order) — a rough recency that keeps a heavy listener's config
+// from growing without limit. Returns a NEW map; the caller owns persistence.
+function prunePodSpeeds(map, cap) {
+    var lim = cap > 0 ? cap : 300
+    if (!map || typeof map !== "object" || Array.isArray(map)) return {}
+    var keys = Object.keys(map)
+    if (keys.length <= lim) return map
+    var out = {}
+    if (map[""] !== undefined) out[""] = map[""]
+    var kept = out[""] !== undefined ? 1 : 0
+    for (var i = keys.length - 1; i >= 0 && kept < lim; i--) {
+        if (keys[i] === "") continue
+        out[keys[i]] = map[keys[i]]
+        kept++
+    }
+    return out
+}
+
 // The playback speeds the chip cycles through. 1x always present.
 var SPEEDS = [0.8, 1.0, 1.25, 1.5, 1.75, 2.0]
 

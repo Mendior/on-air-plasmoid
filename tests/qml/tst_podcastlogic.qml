@@ -198,6 +198,23 @@ TestCase {
         compare(Object.keys(PL.prunePositions(map, 50)).length, 10)
     }
 
+    function test_podspeeds_prune_bounds_and_keeps_global() {
+        var map = { "": 1.5 }
+        for (var i = 0; i < 20; i++) map["feed" + i] = 1.25
+        var out = PL.prunePodSpeeds(map, 5)
+        // Capped to exactly the limit, global default always kept.
+        compare(Object.keys(out).length, 5)
+        compare(out[""], 1.5)
+        // The most-recently-inserted feeds survive; the oldest are dropped.
+        verify(out.feed19 !== undefined)
+        verify(out.feed0 === undefined)
+        // Under the cap the map is returned untouched.
+        compare(Object.keys(PL.prunePodSpeeds({ "": 1, "a": 2 }, 300)).length, 2)
+        // A corrupt (non-object) config never throws.
+        compare(Object.keys(PL.prunePodSpeeds(null, 5)).length, 0)
+        compare(Object.keys(PL.prunePodSpeeds([1, 2, 3], 5)).length, 0)
+    }
+
     function test_silences_parse_only_closed_sane_pairs() {
         var log = "[silencedetect] silence_start: 12.5\n"
                 + "[silencedetect] silence_end: 14.2 | silence_duration: 1.7\n"

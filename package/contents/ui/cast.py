@@ -26,7 +26,7 @@ Commands (argv[1]):
   play   <host> <port> <uuid> <model> <url> <ctype> <title> <art>
   stop   <host> <port> <uuid> <model>
   volume <host> <port> <uuid> <model> <0.0..1.0>
-  dlna-play   <location> <url> <ctype> <title>
+  dlna-play   <location> <url> <ctype> <title> [art]
   dlna-stop   <location>
   dlna-volume <location> <0.0..1.0>
   get-volume      <host> <port> <uuid> <model>  -> "__CAST_VOL__ <0.0..1.0>"
@@ -785,15 +785,22 @@ _DLNA_PN = {
 }
 
 
-def _didl_metadata(title, ctype, url):
+def _didl_metadata(title, ctype, url, art=""):
     """Raw (unescaped) DIDL-Lite for one radio stream.
 
     Both tested renderer families require the stream URL REPEATED inside
     <res> (SetAVTransportURI with metadata whose res is empty fails with
     error 716 "Resource not found") — CurrentURI alone is not enough.
+
+    The optional artwork is emitted as <upnp:albumArtURI> only when it is an
+    http(s) URL the renderer can actually fetch (a file:// sidecar could not
+    reach the TV, and would only risk confusing a strict renderer).
     """
     proto = "http-get:*:%s:%s" % (ctype or "audio/mpeg",
                                   _DLNA_PN.get(ctype or "audio/mpeg", "*"))
+    art_el = ""
+    if art and art.startswith(("http://", "https://")):
+        art_el = "<upnp:albumArtURI>%s</upnp:albumArtURI>" % escape(art)
     return (
         '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" '
         'xmlns:dc="http://purl.org/dc/elements/1.1/" '
@@ -801,9 +808,10 @@ def _didl_metadata(title, ctype, url):
         '<item id="onair-radio" parentID="-1" restricted="1">'
         "<dc:title>%s</dc:title>"
         "<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>"
+        "%s"
         '<res protocolInfo="%s">%s</res>'
         "</item></DIDL-Lite>"
-    ) % (escape(title or "On Air"), escape(proto), escape(url or ""))
+    ) % (escape(title or "On Air"), art_el, escape(proto), escape(url or ""))
 
 
 def _dlna_set_uri_and_play(avt, url, didl, cdata):
@@ -816,7 +824,7 @@ def _dlna_set_uri_and_play(avt, url, didl, cdata):
     _soap(avt, AVT_SERVICE, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
 
 
-def cmd_dlna_play(location, url, ctype, title):
+def cmd_dlna_play(location, url, ctype, title, art=""):
     try:
         dev = _describe_renderer(location)
         if not dev:
@@ -829,7 +837,7 @@ def cmd_dlna_play(location, url, ctype, title):
             _soap(avt, AVT_SERVICE, "Stop", "<InstanceID>0</InstanceID>", timeout=3.0)
         except Exception as exc:
             _dbg("dlna-play pre-stop (expected on idle devices)", exc)
-        didl = _didl_metadata(title, ctype, url)
+        didl = _didl_metadata(title, ctype, url, art)
         # CDATA first: Frontier Silicon renderers (Ruark, Roberts…) silently
         # DISCARD an escaped-metadata URI and then fail Play with 705
         # "Transport is locked" — CDATA is the only packing they play from.
@@ -999,7 +1007,9 @@ def main():
     elif command == "volume" and len(args) >= 5:
         cmd_volume(args[0], args[1], args[2], args[3], args[4])
     elif command == "dlna-play" and len(args) >= 3:
-        cmd_dlna_play(args[0], args[1], args[2], args[3] if len(args) > 3 else "")
+        cmd_dlna_play(args[0], args[1], args[2],
+                      args[3] if len(args) > 3 else "",
+                      args[4] if len(args) > 4 else "")
     elif command == "dlna-stop" and len(args) >= 1:
         cmd_dlna_stop(args[0])
     elif command == "dlna-volume" and len(args) >= 2:

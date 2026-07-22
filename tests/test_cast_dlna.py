@@ -139,6 +139,20 @@ def test_didl_metadata_unknown_type_uses_wildcard_profile(cast):
     assert "http-get:*:application/ogg:*" in didl
 
 
+def test_didl_metadata_includes_http_album_art(cast):
+    didl = cast._didl_metadata("T", "audio/mpeg", "http://s/stream",
+                               "https://cdn.example/cover.jpg?x=1&y=2")
+    assert "<upnp:albumArtURI>https://cdn.example/cover.jpg?x=1&amp;y=2</upnp:albumArtURI>" in didl
+
+
+def test_didl_metadata_omits_non_http_art(cast):
+    # A file:// sidecar (or empty) must NOT become an albumArtURI — the
+    # renderer could never fetch it, and a strict one might choke.
+    for art in ("", "file:///home/u/.cache/cover.jpg", "javascript:alert(1)"):
+        didl = cast._didl_metadata("T", "audio/mpeg", "http://s", art)
+        assert "albumArtURI" not in didl
+
+
 class _FakeSocket:
     """Raises on sendto; records whether close() was called."""
     instances = []

@@ -19,6 +19,20 @@ no longer be pinned onto the one you switched to.
   playing source's generation, so a slow reply from a just-switched-away
   station is dropped rather than shown — or, worse, mistaken for "this station
   has no titles" and pinned off for the rest of the session.
+- **Covers reach the TV.** Casting a podcast episode sent the (empty) station
+  logo slot instead of the show cover, so a Chromecast showed nothing; it now
+  carries the show art. DLNA/UPnP renderers now receive an `albumArtURI` in
+  their metadata as well — previously they got only a title. The art picked
+  for a cast is the show cover for a podcast, the resolved track cover
+  otherwise, and only ever an http(s) image a receiver can actually fetch.
+- **A streamed episode is not a station.** Playing an episode straight from
+  its feed (rather than downloading it) no longer polls the enclosure for
+  radio-style ICY metadata — a feed host can't feed a crafted "now playing"
+  string into the track history or cover lookup, and a well-behaved one isn't
+  re-fetched every few seconds.
+- **The remembered-speed list is bounded.** The per-show playback-speed memory
+  is capped, so trying hundreds of shows can no longer grow the config without
+  limit.
 
 ## 2026.22
 

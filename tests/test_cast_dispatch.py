@@ -71,13 +71,19 @@ def test_stop_and_volume(cast, monkeypatch):
 
 
 def test_dlna_commands(cast, monkeypatch):
+    # Artwork rides along as the optional 5th arg.
+    assert run_main(cast, monkeypatch,
+                    ["dlna-play", "http://loc", "http://s", "audio/mpeg", "T",
+                     "https://cdn/x.jpg"]) \
+        == [("cmd_dlna_play", ("http://loc", "http://s", "audio/mpeg", "T",
+                               "https://cdn/x.jpg"))]
+    # Title and art are optional and default to empty
     assert run_main(cast, monkeypatch,
                     ["dlna-play", "http://loc", "http://s", "audio/mpeg", "T"]) \
-        == [("cmd_dlna_play", ("http://loc", "http://s", "audio/mpeg", "T"))]
-    # Title is optional and defaults to empty
+        == [("cmd_dlna_play", ("http://loc", "http://s", "audio/mpeg", "T", ""))]
     assert run_main(cast, monkeypatch,
                     ["dlna-play", "http://loc", "http://s", "audio/mpeg"]) \
-        == [("cmd_dlna_play", ("http://loc", "http://s", "audio/mpeg", ""))]
+        == [("cmd_dlna_play", ("http://loc", "http://s", "audio/mpeg", "", ""))]
     assert run_main(cast, monkeypatch, ["dlna-stop", "http://loc"]) \
         == [("cmd_dlna_stop", ("http://loc",))]
     assert run_main(cast, monkeypatch, ["dlna-volume", "http://loc", "0.3"]) \

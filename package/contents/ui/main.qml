@@ -2096,8 +2096,18 @@ PlasmoidItem {
         _applyPlaybackRate();
         // Persist for the current show, and always as the global default so
         // the next plain local track inherits the last speed too.
-        _podSpeeds[_currentEpisodeFeed || ""] = podcastRate;
+        // delete-then-set so THIS show's key re-inserts as the newest — the
+        // prune keeps recency by insertion order, and updating an existing key
+        // in place would leave the just-set speed among the oldest and let the
+        // prune drop it before it is ever saved.
+        var feedKey = _currentEpisodeFeed || "";
+        delete _podSpeeds[feedKey];
+        _podSpeeds[feedKey] = podcastRate;
         _podSpeeds[""] = podcastRate;
+        // Bounded like the resume map: a listener who tries hundreds of shows
+        // must not grow this map without limit. A no-op below the cap; the
+        // global "" and the just-set feed are always kept.
+        _podSpeeds = PodcastLogic.prunePodSpeeds(_podSpeeds, 300);
         Plasmoid.configuration.podcastSpeeds = JSON.stringify(_podSpeeds);
     }
     function cyclePodcastRate() {
@@ -4479,6 +4489,24 @@ PlasmoidItem {
         return (url === "" || url.indexOf("file://") === 0) ? "" : url;
     }
 
+    // The artwork a cast device should show for what plays right now: a
+    // podcast's show cover first (playLocalFile clears currentStationFavicon,
+    // so a podcast had none and the TV showed a blank), then the resolved
+    // track cover, then the station logo. Only http(s) art is usable — a cast
+    // receiver (Chromecast or DLNA) cannot fetch a file:// sidecar path.
+    function _castArt() {
+        // Source-EXACT, like _stampPodPosition and the now-playing cover: the
+        // podcast fields are not cleared on every takeover (a station alarm
+        // fires through startWithFade without a handoff), so trusting bare
+        // _podPlayingKey would cast last night's show cover over this morning's
+        // radio alarm. Only when the tracked episode IS the current source.
+        var isPod = _podPlayingKey !== "" && _podPlayingArt !== ""
+                    && playMusic.source.toString() === _podPlayingUrl;
+        var a = isPod ? _podPlayingArt
+              : (albumArtUrl !== "" ? albumArtUrl : currentStationFavicon);
+        return /^https?:/i.test(a) ? a : "";
+    }
+
     // Toggle one device in the target set. Checking starts the current
     // stream on it; unchecking stops THAT device (others keep playing).
     function castToggleDevice(dev) {
@@ -4519,9 +4547,9 @@ PlasmoidItem {
             if (!_casting) {
                 // Entering the casting state: devices checked earlier (while
                 // nothing was playing) must start too, not just this one.
-                _castPlay(url, root.currentStation, root.currentStationFavicon);
+                _castPlay(url, root.currentStation, _castArt());
             } else {
-                _castPlayOn(dev, url, root.currentStation, root.currentStationFavicon);
+                _castPlayOn(dev, url, root.currentStation, _castArt());
             }
         }
     }
@@ -4560,7 +4588,7 @@ PlasmoidItem {
     function _castPlayOn(dev, url, name, art) {
         if (dev.kind === "dlna") {
             _castExec("CAST_PLAY", ["dlna-play", dev.location, url,
-                                    _castContentType(url), name || ""]);
+                                    _castContentType(url), name || "", art || ""]);
         } else {
             _castExec("CAST_PLAY", ["play", dev.host, dev.port, dev.uuid, dev.deviceModel,
                                     url, _castContentType(url), name || "", art || ""]);
@@ -5444,6 +5472,15 @@ PlasmoidItem {
 
     function getStreamInfo(streamUrl, metadata) {
         if (!streamUrl || streamUrl.toString() === "") {
+            return;
+        }
+        // A STREAMED podcast episode is NOT a radio station: never poll its
+        // enclosure for ICY metadata. Otherwise a hostile feed host could
+        // answer the Icy-MetaData probe with a crafted StreamTitle and inject
+        // into the track history / cover lookup / MPRIS, and a benign host
+        // would re-fetch the enclosure head every few seconds. Downloaded
+        // episodes are file:// and already excluded by the callers.
+        if (root._podPlayingUrl !== "" && streamUrl.toString() === root._podPlayingUrl) {
             return;
         }
         if (root._noIcySource && root._noIcySource === streamUrl.toString()) {
@@ -7176,7 +7213,9 @@ PlasmoidItem {
                 root._stallAttempts = 0;
             }
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia && isPlaying() && !isError && !root._qtMetaWorks
-                && playMusic.source.toString().indexOf("file://") !== 0) {
+                && playMusic.source.toString().indexOf("file://") !== 0
+                // A streamed podcast episode gets no ICY polling (see getStreamInfo).
+                && playMusic.source.toString() !== root._podPlayingUrl) {
                 getStreamInfo(playMusic.source, root.metadata);
                 // NB: compare the URL, not truthiness — the bitrate fallback swaps
                 // the source without startWithFade, and the old pin must not
