@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in On Air misbehaves
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: I clicked … and …
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the popup
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: On Air version
+      description: Shown on the widget's About page in its settings.
+      placeholder: "2026.22"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Plasma version and distribution
+      placeholder: "Plasma 6.4, CachyOS"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Journal output (if relevant)
+      description: "Paste the output of: journalctl --user -b | grep -iE 'onair|plasmashell' | tail -50"
+      render: shell

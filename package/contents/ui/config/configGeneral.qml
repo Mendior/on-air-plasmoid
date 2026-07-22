@@ -1291,6 +1291,32 @@ KCM.ScrollViewKCM {
 
         }
 
+        // Feedback doors: a user with a bug in hand should not have to go
+        // hunting for the repository to say so.
+        RowLayout {
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            Layout.topMargin: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.largeSpacing
+
+            Kirigami.UrlButton {
+                text: i18n("Report an issue")
+                url: "https://github.com/Mendior/on-air-plasmoid/issues/new/choose"
+                font: Kirigami.Theme.smallFont
+            }
+
+            Kirigami.UrlButton {
+                text: i18n("Suggest a feature")
+                url: "https://github.com/Mendior/on-air-plasmoid/discussions"
+                font: Kirigami.Theme.smallFont
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+        }
+
     }
 
 }
