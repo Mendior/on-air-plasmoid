@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026.23
+
+A privacy fix on the radio path. The station stream URL — which for some
+services carries a per-listener token in its query — no longer rides on the
+metadata reader's command line, where any other user on the machine could read
+it out of `/proc` for the reader's whole life, every few seconds of listening.
+The URL now travels through an owner-only file in the runtime directory and the
+reader is handed only its path; and a title from a station you already left can
+no longer be pinned onto the one you switched to.
+
+- **Stream URLs stay private.** The ICY title reader used to receive the full
+  stream URL as a command-line argument, leaving it world-readable in
+  `/proc/<pid>/cmdline` while it ran. It now reads the URL from a 0600 file in
+  `$XDG_RUNTIME_DIR`; only the file path is ever on the command line. A missing
+  or blank file is retried quietly instead of silencing the station's titles.
+- **Right title, right station.** Each metadata query is tagged with the
+  playing source's generation, so a slow reply from a just-switched-away
+  station is dropped rather than shown — or, worse, mistaken for "this station
+  has no titles" and pinned off for the rest of the session.
+
 ## 2026.22
 
 The podcatcher release. The popup grew a map — five labeled tabs — and the Podcasts tab behind it grew from a search box into a podcatcher that stands next to the dedicated apps: three directories, instant streaming, chapters, an Up-next queue, self-refreshing subscriptions that download and clean up after themselves, and a wake-up alarm that plays your show. Three adversarial review rounds ran over it before this tag; everything they confirmed is fixed and pinned by tests (245 QML + 106 Python checks at release).

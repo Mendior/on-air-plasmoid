@@ -22,11 +22,40 @@ except ImportError:
     print("__NO_ICY__")
     sys.exit(0)
 
+def resolve_url(arg):
+    """The URL comes as a 0600 FILE in the runtime dir, not inline.
+
+    On argv the URL sits world-readable in /proc/<pid>/cmdline for this
+    process's whole 10-20 s life, every poll — leaking any per-listener token
+    the path/query carries (the same /proc reason the previous metadata was
+    already dropped from argv). The plasmoid writes the URL to an owner-only
+    file and passes its PATH instead.
+
+    A bare http(s) URL is accepted as-is so a direct call or a test needs no
+    file. Anything else is the runtime file path: a MISSING or unreadable file
+    yields "" (the caller then exits quietly and the plasmoid retries next
+    tick) — never the path itself, which would reach requests.get() as a bogus
+    URL and pin the station __NO_ICY__ for the whole session.
+    """
+    if arg.startswith(("http://", "https://")):
+        return arg
+    try:
+        with open(arg, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
+    except OSError:
+        return ""
+
+
 if len(sys.argv) < 3:
-    print("reader.py: usage: reader.py <stream_url> <previous_metadata>", file=sys.stderr)
+    print("reader.py: usage: reader.py <url-or-file> <previous_metadata>", file=sys.stderr)
     sys.exit(2)
 
-script, url, meta = sys.argv[0], sys.argv[1], sys.argv[2]
+script, meta = sys.argv[0], sys.argv[2]
+url = resolve_url(sys.argv[1])
+if not url:
+    # No readable URL (missing/blank file, or an unreadable path) — nothing to
+    # poll. Exit quietly so the plasmoid simply retries next tick.
+    sys.exit(0)
 
 # Errors log the hostname only: full stream URLs can carry listener tokens in
 # path/query, and stderr ends up in the journal.

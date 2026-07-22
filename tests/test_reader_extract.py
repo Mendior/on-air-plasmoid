@@ -66,3 +66,40 @@ def test_utf8_preferred(reader_funcs):
 def test_decode_meta_never_raises(reader_funcs):
     dm = reader_funcs["decode_meta"]
     assert dm(b"\xff\xfe\x00garbage") != ""
+
+
+def test_resolve_url_reads_token_url_from_file(reader_funcs, tmp_path):
+    """The URL is handed over as a 0600 file (kept off /proc argv). resolve_url
+    reads it back verbatim, including any per-listener token, minus whitespace."""
+    ru = reader_funcs["resolve_url"]
+    f = tmp_path / "src"
+    f.write_text("https://cast.example/stream?token=SECRET123\n")
+    assert ru(str(f)) == "https://cast.example/stream?token=SECRET123"
+
+
+def test_resolve_url_passthrough_for_bare_url(reader_funcs):
+    """A direct URL (test/manual invocation, no file) is used as-is."""
+    ru = reader_funcs["resolve_url"]
+    assert ru("http://direct.example/stream") == "http://direct.example/stream"
+
+
+def test_resolve_url_blank_file_is_empty(reader_funcs, tmp_path):
+    """A blank/cleared file yields '' so the caller exits quietly, not a crash."""
+    ru = reader_funcs["resolve_url"]
+    f = tmp_path / "empty"
+    f.write_text("")
+    assert ru(str(f)) == ""
+
+
+def test_resolve_url_missing_file_is_empty(reader_funcs, tmp_path):
+    """A MISSING file must yield '' (quiet retry), never the path itself — the
+    path would reach requests.get() as a bogus URL and pin the station off."""
+    ru = reader_funcs["resolve_url"]
+    missing = tmp_path / "gone"
+    assert ru(str(missing)) == ""
+
+
+def test_resolve_url_https_passthrough(reader_funcs):
+    """https URLs pass through too (scheme check, not a file probe)."""
+    ru = reader_funcs["resolve_url"]
+    assert ru("https://secure.example/stream") == "https://secure.example/stream"

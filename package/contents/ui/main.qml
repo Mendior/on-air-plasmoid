@@ -173,6 +173,18 @@ PlasmoidItem {
     // MUST NOT be applied to a different (meanwhile-switched) station.
     property string _icyQueryUrl: ""
 
+    // The stream URL reaches reader.py through a 0600 file in the runtime dir,
+    // never on argv: on argv it sits world-readable in /proc/<pid>/cmdline for
+    // the reader's whole 10-20 s life, every poll, leaking any per-listener
+    // token the URL carries (the previous metadata already moved off argv for
+    // exactly this reason). The file is (re)written only when the URL changes;
+    // each spawn is tagged with the URL's generation, so a delayed result from
+    // a since-switched station is dropped without the URL ever being in the
+    // (in-process, but still) command string to match on.
+    readonly property string _icyUrlFile: _mprisRunDir + "/arp-icy-src-" + _mprisId
+    property string _icyUrlFileFor: ""
+    property int _icyUrlGen: 0
+
     // Consecutive empty reader.py results — after 6 attempts we stop
     // polling (the server gives no usable title, e.g. a UA filter or placeholder).
     property int _icyEmptyCount: 0
@@ -1264,7 +1276,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1291,7 +1303,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1329,7 +1341,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1370,7 +1382,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1444,7 +1456,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1500,7 +1512,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1577,7 +1589,7 @@ PlasmoidItem {
         // size cap guards the disk; -f keeps HTTP errors out of the file.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.22' -o " + part + " " + safeUrl + " "
+            + "-A 'OnAir/2026.23' -o " + part + " " + safeUrl + " "
             + "&& mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
             + "true # " + nextSeq());
@@ -1764,7 +1776,7 @@ PlasmoidItem {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -3885,7 +3897,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.22");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -5380,6 +5392,7 @@ PlasmoidItem {
         _abortSleepFade();
         // Clear NO_ICY guard so a fresh playback attempt retries ICY metadata —
         // user may have picked a new station, or be re-clicking to force retry.
+        // (_icyUrlFileFor / _icyUrlGen are handled by playMusic.onSourceChanged.)
         root._noIcySource = "";
         root._icyEmptyCount = 0;
         root._qtMetaWorks = false;
@@ -5438,15 +5451,35 @@ PlasmoidItem {
         }
         // Remember which URL this query is for — a delayed result
         // must not be applied to a meanwhile-switched station.
-        root._icyQueryUrl = streamUrl.toString();
-        var safeUrl = streamUrl.toString().replace(/'/g, "'\\''");
+        var u = streamUrl.toString();
+        root._icyQueryUrl = u;
         var scriptPath = Qt.resolvedUrl("reader.py").toString().substring(7);
         var safeScript = scriptPath.replace(/'/g, "'\\''");
-        // The previous metadata is deliberately NOT passed: on argv it sits
-        // world-readable in /proc, leaking the listening history — and all
-        // it ever bought was suppressing a repeated print (the exec handler
-        // drops an unchanged title anyway).
-        var cmd = "python3 '" + safeScript + "' '" + safeUrl + "' ''";
+        var safeFile = _icyUrlFile.replace(/'/g, "'\\''");
+        // The URL changed (a station switch, the first poll of a play): rewrite
+        // the owner-only file and SKIP this one poll, so the write lands before
+        // any reader reads it. printf is a shell builtin, so the URL sits on a
+        // command line for only the microseconds this write takes, once per
+        // station — not on the reader's for its whole life, every poll.
+        if (root._icyUrlFileFor !== u) {
+            root._icyUrlFileFor = u;
+            // NB: the generation is bumped by playMusic.onSourceChanged, at the
+            // moment the source switches — NOT here. Bumping it only on this
+            // write left a window (source already new, this write not yet run)
+            // where a previous station's in-flight reader carried the still-
+            // current gen and its result (even a __NO_ICY__) landed on the new
+            // station.
+            var safeUrl = u.replace(/'/g, "'\\''");
+            executable.exec(": ICY_SRC; umask 077; printf '%s' '" + safeUrl + "' > '" + safeFile + "'");
+            return;
+        }
+        // reader.py reads the URL from the file (path is not sensitive). The
+        // previous metadata is deliberately NOT passed either (same /proc
+        // reason) — the exec handler drops an unchanged title anyway. The
+        // ICYGEN tag lets the handler drop a since-switched station's late
+        // result; nextSeq keeps each poll a distinct command for the engine.
+        var cmd = "python3 '" + safeScript + "' '" + safeFile + "' '' # ICYGEN "
+                  + root._icyUrlGen + " " + nextSeq();
         executable.exec(cmd);
     }
 
@@ -6912,17 +6945,18 @@ PlasmoidItem {
                 return;
             }
             if (cmd.indexOf("reader.py") < 0) return;
-            // Which URL was this query for? A delayed result must not
-            // be applied to a meanwhile-switched station, nor pin __NO_ICY__
-            // to the wrong stream.
-            // Capture the whole shell-quoted argument (including '\'' escapes)
-            // and decode it back — a bare [^']* would break on URLs containing
-            // an apostrophe and discard their metadata forever.
-            var m = cmd.match(/reader\.py' '((?:'\\''|[^'])*)'/);
-            var queryUrl = m ? m[1].replace(/'\\''/g, "'") : root._icyQueryUrl;
-            if (queryUrl !== playMusic.source.toString()) {
+            // Which station was this query for? The URL is no longer in the
+            // command (it went via the runtime file), so the match is on the
+            // generation tag: a result whose gen is not the current one is a
+            // delayed reply from a since-switched station — drop it, and never
+            // pin __NO_ICY__ to the wrong stream.
+            var gm = cmd.match(/# ICYGEN (\d+)/);
+            if (gm && parseInt(gm[1], 10) !== root._icyUrlGen) {
                 return; // stale result — the station has been switched
             }
+            // The current gen IS the playing source, so that is the URL this
+            // result belongs to (used below to pin a no-ICY source).
+            var queryUrl = playMusic.source.toString();
             // Strip only trailing newlines — .trim() would eat the protocol TAB
             // when the StreamUrl part is empty ("Title\t\n") and break '::' titles.
             var formattedText = (stdout || "").replace(/[\r\n]+$/, "");
@@ -6965,6 +6999,16 @@ PlasmoidItem {
 
     MediaPlayer {
         id: playMusic
+
+        // The ICY generation follows the SOURCE, so a reader spawned for the
+        // station we just left is dropped the instant we switch — its result
+        // (title, or a __NO_ICY__ that would wrongly pin the NEW station) can
+        // no longer be misattributed. Resetting _icyUrlFileFor here also forces
+        // the next poll to (re)write the URL file for the new source.
+        onSourceChanged: {
+            root._icyUrlGen++;
+            root._icyUrlFileFor = "";
+        }
 
         onErrorOccurred: {
             connectWatchdog.stop();

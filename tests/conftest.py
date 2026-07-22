@@ -31,8 +31,8 @@ def reader_funcs():
     tree = ast.parse(src)
     wanted = [n for n in tree.body
               if isinstance(n, ast.FunctionDef)
-              and n.name in ("decode_meta", "extract_field")]
-    assert len(wanted) == 2, "reader.py no longer defines the expected helpers"
+              and n.name in ("decode_meta", "extract_field", "resolve_url")]
+    assert len(wanted) == 3, "reader.py no longer defines the expected helpers"
     ns = {}
     module = ast.Module(body=wanted, type_ignores=[])
     exec(compile(module, str(UI_DIR / "reader.py"), "exec"), ns)
