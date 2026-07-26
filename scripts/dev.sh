@@ -255,9 +255,14 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     else echo "NB: reuse not installed — SPDX headers unchecked"; fi
 
     if command -v codespell >/dev/null 2>&1; then
-      # po/ holds translations in twelve languages; LICENSE is not ours to edit.
-      if codespell --skip='.git,po,LICENSE,LICENSES,*.plasmoid,*.png,CLAUDE.md,.claude' \
-                   --ignore-words-list='unparseable' -q 3; then
+      # Spell-check exactly what the repo ships: git ls-files leaves working
+      # drafts out of the scan without having to name them. po/ is twelve
+      # languages of not-English, LICENSE is not ours to edit, and the rest
+      # of the filter is binaries.
+      if (cd "$REPO_DIR" && git ls-files \
+            | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
+            | grep -vE '\.(png|ogg)$' \
+            | xargs -d '\n' codespell --ignore-words-list='unparseable' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi
