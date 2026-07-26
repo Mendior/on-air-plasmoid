@@ -1,0 +1,350 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+"""calibrate.py signal path: the click generator and the peak detector that
+the microphone sync calibration stands on. A detector that fires on noise —
+or misses a real click — turns into a wrong per-device delay in the user's
+config, so both directions are pinned here."""
+import ast
+import math
+import pathlib
+import shutil
+import struct
+import types
+import wave
+
+import pytest
+
+UI_DIR = pathlib.Path(__file__).resolve().parent.parent / "package" / "contents" / "ui"
+
+
+@pytest.fixture(scope="session")
+def calib():
+    """Pure functions lifted from calibrate.py via AST (it runs main() at
+    import and would try to record from a microphone)."""
+    src = (UI_DIR / "calibrate.py").read_text()
+    tree = ast.parse(src)
+    wanted = [n for n in tree.body
+              if isinstance(n, (ast.FunctionDef, ast.Assign, ast.AnnAssign))]
+    # Keep constants (RATE, thresholds) and functions; drop the main() CALL
+    ns = {"math": math, "shutil": shutil, "struct": struct, "wave": wave}
+    body = [n for n in wanted
+            if not (isinstance(n, ast.FunctionDef) and n.name == "main")]
+    exec(compile(ast.Module(body=body, type_ignores=[]), str(UI_DIR / "calibrate.py"), "exec"), ns)
+    return ns
+
+
+def write_wav(path, samples, rate):
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"".join(struct.pack("<h", s) for s in samples))
+
+
+def test_make_click_is_leader_then_burst(calib, tmp_path):
+    p = tmp_path / "click.wav"
+    calib["make_click"](str(p))
+    rate = calib["RATE"]
+    with wave.open(str(p), "rb") as w:
+        assert w.getframerate() == rate
+        assert w.getnchannels() == 1
+        n = w.getnframes()
+        raw = w.readframes(n)
+    total = int(rate * (calib["LEADER_SECONDS"] + calib["LEADER_GAP_SECONDS"] + 0.010))
+    assert n == total
+    samples = [struct.unpack_from("<h", raw, i * 2)[0] for i in range(n)]
+    # The wake-up hum stays far below the burst and below the peak gate —
+    # it must never be mistaken for the moment being measured.
+    leader_peak = max(abs(s) for s in samples[:int(rate * calib["LEADER_SECONDS"])])
+    assert leader_peak <= calib["LEADER_AMP"]
+    burst_peak = max(abs(s) for s in samples[-int(rate * 0.010):])
+    assert 10000 < burst_peak <= 24000  # audible but never clipping
+
+
+def inject_click(samples, rate, at, amp):
+    for i in range(int(rate * 0.01)):
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / int(rate * 0.01)))
+        samples[int(at * rate) + i] = int(amp * env
+                                          * math.sin(2.0 * math.pi * 2200.0 * i / rate))
+
+
+def test_peak_of_finds_a_click_where_it_is(calib, tmp_path):
+    rate = calib["RATE"]
+    skip = calib["ANALYSIS_SKIP"]
+    at = 0.9  # seconds — safely past the skipped warm-up window
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, at, 20000)
+    p = tmp_path / "rec.wav"
+    write_wav(p, samples, rate)
+    got = calib["peak_of"](str(p))
+    assert got is not None
+    t, amp, clipped = got
+    assert abs(t - at) < 0.01
+    assert t > skip  # the AGC-pop window must never win
+    assert 18000 < amp <= 20000  # the peak's own height rides along
+    assert clipped is False
+
+
+def lcg_noise(n, sd, seed=12345):
+    """Deterministic pseudo-noise — the matched-filter tests must not flake."""
+    x = seed
+    out = []
+    for _ in range(n):
+        x = (1103515245 * x + 12345) % (1 << 31)
+        out.append(int((x % (4 * sd + 1)) - 2 * sd))
+    return out
+
+
+def test_matched_filter_holds_still_in_noise(calib, tmp_path):
+    # The bare amplitude argmax wandered by whole samples between runs in
+    # room noise; the matched filter integrates over the full burst and
+    # must pin the arrival to well under a millisecond.
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    at = 0.9
+    # The detector reports the burst PEAK (like the old argmax did), not the
+    # burst start — the truth reference carries the template's own peak.
+    truth = at + max(range(len(tpl)), key=lambda i: abs(tpl[i])) / rate
+    for k, seed in enumerate((1, 99)):
+        samples = lcg_noise(int(rate * 1.5), 1000, seed)
+        inject_click(samples, rate, at, 20000)
+        p = tmp_path / ("noisy%d.wav" % k)
+        write_wav(p, samples, rate)
+        got = calib["peak_of"](str(p), tpl)
+        assert got is not None
+        assert abs(got[0] - truth) < 0.0005  # < half a millisecond off truth
+
+
+def test_matched_filter_survives_inverted_polarity(calib, tmp_path):
+    # A mic/speaker chain that flips the waveform's sign must not move the
+    # measured arrival — the filter correlates on magnitude.
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    times = []
+    for k, amp in enumerate((20000, -20000)):
+        samples = [0] * int(rate * 1.5)
+        inject_click(samples, rate, 0.9, amp)
+        p = tmp_path / ("pol%d.wav" % k)
+        write_wav(p, samples, rate)
+        got = calib["peak_of"](str(p), tpl)
+        assert got is not None
+        times.append(got[0])
+    assert abs(times[0] - times[1]) < 0.0005
+
+
+def test_peak_of_flags_mic_saturation(calib, tmp_path):
+    # A burst flattened against the int16 rail still times fine, but its
+    # amplitude is the microphone's ceiling, not the speaker's loudness —
+    # the flag keeps it out of the level matching.
+    rate = calib["RATE"]
+    samples = [0] * int(rate * 1.5)
+    n = int(rate * 0.01)
+    at = int(0.9 * rate)
+    for i in range(n):
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / n))
+        v = int(80000 * env * math.sin(2.0 * math.pi * 2200.0 * i / rate))
+        samples[at + i] = max(-32768, min(32767, v))
+    p = tmp_path / "clip.wav"
+    write_wav(p, samples, rate)
+    got = calib["peak_of"](str(p))
+    assert got is not None
+    assert got[2] is True
+
+
+def test_peak_of_survives_a_truncated_recording(calib, tmp_path):
+    # A recorder killed mid-header used to escape as wave.Error and abort
+    # the WHOLE run — it must read as one failed measurement instead.
+    p = tmp_path / "trunc.wav"
+    p.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_find_arrivals_separates_and_fuses(calib, tmp_path):
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    # Two speakers 50 ms apart: two arrivals, spread ≈ 50 ms.
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, 0.9, 20000)
+    inject_click(samples, rate, 0.95, 15000)
+    arr = calib["find_arrivals"](samples, tpl, 4)
+    assert len(arr) == 2
+    assert abs((arr[1] - arr[0]) - 0.05) < 0.002
+    # Two speakers 3 ms apart fuse into one peak — reads as "together".
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, 0.9, 20000)
+    inject_click(samples, rate, 0.903, 15000)
+    assert len(calib["find_arrivals"](samples, tpl, 4)) == 1
+
+
+def test_find_arrivals_fixed_window_resists_anchor_creep(calib, tmp_path):
+    # A rising chain of arrivals used to drag the running merge anchor
+    # along and fuse everything into one peak. With the fixed ±8 ms
+    # neighbourhood, arrivals 12 ms apart with a dip between them stay
+    # two arrivals and the spread is honest.
+    rate = calib["RATE"]
+    tpl = calib["click_template"]()
+    samples = [0] * int(rate * 1.5)
+    inject_click(samples, rate, 0.9, 16000)
+    inject_click(samples, rate, 0.912, 20000)   # louder one LATER: the creep case
+    arr = calib["find_arrivals"](samples, tpl, 4)
+    assert len(arr) == 2
+    assert abs((arr[1] - arr[0]) - 0.012) < 0.002
+
+
+def test_peak_of_amplitudes_keep_their_ratio(calib, tmp_path):
+    # The loudness matching stands on this: a speaker heard at half the
+    # amplitude must MEASURE at half the amplitude.
+    rate = calib["RATE"]
+    amps = []
+    for k, target in enumerate((24000, 12000)):
+        samples = [0] * int(rate * 1.5)
+        inject_click(samples, rate, 0.9, target)
+        p = tmp_path / ("rec%d.wav" % k)
+        write_wav(p, samples, rate)
+        got = calib["peak_of"](str(p))
+        assert got is not None
+        amps.append(got[1])
+    assert abs(amps[1] / amps[0] - 0.5) < 0.02
+
+
+def test_peak_of_rejects_silence(calib, tmp_path):
+    p = tmp_path / "silence.wav"
+    write_wav(p, [0] * calib["RATE"], calib["RATE"])
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_peak_of_rejects_steady_noise(calib, tmp_path):
+    # Loud but NOT impulsive — a click must stand far above the noise floor,
+    # otherwise music/room noise would measure as a click.
+    rate = calib["RATE"]
+    samples = [int(8000 * math.sin(2.0 * math.pi * 300.0 * i / rate))
+               for i in range(rate)]
+    p = tmp_path / "noise.wav"
+    write_wav(p, samples, rate)
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_peak_of_gate_is_relative_to_the_pre_click_floor(calib, tmp_path):
+    # Webcam AGC ducks the gain after a loud speaker: the next speaker's
+    # click AND the noise floor shrink together. The gate must compare the
+    # click against the concurrent floor, not an absolute bar — an AGC-
+    # quieted click at 1500 over a floor of ~100 is a real click.
+    rate = calib["RATE"]
+    samples = [(100 if i % 3 else -100) for i in range(int(rate * 1.5))]
+    inject_click(samples, rate, 0.9, 1500)
+    p = tmp_path / "ducked.wav"
+    write_wav(p, samples, rate)
+    got = calib["peak_of"](str(p))
+    assert got is not None
+    assert abs(got[0] - 0.9) < 0.01
+    # ...but the same click drowning in steady noise of its own size is
+    # nothing click-like.
+    samples = [(1000 if i % 2 else -1000) for i in range(int(rate * 1.5))]
+    inject_click(samples, rate, 0.9, 1500)
+    p2 = tmp_path / "buried.wav"
+    write_wav(p2, samples, rate)
+    assert calib["peak_of"](str(p2)) is None
+
+
+def test_peak_of_rejects_too_short_recording(calib, tmp_path):
+    p = tmp_path / "short.wav"
+    write_wav(p, [0] * int(calib["RATE"] * 0.1), calib["RATE"])
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_median_takes_the_middle(calib):
+    assert calib["median"]([3.0, 1.0, 2.0]) == 2.0
+    assert calib["median"]([5.0, 1.0]) == 5.0  # upper-middle on even counts
+
+
+def test_recorder_prefers_pw_record(calib, monkeypatch):
+    monkeypatch.setitem(calib, "shutil",
+                        types.SimpleNamespace(which=lambda n: "/usr/bin/" + n))
+    args = calib["recorder_args"]("mic1", "/tmp/rec.wav")
+    assert args[0] == "pw-record"
+    assert args[args.index("--target") + 1] == "mic1"
+    assert args[-1] == "/tmp/rec.wav"
+
+
+def test_recorder_falls_back_to_parecord(calib, monkeypatch):
+    # Plain PulseAudio has no pw-record; parecord ships with paplay, and the
+    # sample format must be pinned there because peak_of only reads 16-bit.
+    monkeypatch.setitem(calib, "shutil",
+                        types.SimpleNamespace(which=lambda n: None))
+    args = calib["recorder_args"]("", "/tmp/rec.wav")
+    assert args[0] == "parecord"
+    assert "--file-format=wav" in args
+    assert "--format=s16le" in args
+    assert not any(a.startswith("--device=") for a in args)  # no mic given
+    assert args[-1] == "/tmp/rec.wav"
+
+
+def test_recorder_parecord_takes_the_mic(calib, monkeypatch):
+    monkeypatch.setitem(calib, "shutil",
+                        types.SimpleNamespace(which=lambda n: None))
+    assert "--device=alsa_input.usb" in calib["recorder_args"]("alsa_input.usb", "/x.wav")
+
+
+def test_strong_template_match_lowers_the_amplitude_bar(calib, tmp_path):
+    # A fan-loud room with a sensitive mic: floor ~600, click at ~3500 —
+    # under the 8x-the-floor bar, but the matched filter recognizes the
+    # burst unmistakably (measured live: match 0.65 at 7.9x the floor).
+    # With the template in hand the strong shape verdict buys the amplitude
+    # bar down to 4x; without it the full bar still stands.
+    import random
+    rate = calib["RATE"]
+    rng = random.Random(7)
+    samples = [rng.randint(-1200, 1200) for i in range(int(rate * 1.5))]
+    inject_click(samples, rate, 0.9, 3500)
+    p = tmp_path / "noisyroom.wav"
+    write_wav(p, samples, rate)
+    tpl = calib["click_template"]()
+    got = calib["peak_of"](str(p), tpl)
+    assert got is not None
+    assert abs(got[0] - 0.9) < 0.01
+    # The template-less path keeps the old, stricter bar.
+    assert calib["peak_of"](str(p)) is None
+
+
+def test_a_thump_in_noise_is_still_not_a_click(calib, tmp_path):
+    # The relaxed bar leans on the SHAPE verdict — a low-frequency thump at
+    # the same amplitude must not ride in through the lowered gate.
+    import random
+    rate = calib["RATE"]
+    rng = random.Random(11)
+    samples = [rng.randint(-1200, 1200) for i in range(int(rate * 1.5))]
+    n = int(rate * 0.01)
+    for i in range(n):
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / n))
+        samples[int(0.9 * rate) + i] += int(3500 * env
+                                            * math.sin(2.0 * math.pi * 150.0 * i / rate))
+    p = tmp_path / "thump.wav"
+    write_wav(p, [max(-32768, min(32767, s)) for s in samples], rate)
+    assert calib["peak_of"](str(p), calib["click_template"]()) is None
+
+
+def test_agreement_window_matches_the_measured_repeatability(calib):
+    # Deployed-path arrivals repeat within ~50 ms (measured); the agreement
+    # window is 60 ms so chance alignments of room noise across a ~3 s
+    # capture stay rare. 150 ms let roughly a third of pure-noise runs
+    # fabricate an "arrival" that then fed the residual back into the lags.
+    assert calib["_two_that_agree"]([1.00, 1.05]) is not None
+    assert calib["_two_that_agree"]([1.00, 1.10]) is None
+    assert calib["_two_that_agree"]([1.00, 1.30, 1.34]) is not None
+
+
+def test_dead_capture_is_exact_zero_not_quiet(calib):
+    # A hardware-muted mic (the Yeti's own touch button) delivers EXACT
+    # zeros; a live ADC in a silent room still shows a few LSBs. The line
+    # between them is what turns "forty seconds of futile clicks" into an
+    # instant, specific verdict.
+    assert calib["_is_dead_capture"]([])
+    assert calib["_is_dead_capture"]([0] * 48000)
+    assert calib["_is_dead_capture"]([0, 2, -3, 1])
+    assert not calib["_is_dead_capture"]([0, 0, 5, 0])
+
+
+def test_monitors_are_not_microphones(calib):
+    assert not calib["_usable_mic_name"]("")
+    assert not calib["_usable_mic_name"]("alsa_output.usb-X.analog-stereo.monitor")
+    assert calib["_usable_mic_name"]("alsa_input.usb-Blue_Yeti.analog-stereo")

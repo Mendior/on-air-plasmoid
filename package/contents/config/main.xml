@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-FileCopyrightText: 2022-2023 Yuri Saurov <dr@i-glu4it.ru>
+    SPDX-FileCopyrightText: 2026 Egon Greenberg
+
+    SPDX-License-Identifier: LGPL-2.0-or-later
+-->
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0       http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name="advancedradio"/>
+    <group name="General">
+        <entry name="servers" type="String">
+            <label>Stations</label>
+            <default>[
+      {"active":true,"hostname":"https://mangoradio.stream.laut.fm/mangoradio?t302=2022-12-13_14-45-27&amp;uuid=b8559986-54ba-4368-9ac0-f2f4745d4b78","name":"MANGORADIO"},
+      {"active":true,"hostname":"https://reyfm-stream16.radiohost.de/reyfm-original_mp3-192","name":"REYFM - #original"},
+      {"active":true,"hostname":"http://stream.dancewave.online:8080/dance.mp3","name":"Dance Wave!"},
+      {"active":true,"hostname":"https://drive.uber.radio/uber/bollywoodnow/icecast.audio","name":"Mirchi Top 20"},
+      {"active":true,"hostname":"http://stream-uk1.radioparadise.com/aac-320","name":"Radio Paradise (320k)"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/classic","name":"Classic Vinyl HD"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/jazz","name":"Adroit Jazz Underground"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/christmas","name":"Christmas Vinyl HD"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/walm","name":"WALM HD"},
+      {"active":true,"hostname":"http://198.15.94.34:8006/stream","name":"Deep House Lounge"},
+      {"active":true,"hostname":"https://playerservices.streamtheworld.com/api/livestream-redirect/SAM03AAC226_SC","name":"#1980s Zoom"},
+      {"active":true,"hostname":"http://ice3.somafm.com/groovesalad-128-mp3","name":"SomaFM Groove Salad"},
+      {"active":true,"hostname":"http://jking.cdnstream1.com/b22139_128mp3","name":"101 SMOOTH JAZZ"},
+      {"active":true,"hostname":"http://jazzblues.ice.infomaniak.ch/jazzblues-high.mp3","name":"Jazz Radio Blues"},
+      {"active":true,"hostname":"http://ep256.hostingradio.ru:8052/europaplus256.mp3","name":"Europa Plus"},
+      {"active":true,"hostname":"http://lin3.ash.fast-serv.com:6026/stream_96","name":"Rockabilly-radio.net"},
+      {"active":true,"hostname":"https://streaming.nrjaudio.fm/ou7xugf3s5gi?origine=playernrj","name":"NRJ Hits"},
+      {"active":true,"hostname":"http://retroserver.streamr.ru:8043/retro256.mp3","name":"Ретро FM"},
+      {"active":true,"hostname":"https://dfm-disc90.hostingradio.ru/disc9096.aacp","name":"DFM Дискач 90-х"},
+      {"active":true,"hostname":"https://playerservices.streamtheworld.com/api/livestream-redirect/977_COUNTRY_SC","name":".977 Country"}
+      ]</default>
+        </entry>
+    </group>
+    <group name="Appearance">
+        <entry name="speedfactor" type="Double">
+            <default>1.0</default>
+        </entry>
+        <entry name="lastplay" type="bool">
+            <default>true</default>
+        </entry>
+        <entry name="icon" type="String">
+            <label>Main Icon</label>
+            <default>audio-radio-symbolic</default>
+        </entry>
+        <entry name="iconFallback" type="String">
+            <label>Main Icon</label>
+            <default>radio-symbolic</default>
+        </entry>
+        <entry name="defaultVolume" type="Int">
+            <label>Default volume (0-100)</label>
+            <default>75</default>
+        </entry>
+        <entry name="fadeEnabled" type="bool">
+            <label>Smooth fade on station change</label>
+            <default>true</default>
+        </entry>
+        <entry name="fadeDuration" type="Int">
+            <label>Fade duration in ms</label>
+            <default>400</default>
+        </entry>
+        <entry name="albumArtEnabled" type="bool">
+            <label>Lookup album art online (Deezer, iTunes)</label>
+            <default>true</default>
+        </entry>
+        <entry name="blurBackdrop" type="bool">
+            <label>Blurred backdrop in now playing</label>
+            <default>true</default>
+        </entry>
+        <entry name="favorites" type="String">
+            <label>Favorite stations (JSON array of names)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="mprisEnabled" type="bool">
+            <label>Enable system media keys (MPRIS)</label>
+            <default>true</default>
+        </entry>
+        <entry name="autoBitrate" type="bool">
+            <label>Automatically pick highest available bitrate via radio-browser.info</label>
+            <default>true</default>
+        </entry>
+        <entry name="syncOffsetMap" type="String">
+            <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="syncAutoCare" type="Bool">
+            <label>Keep the sync tuned automatically: a passive microphone drift check on the playing audio, and one automatic re-verify when it confirms a drift. Audio is processed in place and never stored or transmitted.</label>
+            <default>false</default>
+        </entry>
+        <entry name="syncRefLatMap" type="String">
+            <label>Bluetooth sink's PipeWire-reported latency in ms at calibration time, keyed by MAC (JSON) — the reference the silent recompensation shifts against</label>
+            <default>{}</default>
+        </entry>
+        <entry name="searchHistory" type="String">
+            <label>Recent successful web searches, newest first (JSON array)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="syncVerifiedMs" type="Int">
+            <label>Residual speaker spread measured by the last verify pass (ms); -1 means never verified</label>
+            <default>-1</default>
+        </entry>
+        <entry name="deviceTrims" type="String">
+            <label>Per-device volume balance, 0.05-1.0 of the master level (JSON: device id to factor)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="deviceChannels" type="String">
+            <label>Per-speaker channel in the combined output: L, R or M (mono mix); absent means stereo (JSON: device id to mode)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="syncExcluded" type="String">
+            <label>Speakers sitting out of the combined output; absent means included (JSON: device id to true)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="syncOffsetMs" type="Int">
+            <label>Extra latency reported for Bluetooth sinks while the combined output is active (ms)</label>
+            <default>0</default>
+        </entry>
+        <entry name="combinePrevOutput" type="String">
+            <label>Output device chosen before the combined output was enabled — restored when a session ends uncleanly</label>
+            <default></default>
+        </entry>
+        <entry name="combinePrevDefault" type="String">
+            <label>System default sink before the combined output took it over — restored when a session ends uncleanly</label>
+            <default></default>
+        </entry>
+        <entry name="combineMasterPct" type="Int">
+            <label>Combined output master level the room was left at — the next enable's ramp ends here instead of at full passthrough</label>
+            <default>100</default>
+        </entry>
+        <entry name="combineWanted" type="bool">
+            <label>The sync switch as the user left it — a login rebuilds the group instead of silently dropping it</label>
+            <default>false</default>
+        </entry>
+        <entry name="autoHeal" type="bool">
+            <label>When a saved station's stream dies, look up its current address on radio-browser.info and follow it</label>
+            <default>true</default>
+        </entry>
+        <entry name="downloadFormat" type="String">
+            <label>Download format: best (max quality, no re-encode), mp3, opus, mp4 (video)</label>
+            <default>best</default>
+        </entry>
+        <entry name="history" type="String">
+            <label>Recently played tracks (JSON)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="likedSongs" type="String">
+            <label>Liked tracks (JSON)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="podcastSubs" type="String">
+            <label>Podcast subscriptions (JSON array of {title, author, art, feedUrl})</label>
+            <default>[]</default>
+        </entry>
+        <entry name="podcastPositions" type="String">
+            <label>Podcast resume positions (JSON map episode-key to {sec, dur, at})</label>
+            <default>{}</default>
+        </entry>
+        <entry name="podcastDownloads" type="String">
+            <label>Downloaded-episode ledger (JSON map filename to {key, title, show, art, feed, at}) — the Downloaded view's join against the folder</label>
+            <default>{}</default>
+        </entry>
+        <entry name="podcastAutoRefreshHours" type="Int">
+            <label>How often the subscriptions are checked for new episodes, in hours (0 = never)</label>
+            <default>12</default>
+        </entry>
+        <entry name="podcastAutoDownload" type="bool">
+            <label>Download the newest episode of a show automatically when the refresh finds one</label>
+            <default>true</default>
+        </entry>
+        <entry name="podcastAutoClean" type="bool">
+            <label>Quietly remove PLAYED downloads that are old or past ten per show — unplayed files are never touched</label>
+            <default>true</default>
+        </entry>
+        <entry name="podcastContinuous" type="bool">
+            <label>When an episode ends, continue with the show's oldest unheard downloaded episode</label>
+            <default>true</default>
+        </entry>
+        <entry name="podcastSkipSilence" type="bool">
+            <label>Jump over stretches of dead air in episodes (per-file silence map, measured at download time)</label>
+            <default>false</default>
+        </entry>
+        <entry name="podcastSeen" type="String">
+            <label>Newest episode key seen per feed (JSON map) — what the refresh compares against</label>
+            <default>{}</default>
+        </entry>
+        <entry name="podcastUpNext" type="String">
+            <label>The listener's cross-show Up-next queue (JSON array of episode identities)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="podcastLastRefresh" type="String">
+            <label>When the last subscription refresh ran (epoch ms as a string)</label>
+            <default>0</default>
+        </entry>
+        <entry name="podcastSpeeds" type="String">
+            <label>Playback speed per show (JSON map feedUrl to rate; "" key is the default)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="podcastPlayed" type="String">
+            <label>Played podcast episodes (JSON map episode-key to timestamp)</label>
+            <default>{}</default>
+        </entry>
+        <entry name="castMenuHeight" type="Int">
+            <label>Remembered height of the output/volume menu in pixels (0 = auto-fit)</label>
+            <default>0</default>
+        </entry>
+        <entry name="historyPanelHeight" type="Int">
+            <label>Remembered height of the recently-played list in pixels (0 = auto)</label>
+            <default>0</default>
+        </entry>
+        <entry name="reportClicks" type="bool">
+            <label>Report an anonymous listening click to radio-browser.info when a station starts playing — opt-in: anything leaving the machine is the user's call</label>
+            <default>false</default>
+        </entry>
+        <entry name="downloadDir" type="String">
+            <label>Download directory (empty = ~/Music/OnAir)</label>
+            <default></default>
+        </entry>
+        <entry name="aiHelperEnabled" type="bool">
+            <label>Clean up track title with Claude CLI before searching/downloading — opt-in: sends track names to an external service</label>
+            <default>false</default>
+        </entry>
+        <entry name="followSystemAccent" type="bool">
+            <label>Use the system accent color instead of the built-in emerald theme</label>
+            <default>false</default>
+        </entry>
+        <entry name="recordMaxMinutes" type="Int">
+            <label>Hard cap for a single recording, in minutes (disk-fill protection)</label>
+            <default>180</default>
+        </entry>
+        <entry name="recordFormat" type="String">
+            <label>Recording format: original (bit-exact copy, recommended), mp3 (re-encode), wav (uncompressed)</label>
+            <default>original</default>
+        </entry>
+        <entry name="recSchedules" type="String">
+            <label>Scheduled recordings (JSON array)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="alarms" type="String">
+            <label>Wake-up alarms (JSON array)</label>
+            <default>[]</default>
+        </entry>
+        <entry name="schedTzOffset" type="Int">
+            <label>Last-seen timezone offset (minutes) for the schedulers; 9999 = unknown</label>
+            <default>9999</default>
+        </entry>
+        <entry name="audioOutputDevice" type="String">
+            <label>Audio output device id for local playback (empty = system default)</label>
+            <default></default>
+        </entry>
+    </group>
+</kcfg>

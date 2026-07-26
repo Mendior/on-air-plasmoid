@@ -1,0 +1,163 @@
+// SPDX-FileCopyrightText: 2026 Egon Greenberg
+// SPDX-License-Identifier: LGPL-2.0-or-later
+// The search's matching rules. The directory only does substring matches
+// and only ranks by fame — these functions decide what the user MEANT, so
+// the decisions live under tests.
+import QtQuick
+import QtTest
+
+import "../../package/contents/ui/SearchLogic.js" as SL
+
+TestCase {
+    name: "SearchLogic"
+
+    function test_fold_is_case_and_accent_blind() {
+        compare(SL.fold("Järviradio"), "jarviradio");
+        compare(SL.fold("  Radio   NOVA  "), "radio nova");
+        compare(SL.fold("Šveits Türgi"), "sveits turgi");
+        compare(SL.fold(null), "");
+    }
+
+    function test_words_splits_the_folded_query() {
+        compare(SL.words("Radio  Nova"), ["radio", "nova"]);
+        compare(SL.words("   "), []);
+    }
+
+    function test_longest_word_stays_unfolded_for_the_server() {
+        // The directory compares accents literally — the word it is asked
+        // for must be the one the user typed. Ties keep the first word.
+        compare(SL.longestWord("Järvi radio"), "Järvi");
+        compare(SL.longestWord("fm Järviradio"), "Järviradio");
+        compare(SL.longestWord(""), "");
+    }
+
+    function test_matches_all_words_any_order_fold_blind() {
+        verify(SL.matchesAllWords("Radio Nova", SL.words("nova radio")));
+        verify(SL.matchesAllWords("Järviradio", SL.words("jarvi")));
+        verify(!SL.matchesAllWords("Radio Nova", SL.words("nova jazz")));
+        verify(!SL.matchesAllWords("anything", []));
+    }
+
+    function test_relevance_exact_then_prefix_then_rest() {
+        compare(SL.relevance("NRJ Suomi", "nrj suomi"), 0);   // the name IS the query
+        compare(SL.relevance("NRJ Suomi Hits", "nrj suomi"), 1);
+        compare(SL.relevance("Radio NRJ Suomi", "nrj suomi"), 2);
+        compare(SL.relevance("anything", ""), 2);             // empty query boosts nothing
+    }
+
+    function test_stems_shave_the_inflected_tail() {
+        compare(SL.stems("elmari"), ["elmar", "elma"]);   // genitive → nominative
+        compare(SL.stems("elmar"), ["elma"]);             // never below four left
+        compare(SL.stems("nova"), []);                    // short queries stay whole
+        compare(SL.stems("  "), []);
+    }
+
+    function test_probe_safe_host_blocks_literal_private_addresses() {
+        // The catalogue is publicly writable — a crafted entry must not
+        // aim the probe's GET at the user's own machine or network.
+        verify(!SL.isProbeSafeHost("http://localhost:8000/stream"));
+        verify(!SL.isProbeSafeHost("http://127.0.0.1/stream"));
+        verify(!SL.isProbeSafeHost("http://127.8.9.10/stream"));      // whole /8
+        verify(!SL.isProbeSafeHost("http://10.0.0.5:8080/live"));
+        verify(!SL.isProbeSafeHost("http://172.16.0.1/x"));
+        verify(!SL.isProbeSafeHost("http://172.31.255.254/x"));
+        verify(!SL.isProbeSafeHost("http://192.168.1.1/x"));
+        verify(!SL.isProbeSafeHost("http://169.254.1.1/x"));
+        verify(!SL.isProbeSafeHost("http://user:pass@127.0.0.1/x"));  // userinfo hides nothing
+        verify(!SL.isProbeSafeHost("http://[::1]:8000/x"));
+        verify(!SL.isProbeSafeHost("http://[fc00::1]/x"));
+        verify(!SL.isProbeSafeHost("http://[fd12:3456::1]/x"));
+        verify(!SL.isProbeSafeHost("http://[fe80::1%25eth0]/x"));     // zone id included
+        verify(!SL.isProbeSafeHost(""));
+    }
+
+    function test_probe_safe_host_blocks_every_alternate_spelling() {
+        // An address has more spellings than a dotted quad. Qt's URL layer
+        // resolves inet_aton's dialects (verified live: 2130706433,
+        // 0177.0.0.1 and 127.1 all connect to 127.0.0.1), glibc resolves a
+        // trailing root dot, and IPv6 embeds IPv4 two ways — the guard
+        // (HostGuard.js, shared with the settings pages) must read them all.
+        verify(!SL.isProbeSafeHost("http://[::ffff:127.0.0.1]/x"));   // mapped, dotted
+        verify(!SL.isProbeSafeHost("http://[::ffff:7f00:1]/x"));      // mapped, hex
+        verify(!SL.isProbeSafeHost("http://[::ffff:192.168.1.1]/x"));
+        verify(!SL.isProbeSafeHost("http://[0:0:0:0:0:0:0:1]/x"));    // loopback, longhand
+        verify(!SL.isProbeSafeHost("http://[::0:1]/x"));              // loopback, partial run
+        verify(!SL.isProbeSafeHost("http://[::]/x"));                 // unspecified
+        verify(!SL.isProbeSafeHost("http://2130706433/x"));           // decimal 127.0.0.1
+        verify(!SL.isProbeSafeHost("http://127.1/x"));                // shortened
+        verify(!SL.isProbeSafeHost("http://0177.0.0.1/x"));           // octal
+        verify(!SL.isProbeSafeHost("http://0x7f.0.0.1/x"));           // hex
+        verify(!SL.isProbeSafeHost("http://0.0.0.0/x"));              // routes to loopback
+        verify(!SL.isProbeSafeHost("http://localhost./x"));           // DNS root dot
+        verify(!SL.isProbeSafeHost("http://sub.localhost/x"));        // RFC 6761 subdomains
+        verify(!SL.isProbeSafeHost("http://a@b@127.0.0.1/x"));        // the LAST @ ends userinfo
+        // ...and the spellings must not swallow the public internet.
+        verify(SL.isProbeSafeHost("http://0x08.0x08.0x08.0x08/x"));   // 8.8.8.8
+        verify(SL.isProbeSafeHost("http://[::ffff:8.8.8.8]/x"));      // mapped public
+        verify(SL.isProbeSafeHost("http://10.or.at/x"));              // hostname, not a quad
+        verify(SL.isProbeSafeHost("http://999.1.2.3/x"));             // not inet_aton-valid
+        verify(SL.isProbeSafeHost("http://fcstation.example/x"));     // fc-prefixed NAME
+    }
+
+    function test_probe_safe_host_passes_public_and_dns_hosts() {
+        // Literal-only by design: QML has no resolver, so a DNS name that
+        // resolves privately (rebinding) cannot be caught here.
+        verify(SL.isProbeSafeHost("http://stream.example.com/live"));
+        verify(SL.isProbeSafeHost("https://user:pass@radio.example.org:8000/x"));
+        verify(SL.isProbeSafeHost("http://93.184.216.34/stream"));
+        verify(SL.isProbeSafeHost("http://172.15.0.1/x"));            // outside the /12
+        verify(SL.isProbeSafeHost("http://172.32.0.1/x"));
+        verify(SL.isProbeSafeHost("http://192.169.0.1/x"));
+        verify(SL.isProbeSafeHost("http://[2001:db8::1]/x"));
+    }
+
+    function test_probe_verdict_reads_the_status_line() {
+        compare(SL.probeVerdict(200), 1);    // a live mount
+        compare(SL.probeVerdict(206), 1);
+        compare(SL.probeVerdict(404), 0);    // a dead mount, definitively
+        compare(SL.probeVerdict(403), 0);    // geo-blocks read as forbidden
+        compare(SL.probeVerdict(410), 0);
+        compare(SL.probeVerdict(429), -1);   // a throttle is not a death certificate
+        compare(SL.probeVerdict(460), -1);   // CDN rate limiter, measured live
+        compare(SL.probeVerdict(503), -1);   // a server hiccup is not a dead station
+        compare(SL.probeVerdict(0), -1);     // transport error: unknown, not dead
+    }
+
+    // The country map the resolver callback stands in for in these tests.
+    function _cc(name) {
+        var map = { "uk": "GB", "finland": "FI", "new zealand": "NZ",
+                    "france": "FR" }
+        var k = (name || "").toLowerCase()
+        return map[k] !== undefined ? map[k] : ""
+    }
+
+    function test_scoped_query_splits_genre_in_country() {
+        var r = SL.scopedQuery("70s in UK", _cc)
+        compare(r.text, "70s"); compare(r.cc, "GB"); compare(r.country, "UK")
+        r = SL.scopedQuery("jazz from France", _cc)
+        compare(r.text, "jazz"); compare(r.cc, "FR")
+        // Multiword country and multiword genre both survive.
+        r = SL.scopedQuery("classic rock in new zealand", _cc)
+        compare(r.text, "classic rock"); compare(r.cc, "NZ")
+    }
+
+    function test_scoped_query_leaves_band_names_alone() {
+        // "chains" is no country — the resolver said no, one query stays one.
+        compare(SL.scopedQuery("alice in chains", _cc), null)
+        compare(SL.scopedQuery("in flames", _cc), null)      // no text before
+        compare(SL.scopedQuery("radio france", _cc), null)   // no separator
+        compare(SL.scopedQuery("", _cc), null)
+        // A later separator wins when the first tail is not a country.
+        var r = SL.scopedQuery("stuck in the middle from uk", _cc)
+        compare(r.text, "stuck in the middle"); compare(r.cc, "GB")
+    }
+
+    function test_country_flag_from_iso_code() {
+        compare(SL.countryFlag("GB"), "🇬🇧")
+        compare(SL.countryFlag("fi"), "🇫🇮")   // case-blind
+        compare(SL.countryFlag(""), "")
+        compare(SL.countryFlag("G"), "")
+        compare(SL.countryFlag("GBR"), "")
+        compare(SL.countryFlag("1!"), "")
+    }
+}

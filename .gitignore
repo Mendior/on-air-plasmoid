@@ -1,0 +1,8 @@
+*.plasmoid
+__pycache__/
+.coverage
+.pytest_cache/
+.ruff_cache/
+STORE-TEKSTID.md
+FOORUMI-POSTITUS.md
+package/contents/locale/

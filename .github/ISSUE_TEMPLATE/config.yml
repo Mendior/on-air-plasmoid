@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Feature ideas & questions
+    url: https://github.com/Mendior/on-air-plasmoid/discussions
+    about: Suggestions, questions and everything that is not a bug live here.
+  - name: KDE Store page
+    url: https://store.kde.org/p/2364623
+    about: Ratings and comments on the KDE Store.
