@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
 blank_issues_enabled: true
 contact_links:
   - name: Feature ideas & questions

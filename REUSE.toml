@@ -1,0 +1,27 @@
+version = 1
+SPDX-PackageName = "On Air"
+SPDX-PackageSupplier = "Egon Greenberg <Egon.greenberg@gmail.com>"
+SPDX-PackageDownloadLocation = "https://github.com/Mendior/on-air-plasmoid"
+
+# Prose and binary assets cannot carry a header without showing it to the
+# reader, so their copyright is declared here instead.
+
+[[annotations]]
+path = ["README.md", "CHANGELOG.md", "RELEASING.md", "SECURITY.md", "docs/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Egon Greenberg"
+SPDX-License-Identifier = "LGPL-2.0-or-later"
+
+[[annotations]]
+path = "screenshots/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Egon Greenberg"
+SPDX-License-Identifier = "LGPL-2.0-or-later"
+
+# JSON has no comment syntax. This one keeps both authors because the widget
+# metadata descends from the original Advanced Radio Player manifest.
+[[annotations]]
+path = "package/metadata.json"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["2022-2023 Yuri Saurov <dr@i-glu4it.ru>", "2026 Egon Greenberg"]
+SPDX-License-Identifier = "LGPL-2.0-or-later"

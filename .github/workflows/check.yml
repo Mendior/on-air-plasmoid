@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
 # Two-tier gate, mirroring scripts/dev.sh:
 #   core — fast, Qt-free: Python compile + unit tests, translations,
 #          metadata.json, shell syntax, regression grep rules.

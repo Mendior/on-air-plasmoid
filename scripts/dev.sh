@@ -47,6 +47,8 @@ Usage: scripts/dev.sh <command>
   lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json
             + po validation + regression grep rules + unit tests (QMLLINT=none skips qmllint)
   check     lint + offscreen plasmoidviewer runtime smoke test (run before every release)
+  preflight reuse (SPDX) + codespell + yamllint + gitleaks + lychee (links, needs network)
+            — slower and partly online, so it runs before a release, not every commit
   i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
   locale-install  compile po/ catalogs into the LOCAL install (old plugin id domain)
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
@@ -240,6 +242,49 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     fi
     echo "runtime OK"
     ;;
+  preflight)
+    # Slower, partly network-bound checks that belong before a release rather
+    # than before every commit. Each tool is optional: a machine without it
+    # says so and the rest still run, so this never blocks work on a fresh
+    # checkout. 2026-07-26 this pass caught a dead attribution link that had
+    # sat in the public README since the first release.
+    fail=0
+    if command -v reuse >/dev/null 2>&1; then
+      if reuse lint --quiet; then echo "reuse OK"
+      else echo "preflight FAILED: reuse"; fail=1; fi
+    else echo "NB: reuse not installed — SPDX headers unchecked"; fi
+
+    if command -v codespell >/dev/null 2>&1; then
+      # po/ holds translations in twelve languages; LICENSE is not ours to edit.
+      if codespell --skip='.git,po,LICENSE,LICENSES,*.plasmoid,*.png,CLAUDE.md,.claude' \
+                   --ignore-words-list='unparseable' -q 3; then
+        echo "codespell OK"
+      else echo "preflight FAILED: codespell"; fail=1; fi
+    else echo "NB: codespell not installed"; fi
+
+    if command -v yamllint >/dev/null 2>&1; then
+      # Warnings are style; only errors gate the release.
+      if yamllint --no-warnings .github/; then echo "yamllint OK"
+      else echo "preflight FAILED: yamllint"; fail=1; fi
+    else echo "NB: yamllint not installed"; fi
+
+    if command -v gitleaks >/dev/null 2>&1; then
+      if gitleaks dir . --no-banner --redact -l error >/dev/null 2>&1; then
+        echo "gitleaks OK"
+      else echo "preflight FAILED: gitleaks found something — inspect locally, do not paste it"; fail=1; fi
+    else echo "NB: gitleaks not installed"; fi
+
+    if command -v lychee >/dev/null 2>&1; then
+      # Network: keep the concurrency low so a doc full of links to one host
+      # does not look like a scraper.
+      if lychee --max-concurrency 4 --no-progress --quiet README.md SECURITY.md docs/; then
+        echo "lychee OK"
+      else echo "preflight FAILED: broken links"; fail=1; fi
+    else echo "NB: lychee not installed — links unchecked"; fi
+
+    [ "$fail" -eq 0 ] || exit 1
+    echo "preflight OK"
+    ;;
   build)
     ver="$(python3 -c "import json; print(json.load(open('$PKG/metadata.json'))['KPlugin']['Version'])")"
     out="$REPO_DIR/on-air-$ver.plasmoid"
@@ -301,12 +346,16 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # xgettext always emits its own placeholder title and author lines. The
     # template is the first file a translator downloads, so it carries the
     # same header the catalogs do instead of FIRST AUTHOR <EMAIL@ADDRESS>.
+    # The tags below are data for that rewrite, not this file's own licensing —
+    # reuse would otherwise read the sed delimiter as part of the expression.
+    # REUSE-IgnoreStart
     sed -i '1s|.*|# Translation template for On Air.|;
             2s|.*|# SPDX-FileCopyrightText: 2026 Egon Greenberg|;
             3s|.*|# SPDX-License-Identifier: LGPL-2.0-or-later|;
             4{/FIRST AUTHOR/d};
             s|^"Last-Translator: FULL NAME <EMAIL@ADDRESS>|"Last-Translator: Egon Greenberg|' \
         "$REPO_DIR/po/template.pot"
+    # REUSE-IgnoreEnd
     for po in "$REPO_DIR"/po/*.po; do
       [ -e "$po" ] || continue
       msgmerge --no-wrap -q --update --backup=off "$po" "$REPO_DIR/po/template.pot"

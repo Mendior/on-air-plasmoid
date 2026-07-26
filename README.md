@@ -108,7 +108,7 @@ A Bluetooth speaker adds its own 100–300 ms of codec latency on top, so it can
 
 **On Air** (2026 edition) by **Egon Greenberg** — new UI, bug fixes, worldwide search, downloads, offline library, MPRIS/metadata engine.
 
-Based on [Advanced Radio Player](https://store.kde.org/p/1972502) by **Yuri Saurov**.
+Based on **Advanced Radio Player** by **Yuri Saurov**, first published on the KDE Store.
 
 Licensed under **LGPL-2.0-or-later**. See [LICENSE](LICENSE).
 

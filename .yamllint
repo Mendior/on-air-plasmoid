@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+extends: default
+
+rules:
+  # Package lists and shell one-liners inside issue templates do not survive
+  # being wrapped at 80. Everything else stays at the default strictness.
+  line-length:
+    max: 120
+  # A GitHub workflow or issue template is a single document; the --- marker
+  # adds nothing and no GitHub example uses it.
+  document-start: disable
+  # "on:" is a workflow keyword, not the boolean true.
+  truthy:
+    check-keys: false

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
 name: Bug report
 description: Something in On Air misbehaves
 labels: [bug]
