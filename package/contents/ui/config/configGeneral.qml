@@ -67,6 +67,18 @@ KCM.ScrollViewKCM {
         return /^https?:\/\//i.test(s) ? s : "";
     }
 
+    // The same gate plus the HOST judgement, for strings that arrive from
+    // somewhere the user did not type: a catalogue row, an imported file.
+    // Those reach an Image.source, which fetches with no click at all, and
+    // get saved with the station — a scheme test alone let a crafted entry
+    // aim that silent GET at the user's own network. What the user types
+    // into the logo field themselves keeps the plain gate: their machine,
+    // their choice, and a self-hosted logo is a fair thing to want.
+    function _extUrlOrEmpty(v) {
+        const s = _webUrlOrEmpty(v);
+        return (s !== "" && _privateHostUrl(s)) ? "" : s;
+    }
+
     // Catalogue data must not point the fetcher (or a saved logo URL) at
     // localhost or the LAN. The address judgement lives in HostGuard.js,
     // shared with the search's liveness probe — one gate, every spelling.
@@ -146,6 +158,20 @@ KCM.ScrollViewKCM {
                .test(String(u || ""));
     }
 
+    // All five counters, because the summary at the end subtracts the upgrade
+    // pair from the other two. Three roads start a fetch and two of them used
+    // to leave the upgrade pair holding the previous run's numbers, which
+    // skews "how many were missed" — and when the skew happens to land on
+    // zero, the run reports itself as clean while stations that genuinely
+    // failed go unmentioned.
+    function _resetLogoCounters() {
+        _logoTotal = _logoQueue.length;
+        _logoDone = 0;
+        _logoFound = 0;
+        _logoUpgradeTotal = 0;
+        _logoUpgradeFound = 0;
+    }
+
     function fetchMissingLogos() {
         if (_logoFetching)
             return;
@@ -167,11 +193,8 @@ KCM.ScrollViewKCM {
                                   "upgrade": true, "oldFavicon": fav });
             }
         }
-        _logoTotal = _logoQueue.length;
-        _logoDone = 0;
-        _logoFound = 0;
-        _logoUpgradeTotal = 0;
-        _logoUpgradeFound = 0;
+        _resetLogoCounters();
+        // Counted after the reset, never before — the reset would wipe it.
         for (var q = 0; q < _logoQueue.length; q++)
             if (_logoQueue[q].upgrade === true) _logoUpgradeTotal++;
         if (_logoTotal === 0) {
@@ -223,7 +246,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -238,8 +261,8 @@ KCM.ScrollViewKCM {
                 try {
                     const row = (JSON.parse(xhr.responseText) || [])[0] || {};
                     ok = true;
-                    fav = _webUrlOrEmpty(row.favicon);
-                    home = _webUrlOrEmpty(row.homepage);
+                    fav = _extUrlOrEmpty(row.favicon);
+                    home = _extUrlOrEmpty(row.homepage);
                 } catch (e) { ok = false; }
             }
             if (!ok && retryCount < _apiServers.length - 1) {
@@ -274,7 +297,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -304,8 +327,8 @@ KCM.ScrollViewKCM {
                             // applies to stream URLs) — a file:// or data:
                             // entry from the publicly writable directory
                             // must never reach an Image or an XHR.
-                            const fav = _webUrlOrEmpty(r.favicon);
-                            const home = _webUrlOrEmpty(r.homepage);
+                            const fav = _extUrlOrEmpty(r.favicon);
+                            const home = _extUrlOrEmpty(r.homepage);
                             if (firstHome === "" && home !== "")
                                 firstHome = home;
                             if (firstWithIcon === "" && fav !== "")
@@ -461,7 +484,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         var keptPrefix = "";
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.23)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.24)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
@@ -506,6 +529,14 @@ KCM.ScrollViewKCM {
             _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
+            // A homepage that redirects into the LAN gets its body dropped:
+            // scraping it would turn an internal page's <link> tags into the
+            // next round of candidates, and the first hop's gate cannot see
+            // a redirect Qt follows on its own.
+            if (!HostGuard.answerFromPublicHost(xhr)) {
+                fallback();
+                return;
+            }
             const candidates = [];
             if (apiFavicon !== "")
                 candidates.push(apiFavicon);
@@ -649,7 +680,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             // A "logo" that streams past 512 KiB is not a logo — cap the
@@ -668,7 +699,13 @@ KCM.ScrollViewKCM {
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
             let ok = false;
-            if (xhr.status >= 200 && xhr.status < 400 && xhr.response) {
+            // The candidate's host was judged before the request, but Qt
+            // follows redirects inside the network layer — a station page
+            // answering "302 → http://192.168.1.1/x.png" would otherwise
+            // hand an internal host's bytes to the logo check, and the
+            // result would be saved as this station's logo.
+            if (xhr.status >= 200 && xhr.status < 400 && xhr.response
+                && HostGuard.answerFromPublicHost(xhr)) {
                 try {
                     const buf = new Uint8Array(xhr.response);
                     ok = _looksLikeImageBytes(buf);
@@ -700,9 +737,7 @@ KCM.ScrollViewKCM {
             _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
                               "uuid": (it.uuid || "").toString() });
         }
-        _logoTotal = _logoQueue.length;
-        _logoDone = 0;
-        _logoFound = 0;
+        _resetLogoCounters();
         if (_logoTotal === 0) {
             showMessage(true, i18n("No stations to refresh."));
             return;
@@ -1035,9 +1070,7 @@ KCM.ScrollViewKCM {
                 const rowIdx = dialogMode === -1 ? stationsModel.count - 1 : dialogMode;
                 _logoQueue = [{ "index": rowIdx, "name": itemObject.name,
                                 "hostname": itemObject.hostname }];
-                _logoTotal = 1;
-                _logoDone = 0;
-                _logoFound = 0;
+                _resetLogoCounters();
                 _logoFetching = true;
                 _apiServer = "all";
                 _fetchNextLogo();
@@ -1154,7 +1187,7 @@ KCM.ScrollViewKCM {
                         const row = {
                             "name": clip(srv.name),
                             "hostname": clip(srv.hostname),
-                            "favicon": _webUrlOrEmpty(clip(srv.favicon)),
+                            "favicon": _extUrlOrEmpty(clip(srv.favicon)),
                             "active": srv.active === undefined ? true
                                       : srv.active !== false && srv.active !== "false" && srv.active !== 0
                         };

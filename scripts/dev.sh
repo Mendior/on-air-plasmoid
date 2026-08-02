@@ -33,9 +33,10 @@ require_install_dir() {
 QMLLINT="${QMLLINT:-/usr/lib/qt6/bin/qmllint}"
 # Qt6 qmltestrunner (qt6-declarative) — runs the QML logic tests in tests/qml.
 QMLTESTRUNNER="${QMLTESTRUNNER:-/usr/lib/qt6/bin/qmltestrunner}"
-# locale/ is excluded from both sync directions: a local install (old plugin
-# id) keeps its old-domain translations; the published package is English-only
-# and ships no locale.
+# locale/ is excluded from both sync directions because the two trees carry
+# different catalog domains: a local install keeps the ones built for whichever
+# plugin id it was first installed under. The shipped .plasmoid is a separate
+# matter — "build" compiles all twelve catalogs into it below.
 RSYNC_OPTS=(-a --delete --exclude '__pycache__' --exclude 'locale')
 
 usage() {
@@ -54,6 +55,8 @@ Usage: scripts/dev.sh <command>
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
   view      plasmoidviewer on package/ (quick preview without restarting plasmashell)
   restart   systemctl --user restart plasma-plasmashell (reloads the QML)
+  doctor    is this machine running the code you think it is? (git vs repo vs
+            install vs the panel) — changes nothing; 0 = clean, 1 = skew, 2 = cannot tell
 EOF
 }
 
@@ -259,10 +262,15 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       # drafts out of the scan without having to name them. po/ is twelve
       # languages of not-English, LICENSE is not ours to edit, and the rest
       # of the filter is binaries.
+      # The ignore list holds three real words the dictionary does not know:
+      # "retuned" (what the caretaker does to a room), and "te", a local
+      # holding a title-equality score in SearchLogic. A gate that is red on
+      # false positives is a gate people learn to skip, which is the whole
+      # reason this one exists.
       if (cd "$REPO_DIR" && git ls-files \
             | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
             | grep -vE '\.(png|ogg)$' \
-            | xargs -d '\n' codespell --ignore-words-list='unparseable' -q 3); then
+            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi
@@ -274,9 +282,23 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     else echo "NB: yamllint not installed"; fi
 
     if command -v gitleaks >/dev/null 2>&1; then
-      if gitleaks dir . --no-banner --redact -l error >/dev/null 2>&1; then
+      # Scan what the repo ships, not what happens to sit in the directory.
+      # "gitleaks dir ." walks .gitignore'd files too, so one local appletsrc
+      # backup — full of stream tokens, and unpublishable by construction —
+      # kept this gate red for something no commit could ever carry. A gate
+      # that is always red teaches you to skip it. git ls-files draws the
+      # same line the codespell step above already draws.
+      scan="$(mktemp -d)"
+      # The copy and the scan fail differently and must SAY so: one verdict
+      # line for both read "gitleaks found something" when it was the copy
+      # that broke, sending you hunting for a secret that was never there.
+      # Both still fail closed — a gate that cannot look is not a green gate.
+      if ! (cd "$REPO_DIR" && git ls-files -z | xargs -0 cp --parents -t "$scan"); then
+        echo "preflight FAILED: could not stage tracked files for the secret scan"; fail=1
+      elif gitleaks dir "$scan" --no-banner --redact -l error >/dev/null 2>&1; then
         echo "gitleaks OK"
       else echo "preflight FAILED: gitleaks found something — inspect locally, do not paste it"; fail=1; fi
+      [ -n "$scan" ] && rm -rf "$scan"
     else echo "NB: gitleaks not installed"; fi
 
     if command -v lychee >/dev/null 2>&1; then
@@ -314,11 +336,17 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     ;;
   locale-install)
     require_install_dir
-    # Compile the po catalogs into the LOCAL install under its OLD plugin id
-    # (org.kde.plasma.advancedradio) so the panel widget is translated too.
-    # The published package gets its own catalogs at build time; the regular
-    # install/pull sync deliberately never touches locale/.
-    domain="plasma_applet_org.kde.plasma.advancedradio"
+    # Compile the po catalogs into the LOCAL install so the panel widget is
+    # translated too. The published package gets its own catalogs at build
+    # time; the regular install/pull sync deliberately never touches locale/.
+    #
+    # The domain follows THIS MACHINE's install id, which is not the same on
+    # both: the home machine still runs the old org.kde.plasma.advancedradio
+    # tree, the work machine only has io.github.mendior.onair. This used to be
+    # hardcoded to the old id, so on the work machine it wrote catalogs under a
+    # domain KDE never looks up and the widget stayed English no matter how
+    # many times this ran.
+    domain="plasma_applet_$(basename "$INSTALL_DIR")"
     for po in "$REPO_DIR"/po/*.po; do
       [ -e "$po" ] || continue
       lang="$(basename "$po" .po)"
@@ -373,6 +401,111 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     ;;
   restart)
     systemctl --user restart plasma-plasmashell
+    ;;
+  doctor)
+    # Three questions nobody could answer without archaeology, and every one
+    # of them has already cost a night: is the repo where I think it is, does
+    # the install match it, and is the PANEL running that install?
+    #
+    # The last one is the one that bites. QML is read once at plasmashell
+    # start, while calibrate.py is exec'd from disk on every run — so an
+    # install without a restart leaves one generation of QML driving another
+    # generation of python, which is exactly how a calibration came to store
+    # 44 ms in a room that measures 150.
+    # Every read below is wrapped so it cannot ABORT the run. This is a
+    # diagnostic: dying halfway is the one behaviour it must never have, and
+    # under `set -euo pipefail` a grep that legitimately finds nothing does
+    # exactly that — measured, on the first draft of this very command.
+    doctor_rc=0
+    # Not require_install_dir: an ambiguous or missing install is "cannot
+    # tell" (2), not "skew" (1), and the difference matters to whoever reads
+    # the exit code instead of the text.
+    if [ -z "${INSTALL_DIR:-}" ]; then
+      echo "machine : $(hostname)"
+      echo "install : both plugin ids exist under $INSTALL_BASE — set INSTALL_DIR to the tree the panel runs"
+      echo "verdict : cannot tell — see the lines above"
+      exit 2
+    fi
+    echo "machine : $(hostname)   install: $INSTALL_DIR"
+
+    # 1. git — the commit, and whether anything is unshared or uncommitted.
+    git_head="$(git -C "$REPO_DIR" log --format='%h %s' -1 2>/dev/null || echo '(no git)')"
+    git_dirty="$( { git -C "$REPO_DIR" status --porcelain 2>/dev/null || true; } | wc -l)"
+    git_ab="$(git -C "$REPO_DIR" rev-list --left-right --count origin/main...HEAD 2>/dev/null || echo '? ?')"
+    echo "git     : $git_head"
+    if [ "$git_dirty" -gt 0 ]; then
+      echo "          ${git_dirty} uncommitted file(s) — this work exists on THIS machine only"
+      doctor_rc=1
+    fi
+    case "$git_ab" in
+      "0	0") echo "          in step with origin/main" ;;
+      "? ?") echo "          no origin/main to compare against"; if [ "$doctor_rc" -eq 0 ]; then doctor_rc=2; fi ;;
+      *)     echo "          origin/main vs HEAD: $git_ab (behind/ahead) — fetch or push before trusting this tree"
+             doctor_rc=1 ;;
+    esac
+
+    # 2. repo vs install. Checksums, not timestamps: `install` syncs with
+    # plain -a (size+mtime), so a same-size same-mtime difference would be
+    # invisible to anything cheaper. Dry-run — this command never writes.
+    #
+    # Only CONTENT changes and deletions are counted. rsync also itemizes
+    # attribute-only lines, and a bare line count made a directory's mtime
+    # read as a changed file: `git checkout` or the release recipe's
+    # `read-tree` rewrite mtimes without touching a byte, and doctor would
+    # then order install+restart over identical code — a gate that cries
+    # wolf teaches people to ignore it, which is the whole thing this
+    # command exists to prevent.
+    skew="$( { rsync -ainc --dry-run "${RSYNC_OPTS[@]}" \
+                 "$PKG/contents/" "$INSTALL_DIR/contents/" 2>/dev/null || true; } \
+             | grep -cE '^([<>ch][fdLDS]|\*deleting)' || true)"
+    if [ "$skew" -eq 0 ]; then
+      echo "install : matches package/contents"
+    else
+      echo "install : ${skew} file(s) differ from package/contents — run: scripts/dev.sh install && scripts/dev.sh restart"
+      doctor_rc=1
+    fi
+
+    # 3. install vs the running panel. ctime, never mtime: rsync -a preserves
+    # the SOURCE mtime, so an installed file's mtime can predate the install
+    # by days. ctime is when this machine's inode was written, i.e. the
+    # install moment. And the marker must come from the CURRENT plasmashell —
+    # an older pid's line would happily "prove" a shell that no longer runs.
+    pshell_pid="$(systemctl --user show -P ExecMainPID plasma-plasmashell 2>/dev/null || echo 0)"
+    # A missing install tree is a normal answer on a machine that never
+    # installed the widget, and `find` on it exits nonzero.
+    newest_inst="$( { find "$INSTALL_DIR/contents" -path '*/locale/*' -prune -o -type f \
+                        \( -name '*.qml' -o -name '*.js' \) -printf '%C@\n' 2>/dev/null || true; } \
+                    | sort -rn | head -1 | cut -d. -f1)"
+    # The marker is asked for only once the shell is known to run, and the
+    # no-match case is neutralised: a journal that has rotated past the load
+    # is "cannot tell", not a reason to stop talking.
+    loaded_at=""
+    if [ -n "${pshell_pid:-}" ] && [ "${pshell_pid:-0}" != "0" ]; then
+      loaded_at="$(journalctl --user _PID="$pshell_pid" -o short-unix --no-pager 2>/dev/null \
+                     | { grep -F '[ARP] widget loaded' || true; } | tail -1 | cut -d. -f1)"
+    fi
+    if [ "${pshell_pid:-0}" = "0" ] || [ -z "${pshell_pid:-}" ]; then
+      echo "panel   : plasmashell is not running — cannot tell what is loaded"
+      if [ "$doctor_rc" -eq 0 ]; then doctor_rc=2; fi
+    elif [ -z "$newest_inst" ]; then
+      echo "panel   : nothing installed at $INSTALL_DIR — cannot tell what the panel runs"
+      if [ "$doctor_rc" -eq 0 ]; then doctor_rc=2; fi
+    elif [ -z "$loaded_at" ]; then
+      echo "panel   : no '[ARP] widget loaded' from pid $pshell_pid — the widget may not be on a panel, or the journal has rotated"
+      if [ "$doctor_rc" -eq 0 ]; then doctor_rc=2; fi
+    elif [ "$loaded_at" -ge "$newest_inst" ]; then
+      echo "panel   : running the installed QML (loaded $(date -d "@$loaded_at" '+%F %H:%M:%S'), newest install $(date -d "@$newest_inst" '+%F %H:%M:%S'))"
+    else
+      echo "panel   : STALE — installed at $(date -d "@$newest_inst" '+%F %H:%M:%S') but the panel loaded at $(date -d "@$loaded_at" '+%F %H:%M:%S'); run: scripts/dev.sh restart"
+      doctor_rc=1
+    fi
+
+    case "$doctor_rc" in
+      0) echo "verdict : this machine is running the code you think it is" ;;
+      1) echo "verdict : SKEW — see the lines above" ;;
+      *) echo "verdict : cannot tell — see the lines above" ;;
+    esac
+    exit "$doctor_rc"
     ;;
   *)
     usage

@@ -51,16 +51,38 @@ def test_play_full_argv(cast, monkeypatch):
     calls = run_main(cast, monkeypatch, [
         "play", "h", "8009", "u", "m", "http://s", "audio/mpeg", "Title", "http://art",
     ])
+    # No ninth argument: radio, and the receiver is told LIVE as before.
     assert calls == [("cmd_play",
                       ("h", "8009", "u", "m", "http://s", "audio/mpeg",
-                       "Title", "http://art"))]
+                       "Title", "http://art", None))]
 
 
 def test_play_optional_title_art_default_empty(cast, monkeypatch):
     calls = run_main(cast, monkeypatch,
                      ["play", "h", "8009", "u", "m", "http://s", "audio/aac"])
     assert calls == [("cmd_play",
-                      ("h", "8009", "u", "m", "http://s", "audio/aac", "", ""))]
+                      ("h", "8009", "u", "m", "http://s", "audio/aac", "", "", None))]
+
+
+def test_play_start_position_marks_an_episode(cast, monkeypatch):
+    # The ninth argument is the resume position in seconds — its presence is
+    # what tells cmd_play this is an episode, not an endless stream.
+    calls = run_main(cast, monkeypatch, [
+        "play", "h", "8009", "u", "m", "http://s", "audio/mpeg", "T", "", "125.5",
+    ])
+    assert calls == [("cmd_play",
+                      ("h", "8009", "u", "m", "http://s", "audio/mpeg", "T", "", 125.5))]
+    # An empty or unreadable value falls back to "radio".
+    for bad in ["", "later"]:
+        calls = run_main(cast, monkeypatch, [
+            "play", "h", "8009", "u", "m", "http://s", "audio/mpeg", "T", "", bad,
+        ])
+        assert calls[0][1][8] is None
+    # Negative positions are clamped, not passed through.
+    calls = run_main(cast, monkeypatch, [
+        "play", "h", "8009", "u", "m", "http://s", "audio/mpeg", "T", "", "-9",
+    ])
+    assert calls[0][1][8] == 0.0
 
 
 def test_stop_and_volume(cast, monkeypatch):

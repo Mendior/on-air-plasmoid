@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026.24
+
+The multi-speaker sync now looks after itself. A periodic check listens to
+the room with a tone too high to hear and, when the speakers have drifted
+apart, corrects them quietly — no clicks, no parked music, nothing you can
+hear. A correction needs several readings that agree on the direction, lands
+as their median, and waits for a natural break in the sound, so playback is
+never interrupted.
+
+- **A muted speaker is muted, not broken.** A speaker you mute — before or
+  even during a check — sits that check out by name and comes back when you
+  unmute it, instead of being written off for the rest of the session.
+- **Bluetooth reconnects are trimmed automatically.** A speaker that comes
+  back from a reconnect with different buffering is compensated against its
+  calibration, and the fine-tune slider always shows the number actually in
+  force.
+- **Enabling the sync respects your volume.** Switching it on no longer
+  jumps the machine to full volume — and switching it off really ends the
+  measurement, whichever way you cancel it.
+- **Podcast downloads land where they should.** A relative download folder
+  works, covers are saved next to their episodes, two shows that both
+  publish a "Trailer" no longer share one file, and a downloaded episode
+  survives its show moving to a new feed address. Half-finished downloads
+  are cleaned up at startup.
+- **Casting can scrub.** A podcast episode on a Chromecast or DLNA renderer
+  can be seeked, and resumes where it left off.
+- **Covers and logos behave.** Track covers arrive faster and only when
+  they actually belong to the track; station logos are fetched more
+  carefully and rebuilt from zero when the catalogue changes.
+- **Sturdier all around.** A podcast feed with broken XML can no longer
+  freeze the panel; stream, recording and download addresses stay out of
+  places other users of the machine could read; the search's country chip,
+  genre chips and the download toast all tell the truth again; and the
+  widget goes easier on the battery when the laptop is unplugged.
+
 ## 2026.23
 
 A privacy fix on the radio path. The station stream URL — which for some

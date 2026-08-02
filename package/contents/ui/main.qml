@@ -18,10 +18,13 @@ import org.kde.plasma.plasmoid
 import "AlarmLogic.js" as AlarmLogic
 import "FaviconLogic.js" as FaviconLogic
 import "EpisodeState.js" as EpisodeState
+import "HostGuard.js" as HostGuard
 import "HealLogic.js" as HealLogic
 import "OpmlLogic.js" as OpmlLogic
 import "PodcastLogic.js" as PodcastLogic
 import "PlaylistLogic.js" as PlaylistLogic
+import "PathLogic.js" as PathLogic
+import "SearchLogic.js" as SearchLogic
 
 PlasmoidItem {
     id: root
@@ -98,6 +101,11 @@ PlasmoidItem {
     readonly property string _mprisId: (Plasmoid.id !== undefined ? Plasmoid.id : 0).toString()
     readonly property string _mprisStateFile: _mprisRunDir + "/arp-mpris-state-" + _mprisId + ".json"
     readonly property string _mprisCmdFile: _mprisRunDir + "/arp-mpris-cmd-" + _mprisId + ".txt"
+    // Podcast downloads hand curl its URL through this owner-only config
+    // file (-K) instead of argv — an enclosure URL can carry a private
+    // feed's token, and argv is world-readable in /proc for as long as
+    // the transfer runs. Same reasoning as reader.py's URL file above.
+    readonly property string _podUrlFile: _mprisRunDir + "/arp-pod-url-" + _mprisId
     property int _mprisCmdSeq: 0
     property bool _mprisStarted: false
     // Whether inotifywait is available (0 process spawns while idle) or we poll
@@ -109,15 +117,12 @@ PlasmoidItem {
     // What is currently being downloaded — shown on the My Music page and in the footer
     property string _dlCurrentQuery: ""
     readonly property string downloadDirPath: {
-        var conf = (Plasmoid.configuration.downloadDir || "").trim();
-        // Expand a leading tilde (the settings placeholder itself suggests
-        // "~/Music/..."), otherwise downloads land in a literal "~" directory
-        // and the My Music page stays empty.
-        if (conf === "~" || conf.indexOf("~/") === 0) {
-            var h = Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation).toString();
-            var home = h.indexOf("file://") === 0 ? h.substring(7) : "";
-            conf = home + conf.substring(1);
-        }
+        var h = Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation).toString();
+        var home = h.indexOf("file://") === 0 && h.length > 7 ? h.substring(7) : "";
+        // Tilde, $HOME and plain relative paths all arrive here; PathLogic
+        // settles them, and returns "" when there is nothing to anchor to so
+        // we fall through to the default instead of inventing a path.
+        var conf = PathLogic.absoluteDir(Plasmoid.configuration.downloadDir, home);
         if (conf !== "") return conf;
         var loc = Labs.StandardPaths.writableLocation(Labs.StandardPaths.MusicLocation).toString();
         var base = loc.indexOf("file://") === 0 && loc.length > 7 ? loc.substring(7) : (_mprisRunDir + "/Music");
@@ -158,11 +163,36 @@ PlasmoidItem {
         // downloads land there, and the podcast page's FolderListModel is
         // gated on the identical latch (a model pointed at a missing
         // folder lists $HOME — issue #3's lesson).
+        // A logout or crash mid-transfer strands a Podcasts/*.part: the
+        // downloader's own rm dies with its shell, no ledger row was
+        // written yet, and the extension filter keeps the file out of
+        // every list — invisible disk residue until someone re-downloads
+        // that exact episode. Day-old is far beyond any live transfer
+        // (--max-time caps one at an hour). The sweep's outcome stays off
+        // the sentinel chain on purpose: a failed find must not unlatch
+        // downloads.
         executable.exec(": MUSICDIR; mkdir -p '" + safeMusicDir + "/Podcasts'"
-            + " && [ -d '" + safeMusicDir + "' ] && echo __MUSICDIR_OK__; true");
+            + " && find '" + safeMusicDir + "/Podcasts' -maxdepth 1 -name '*.part' -mtime +1 -delete 2>/dev/null"
+            + "; [ -d '" + safeMusicDir + "' ] && echo __MUSICDIR_OK__; true");
     }
 
     onDownloadDirPathChanged: _ensureMusicDir()
+
+    // Where the listener actually sits, read from the machine's timezone.
+    // The locale lies about exactly this: en_US.UTF-8 is the default LANG
+    // half the world over, and this very machine ran en_US under
+    // Europe/Helsinki — so the search page greeted a listener in Finland
+    // with "Popular in United States". zone1970.tab ships with tzdata and
+    // answers offline; a copied (non-symlink) localtime or a missing table
+    // leaves this empty and the locale keeps ruling.
+    property string homeCountryCode: ""
+    function _homeCountryProbe() {
+        executable.exec(": TZ_CC; z=$(readlink -f /etc/localtime 2>/dev/null);"
+            + " z=${z##*/zoneinfo/};"
+            + " awk -v z=\"$z\" 'BEGIN{FS=\"\\t\"} $1!~/^#/ && $3==z"
+            + " {split($1,a,\",\"); print a[1]; exit}'"
+            + " /usr/share/zoneinfo/zone1970.tab 2>/dev/null; true");
+    }
 
     // Source URL that has confirmed it does NOT expose ICY metadata. While set,
     // we suppress reader.py polling for that source to avoid spawning python
@@ -172,6 +202,10 @@ PlasmoidItem {
     // The URL the last reader.py query was made for — a delayed result
     // MUST NOT be applied to a different (meanwhile-switched) station.
     property string _icyQueryUrl: ""
+    // A reader.py is out and has not answered yet. The poll timer repeats on
+    // its own schedule and does not care, so without this a stalling stream
+    // stacked one python3 and one extra stream connection per tick.
+    property bool _icyInFlight: false
 
     // The stream URL reaches reader.py through a 0600 file in the runtime dir,
     // never on argv: on argv it sits world-readable in /proc/<pid>/cmdline for
@@ -498,6 +532,10 @@ PlasmoidItem {
             }
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
+            // A wrapper that redirects into the LAN must not have its body
+            // parsed into a stream address: Qt follows redirects internally,
+            // so the requested URL's gate covers the first hop only.
+            if (!HostGuard.answerFromPublicHost(xhr)) { cb(url); return; }
             var got = PlaylistLogic.classify(xhr.responseText || "", url);
             if (got.kind === "entry" && hop < 1 && got.url !== url
                 && PlaylistLogic.isWrapper(got.url)) {
@@ -694,7 +732,7 @@ PlasmoidItem {
         }
         var next = cands.shift();
         root._previewRescueCands = cands;
-        console.log("[ARP] preview rescue: auditioning " + next + " for dead " + pvKey);
+        console.log("[ARP] preview rescue: auditioning " + _hostOf(next) + " for dead " + _hostOf(pvKey));
         _unwrapPlaylist(next, function(playUrl) {
             if (root._previewSeq !== pvSeq || root._previewUrl !== pvKey) return;
             // Keep the resolved-URL trio on the live rescue address, so a
@@ -748,11 +786,35 @@ PlasmoidItem {
     // the messy radio title is cleaned before searching (15 s timeout; on
     // failure the local cleanup is used — the AI is never on the critical
     // path).
+    // The `downloading` flag has to come back down on EVERY road, or the
+    // button dies for the whole session: a shell restart mid-flight eats
+    // the pending exec's result, no handler ever runs, and each later
+    // click returns silently while the spinner claims work is happening —
+    // measured aftermath on this machine: yt-dlp's cache untouched for
+    // days while the user kept pressing download. The guard is armed short
+    // for the 15 s AI leg and long for the 30 min yt-dlp leg.
+    Timer {
+        id: dlGuardTimer
+        repeat: false
+        onTriggered: {
+            if (!root.downloading) return;
+            root.downloading = false;
+            root._dlCurrentQuery = "";
+            root._dlPendingRaw = "";
+            root._dlChosenId = "";
+            notify(i18n("Download gave no answer"),
+                   i18n("Nothing came back from the downloader — try again."),
+                   "dialog-warning");
+        }
+    }
+
     function downloadTrack(raw) {
         if (downloading) return;
         if (!raw) return;
         downloading = true;
         if (Plasmoid.configuration.aiHelperEnabled) {
+            dlGuardTimer.interval = 25000;   // timeout 15 on the CLI + slack
+            dlGuardTimer.restart();
             root._dlPendingRaw = raw;
             // SECURITY: the station's ICY title is UNTRUSTED input. We hand it to
             // Claude only for text processing, NOT as an agent:
@@ -782,10 +844,37 @@ PlasmoidItem {
     // missing package).
     property bool _dlTriedNoEmbed: false
 
+    // The chosen video for the current download — the mutagen retry
+    // re-fetches this exact id instead of searching again.
+    property string _dlChosenId: ""
+
+    // Phase one: candidates, not a download. ytsearch1 took the search
+    // engine's #1 on faith, and #1 is ranked by fame: the stream said
+    // "Uplifting Only Episode 659" and the famous "600 Special" arrived —
+    // two hours of the wrong show. Five candidates go through
+    // SearchLogic.downloadPick (numbers must match), and no qualifier
+    // means an honest refusal instead of the wrong file.
     function _startDownload(query, skipEmbed) {
-        if (!query) { downloading = false; return; }
+        if (!query) { downloading = false; dlGuardTimer.stop(); return; }
+        dlGuardTimer.interval = 55000;   // timeout 45 on the probe + slack
+        dlGuardTimer.restart();
         root._dlCurrentQuery = query;
         if (!skipEmbed) root._dlTriedNoEmbed = false;
+        var safeProbeQuery = query.replace(/'/g, "'\\''");
+        executable.exec(": DL_PICK; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
+                        + "timeout 45 yt-dlp --simulate --no-playlist --print '%(id)s\t%(title)s' "
+                        + "'ytsearch5:" + safeProbeQuery + "' 2>/dev/null; true");
+    }
+
+    // Phase two: fetch the picked video. videoId is validated against the
+    // id alphabet before it reaches the shell.
+    function _dlFetch(videoId, skipEmbed) {
+        if (!/^[A-Za-z0-9_-]{6,16}$/.test(videoId)) { downloading = false; dlGuardTimer.stop(); return; }
+        // Re-armed for the long leg: yt-dlp itself is bounded by its
+        // timeout 1800, so the guard only has to outlive a result that
+        // never arrives, not police the download.
+        dlGuardTimer.interval = 1860000;
+        dlGuardTimer.restart();
         var fmt = (Plasmoid.configuration.downloadFormat || "best").toLowerCase();
         var fmtArgs;
         if (fmt === "mp3") {
@@ -803,7 +892,6 @@ PlasmoidItem {
         if (skipEmbed)
             fmtArgs = fmtArgs.replace(" --embed-metadata", "").replace(" --embed-thumbnail", "");
         var safeDir = downloadDirPath.replace(/'/g, "'\\''");
-        var safeQuery = query.replace(/'/g, "'\\''");
         // The cover is written out as well as embedded: pure QML has no way
         // to read art back out of a local file, so the player's My Music
         // cover comes from a same-stem sidecar image. Sidecars live in a
@@ -812,9 +900,13 @@ PlasmoidItem {
         // otherwise the original (usually webp) stays and Qt's image
         // plugins read it. The delete button sweeps the sidecar with the
         // track, so nothing orphans.
+        // A per-type output template rather than --paths: yt-dlp documents
+        // that -P "is ignored if --output is an absolute path", and ours is,
+        // so the covers had been landing next to the tracks all along and the
+        // .covers sweep further down had nothing to sweep.
         if (fmt !== "mp4")
             fmtArgs += " --write-thumbnail --convert-thumbnails jpg"
-                     + " -P 'thumbnail:" + safeDir + "/.covers'";
+                     + " -o 'thumbnail:" + safeDir + "/.covers/%(title)s.%(ext)s'";
         // Check for yt-dlp BEFORE running and emit a clear sentinel if it is
         // missing — otherwise the user would see a confusing "Unknown error" (the
         // exit-127 stderr does not contain the word "ERROR" that the filter below looks for).
@@ -830,9 +922,16 @@ PlasmoidItem {
         // needs the same picture twice. Week-old *.part residue (downloads
         // that never resumed) goes too; younger ones stay resumable. yt-dlp's
         // own exit code is preserved for the handler (the mutagen retry reads it).
+        // --print after_move:filepath is the download's receipt: the final
+        // absolute path, conversion extension included, one line on stdout
+        // (measured live — and measured that a ytsearch with NO result
+        // exits 0 after "Downloading 0 items", which is why exit code
+        // alone must never be read as "a track arrived"). The implied
+        // quiet mode keeps stdout to just that line; errors still reach
+        // stderr, which the mutagen retry below depends on.
         executable.exec(": DL_YTDLP; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
-                        + "mkdir -p '" + safeDir + "' && timeout 1800 yt-dlp --no-playlist " + fmtArgs
-                        + " -o '" + safeDir + "/%(title)s.%(ext)s' 'ytsearch1:" + safeQuery + "'; rc=$?; "
+                        + "mkdir -p '" + safeDir + "' && timeout 1800 yt-dlp --no-playlist --print after_move:filepath " + fmtArgs
+                        + " -o '" + safeDir + "/%(title)s.%(ext)s' 'https://www.youtube.com/watch?v=" + videoId + "'; rc=$?; "
                         + "for f in '" + safeDir + "'/.covers/*.webp; do s=\"${f%.webp}\"; "
                         + "if [ -f \"$s.jpg\" ] || [ -f \"$s.png\" ]; then rm -f \"$f\"; fi; done 2>/dev/null; "
                         + "find '" + safeDir + "' -maxdepth 1 -name '*.part' -mtime +7 -delete 2>/dev/null; "
@@ -899,11 +998,23 @@ PlasmoidItem {
 
     Timer {
         id: sinkMasterPoll
+        // Every tick is a shell pipeline — pactl twice, grep, head, tr — so
+        // this is the most expensive repeating thing in the widget by process
+        // count, not by CPU. It runs ONLY with the popup open, which is the
+        // reason it is not slowed on battery: the seconds it costs are
+        // seconds the user is looking straight at the slider it feeds, and
+        // stretching it to ten made an external volume or mute change sit
+        // wrong on screen for that long. Power saved while someone stares at
+        // a stale number is not power well saved.
         interval: 2000
         repeat: true
         running: root.expanded
         triggeredOnStart: true
-        onTriggered: executable.exec(": SINKVOL;"
+        // LC_ALL=C is load-bearing, not hygiene: the mute readout greps
+        // pactl's own "yes"/"no", which a translated desktop answers in
+        // the user's language — the speaker icon then read "unmuted"
+        // forever. Same contract the sync engine's shell door sets.
+        onTriggered: executable.exec(": SINKVOL; export LC_ALL=C LANGUAGE=C;"
             + " v=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
             + " m=$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | grep -o 'yes\\|no');"
             + " echo \"SINKVOL ${v:--1} ${m:-no}\"; true # " + (++_execSeq))
@@ -919,9 +1030,23 @@ PlasmoidItem {
     }
 
     function toggleSinkMasterMute() {
-        _sinkMasterMuted = !_sinkMasterMuted;
-        executable.exec(": SINKSET; pactl set-sink-mute @DEFAULT_SINK@ "
-            + (_sinkMasterMuted ? "1" : "0") + " 2>/dev/null; true # " + (++_execSeq));
+        // pactl decides, not our cached belief. This used to flip
+        // _sinkMasterMuted and send the ABSOLUTE 0 or 1 that followed from
+        // it — which is the opposite of what the user asked whenever the
+        // mute moved from somewhere else since the last poll. The poll is
+        // two seconds behind on mains and ten on battery, and the keyboard
+        // mute key is exactly the "somewhere else" people use: mute from
+        // the keyboard, then press the widget's speaker to get sound back,
+        // and it sent set-sink-mute 1 and stayed silent.
+        //
+        // Reading the result back on the same round trip (SINKVOL's own
+        // sentinel and format) also means the icon flips as soon as the
+        // command returns instead of at the next poll.
+        executable.exec(": SINKVOL; export LC_ALL=C LANGUAGE=C;"
+            + " pactl set-sink-mute @DEFAULT_SINK@ toggle 2>/dev/null;"
+            + " v=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %);"
+            + " m=$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | grep -o 'yes\\|no');"
+            + " echo \"SINKVOL ${v:--1} ${m:-no}\"; true # " + (++_execSeq));
     }
 
     onExpandedChanged: {
@@ -1016,6 +1141,23 @@ PlasmoidItem {
         void _podDlRev;
         var e = _podDownloads[fileName];
         return (e && typeof e === "object") ? e : null;
+    }
+
+    // The file an episode was downloaded to, found by the episode's OWN
+    // identity rather than by recomputing its name. The name carries a tag
+    // derived from the feed, and a feed can move: `_podFeedRescue` rewrites
+    // the subscription when a show changes host, and from that moment every
+    // recomputed name misses — the row reads "not downloaded", tapping it
+    // streams over the network while the file sits on disk, and ⬇ fetches a
+    // second copy. The key never moves, so the ledger is asked instead.
+    function podcastFileForKey(key) {
+        void _podDlRev;
+        if (!key) return "";
+        for (var fn in _podDownloads) {
+            var e = _podDownloads[fn];
+            if (e && typeof e === "object" && e.key === key) return fn;
+        }
+        return "";
     }
 
     // Remove one downloaded episode: the FILE (guarded to the Podcasts
@@ -1259,7 +1401,7 @@ PlasmoidItem {
         var guard = null;
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podSearchSeq) return;   // a newer search took over
             try {
                 var res = JSON.parse(xhr.responseText || "{}").results || [];
@@ -1276,7 +1418,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1286,7 +1428,7 @@ PlasmoidItem {
         var guard = null;
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podSearchSeq) return;
             try {
                 var res = JSON.parse(xhr.responseText || "{}").data || [];
@@ -1303,7 +1445,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1324,7 +1466,7 @@ PlasmoidItem {
                 return;
             }
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podSearchSeq) return;
             try {
                 var res = JSON.parse(xhr.responseText || "[]") || [];
@@ -1341,7 +1483,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1359,7 +1501,7 @@ PlasmoidItem {
         var guard = null;
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podTrendSeq) return;
             root.podcastTrendingBusy = false;
             podcastTrendingModel.clear();
@@ -1382,7 +1524,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1423,7 +1565,7 @@ PlasmoidItem {
                 return;
             }
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podFeedSeq) return;
             root.podcastFeedLoading = false;
             // A capped body still parses — RSS carries the newest items first.
@@ -1456,7 +1598,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1468,7 +1610,7 @@ PlasmoidItem {
         var guard = null;
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podFeedSeq) return;
             var fresh = "";
             try {
@@ -1493,7 +1635,7 @@ PlasmoidItem {
                     : i18n("This address is not a podcast feed.");
                 return;
             }
-            console.log("[ARP] podcast feed heal: " + deadFeed + " -> " + fresh);
+            console.log("[ARP] podcast feed heal: " + _hostOf(deadFeed) + " -> " + _hostOf(fresh));
             // A subscribed show follows its feed for good — the seen map
             // and the per-show speed move with it, so nothing re-announces
             // and the remembered pace survives the move.
@@ -1512,15 +1654,38 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
 
     // The exact filename an episode downloads to — the UI checks the
-    // Podcasts folder for it to tell "download" from "play".
-    function podcastFileName(title, url) {
-        return PodcastLogic.safeFileName(title, "episode") + "." + PodcastLogic.fileExt(url);
+    // Podcasts folder for it to tell "download" from "play". The feed+guid
+    // tag is what keeps two shows' "Trailer" apart; podcastFileNameLegacy
+    // is the pre-tag name, which files already on disk still carry.
+    function podcastFileName(title, url, feed, guid) {
+        return PodcastLogic.episodeFileName(title, url, feed, guid);
+    }
+    function podcastFileNameLegacy(title, url) {
+        return PodcastLogic.legacyEpisodeFileName(title, url);
+    }
+
+    // May THIS show claim a pre-tag file? The old name carries no feed, so
+    // the ledger is the only witness — and it is asked only to CONTRADICT.
+    // A file the ledger never knew (downloaded before it, or pruned since)
+    // still belongs to whoever opens it, exactly as it always did; a row
+    // naming a different feed is proof of the very collision the tag was
+    // added to end, and then the alias is refused rather than handing one
+    // show the other's audio under the right title.
+    function podcastLegacyIsOurs(fileName, feed, guid, url) {
+        var e = _podDownloads[fileName];
+        if (!e) return true;
+        if (e.key !== undefined && e.key !== "") {
+            var k = PodcastLogic.episodeKey(guid, url);
+            if (k !== "" && e.key === k) return true;
+        }
+        if (!e.feed || !feed) return true;
+        return e.feed === feed;
     }
 
     function downloadEpisode(title, url, guid) {
@@ -1568,29 +1733,72 @@ PlasmoidItem {
         // link. Strip markup and bidi/control chars, exactly as every LAN
         // device name is stripped before it reaches a notification or a list.
         _podDownloadTitle = _sanitizeDeviceName(title);
-        // Every word single-quoted through the ONE tested escaper — the URL
-        // is fully feed-controlled, so a hand-rolled inline escape is
-        // exactly where a mistyped backslash became command injection.
-        var part = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + podcastFileName(title, url) + ".part");
-        var dest = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + podcastFileName(title, url));
-        var dir = PodcastLogic.shQuote(downloadDirPath + "/Podcasts");
-        var safeUrl = PodcastLogic.shQuote(url);
         // The episode's identity, held until the OK ack writes the ledger.
         _podDownloadMeta = {
-            "file": podcastFileName(title, url),
+            "file": podcastFileName(title, url, job.feed, guid),
             "key": _podDownloadKey,
             "title": _podDownloadTitle,
             "show": String(job.show || "").substring(0, 200),
             "art": PodcastLogic.urlAllowed(job.art) ? String(job.art).substring(0, 2048) : "",
             "feed": String(job.feed || "").substring(0, 2048)
         };
+        // A control character in the URL could smuggle a second line — a
+        // second directive — into the curl config written below. urlAllowed
+        // has vetted scheme and host already; an address with a newline in
+        // it is not an address.
+        if (/[\x00-\x1f\x7f]/.test(url)) {
+            _podDownloadFail("control character in enclosure URL");
+            return;
+        }
+        // The URL goes to disk first (owner-only, like reader.py's file) and
+        // curl picks it up with -K, so it never rides a long-lived argv. It
+        // is on THIS printf's command line for the microseconds the write
+        // takes — the whole-transfer exposure was the point of the change.
+        var cfgLine = 'url = "' + url.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
+        executable.exec(": POD_URL; umask 077; printf '%s' "
+            + PodcastLogic.shQuote(cfgLine)
+            + " > " + PodcastLogic.shQuote(_podUrlFile)
+            + " && echo __POD_URL_OK__ || echo __POD_URL_FAIL__; "
+            + "true # " + nextSeq());
+    }
+
+    // One failure road for both halves of a download: free the slot, tell
+    // the user if this was their own tap, and let the line move. The reason
+    // is for the journal, so it names no URL.
+    function _podDownloadFail(reason) {
+        console.warn("[ARP] podcast download failed: " + reason);
+        if (!_podDownloadAuto)
+            notify(i18n("Episode download failed"), _podDownloadTitle, "dialog-error");
+        _podDownloadKey = "";
+        _podDownloadTitle = "";
+        _podDownloadMeta = null;
+        if (_podDlQueue.length > 0) {
+            var nextJob = _podDlQueue.shift();
+            _podDlQueue = _podDlQueue;
+            _podStartDownload(nextJob);
+        }
+    }
+
+    // The transfer itself, started only once the URL file is on disk.
+    // Every word single-quoted through the ONE tested escaper — the file
+    // name derives from feed data, so a hand-rolled inline escape is
+    // exactly where a mistyped backslash became command injection.
+    function _podRunDownload() {
+        var pdm = _podDownloadMeta;
+        if (!pdm || !pdm.file) return;
+        var part = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + pdm.file + ".part");
+        var dest = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + pdm.file);
+        var dir = PodcastLogic.shQuote(downloadDirPath + "/Podcasts");
+        var cfg = PodcastLogic.shQuote(_podUrlFile);
         // Staged download: .part first, atomic rename on success — the
         // folder model never lists a half-written file as playable. The
         // size cap guards the disk; -f keeps HTTP errors out of the file.
+        // The config file is spent the moment curl exits, either way.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.23' -o " + part + " " + safeUrl + " "
-            + "&& mv -f " + part + " " + dest + " "
+            + "-A 'OnAir/2026.24' -o " + part + " -K " + cfg + "; "
+            + "rc=$?; rm -f " + cfg + "; "
+            + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
             + "true # " + nextSeq());
     }
@@ -1681,8 +1889,11 @@ PlasmoidItem {
                 // A guid-less feed whose enclosure URL wears a per-request
                 // token would read "new" on every fetch — the TITLE-derived
                 // filename is the stable identity to remember it by.
+                // The LEGACY (title-only) name is the right stable identity
+                // here: the tagged name folds the guid back in, and for a
+                // guid-less feed that is exactly what this branch cannot use.
                 var nk = newest.guid !== "" ? PodcastLogic.episodeKey(newest.guid, newest.url)
-                                            : "t:" + podcastFileName(newest.title, newest.url);
+                                            : "t:" + podcastFileNameLegacy(newest.title, newest.url);
                 var known = _podSeen[job.feed];
                 if (known === undefined) {
                     _podSeen[job.feed] = nk;      // first acquaintance: quiet
@@ -1690,7 +1901,14 @@ PlasmoidItem {
                     _podSeen[job.feed] = nk;
                     _podRefreshNews.push(_sanitizeDeviceName(job.title || feed.title || ""));
                     var epKey = PodcastLogic.episodeKey(newest.guid, newest.url);
-                    var already = _podDownloads[podcastFileName(newest.title, newest.url)] !== undefined;
+                    // Either name counts as "already here": episodes fetched
+                    // before the tag existed sit under the legacy one.
+                    var legacyName = podcastFileNameLegacy(newest.title, newest.url);
+                    var already = _podDownloads[podcastFileName(newest.title, newest.url,
+                                                                job.feed, newest.guid)] !== undefined
+                                  || (_podDownloads[legacyName] !== undefined
+                                      && podcastLegacyIsOurs(legacyName, job.feed,
+                                                             newest.guid, newest.url));
                     if (Plasmoid.configuration.podcastAutoDownload === true
                         && !already && !isEpisodePlayed(epKey)) {
                         // Counted only when the queue actually TOOK it — a
@@ -1772,11 +1990,11 @@ PlasmoidItem {
             }
             if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
             done = true;
-            if (guard) guard.stop();
+            _clearXhrTimeout(guard); guard = null;
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1982,6 +2200,7 @@ PlasmoidItem {
         _flushPodPositions();
         _podPlayingKey = "";
         _podPlayingUrl = "";
+        _podPlayingRawUrl = "";
         _podPlayingArt = "";
         _podPlayingShow = "";
         _podPendingSeekUrl = "";
@@ -2346,15 +2565,37 @@ PlasmoidItem {
         }
     }
 
+    // The balance a sleeping speaker will come back at, as a percentage —
+    // "" when it is at full and there is nothing worth saying. The slider
+    // for an absent speaker cannot be shown (there is no sink to bind it
+    // to), and its VALUE was the part the user actually wanted to know:
+    // the row said "remembered" while quietly withholding at what level.
+    function _syncTrimTextFor(mac) {
+        try {
+            const t = JSON.parse(Plasmoid.configuration.deviceTrims || "{}")[mac];
+            if (t === undefined) return "";
+            const pct = Math.round(parseFloat(t) * 100);
+            if (!isFinite(pct) || pct >= 100 || pct <= 0) return "";
+            return pct + "%";
+        } catch (e) {
+            return "";
+        }
+    }
+
     function _favUrls() {
         const seen = {};
         const urls = [];
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             for (const s of servers) {
-                const f = (s.favicon || "").toString().trim();
-                // http(s) only — anything else must never reach the shell
-                if (!/^https?:\/\//i.test(f) || seen[f]) continue;
+                // The same gate the write side passes, applied again on the
+                // way OUT: a scheme test alone was the whole check here, and
+                // this list becomes a curl fetch at every widget start. Logos
+                // stored before the host gate existed — or arriving by a hand
+                // edit or an .arp import — would otherwise still knock on the
+                // LAN once per start, with no click anywhere.
+                const f = FaviconLogic.webUrlOrEmpty((s.favicon || "").toString().trim());
+                if (f === "" || seen[f]) continue;
                 seen[f] = true;
                 urls.push(f);
             }
@@ -2590,6 +2831,17 @@ PlasmoidItem {
     // Same stable-id pattern as the MPRIS files: two widget instances must
     // never kill each other's recording via a shared pid file.
     readonly property string _recPidFile: _mprisRunDir + "/arp-rec-" + _mprisId + ".pid"
+    // The recording's own curl config, same owner-only road the podcast
+    // downloads take. A recording runs for minutes or hours, so a stream URL
+    // on ffmpeg's argv was the LONGEST-lived leak in the widget: anyone with
+    // a shell on the machine could read a per-listener token out of
+    // /proc/<pid>/cmdline the whole time. curl fetches from the file and
+    // pipes the bytes to ffmpeg, which never learns the address.
+    readonly property string _recUrlFile: _mprisRunDir + "/arp-rec-url-" + _mprisId
+    // The recording waiting for its config file to land (the write is its
+    // own short command — putting it in the same string as the recording
+    // would park the URL on THAT shell's argv for the whole session).
+    property var _recPending: null
     property var recSchedules: []
 
     function _pad2(n) { return ("0" + n).slice(-2); }
@@ -2635,17 +2887,60 @@ PlasmoidItem {
     // from a stream that died on its own.
     property bool _recStopRequested: false
 
+    // A recording that ends BEFORE its shell ever ran never reaches the
+    // completion handler — and that handler is the only place the scheduled
+    // bookkeeping is settled. Without this, a scheduled occurrence that fails
+    // this early keeps its key marked active with no backoff written, so the
+    // 30 s tick relaunches it (and notifies) for the whole window.
+    // stopped: the user called it off, so the occurrence is spent rather than
+    // retried — the same distinction the completion handler draws.
+    function _recFinishAborted(stopped) {
+        var key = _recActiveSchedKey;
+        var wasScheduled = _recScheduled;
+        recording = false;
+        _recScheduled = false;
+        _recStopRequested = false;
+        _recActiveSchedKey = "";
+        _recUrl = "";
+        _recFilePath = "";
+        _recTracksPath = "";
+        _recPending = null;
+        // The address may already be on disk with nothing left to read it.
+        executable.exec(": REC_URLCLEAN; rm -f '"
+                        + _recUrlFile.replace(/'/g, "'\\''") + "'; true # " + (++_execSeq));
+        if (!wasScheduled || key === "") return;
+        if (stopped) {
+            delete _recRetryCount[key];
+            delete _recRetryAfter[key];
+            _recSchedAdvance(key);
+            return;
+        }
+        var n = (_recRetryCount[key] || 0) + 1;
+        _recRetryCount[key] = n;
+        _recRetryAfter[key] = n >= 6
+            ? Date.now() + 3600000
+            : Date.now() + Math.min(240000, 30000 * Math.pow(2, n - 1));
+    }
+
     function recStop() {
         if (!recording) return;
         _recStopRequested = true;
+        // A stop can land in the gap between the url-file write and its ack,
+        // where there is no pid yet and nothing to signal. The pending job is
+        // dropped here so the ack cannot start a recording the user (or a
+        // station switch) has already called off — it used to start anyway,
+        // and on a station switch it recorded the PREVIOUS station.
+        if (_recPending !== null) {
+            _recFinishAborted(true);
+            return;
+        }
         var safePid = _recPidFile.replace(/'/g, "'\\''");
-        // SIGINT (not KILL) lets ffmpeg finish the container properly. Verify
-        // the pid is actually OUR ffmpeg before signalling: a hard-killed
-        // wrapper can leave a stale pid file, and after pid reuse a blind
-        // kill would SIGINT an unrelated process (same guard the alarm
-        // inhibitor uses).
+        // The pid is the pipeline's ffmpeg — SIGINT (not KILL) is what lets it
+        // finish the container. Verify it is really ours before signalling: a
+        // hard-killed wrapper can leave a stale pid file, and after pid reuse
+        // a blind kill would hit an unrelated process.
         executable.exec(": REC_STOP; p=$(cat '" + safePid + "' 2>/dev/null);"
-            + " [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*-rw_timeout'"
+            + " [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'"
             + " && kill -INT \"$p\" 2>/dev/null; true");
     }
 
@@ -2692,7 +2987,6 @@ PlasmoidItem {
         var safeDir = downloadDirPath.replace(/'/g, "'\\''");
         var safeOut = _recFilePath.replace(/'/g, "'\\''");
         var safeTracks = _recTracksPath.replace(/'/g, "'\\''");
-        var safeUrl = url.replace(/'/g, "'\\''");
         var safePid = _recPidFile.replace(/'/g, "'\\''");
         // ffmpeg runs as a CHILD (&, wait) — the pid file holds the timeout
         // wrapper's pid for SIGINT (GNU timeout forwards it, so a user stop
@@ -2715,34 +3009,80 @@ PlasmoidItem {
         var recEstMin = scheduled ? Math.ceil(_recDurationSec / 60)
                                   : Math.min(30, Math.ceil(_recDurationSec / 60));
         var recNeedKiB = recEstMin * (ext === "wav" ? 10240 : 2048);
-        executable.exec(": REC_START; if ! command -v ffmpeg >/dev/null 2>&1; then echo __NO_FFMPEG__; exit 0; fi; "
-            + "mkdir -p '" + safeDir + "' || { echo __REC_EMPTY__; exit 0; }; "
-            + "avail=$(df -Pk '" + safeDir + "' 2>/dev/null | awk 'NR==2{print $4}'); "
-            + "if [ -n \"$avail\" ] && [ \"$avail\" -lt " + recNeedKiB + " ] 2>/dev/null; then echo __REC_NOSPACE__; exit 0; fi; "
-            + "timeout --signal=INT --kill-after=30 " + (_recDurationSec + Math.max(300, Math.ceil(_recDurationSec * 0.10)))
-            + " ffmpeg -hide_banner -nostdin -loglevel error"
-            + " -user_agent 'VLC/3.0.20 LibVLC/3.0.20'"
-            + " -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10"
-            // A server that stops sending but holds the TCP socket open makes
-            // ffmpeg block on read forever: '-t' caps MEDIA time, which never
-            // advances, so the process (and the whole recorder) would hang
-            // for days. -rw_timeout gives up on a read after 30 s of silence,
-            // turning the stall into an EOF the reconnect logic can act on.
-            + " -rw_timeout 30000000"
-            + " -i '" + safeUrl + "' " + codecArgs + " -t " + Math.max(60, Math.floor(durationSec))
-            + " -metadata title='" + base.replace(/'/g, "'\\''") + "'"
-            + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
-            + " -n '" + safeOut + "' & pid=$!; echo $pid > '" + safePid + "'; "
-            + "wait $pid; rc=$?; rm -f '" + safePid + "'; "
-            // Report ffmpeg's exit code AND the file size — "file is not empty"
-            // alone reported half-dead recordings (disk full, stream died) as
-            // successes. The QML side combines rc with the elapsed time to tell
-            // a requested stop / duration cap from a mid-recording failure.
-            + "bytes=$(stat -c %s '" + safeOut + "' 2>/dev/null || echo 0); "
-            + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then echo \"__REC_DONE__ rc=$rc bytes=$bytes\"; "
-            + "else rm -f '" + safeOut + "' '" + safeTracks + "'; echo \"__REC_EMPTY__ rc=$rc\"; fi");
-        if (scheduled)
-            notify(i18n("Scheduled recording started"), stationName, "media-record");
+        var safeCfg = _recUrlFile.replace(/'/g, "'\\''");
+        // A control character would smuggle a second directive into the curl
+        // config — the same guard the podcast download applies to its own.
+        if (/[\x00-\x1f\x7f]/.test(url)) {
+            notify(i18n("Recording failed"), stationName, "dialog-error");
+            _recFinishAborted(false);
+            return;
+        }
+        // Everything the recording command needs EXCEPT the address. It waits
+        // for the config write below, which is deliberately its own short
+        // command: one string carrying both would put the URL on the
+        // recording shell's argv for the whole recording — the very leak.
+        _recPending = {
+            // Every early exit takes the config file with it — the address
+            // must not outlive the recording that never started.
+            "cmd": ": REC_START; cln() { rm -f '" + safeCfg + "'; }; "
+                + "if ! command -v ffmpeg >/dev/null 2>&1; then cln; echo __NO_FFMPEG__; exit 0; fi; "
+                + "if ! command -v curl >/dev/null 2>&1; then cln; echo __NO_CURL__; exit 0; fi; "
+                + "mkdir -p '" + safeDir + "' || { cln; echo __REC_EMPTY__; exit 0; }; "
+                + "avail=$(df -Pk '" + safeDir + "' 2>/dev/null | awk 'NR==2{print $4}'); "
+                + "if [ -n \"$avail\" ] && [ \"$avail\" -lt " + recNeedKiB + " ] 2>/dev/null; then cln; echo __REC_NOSPACE__; exit 0; fi; "
+                // curl owns the network now, so its flags carry what ffmpeg's
+                // used to: -A is the VLC agent (some stations refuse ffmpeg's
+                // own), --retry replaces -reconnect, and --speed-time is the
+                // -rw_timeout twin — a server that holds the socket open
+                // while sending nothing is given up on after 30 s instead of
+                // blocking a recording for days.
+                //
+                // ONE shell, no nested `sh -c "…"`. A double-quoted inner
+                // command would be expanded by the OUTER shell first, and a
+                // station name is catalogue text: measured, "Cash $Money FM"
+                // lost its word and "Radio $(id -un) FM" ran the command.
+                // Single quotes on one level keep every name literal, exactly
+                // as they did before the URL moved off the argv.
+                //
+                // The wall-clock cap wraps CURL, and the pid written down is
+                // the pipeline's last member — ffmpeg. Stopping it finalizes
+                // the container directly and curl leaves with the broken pipe
+                // (measured: a valid file, the dollar intact, nothing left
+                // running).
+                + " timeout --signal=INT --kill-after=30 " + (_recDurationSec + Math.max(300, Math.ceil(_recDurationSec * 0.10)))
+                // --http0.9: a Shoutcast v1 server answers "ICY 200 OK", which
+                // is not an HTTP status line, and curl has refused those by
+                // default since 7.66 — exit 1, no retry, no bytes. ffmpeg's own
+                // client parsed them, so these stations recorded fine until the
+                // fetch moved to curl and then failed instantly while playback
+                // kept working. Measured against a real ICY responder: with the
+                // flag the recording is a valid file, the ICY header does not
+                // leak into it, and an ordinary HTTP station is unaffected.
+                + " curl -sS -L --http0.9 -K '" + safeCfg + "'"
+                + " -A 'VLC/3.0.20 LibVLC/3.0.20'"
+                + " --retry 20 --retry-delay 2 --speed-limit 1 --speed-time 30"
+                + " | ffmpeg -hide_banner -nostdin -loglevel error -i pipe:0 "
+                + codecArgs + " -t " + Math.max(60, Math.floor(durationSec))
+                + " -metadata title='" + base.replace(/'/g, "'\\''") + "'"
+                + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
+                + " -n '" + safeOut + "'"
+                + " & pid=$!; echo $pid > '" + safePid + "'; "
+                + "wait $pid; rc=$?; rm -f '" + safePid + "' '" + safeCfg + "'; "
+                // Report the exit code AND the file size — "file is not empty"
+                // alone reported half-dead recordings (disk full, stream died) as
+                // successes. The QML side combines rc with the elapsed time to tell
+                // a requested stop / duration cap from a mid-recording failure.
+                + "bytes=$(stat -c %s '" + safeOut + "' 2>/dev/null || echo 0); "
+                + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then echo \"__REC_DONE__ rc=$rc bytes=$bytes\"; "
+                + "else rm -f '" + safeOut + "' '" + safeTracks + "'; echo \"__REC_EMPTY__ rc=$rc\"; fi",
+            "scheduled": scheduled,
+            "station": stationName
+        };
+        var recCfgLine = 'url = "' + url.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
+        executable.exec(": REC_URL; umask 077; printf '%s' "
+            + PodcastLogic.shQuote(recCfgLine)
+            + " > " + PodcastLogic.shQuote(_recUrlFile)
+            + " && echo __REC_URL_OK__ || echo __REC_URL_FAIL__; true # " + nextSeq());
     }
 
     // ── Scheduled recordings ─────────────────────────────────────────────────
@@ -3097,6 +3437,14 @@ PlasmoidItem {
         // mid-flight would drag the volume right back down, and a pending
         // sleep timer would stop the just-started station minutes later.
         cancelSleepTimer();
+        // Last night's episode has to be handed over before the station takes
+        // the player, exactly as _playStation and playLocalFile do it. Left
+        // standing, the episode's key outlives it: the stall timer then files
+        // the STATION's position under the episode's bookmark, and the connect
+        // watchdog reads "a podcast is playing" and stops instead of healing —
+        // so the one thing an alarm may never do, end in silence, is what the
+        // recovery road would have done.
+        _podHandoff();
         alarmFallbackTimer.interval = 25000;   // a kick may have shortened it
         // ...and a sink left muted last night would turn the wake-up into
         // silence — unmute it, best-effort (no pactl / no PulseAudio is fine).
@@ -3116,6 +3464,13 @@ PlasmoidItem {
         // the same one — that is exactly the route that dies overnight.
         _alarmCastConfirmed = false;
         _castCurrentUrl = "";
+        // The evening's last act may have been a search preview, and the
+        // preview pair outlives the popup: left set, the alarm's own stream
+        // inherits the preview's short connect leash, and the failure roads
+        // would retry LAST NIGHT's candidate under this alarm's station
+        // name. The alarm starts clean.
+        _previewUrl = "";
+        _previewUuid = "";
         // startWithFade is called directly (no _playStation), so the
         // origin/resolved pair would still describe LAST NIGHT's stream —
         // and an error on the alarm stream would then heal the wrong
@@ -3269,11 +3624,22 @@ PlasmoidItem {
             _healSeq++;
             _healClearPending();
             _healRun = null;
+            // A preview retry rung still in flight holds the same power as
+            // a heal audition — its startWithFade would replace the tone
+            // just the same. Same bump, same reason.
+            _previewSeq++;
+            _previewUrl = "";
+            _previewUuid = "";
             healTimer.stop();
             healRetryTimer.stop();
             netResumeTimer.stop();
             connectWatchdog.stop();
             _wantsPlaying = false;
+            // A podcast alarm that never got going hands its episode over
+            // here: the tone is taking the player, so the needle is filed
+            // and the episode's identity retired before it can follow the
+            // chime around.
+            _podHandoff();
             // file:// skips the cast branch in startWithFade — the tone
             // plays locally, which is exactly where the sleeper is. The tone
             // starts BEFORE the toast: the sleeper needs sound, not words,
@@ -3646,7 +4012,19 @@ PlasmoidItem {
     // continues uninterrupted (now as an "own" station).
     function addStationToList(name, url, favicon, makeFavorite, rbUuid) {
         if (!url) return;
-        const keepPlaying = isPlaying() && root._previewUrl === url;
+        // A cast preview counts: the local player idles while the speaker
+        // sounds, and isPlaying() alone left the handoff branch unreached —
+        // the starred row kept "previewing" a stream the write had killed.
+        const keepPlaying = (isPlaying() || _casting) && root._previewUrl === url;
+        // Starring row B while row A's preview is audible: the config write
+        // stops A cold with no fade and no resume road of its own. Capture
+        // the audition and restart it after the write settles.
+        const foreignPreview = (isPlaying() || _casting)
+                               && root._previewUrl !== "" && root._previewUrl !== url
+                               ? { "name": root.currentStation, "url": root._previewUrl,
+                                   "icon": root.currentStationFavicon,
+                                   "uuid": root._previewUuid, "raw": root._previewRawUrl }
+                               : null;
         // The config write below stops playback (onServersChanged). If a regular
         // list station was playing, remember it so it can resume afterwards —
         // same guard as removeStation: only a real list-station stream, never a
@@ -3656,28 +4034,45 @@ PlasmoidItem {
                               ? root._currentOrigUrl : "";
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
+            var wrote = false;
+            var known = false;
             for (var i = 0; i < servers.length; i++) {
                 if ((servers[i].hostname || "") === url) {
+                    known = true;
                     if (makeFavorite && !isFavorite(servers[i].name)) toggleFavorite(servers[i].name);
-                    return;
+                    // A saved station can only appear as a web result while
+                    // it is DEACTIVATED (the search dedup knows active rows
+                    // only) — and the ⭐ then did nothing at all: row gone,
+                    // station still hidden. "Add" means make it show.
+                    if (servers[i].active === false) {
+                        servers[i].active = true;
+                        Plasmoid.configuration.servers = JSON.stringify(servers);
+                        wrote = true;
+                    }
+                    break;
                 }
             }
-            const stName = (name || url).toString();
-            // The radio-browser uuid rides along from the search result — it
-            // is the station's identity for clicks/votes, free at add time.
-            // The one gate every persisted favicon passes: file://, data:
-            // and scheme-less strings become "" (the backfill then fills).
-            servers.push({ "active": true, "hostname": url, "name": stName,
-                           "favicon": FaviconLogic.webUrlOrEmpty(favicon),
-                           "uuid": rbUuid || "" });
-            // This triggers onServersChanged → reloadStationsModel (stop + reload),
-            // so we continue only after an event-loop cycle.
-            Plasmoid.configuration.servers = JSON.stringify(servers);
-            // Favorites are keyed by NAME: starring a new station whose name
-            // already matches an existing favorite must not TOGGLE that
-            // favorite off. Guard on isFavorite, same as the already-in-list
-            // branch above.
-            if (makeFavorite && !isFavorite(stName)) toggleFavorite(stName);
+            if (!known) {
+                const stName = (name || url).toString();
+                // The radio-browser uuid rides along from the search result — it
+                // is the station's identity for clicks/votes, free at add time.
+                // The one gate every persisted favicon passes: file://, data:
+                // and scheme-less strings become "" (the backfill then fills).
+                servers.push({ "active": true, "hostname": url, "name": stName,
+                               "favicon": FaviconLogic.webUrlOrEmpty(favicon),
+                               "uuid": rbUuid || "" });
+                // This triggers onServersChanged → reloadStationsModel (stop + reload),
+                // so we continue only after an event-loop cycle.
+                Plasmoid.configuration.servers = JSON.stringify(servers);
+                // Favorites are keyed by NAME: starring a new station whose name
+                // already matches an existing favorite must not TOGGLE that
+                // favorite off. Guard on isFavorite, same as the already-in-list
+                // branch above.
+                if (makeFavorite && !isFavorite(stName)) toggleFavorite(stName);
+                wrote = true;
+            }
+            // No write, no stop — nothing to hand over or resume.
+            if (!wrote) return;
             Qt.callLater(function() {
                 for (var k = 0; k < stationsModel.count; k++) {
                     const h = stationsModel.get(k).hostname;
@@ -3694,6 +4089,17 @@ PlasmoidItem {
                         return;
                     }
                 }
+                // Neither branch claimed the audio and a foreign preview was
+                // audible before the write — give the audition back. UNLESS
+                // it never went silent: the config write stops only the
+                // local player, a cast keeps sounding right through it, and
+                // "restarting" it would hit previewStation's toggle branch
+                // and stop the speaker instead.
+                if (foreignPreview
+                    && !(root._casting && root._previewUrl === foreignPreview.url))
+                    previewStation(foreignPreview.name, foreignPreview.url,
+                                   foreignPreview.icon, foreignPreview.uuid,
+                                   foreignPreview.raw);
             });
         } catch (e) {
             console.log("[ARP] addStationToList: " + e);
@@ -3797,7 +4203,11 @@ PlasmoidItem {
                     }
                     // If we can't find the user's URL in radio-browser we can't
                     // judge "higher bitrate" safely — skip the upgrade entirely.
-                    if (!foundOrig) {
+                    // Same when its reported bitrate is 0: that is the
+                    // directory's "unknown", not a floor, and treating it as
+                    // one let any low-rate sibling replace an unreported
+                    // main mount as an "upgrade". No baseline, no switch.
+                    if (!foundOrig || origBr === 0) {
                         _bitrateCachePut(origUrl, origUrl);
                         onPicked(origUrl);
                         return;
@@ -3841,7 +4251,7 @@ PlasmoidItem {
             // for the same reason.
             if (answered) _bitrateCachePut(origUrl, pickedUrl);
             if (pickedUrl !== origUrl) {
-                console.log("[ARP] auto-bitrate upgrade: " + stationName + " => " + pickedUrl);
+                console.log("[ARP] auto-bitrate upgrade: " + _hostOf(origUrl) + " => " + _hostOf(pickedUrl));
             }
             onPicked(pickedUrl);
         });
@@ -3890,13 +4300,17 @@ PlasmoidItem {
     // move on to the next mirror; anything else, including a 4xx that would
     // be identical everywhere, belongs to the caller. Every mirror down →
     // onDone(null), so callers can fall back instead of waiting forever.
-    function _rbFetch(path, timeoutMs, onDone) {
+    function _rbFetch(path, timeoutMs, onDone, single) {
         // The order starts at the mirror that answered LAST — a mirror that
         // just worked keeps working, and nobody waits behind a known-slow
         // one's timeout on every single lookup.
         var order = [];
         for (var mi = 0; mi < root._rbMirrors.length; mi++)
             order.push(root._rbMirrors[(root._rbMirrorGood + mi) % root._rbMirrors.length]);
+        // single = a write, not a read. A vote whose reply got lost on the
+        // way back has still been counted — walking the failover would
+        // submit it again on the next mirror. One attempt, honest failure.
+        if (single) order = [order[0]];
         var attempt = 0;
         function tryNext() {
             if (attempt >= order.length) { onDone(null); return; }
@@ -3907,7 +4321,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.23");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.24");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -3931,13 +4345,20 @@ PlasmoidItem {
                 // and 'try again later' from one server is not the
                 // directory's answer — the next mirror serves it fine.
                 // (Measured live: a busy de1 turned a working directory
-                // into 'not reachable' for the user.)
-                if (xhr.status === 0 || xhr.status >= 500 || xhr.status === 429) {
+                // into 'not reachable' for the user.) 403/401 are the same
+                // class — a WAF or IP rule on one mirror, not the
+                // directory's verdict; these endpoints never auth.
+                if (xhr.status === 0 || xhr.status >= 500 || xhr.status === 429
+                    || xhr.status === 403 || xhr.status === 401) {
                     tryNext();
                     return;
                 }
-                root._rbMirrorGood = root._rbMirrors.indexOf(srv) >= 0
-                                     ? root._rbMirrors.indexOf(srv) : 0;
+                // Pin only a mirror that genuinely ANSWERED: pinning on any
+                // delivered status parked the rotation on index 0 while it
+                // was refusing, and the failover never rotated again.
+                if (xhr.status >= 200 && xhr.status < 400)
+                    root._rbMirrorGood = root._rbMirrors.indexOf(srv) >= 0
+                                         ? root._rbMirrors.indexOf(srv) : 0;
                 onDone(xhr);
             };
             guard = _armXhrTimeout(xhr, timeoutMs);
@@ -4040,8 +4461,11 @@ PlasmoidItem {
         // identical stop commands — without the suffix the second one would
         // be swallowed and the device would keep playing. A trailing shell
         // comment keeps the sentinel prefix matches unaffected.
-        // Deliberately NOT applied to executable.exec() globally: reader.py
-        // polling relies on the dedup as its natural in-flight throttle.
+        // Not applied to executable.exec() globally, but not because anything
+        // depends on the dedup: the title poll carries its own suffix for the
+        // same reason this one does, and is paced by its 5 s timer instead.
+        // Commands that may genuinely repeat opt in here; the rest are better
+        // off deduped.
         cmd += " # " + (++_execSeq);
         executable.exec(cmd);
     }
@@ -4093,7 +4517,42 @@ PlasmoidItem {
     readonly property var playerOutput: playMusicOutput
     readonly property string instanceId: _mprisId
 
-    function exec(cmd) { executable.exec(cmd); }
+    // The sync engine's only door to a shell — every one of its commands
+    // comes through here, which is where the C locale belongs rather than
+    // at 25 call sites: the balance and latency work parses pactl's own
+    // words ("Sink Input #", "Owner Module:", "Latency:"), and on a
+    // translated desktop those come back in the user's language, so the
+    // trims went silently dead. The export goes BEHIND the ": PW_x;"
+    // sentinel, never in front of it: the engine dispatches every answer
+    // with indexOf(sentinel) === 0, and a prefix would orphan all of them.
+    // The A2DP profile bounce, in one place. Two callers walk the same road —
+    // the solo speaker kick and the sync watchdog's join kick — and each used
+    // to carry its own copy of this shell. NEVER a disconnect: measured on a
+    // JBL Flip 7, a software disconnect can destroy the pairing outright, so
+    // the profile is cycled instead and the previous one restored if both
+    // standard A2DP spellings refuse. Ships without a sentinel or a sequence
+    // suffix — those belong to the caller's own round-trip — and the caller
+    // must be in the C locale, because the awk reads pactl's English labels.
+    function btProfileBounceShell(mac) {
+        const macU = String(mac).replace(/:/g, "_");
+        return "c=bluez_card." + macU
+             + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + macU + "/{f=1}"
+             + " f && /Active Profile:/{print $3; exit}');"
+             + " timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
+             + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
+             + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
+             + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true";
+    }
+
+    function exec(cmd) {
+        // The sentinel runs to the first ";" and can carry arguments
+        // (": BT_KICK AA:BB:…;"), so match the whole no-op command, not a
+        // bare word — BT_KICK's own handler reads that MAC back out of it.
+        const s = String(cmd);
+        const m = /^(:[^;]*;\s*)/.exec(s);
+        const loc = "export LC_ALL=C LANGUAGE=C; ";
+        executable.exec(m ? m[1] + loc + s.slice(m[1].length) : loc + s);
+    }
     function nextSeq() { return ++_execSeq; }
 
     // The ONLY door to dlNotification (dev.sh lints direct use). A toast is
@@ -4459,14 +4918,8 @@ PlasmoidItem {
                 // The bounce renegotiates A2DP; the link stays untouched,
                 // and the previous profile is restored if both standard
                 // names refuse, so the card is never left dead on "off".
-                var soloMacU = mac.replace(/:/g, "_");
-                executable.exec(": BT_SOLOKICK; c=bluez_card." + soloMacU
-                    + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + soloMacU + "/{f=1}"
-                    + " f && /Active Profile:/{print $3; exit}');"
-                    + " timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
-                    + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
-                    + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
-                    + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true"
+                executable.exec(": BT_SOLOKICK; export LC_ALL=C LANGUAGE=C; "
+                    + btProfileBounceShell(mac)
                     + " # " + (++root._execSeq));
                 btRouteTimeout.interval = 30000;
                 btRouteTimeout.restart();
@@ -4586,12 +5039,20 @@ PlasmoidItem {
     }
 
     function _castPlayOn(dev, url, name, art) {
+        // A podcast episode is not a stream: it has a duration and the
+        // listener owns a position in it. Told nothing, the receiver was
+        // sent it as LIVE — no scrubber, no seek, and the resume bookmark
+        // dropped on the floor, so a device always started the episode from
+        // zero. The position rides along and the receiver gets its own.
+        var podPos = (root._podPlayingUrl !== "" && url === root._podPlayingUrl)
+                     ? Math.max(0, Math.round(playMusic.position / 1000)) : -1;
         if (dev.kind === "dlna") {
             _castExec("CAST_PLAY", ["dlna-play", dev.location, url,
                                     _castContentType(url), name || "", art || ""]);
         } else {
             _castExec("CAST_PLAY", ["play", dev.host, dev.port, dev.uuid, dev.deviceModel,
-                                    url, _castContentType(url), name || "", art || ""]);
+                                    url, _castContentType(url), name || "", art || "",
+                                    podPos >= 0 ? String(podPos) : ""]);
         }
     }
 
@@ -4888,7 +5349,7 @@ PlasmoidItem {
             return;
         }
         var next = run.candidates.shift();
-        console.log("[ARP] heal: auditioning " + next.url + " for dead " + run.orig);
+        console.log("[ARP] heal: auditioning " + _hostOf(next.url) + " for dead " + _hostOf(run.orig));
         _unwrapPlaylist(next.url, function(playUrl) {
             if (run.seq !== _healSeq) return;
             root._healOrigUrl = run.orig;
@@ -5114,9 +5575,10 @@ PlasmoidItem {
             && now - _clickSent[entry.hostname] < 14400000) return;
         _clickSent[entry.hostname] = now;
         _rbResolveUuid(function(uuid) {
-            // Fire-and-forget, but with failover — a dead mirror used to
-            // swallow the ping while the 4 h lock was already taken.
-            _rbFetch("/json/url/" + uuid, 4000, function(xhr) {});
+            // Fire-and-forget, single attempt: the ping is a write, and a
+            // reply lost on flaky wifi does not mean the click was — the
+            // failover walk was double-counting it on the next mirror.
+            _rbFetch("/json/url/" + uuid, 4000, function(xhr) {}, true);
         });
     }
 
@@ -5127,6 +5589,10 @@ PlasmoidItem {
         _voteStatus = "busy";
         var votedUrl = entry.hostname;
         _rbResolveUuid(function(uuid) {
+            // Single attempt (see _rbFetch): a vote is a write, and the
+            // API counts it whether or not the reply survived the wifi —
+            // re-walking the mirrors turned one 👍 into several and then
+            // reported the vote as failed on top.
             _rbFetch("/json/vote/" + uuid, 5000, function(xhr) {
                 var ok = false;
                 try { ok = xhr && JSON.parse(xhr.responseText).ok === true; } catch (e) {}
@@ -5136,7 +5602,7 @@ PlasmoidItem {
                 } else if (root._currentOrigUrl === votedUrl && root._voteStatus === "busy") {
                     root._voteStatus = "";
                 }
-            });
+            }, true);
         });
         // The resolve may fail silently — release the button after a beat.
         voteResetTimer.restart();
@@ -5370,6 +5836,7 @@ PlasmoidItem {
             // (the position was stamped at stop entry).
             _podPlayingKey = "";
             _podPlayingUrl = "";
+            _podPlayingRawUrl = "";
             _podPlayingArt = "";
             _podPlayingShow = "";
             playMusicOutput.volume = targetVolume();
@@ -5390,6 +5857,13 @@ PlasmoidItem {
         // multi-room mode, in addition to) decoding it locally. Local files
         // can't be cast (the devices can't reach file://), so those still
         // play only on this computer.
+        // A podcast episode takes the LOCAL player by design (the receivers
+        // get no resume, no position and no speed — see the cast notes), but
+        // "not cast" is not "leave the old cast running": the station kept
+        // playing on the TV while the episode played here, and nothing in
+        // the UI said so. The devices are released before the episode starts.
+        if (_podStarting && _castTargets.length > 0 && _casting)
+            _castStopAll();
         if (_castTargets.length > 0 && station.hostname && !root._podStarting
             && station.hostname.toString().indexOf("file://") !== 0) {
             var castUrl = station.hostname.toString();
@@ -5507,7 +5981,17 @@ PlasmoidItem {
             // current gen and its result (even a __NO_ICY__) landed on the new
             // station.
             var safeUrl = u.replace(/'/g, "'\\''");
-            executable.exec(": ICY_SRC; umask 077; printf '%s' '" + safeUrl + "' > '" + safeFile + "'");
+            // The flag above is set OPTIMISTICALLY, before the write is known
+            // to have landed — a failed write (full runtime dir, a vanished
+            // XDG_RUNTIME_DIR) would then never be retried within the
+            // station, and every later poll would read a stale or missing
+            // file. The sentinel lets the ack put the flag back so the next
+            // poll writes again.
+            // The sentinel stays BARE — naming the station in it would put the
+            // address back on a command line, which is the whole point of the
+            // file. The handler compares against _icyUrlFileFor instead.
+            executable.exec(": ICY_SRC; umask 077; printf '%s' '" + safeUrl + "' > '" + safeFile
+                            + "' && echo __ICY_SRC_OK__ || echo __ICY_SRC_FAIL__");
             return;
         }
         // reader.py reads the URL from the file (path is not sensitive). The
@@ -5515,8 +5999,17 @@ PlasmoidItem {
         // reason) — the exec handler drops an unchanged title anyway. The
         // ICYGEN tag lets the handler drop a since-switched station's late
         // result; nextSeq keeps each poll a distinct command for the engine.
+        // One reader at a time. The timer repeats regardless of whether the
+        // last one came back, and a reader can sit on its 10 s connect
+        // timeout or run to reader.py's own 20 s cap — so a stream that
+        // stalls used to have a python3 and a second stream connection
+        // piling up every 5 s (every 8 s on battery), four or five deep,
+        // all for one title. Every spawn produces exactly one callback,
+        // which is where this clears.
+        if (root._icyInFlight) return;
         var cmd = "python3 '" + safeScript + "' '" + safeFile + "' '' # ICYGEN "
                   + root._icyUrlGen + " " + nextSeq();
+        root._icyInFlight = true;
         executable.exec(cmd);
     }
 
@@ -5610,11 +6103,11 @@ PlasmoidItem {
     // definitive=false is a transient failure — timeout/abort (status 0),
     // an HTTP error (iTunes rate-limits at ~20 req/min with 403), a quota
     // error or an unparseable body — and must not be negative-cached.
-    function _queryItunes(query, cacheKey, onResult) {
+    function _queryItunes(query, cacheKey, onResult, want) {
         console.log("[ARP] iTunes query");
         var xhr = new XMLHttpRequest;
         var guard = null;
-        xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=song&limit=1&media=music");
+        xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=song&limit=10&media=music");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -5622,7 +6115,12 @@ PlasmoidItem {
                 try {
                     var data = JSON.parse(xhr.responseText);
                     if (data.results && data.results.length > 0) {
-                        var artUrl = data.results[0].artworkUrl100 || "";
+                        var icands = [];
+                        for (var ii = 0; ii < data.results.length; ii++)
+                            icands.push({ "artist": data.results[ii].artistName || "",
+                                          "title": data.results[ii].trackName || "" });
+                        var ip = SearchLogic.artPick(want.artist, want.title, icands);
+                        var artUrl = ip >= 0 ? (data.results[ip].artworkUrl100 || "") : "";
                         if (artUrl) {
                             onResult(artUrl.replace("100x100bb", "300x300bb"), true);
                             return;
@@ -5636,7 +6134,7 @@ PlasmoidItem {
             }
             onResult("", false);
         };
-        guard = _armXhrTimeout(xhr, 3500);
+        guard = _armXhrTimeout(xhr, 2500);
         xhr.send();
     }
 
@@ -5655,11 +6153,11 @@ PlasmoidItem {
         return u;
     }
 
-    function _queryDeezer(query, cacheKey, onResult) {
+    function _queryDeezer(query, cacheKey, onResult, want) {
         console.log("[ARP] Deezer query");
         var xhr = new XMLHttpRequest;
         var guard = null;
-        xhr.open("GET", "https://api.deezer.com/search?q=" + encodeURIComponent(query) + "&limit=1");
+        xhr.open("GET", "https://api.deezer.com/search?q=" + encodeURIComponent(query) + "&limit=10");
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
@@ -5670,13 +6168,23 @@ PlasmoidItem {
                     // that is a transient failure, not "no such track".
                     if (!data.error) {
                         if (data.data && data.data.length > 0) {
-                            var album = data.data[0].album || {};
-                            var artUrl = _deezerRealArt(album.cover_big)
-                                         || _deezerRealArt(album.cover_medium)
-                                         || _deezerRealArt((data.data[0].artist || {}).picture_medium);
-                            if (artUrl) {
-                                onResult(artUrl, true);
-                                return;
+                            // Five candidates, and the one whose ARTIST is
+                            // ours — not simply the first. Nothing matching
+                            // is an honest "no cover": see artPick.
+                            var cands = [];
+                            for (var ci = 0; ci < data.data.length; ci++)
+                                cands.push({ "artist": ((data.data[ci] || {}).artist || {}).name || "",
+                                             "title": (data.data[ci] || {}).title || "" });
+                            var pi = SearchLogic.artPick(want.artist, want.title, cands);
+                            if (pi >= 0) {
+                                var album = data.data[pi].album || {};
+                                var artUrl = _deezerRealArt(album.cover_big)
+                                             || _deezerRealArt(album.cover_medium)
+                                             || _deezerRealArt((data.data[pi].artist || {}).picture_medium);
+                                if (artUrl) {
+                                    onResult(artUrl, true);
+                                    return;
+                                }
                             }
                         }
                         onResult("", true);
@@ -5686,7 +6194,7 @@ PlasmoidItem {
             }
             onResult("", false);
         };
-        guard = _armXhrTimeout(xhr, 3500);
+        guard = _armXhrTimeout(xhr, 2500);
         xhr.send();
     }
 
@@ -5704,11 +6212,17 @@ PlasmoidItem {
                     if (!data.error) {
                         if (data.data && data.data.length > 0) {
                             var artist = data.data[0];
-                            var artUrl = _deezerRealArt(artist.picture_big)
-                                         || _deezerRealArt(artist.picture_medium);
-                            if (artUrl) {
-                                onResult(artUrl, true);
-                                return;
+                            // The photo of SOME artist is not a fallback,
+                            // it is a wrong picture with a friendly face —
+                            // the name has to be the one we asked for.
+                            if (SearchLogic.nameAkin(SearchLogic.fold(artistName),
+                                                     SearchLogic.fold(artist.name || ""))) {
+                                var artUrl = _deezerRealArt(artist.picture_big)
+                                             || _deezerRealArt(artist.picture_medium);
+                                if (artUrl) {
+                                    onResult(artUrl, true);
+                                    return;
+                                }
                             }
                         }
                         onResult("", true);
@@ -5718,7 +6232,7 @@ PlasmoidItem {
             }
             onResult("", false);
         };
-        guard = _armXhrTimeout(xhr, 3500);
+        guard = _armXhrTimeout(xhr, 2500);
         xhr.send();
     }
 
@@ -5752,6 +6266,18 @@ PlasmoidItem {
         onTriggered: root.lookupAlbumArt(root._artLookupPendingRaw)
     }
 
+    // What the cache already knows about a lookup key, applied at once.
+    // True means the cache settled it — either a cover, or a still-fresh
+    // "this track has none", which is just as final and costs no network.
+    function _artFromCache(query) {
+        var hit = _artCache[query];
+        if (hit === undefined) return false;
+        if (hit.url === "" && Date.now() - hit.t >= _artNegativeTtlMs) return false;
+        albumArtUrl = hit.url;
+        _albumArtKey = hit.url ? query : "";
+        return true;
+    }
+
     function lookupAlbumArt(trackString) {
         // A local track's own sidecar cover outranks any network guess.
         if (root._localArtForSource !== ""
@@ -5772,12 +6298,7 @@ PlasmoidItem {
             _albumArtKey = "";
             return;
         }
-        var hit = _artCache[query];
-        if (hit !== undefined && (hit.url !== "" || Date.now() - hit.t < _artNegativeTtlMs)) {
-            albumArtUrl = hit.url;
-            _albumArtKey = hit.url ? query : "";
-            return;
-        }
+        if (_artFromCache(query)) return;
         // A NEW track's lookup begins: the old track's cover must not pose
         // over it while the network answers (or fails to).
         if (albumArtUrl !== "" && _albumArtKey !== query) {
@@ -5789,8 +6310,17 @@ PlasmoidItem {
         // friendlier than iTunes' (~20 req/min per IP), so the common case
         // costs a single Deezer call and iTunes only ever sees fallbacks.
         // The old parallel-pair start burned both quotas on every track.
+        // What the stream said it is playing — every candidate a music
+        // service offers is judged against this, never accepted on faith.
+        var want = { "artist": parsed.artist || "", "title": parsed.title || "" };
         var attempts = [
             {fn: _queryDeezer, q: query},
+            // Deezer's field search, for the records filed under a name the
+            // stream does not use: measured, "Bodies Without Organs" returns
+            // three karaoke pressings by free text, while track:"Sunshine In
+            // The Rain" has the real one — under "BWO". The picker's initial
+            // matching recognizes the pair; free text alone never could.
+            {fn: _queryDeezer, q: 'track:"' + (parsed.title || "").replace(/"/g, " ") + '"'},
             {fn: _queryItunes, q: query}
         ];
         var primary = _primaryArtist(parsed.artist);
@@ -5804,6 +6334,29 @@ PlasmoidItem {
             attempts.push({fn: _queryDeezer, q: parsed.title});
             attempts.push({fn: _queryItunes, q: parsed.title});
         }
+
+        // Two of these repeat earlier ones byte for byte in the ordinary
+        // "Artist - Title" case: _primaryArtist hands back the artist
+        // unchanged when it carries no splitter, and _normalizeQuery is a
+        // no-op on a title with no bracket, pipe or kbps tag — so the
+        // primary+title Deezer attempt is the plain Deezer one again, and
+        // likewise for iTunes. Checked against the real functions on
+        // "ABBA - Dancing Queen", "Curly Strings - Kuu" and
+        // "Metallica - Nothing Else Matters - Raadio 2": six attempts, two
+        // of them exact repeats. They only run on the MISS path, which is
+        // precisely where someone is already waiting longest, and the cache
+        // is keyed on the track rather than the attempt, so each repeat
+        // really does go back out to the network.
+        var uniqAttempts = [];
+        for (var ai = 0; ai < attempts.length; ai++) {
+            var isDup = false;
+            for (var bi = 0; bi < uniqAttempts.length; bi++) {
+                if (uniqAttempts[bi].fn === attempts[ai].fn
+                    && uniqAttempts[bi].q === attempts[ai].q) { isDup = true; break; }
+            }
+            if (!isDup) uniqAttempts.push(attempts[ai]);
+        }
+        attempts = uniqAttempts;
 
         var sawTransient = false;
 
@@ -5826,7 +6379,7 @@ PlasmoidItem {
                 }
                 if (!definitive) sawTransient = true;
                 runNext();
-            });
+            }, want);
         }
         runNext();
     }
@@ -5921,7 +6474,7 @@ PlasmoidItem {
         // Create the cmd file BEFORE the inotify probe can arm the watcher —
         // watching a missing file makes inotifywait exit instantly (spawn churn).
         executable.exec("touch '" + safeCmd + "'");
-        executable.exec("bash '" + safeLauncher + "' '" + safeState + "' '" + safeCmd + "'");
+        executable.exec(": MPRIS_START; bash '" + safeLauncher + "' '" + safeState + "' '" + safeCmd + "'");
         _mprisStarted = true;
         // Prefer inotify-based waiting (0 spawns while idle); the probe response
         // arrives via executable.onExited and starts the right mechanism.
@@ -5949,7 +6502,16 @@ PlasmoidItem {
                                      .replace(/\.json$/, ".log").replace(/'/g, "'\\''");
         executable.exec("pkill -f 'mpris.py " + safeState + "'");
         executable.exec("pkill -f 'inotifywait.*" + safeCmd + "'");
-        executable.exec("rm -f '" + safeState + "' '" + safeCmd + "' '" + safeLog + "'");
+        // The two URL files ride along: each holds the last stream or
+        // enclosure address (observed live: an arp-icy-src file from the
+        // previous day's session, still readable after the widget was gone).
+        // Clearing the -For guard makes the next poll rewrite its file
+        // instead of trusting a file that just left.
+        var safeIcy = _icyUrlFile.replace(/'/g, "'\\''");
+        var safePodCfg = _podUrlFile.replace(/'/g, "'\\''");
+        root._icyUrlFileFor = "";
+        executable.exec("rm -f '" + safeState + "' '" + safeCmd + "' '" + safeLog
+                        + "' '" + safeIcy + "' '" + safePodCfg + "'");
         // Second pass for a daemon that slipped through the launcher's startup
         // debounce window and recreated its files after the sweep above.
         // ^python3 anchor: must never match this wrapper's own sh cmdline.
@@ -6042,11 +6604,12 @@ PlasmoidItem {
             var raw = parts[0] || "";
             root.title = raw;
             // The ICY StreamUrl is server-supplied and lands straight in an
-            // Image.source — a file://, qrc: or data: scheme would let a
-            // station probe local files or smuggle content, so only http(s)
-            // is allowed through to the artwork chain.
-            var icyImg = parts[1] || "";
-            root.imageurl = /^https?:\/\//i.test(icyImg) ? icyImg : "";
+            // Image.source (and in mpris:artUrl) — a file://, qrc: or data:
+            // scheme would let a station probe local files or smuggle
+            // content, and a LAN/loopback host would turn every listener's
+            // panel into a blind GET at their own router. One gate, the
+            // same one the search probe and the logo fetcher use.
+            root.imageurl = FaviconLogic.webUrlOrEmpty(parts[1] || "");
             // Same undressing as the art lookup — the two roads MUST parse
             // the same string, or the lookup's cache key and the current-
             // track key disagree on three-segment titles and a found cover
@@ -6076,7 +6639,36 @@ PlasmoidItem {
             if (artKey !== root._artPendingKey) {
                 root._artPendingKey = artKey;
                 root._artLookupPendingRaw = raw;
-                artLookupDebounce.restart();
+                // The debounce is there to stop a flapping StreamTitle
+                // launching a network chain per flap. Dropping a stale
+                // cover is not a network chain, and neither is reading the
+                // cache — making those wait it out is what left the
+                // PREVIOUS track's sleeve sitting under the new track's
+                // name for a second and a half. It reached further than the
+                // popup, too: the MPRIS state file is written on its own
+                // 300 ms debounce, so the lock screen and the media
+                // controls showed the same mismatch, and a cast session
+                // sent the old sleeve to the television.
+                //
+                // A local file's sidecar cover owns the art for its whole
+                // track and is not ours to clear — same guard lookupAlbumArt
+                // opens with.
+                var artOwnedLocally = root._localArtForSource !== ""
+                                      && playMusic.source.toString() === root._localArtForSource;
+                var artSettled = false;
+                if (!artOwnedLocally) {
+                    if (root.albumArtUrl !== "" && root._albumArtKey !== artKey) {
+                        root.albumArtUrl = "";
+                        root._albumArtKey = "";
+                    }
+                    // A track already looked up once needs neither the
+                    // debounce nor the network: paint it and stand down.
+                    artSettled = Plasmoid.configuration.albumArtEnabled
+                                 && artKey.length > 0
+                                 && root._artFromCache(artKey);
+                }
+                if (artSettled) artLookupDebounce.stop();
+                else artLookupDebounce.restart();
             }
         } else {
             // A lookup still waiting out its debounce is for a title that no
@@ -6141,6 +6733,7 @@ PlasmoidItem {
         // Today's mirror set, from the directory itself — the shipped list
         // is only the door in.
         _rbDiscoverMirrors();
+        _homeCountryProbe();
         _ensureMusicDir();
         _loadPodcastSubs();
         _loadPodPositions();
@@ -6158,7 +6751,13 @@ PlasmoidItem {
         // pid reuse would otherwise SIGINT an innocent process on startup.
         // The file is removed either way (it is this session's to clean).
         executable.exec(": REC_CLEAN; p=$(cat '" + safePid + "' 2>/dev/null);"
-            + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*-rw_timeout'; then"
+            // The identity check must name what the recording's argv ACTUALLY
+            // says. It looked for -rw_timeout, a flag that left with the move
+            // to curl, so the sweep stopped matching anything — and since the
+            // pid file is removed either way, a crash left an orphan recording
+            // running with nothing able to reach it. Same pattern the stop
+            // road uses.
+            + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'; then"
             + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "'; true");
         // The resume tick waits for the sweep's ack (see the REC_CLEAN
         // handler): both run async shells over the SAME pid file, and a
@@ -6176,6 +6775,13 @@ PlasmoidItem {
         _savePodPositions();
         recStop();
         _mprisStop();
+        // _mprisStop sweeps the URL files too, but returns early when the
+        // daemon never ran — and both files get written with MPRIS off
+        // just the same. One more rm costs nothing; a stream address
+        // outliving its widget does.
+        executable.exec("rm -f '" + _icyUrlFile.replace(/'/g, "'\\''")
+                        + "' '" + _podUrlFile.replace(/'/g, "'\\''")
+                        + "' '" + _recUrlFile.replace(/'/g, "'\\''") + "'");
         // The keep-awake holder is a DETACHED process group (setsid) that
         // outlives the widget — removing the plasmoid would otherwise leave
         // the machine unable to sleep for up to 12 hours, plus a stale pid
@@ -6243,6 +6849,41 @@ PlasmoidItem {
         target: Plasmoid.configuration
     }
 
+    // ── Power awareness ──────────────────────────────────────────────────────
+    // A radio widget that sits on a panel all day is exactly the kind of thing
+    // that quietly drains a laptop, so it asks the desktop what it is running
+    // on. The engine is the one plasma5support already ships — no new
+    // dependency, no polling of our own: the answer is pushed.
+    P5Support.DataSource {
+        id: powerSource
+        engine: "powermanagement"
+        connectedSources: ["AC Adapter", "Power Profiles"]
+    }
+
+    // "Plugged in" is the honest signal. Has-Battery is NOT: measured on this
+    // desktop it reads true (a peripheral reports one) with State=Unknown, so
+    // a machine that has never seen a battery would have started saving power.
+    // Anything missing or unknown counts as plugged in — a desktop must never
+    // lose its animations to a guess.
+    readonly property bool onBattery: {
+        const ac = powerSource.data["AC Adapter"];
+        return ac !== undefined && ac["Plugged in"] === false;
+    }
+
+    // The system's own power-saver profile, where power-profiles-daemon is
+    // installed (measured here: Installed=false, Current Profile empty — so
+    // the key must be read defensively). Choosing power-saver on AC is still
+    // the user saying "spend less", and this widget listens.
+    readonly property bool powerSaverProfile: {
+        const pp = powerSource.data["Power Profiles"];
+        return pp !== undefined && String(pp["Current Profile"] || "") === "power-saver";
+    }
+
+    // The one property the expensive things read. Off by configuration means
+    // off: someone who wants the vinyl spinning on battery keeps it.
+    readonly property bool thrifty: Plasmoid.configuration.saveOnBattery !== false
+                                    && (onBattery || powerSaverProfile)
+
     P5Support.DataSource {
         id: executable
 
@@ -6272,7 +6913,11 @@ PlasmoidItem {
         function onExited(cmd, exitCode, exitStatus, stdout, stderr) {
             // MPRIS launcher failed (missing python-dbus/PyGObject, dead bus…):
             // surface it and stop churning writes/polls against a dead daemon.
-            if (cmd.indexOf("start-mpris.sh") !== -1) {
+            // Prefix sentinel, not a substring: this branch returns, so a
+            // command whose text merely embeds the launcher name — a station
+            // or episode title reaches these strings — would swallow every
+            // branch below it. Same rule as ": DL_YTDLP;" and ": AI_CLEAN;".
+            if (cmd.indexOf(": MPRIS_START;") === 0) {
                 if (exitCode !== 0) {
                     console.warn("[ARP] MPRIS daemon failed to start (exit " + exitCode + "): " + (stderr || "").trim());
                     mprisCmdPoll.stop();
@@ -6281,9 +6926,64 @@ PlasmoidItem {
                 }
                 return;
             }
+            // The title-reader's URL file: the flag that says "this station's
+            // address is on disk" is set before the write is known to have
+            // worked. A failed write puts it back, so the next poll writes
+            // again instead of the station going titleless for its whole play.
+            if (cmd.indexOf(": ICY_SRC;") === 0) {
+                if ((stdout || "").indexOf("__ICY_SRC_OK__") === -1) {
+                    console.warn("[ARP] ICY url file write failed — will retry on the next poll");
+                    root._icyUrlFileFor = "";
+                    return;
+                }
+                // The address is on disk, so ask for the title NOW. Writing
+                // the file consumed the one immediate poll a station start
+                // gets, and nothing here used to take its place: the first
+                // track name waited out a whole infoTimer interval on top of
+                // the reader's own second — measured at 6.2 s on mains and
+                // 16.2 s on battery, with the cover queued behind it. The
+                // reader takes 1.15-1.38 s from a cold start (measured over
+                // three runs against a live stream), and that is now the
+                // whole wait.
+                if (isPlaying() && !isError && !root._qtMetaWorks
+                    && playMusic.source.toString() === root._icyUrlFileFor)
+                    getStreamInfo(playMusic.source, root.metadata);
+                return;
+            }
+            // The recording's address landed in its owner-only file — now the
+            // recording itself can start, carrying no URL of its own.
+            if (cmd.indexOf(": REC_URL;") === 0) {
+                var recJob = root._recPending;
+                root._recPending = null;
+                // Called off in the gap (a stop, a station switch): recStop
+                // already settled the state, and starting now would record
+                // the address of a station the user has left.
+                if (!recJob) return;
+                if ((stdout || "").indexOf("__REC_URL_OK__") === -1) {
+                    notify(i18n("Recording failed"), recJob.station, "dialog-error");
+                    root._recFinishAborted(false);
+                    return;
+                }
+                executable.exec(recJob.cmd);
+                if (recJob.scheduled)
+                    notify(i18n("Scheduled recording started"), recJob.station, "media-record");
+                return;
+            }
             // Whole-room sync: every PW_*/BT_KICK round-trip belongs to
             // the engine, which answers true when the command was its own.
             if (syncEngine.handleExec(cmd, stdout, stderr)) return;
+            // The download's first half came home: the URL is in the
+            // owner-only config file (or the write failed, which ends the
+            // job on the same road a failed transfer takes). Only now does
+            // curl start, with a command line that names paths, not the URL.
+            if (cmd.indexOf(": POD_URL;") === 0) {
+                if (root._podDownloadKey === "") return;
+                if ((stdout || "").indexOf("__POD_URL_OK__") !== -1)
+                    root._podRunDownload();
+                else
+                    root._podDownloadFail("could not stage the URL file");
+                return;
+            }
             // Podcast episode download finished — one honest word either
             // way, and the single-download slot frees up. The Podcasts
             // folder model watches the directory itself, so the new file
@@ -6383,6 +7083,13 @@ PlasmoidItem {
                 root._applyImportedOpml(stdout || "");
                 return;
             }
+            // Timezone → home country, for the search page's local chips.
+            // Anything but a clean ISO code leaves the locale fallback ruling.
+            if (cmd.indexOf(": TZ_CC;") === 0) {
+                var tzcc = (stdout || "").trim().toUpperCase();
+                if (/^[A-Z]{2}$/.test(tzcc)) root.homeCountryCode = tzcc;
+                return;
+            }
             // Music-library folder confirmed on disk → safe to load. Without
             // the sentinel a failed mkdir would still fire the signal and My
             // Music would list $HOME (issue #3); a failure instead leaves the
@@ -6467,8 +7174,12 @@ PlasmoidItem {
             if (cmd.indexOf(": CAST_PLAY;") === 0) {
                 var castOut = stdout || "";
                 if (castOut.indexOf("__NO_PYCHROMECAST__") !== -1) {
-                    notify(i18n("Casting needs python-chromecast"),
-                           i18n("Install the python-chromecast package to cast to your devices."),
+                    // The library, not a distro's name for it: the package is
+                    // python-pychromecast on Arch, python3-pychromecast on
+                    // Debian and Fedora, and naming one of them here would be
+                    // wrong for everyone else. README carries the Arch name.
+                    notify(i18n("Casting needs pychromecast"),
+                           i18n("Install the pychromecast library to cast to your devices."),
                            "dialog-warning");
                 } else if (castOut.indexOf("__CAST_OK__") === -1) {
                     // Name the device that actually failed — the aggregate
@@ -6784,9 +7495,19 @@ PlasmoidItem {
             }
             // AI title-cleanup response → start the download
             if (cmd.indexOf(": AI_CLEAN;") === 0) {
-                var cleaned = (stdout || "").split("\n")[0].trim();
-                // Trust the AI response only if it looks reasonable
-                if (cleaned.length < 3 || cleaned.length > 120) {
+                var cleaned = (stdout || "").split("\n")[0].trim()
+                              .replace(/^["'`]+|["'`]+$/g, "");
+                // The contract is exactly "Artist - Title" — and a sane
+                // LENGTH is no proof of it: the CLI can answer with chat, an
+                // apology, or a rate-limit notice ("You've hit your session
+                // limit · resets 10:30am" is 63 perfectly plausible
+                // characters, seen live this very day), and the old check
+                // sent exactly that to the music search. No " - ", or any
+                // refusal wording, means it is not a cleaned title; the
+                // regex cleaner is the road that always works.
+                if (cleaned.length < 3 || cleaned.length > 120
+                    || cleaned.indexOf(" - ") === -1
+                    || /session limit|sorry|cannot|unable|error|apolog/i.test(cleaned)) {
                     cleaned = _cleanQueryLocal(root._dlPendingRaw);
                 }
                 root._dlPendingRaw = "";
@@ -6855,6 +7576,12 @@ PlasmoidItem {
                     recTitle = i18n("ffmpeg is not installed");
                     recText = i18n("Install ffmpeg to record radio.");
                     recIcon = "dialog-warning";
+                } else if (recOut.indexOf("__NO_CURL__") !== -1) {
+                    // curl fetches the stream so the address never rides on a
+                    // command line — no curl, no recording.
+                    recTitle = i18n("curl is not installed");
+                    recText = i18n("Install curl to record radio.");
+                    recIcon = "dialog-warning";
                 } else if (recOut.indexOf("__REC_NOSPACE__") !== -1) {
                     recTitle = i18n("Not enough disk space for this recording");
                     recText = i18n("Free some space in %1 and try again.", root.downloadDirPath);
@@ -6874,7 +7601,10 @@ PlasmoidItem {
                     recText = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
                     recIcon = "dialog-error";
                 }
-                var recNoFfmpeg = recOut.indexOf("__NO_FFMPEG__") !== -1;
+                // A missing tool is a missing tool — curl counts like ffmpeg:
+                // neither will appear inside a recording window.
+                var recNoFfmpeg = recOut.indexOf("__NO_FFMPEG__") !== -1
+                                  || recOut.indexOf("__NO_CURL__") !== -1;
                 var recNoSpace = recOut.indexOf("__REC_NOSPACE__") !== -1;
                 // A near-instant failure (ffmpeg absent, mkdir/disk failure,
                 // stream refused at once) is what storms — a real capture
@@ -6945,7 +7675,57 @@ PlasmoidItem {
                 return;
             }
             // yt-dlp finished → notify (sentinel-prefix match, see _startDownload)
+            // Candidate list back from the search probe: pick or refuse.
+            if (cmd.indexOf(": DL_PICK;") === 0) {
+                if ((stdout || "").indexOf("__NO_YTDLP__") !== -1) {
+                    dlGuardTimer.stop();
+                    root.downloading = false;
+                    root._dlCurrentQuery = "";
+                    notify(i18n("yt-dlp is not installed"),
+                           i18n("Install yt-dlp (and ffmpeg) to download tracks."),
+                           "dialog-warning");
+                    return;
+                }
+                var candIds = [], candTitles = [];
+                var candLines = (stdout || "").split("\n");
+                for (var ci = 0; ci < candLines.length; ci++) {
+                    var tab = candLines[ci].indexOf("\t");
+                    if (tab <= 0) continue;
+                    var cid = candLines[ci].substring(0, tab).trim();
+                    if (!/^[A-Za-z0-9_-]{6,16}$/.test(cid)) continue;
+                    candIds.push(cid);
+                    candTitles.push(candLines[ci].substring(tab + 1).trim());
+                }
+                if (candIds.length === 0) {
+                    dlGuardTimer.stop();
+                    root.downloading = false;
+                    var noQ = root._dlCurrentQuery;
+                    root._dlCurrentQuery = "";
+                    notify(i18n("Nothing found to download"),
+                           i18n("No track matched \"%1\" — a show or album title often has no single track to find.", noQ),
+                           "dialog-warning");
+                    return;
+                }
+                var pick = SearchLogic.downloadPick(root._dlCurrentQuery, candTitles);
+                if (pick === -1) {
+                    // The search DID answer — with the wrong show. Refusing
+                    // with both names beats two hours of the wrong episode.
+                    dlGuardTimer.stop();
+                    root.downloading = false;
+                    var badQ = root._dlCurrentQuery;
+                    root._dlCurrentQuery = "";
+                    notify(i18n("Found only a different show — skipped"),
+                           i18n("Best match for \"%1\" was \"%2\". Not downloading the wrong one.",
+                                badQ, candTitles[0].substring(0, 70)),
+                           "dialog-warning");
+                    return;
+                }
+                root._dlChosenId = candIds[pick];
+                _dlFetch(candIds[pick], root._dlTriedNoEmbed);
+                return;
+            }
             if (cmd.indexOf(": DL_YTDLP;") === 0) {
+                dlGuardTimer.stop();
                 root.downloading = false;
                 var dlQuery = root._dlCurrentQuery;
                 root._dlCurrentQuery = "";
@@ -6955,24 +7735,45 @@ PlasmoidItem {
                 // partial file yt-dlp leaves behind does not collide: the
                 // retry overwrites the same output name.)
                 if (exitCode !== 0 && (stderr || "").indexOf("mutagen") !== -1
-                    && !root._dlTriedNoEmbed && dlQuery !== "") {
+                    && !root._dlTriedNoEmbed && root._dlChosenId !== "") {
                     root._dlTriedNoEmbed = true;
                     notify(i18n("Downloading again without the cover"),
                            i18n("Embedding tags needs the python-mutagen package — install it to get covers in your files."),
                            "download");
                     root.downloading = true;
-                    _startDownload(dlQuery, true);
+                    root._dlCurrentQuery = dlQuery;
+                    // The retry fetches the SAME picked video — searching
+                    // again could land on a different candidate mid-retry.
+                    _dlFetch(root._dlChosenId, true);
                     return;
                 }
+                root._dlChosenId = "";
                 var dlTitle, dlText, dlIcon;
                 if ((stdout || "").indexOf("__NO_YTDLP__") !== -1) {
                     dlTitle = i18n("yt-dlp is not installed");
                     dlText = i18n("Install yt-dlp (and ffmpeg) to download tracks.");
                     dlIcon = "dialog-warning";
                 } else if (exitCode === 0) {
-                    dlTitle = i18n("Track downloaded ✓");
-                    dlText = i18n("Saved to: %1", root.downloadDirPath);
-                    dlIcon = "download";
+                    // Exit 0 does NOT mean a track arrived: a search with no
+                    // result finishes "Downloading 0 items" and exits clean
+                    // (measured), so the old toast claimed success with no
+                    // file anywhere. The printed after_move path is the
+                    // receipt. And the file carries the FOUND video's title,
+                    // not the query — a DJ set's album line finds a video
+                    // named nothing like what the widget showed, so the
+                    // toast must say the name the file actually got.
+                    var dlPath = ((stdout || "").split("\n")
+                                  .filter(function(l){ return l.charAt(0) === "/"; })
+                                  .pop() || "");
+                    if (dlPath !== "") {
+                        dlTitle = i18n("Track downloaded ✓");
+                        dlText = i18n("Saved as \"%1\" — newest first in My Music", dlPath.split("/").pop());
+                        dlIcon = "download";
+                    } else {
+                        dlTitle = i18n("Nothing found to download");
+                        dlText = i18n("No track matched \"%1\" — a show or album title often has no single track to find.", dlQuery);
+                        dlIcon = "dialog-warning";
+                    }
                 } else {
                     dlTitle = i18n("Download failed");
                     dlText = ((stderr || "").split("\n").filter(function(l){ return l.indexOf("ERROR") >= 0; })[0] || i18n("Unknown error")).substring(0, 120);
@@ -6982,6 +7783,11 @@ PlasmoidItem {
                 return;
             }
             if (cmd.indexOf("reader.py") < 0) return;
+            // This reader is done, whatever it had to say — including the
+            // stale-generation case below, which returns early. Clearing
+            // here and nowhere else keeps the flag honest against every
+            // exit from this handler.
+            root._icyInFlight = false;
             // Which station was this query for? The URL is no longer in the
             // command (it went via the runtime file), so the match is on the
             // generation tag: a result whose gen is not the current one is a
@@ -7045,6 +7851,11 @@ PlasmoidItem {
         onSourceChanged: {
             root._icyUrlGen++;
             root._icyUrlFileFor = "";
+            // The outgoing station's reader still owes a callback, but its
+            // result will be dropped as stale — so the new station must not
+            // inherit a raised in-flight flag and sit there unable to ask
+            // for its own title.
+            root._icyInFlight = false;
         }
 
         onErrorOccurred: {
@@ -7124,8 +7935,8 @@ PlasmoidItem {
                 // player (a guaranteed second error) and poisoning the
                 // bitrate cache under a key the resolver never reads.
                 _bitrateCachePut(root._currentUnwrappedUrl, root._currentUnwrappedUrl);
-                console.log("[ARP] auto-bitrate fallback: " + root._currentResolvedUrl
-                            + " failed, retrying with " + root._currentUnwrappedUrl);
+                console.log("[ARP] auto-bitrate fallback: " + _hostOf(root._currentResolvedUrl)
+                            + " failed, retrying with " + _hostOf(root._currentUnwrappedUrl));
                 bitrateFallbackTimer.fallbackUrl = root._currentUnwrappedUrl;
                 // Mark as already-downgraded so a second error on the original
                 // URL won't re-enter this branch.
@@ -7331,7 +8142,12 @@ PlasmoidItem {
         audioOutput: AudioOutput {
             id: playMusicOutput
 
-            volume: 0.75
+            // The level the user actually chose, from the first moment —
+            // not a hardcoded 0.75 that the volume slider then showed until
+            // something started playing. Assigned once rather than bound:
+            // every later change comes through setUserVolume or a fade, and
+            // a live binding would fight both.
+            Component.onCompleted: volume = root.targetVolume()
 
             onVolumeChanged: _mprisQueueWrite()
         }
@@ -7587,6 +8403,7 @@ PlasmoidItem {
             // mode while the sound is still fading out.
             root._podPlayingKey = "";
             root._podPlayingUrl = "";
+            root._podPlayingRawUrl = "";
             root._podPlayingArt = "";
             root._podPlayingShow = "";
             playMusicOutput.volume = targetVolume();
@@ -7603,8 +8420,12 @@ PlasmoidItem {
         onTriggered: {
             // A stalled PODCAST stream is not a dying station: remember the
             // needle, restart the same episode AT the bookmark, and never
-            // walk the station-heal road on its behalf.
-            if (root._podPlayingKey !== "") {
+            // walk the station-heal road on its behalf. Source-exact, like
+            // _stampPodPosition: the flag alone would file whatever is
+            // playing now under the last episode's bookmark if any caller
+            // ever forgets its handoff.
+            if (root._podPlayingKey !== ""
+                && playMusic.source.toString() === root._podPlayingUrl) {
                 var stSec = Math.round(playMusic.position / 1000);
                 if (stSec > 8) {
                     root._podPositions[root._podPlayingKey] = {
@@ -7622,6 +8443,13 @@ PlasmoidItem {
                 playMusic.source = "";
                 playMusic.source = stSrc;
                 playMusic.play();
+                // The restart is a fresh connection like any other — re-arm
+                // the connect deadline, the same way the station branch does
+                // below. Without it a restart that is accepted but delivers
+                // no bytes and no error leaves the episode frozen in the
+                // playing state until a manual stop.
+                if (stSrc.toString().indexOf("file://") !== 0)
+                    connectWatchdog.restart();
                 return;
             }
             if (playMusic.mediaStatus === MediaPlayer.StalledMedia) {
@@ -7685,7 +8513,10 @@ PlasmoidItem {
             // A starving PODCAST stream stops honestly where it stood —
             // the bookmark survives (the stamp timer wrote it), the row's
             // next tap resumes, and no station road gets to touch it.
-            if (root._podPlayingKey !== "") {
+            // Source-exact for the same reason as the stall timer: a stale
+            // key must not talk a station out of its own heal road.
+            if (root._podPlayingKey !== ""
+                && playMusic.source.toString() === root._podPlayingUrl) {
                 playMusic.stop();
                 root._podPlayingKey = "";
                 root._podPlayingUrl = "";
@@ -7762,7 +8593,18 @@ PlasmoidItem {
 
     Timer {
         id: infoTimer
-        interval: 5000
+        // Each tick that reaches getStreamInfo spawns python3 AND opens a
+        // second connection to the stream, purely to read the track title —
+        // it only runs where Qt's own metadata does not work.
+        //
+        // Fifteen seconds on battery was too clever by half: the mean wait
+        // for a track change was then eight seconds on top of the reader's
+        // own 1.2 s, which on a three-minute song is a noticeable slice of
+        // it spent showing the previous track. Eight seconds halves the
+        // wake-ups against mains while keeping that mean under five. The
+        // station's FIRST title no longer rides this timer at all — the
+        // url-file ack asks for it directly.
+        interval: root.thrifty ? 8000 : 5000
         repeat: true
         triggeredOnStart: false
         onTriggered: {

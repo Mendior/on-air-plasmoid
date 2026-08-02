@@ -52,10 +52,30 @@ function _tagBody(fragment, tag) {
     var names = tag.indexOf(":") !== -1
         ? [tag, tag.split(":")[1]]
         : [tag]
+    // indexOf and substring only — no regex touches the unbounded fragment.
+    // The closing-tag probe that stood here first was a presence test, and a
+    // single </title> sitting AHEAD of a wall of bare opens answered it while
+    // the real pattern still restarted at every open (measured: 19.2 s at
+    // 600 KiB, the same freeze the probe was built against). Each refinement
+    // of the probe just moved the hole; a linear scan has nowhere to move it.
+    var lower = fragment.toLowerCase()
     for (var i = 0; i < names.length; i++) {
-        var re = new RegExp("<" + names[i] + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + names[i] + ">", "i")
-        var m = re.exec(fragment)
-        if (m) return m[1]
+        var name = names[i].toLowerCase()
+        var from = 0
+        while (true) {
+            var open = lower.indexOf("<" + name, from)
+            if (open === -1) break
+            var next = lower.charAt(open + 1 + name.length)
+            // ">" or whitespace ends the NAME; anything else is a longer tag
+            // that merely shares the prefix (<titlex>).
+            if (next !== ">" && !/^\s$/.test(next)) { from = open + 1; continue }
+            var gt = lower.indexOf(">", open + 1 + name.length)
+            if (gt === -1) break
+            var close = lower.indexOf("</" + name + ">", gt + 1)
+            // No close ahead of this open means none ahead of any later one.
+            if (close === -1) break
+            return fragment.substring(gt + 1, close)
+        }
     }
     return ""
 }
@@ -195,13 +215,27 @@ function parseFeed(xml, maxItems) {
     var chImg = /<itunes:image\b[^>]*>/i.exec(head)
     var showImg = chImg ? decodeEntities(_attr(chImg[0], "href")).trim() : ""
     if (showImg === "") {
-        var rssImg = /<image\b[^>]*>([\s\S]*?)<\/image>/i.exec(head)
-        if (rssImg) showImg = _cleanText(_tagBody(rssImg[1], "url"))
+        // <image><url>…</url></image>, the RSS 2.0 spelling. _tagBody is the
+        // same linear scan the field readers use — the dedicated regex that
+        // stood here needed its own quadratic probe and shared its hole.
+        var rssImg = _tagBody(head, "image")
+        if (rssImg !== "") showImg = _cleanText(_tagBody(rssImg, "url"))
     }
     out.image = urlAllowed(showImg) ? showImg : ""
     var itemRe = /<item[\s>][\s\S]*?<\/item>/gi
+    // The probe rides along at the same offset as the item scanner. A tail
+    // with no </item> left in it is the quadratic case again, and here it
+    // survives the whole-body check because an earlier item did close. The
+    // probe matches the scanner's full terminator, ">" included — a bare
+    // "</item" prefix in the tail would pass a looser probe and put the
+    // scanner right back on the expensive path.
+    var itemClose = /<\/item>/gi
     var m
-    while ((m = itemRe.exec(text)) !== null && out.episodes.length < cap) {
+    while (out.episodes.length < cap) {
+        itemClose.lastIndex = itemRe.lastIndex
+        if (!itemClose.test(text)) break
+        m = itemRe.exec(text)
+        if (m === null) break
         var item = m[0]
         var encTag = /<enclosure\b[^>]*>/i.exec(item)
         if (!encTag) continue                       // an episode IS its audio
@@ -268,9 +302,54 @@ function fileExt(url) {
            .indexOf(ext) !== -1 ? ext : "mp3"
 }
 
-// One episode's identity in the positions map.
+// A short stable tag for a string — djb2, unsigned, hex. Not a security
+// hash: it exists to keep two different episodes from sharing a filename.
+function shortTag(s) {
+    var h = 5381
+    var str = String(s || "")
+    for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0
+    var out = (h >>> 0).toString(16)
+    while (out.length < 8) out = "0" + out
+    return out
+}
+
+// The file an episode downloads to. The title ALONE is not an identity:
+// two shows both publishing "Trailer" (or one daily feed reusing a title)
+// landed on the same name in one flat folder, and everything downstream —
+// the ledger, the "Downloaded" badge, auto-clean — keys off that name, so
+// the second show played the first one's audio and its own download was
+// never fetched. The feed+guid tag makes the name as unique as the episode.
+function episodeFileName(title, url, feed, guid) {
+    // The feed goes in through feedKey, not raw: directories disagree about
+    // scheme, port and trailing slash for the same show, and the raw string
+    // would give one show two tags — every file downloaded under the other
+    // spelling then reads as "not downloaded".
+    return safeFileName(title, "episode")
+           + " [" + shortTag(feedKey(feed) + "\n" + episodeKey(guid, url)) + "]."
+           + fileExt(url)
+}
+
+// What the same episode was called before the tag existed. Files already
+// on disk keep working: every "is it downloaded" check accepts this name
+// too, so nothing has to be renamed and no ledger has to be migrated.
+function legacyEpisodeFileName(title, url) {
+    return safeFileName(title, "episode") + "." + fileExt(url)
+}
+
+// One episode's identity in the positions map. Capped: this string is
+// persisted into the plasma config, which the shell rewrites in full on
+// every change, and a feed's <guid> is whatever the publisher wrote —
+// every sibling field here is capped, this one was not. 256 characters
+// still identify an episode uniquely in practice; a guid longer than that
+// changes identity once, and its bookmark starts over.
 function episodeKey(guid, url) {
-    return (guid && guid !== "") ? guid : (url || "")
+    var k = (guid && guid !== "") ? String(guid) : String(url || "")
+    // Bounded, but still an identity. A plain cut is lossy: ad-served shows
+    // hand out chained tracking guids ~300 characters long with the episode
+    // id at the END, so two episodes can share their first 256 characters —
+    // and then they shared a played mark, a resume position, a filename and
+    // a place in the download queue. The tail keeps them apart.
+    return k.length > 256 ? k.substring(0, 240) + "#" + shortTag(k) : k
 }
 
 // A string wrapped as ONE safe POSIX single-quoted shell word. The whole

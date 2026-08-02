@@ -19,6 +19,8 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
 import "EpisodeState.js" as EpisodeState
+import "FaviconLogic.js" as FaviconLogic
+import "HostGuard.js" as HostGuard
 import "PodcastLogic.js" as PodcastLogic
 import "ReorderLogic.js" as ReorderLogic
 import "SearchLogic.js" as SearchLogic
@@ -69,13 +71,15 @@ PlasmaExtras.Representation {
         function onCurrentStationChanged() { fullRepresentation._brokenArtUrls = {} }
         // The preview ladder's honest give-up doubles as a probe verdict:
         // the row the listener just heard fail gets its offline tag, so
-        // the list learns what the ear already knows.
+        // the list learns what the ear already knows. The tag stays with
+        // THIS list only — the ladder never saw an HTTP status (QtMultimedia
+        // reports a dead WiFi and a dead mount identically), so writing the
+        // 15-min verdict cache here condemned live stations for as long as
+        // the listener's own connection blinked. The cache takes verdicts
+        // only from the probe, which read a real status line.
         function on_FriendlyErrorChanged() {
-            if (root._friendlyError !== "" && root._previewUrl !== "") {
-                fullRepresentation._probeVerdicts[root._previewUrl] =
-                    { "v": 0, "t": Date.now() }
+            if (root._friendlyError !== "" && root._previewUrl !== "")
                 fullRepresentation._webSetAlive(root._previewUrl, 0)
-            }
         }
     }
 
@@ -119,11 +123,26 @@ PlasmaExtras.Representation {
     // plays right now, bitrate = audiophile ordering.
     property string webSearchOrder: "votes"
     // The pinned country scope — set by an "in <country>" query (or the
-    // roulette), shown as a flag chip, applied to every plain query until
+    // home shortcut), shown as a flag chip, applied to every plain query until
     // the chip's ✕ releases it. Session-only by design: a scope is a
     // browsing gesture, not a setting.
     property string webScopeCc: ""
     property string webScopeName: ""
+    // The listener's home country for the local chips: the timezone-derived
+    // answer wins (main.qml's TZ_CC probe — the machine's zone says where it
+    // SITS), the locale territory fills in until it lands. The locale alone
+    // claimed United States to a listener under Europe/Helsinki, because
+    // en_US.UTF-8 is simply the default LANG.
+    readonly property string webHomeCc: {
+        if (root.homeCountryCode !== "") return root.homeCountryCode
+        // The territory is the LAST two-letter part: plain "fi_FI" has it
+        // second, script-tagged locales ("sr_Cyrl_RS") third.
+        var parts = Qt.locale().name.split("_")
+        for (var i = parts.length - 1; i >= 1; i--)
+            if (/^[A-Z]{2}$/.test(parts[i])) return parts[i]
+        return ""
+    }
+    readonly property string webHomeName: SearchLogic.countryDisplayName(webHomeCc, Qt.locale().name)
     // The last query as TYPED (with its "in <country>" tail) — what the
     // history should remember whichever pass ends up succeeding.
     property string _webLastTyped: ""
@@ -140,6 +159,15 @@ PlasmaExtras.Representation {
     // fetch that same page forever.
     property int _webLastParsed: 0
     property int _webSkipAhead: 0
+    // Raw rows the last append actually walked before the cap cut it off —
+    // the true position in the SOURCE list, which is what a next page's
+    // offset must name. Appended rows undercount it (dedup), the whole
+    // parsed page overcounts it (the cap break).
+    property int _webLastConsumed: 0
+    // The typed string whose derived country scope the user released with
+    // the chip's ✕ — a mode or order chip re-running the same text must
+    // not pin that scope right back. Any new text clears it: new intent.
+    property string _webScopeReleasedFor: ""
     // Recent successful searches, newest first, persisted in the config.
     property var webHistory: []
 
@@ -166,6 +194,23 @@ PlasmaExtras.Representation {
     // open a SECOND GET to a host already being probed (the very per-host
     // double-knock the verdict cache exists to prevent).
     property var _probeInFlight: ({})
+    // The probes' own XHRs, for the teardown below. The timeout guards are
+    // main.qml's Timers and survive us; these do not get a second keeper.
+    property var _probeLiveXhrs: []
+
+    // A probe can outlive this representation: the popup closes, done()
+    // trips over the dead object after it already cleared the timeout
+    // guard, and the header-abort never runs — a stream body then
+    // downloads inside plasmashell until the process ends. Kill them
+    // with the representation; abort here runs outside any XHR handler.
+    Component.onDestruction: {
+        // Iterate a COPY: abort() delivers DONE synchronously and done()
+        // splices the live array mid-loop — walking the original skipped
+        // every second probe (measured with a standalone harness).
+        var live = _probeLiveXhrs.slice()
+        for (var i = 0; i < live.length; i++)
+            try { live[i].abort() } catch (e) {}
+    }
 
     function _probeKick(seq) {
         if (seq !== fullRepresentation._webSearchSeq) return
@@ -212,6 +257,13 @@ PlasmaExtras.Representation {
             if (settled) return
             settled = true
             root._clearXhrTimeout(guard)
+            // The representation can die mid-probe; its id then reads null
+            // and the property writes below would throw INSIDE this XHR
+            // handler — before the deferred abort line ever runs.
+            if (!fullRepresentation) return
+            var keep = fullRepresentation._probeLiveXhrs
+            var ki = keep.indexOf(xhr)
+            if (ki !== -1) keep.splice(ki, 1)
             fullRepresentation._probeActive = Math.max(0, fullRepresentation._probeActive - 1)
             delete fullRepresentation._probeInFlight[url]
             var now = Date.now()
@@ -228,6 +280,7 @@ PlasmaExtras.Representation {
             // above stays guarded by this probe's own seq.
             Qt.callLater(function() { _probeKick(fullRepresentation._webSearchSeq) })
         }
+        var headerVerdict = null
         xhr.onreadystatechange = function() {
             if (settled) return
             if (xhr.readyState === xhr.HEADERS_RECEIVED) {
@@ -237,14 +290,27 @@ PlasmaExtras.Representation {
                 // measured live, reproduced standalone). One tick later is
                 // the same safe side the timeout guard's Timer aborts from,
                 // and still cuts the endless stream body off instantly.
-                done(SearchLogic.probeVerdict(xhr.status))
+                //
+                // The verdict is HELD rather than applied, because WHERE the
+                // answer came from cannot be known yet: Qt follows redirects
+                // internally and responseURL is empty at this state, filled
+                // only from the next one on (measured on 6.11.1). The abort
+                // brings us to DONE within the tick that was already
+                // scheduled, and the origin is judged there.
+                headerVerdict = SearchLogic.probeVerdict(xhr.status)
                 Qt.callLater(function() { try { xhr.abort() } catch (e) {} })
             } else if (xhr.readyState === xhr.DONE) {
-                done(SearchLogic.probeVerdict(xhr.status))
+                // A public catalogue row can answer "302 → the listener's own
+                // LAN". An internal host's status line must not become a
+                // visible "alive" badge, so such an answer stays unknown.
+                if (!HostGuard.answerFromPublicHost(xhr)) { done(-1); return }
+                done(headerVerdict !== null
+                     ? headerVerdict : SearchLogic.probeVerdict(xhr.status))
             }
         }
         xhr.open("GET", url)
         guard = root._armXhrTimeout(xhr, 6000)
+        fullRepresentation._probeLiveXhrs.push(xhr)
         xhr.send()
     }
 
@@ -254,8 +320,31 @@ PlasmaExtras.Representation {
         for (var i = 0; i < webResultsModel.count; i++)
             if (webResultsModel.get(i).url === url) {
                 webResultsModel.setProperty(i, "alive", verdict)
+                if (verdict === 0) _webSinkDead()
                 return
             }
+    }
+
+    // Rows the probe condemned sink below the living, keeping their own
+    // order at the bottom — the list is a recommendation, and "not
+    // answering" is not one. Re-run after every page append too, or the
+    // fresh page's live rows would land underneath yesterday's dead.
+    function _webSinkDead() {
+        // Each dead row goes to the very END in encounter order — moving
+        // into a shrinking `last` slot came out reversed, and re-runs
+        // flip-flopped the block (measured on a real ListModel). This form
+        // is stable and idempotent: a second pass rotates the dead block
+        // through the tail and lands it exactly where it started.
+        var moved = 0
+        var i = 0
+        while (i < webResultsModel.count - moved) {
+            if (webResultsModel.get(i).alive === 0) {
+                webResultsModel.move(i, webResultsModel.count - 1, 1)
+                moved++
+            } else {
+                i++
+            }
+        }
     }
 
     // Every search road ends here. A directory that answered but left the
@@ -308,10 +397,23 @@ PlasmaExtras.Representation {
                 _webRememberQuery(fullRepresentation._webLastTyped || q)
                 if (cc === "") _webBoostRelevance(stem)
                 // "Show more" must page the query that actually filled the
-                // list, not the original name query that returned nothing.
+                // list, not the original name query that returned nothing —
+                // and from the position this answer really consumed, or the
+                // rows the dedup ate would push the offset past unseen ones.
                 fullRepresentation._webLastQs = qs + tail
+                fullRepresentation._webSkipAhead =
+                    fullRepresentation._webLastConsumed - webResultsModel.count
                 _probeKick(seq)
                 fullRepresentation.webSearchFailed = false
+                fullRepresentation.webSearching = false
+                return
+            }
+            // Every mirror died under this stem — the next stem would only
+            // re-walk the same dead chain, ~12 s of spinner a rung, and the
+            // exhaustion line would then claim "no results" about a network
+            // that never answered. Say what actually happened instead.
+            if (xhr === null) {
+                fullRepresentation.webSearchFailed = webResultsModel.count === 0
                 fullRepresentation.webSearching = false
                 return
             }
@@ -358,24 +460,61 @@ PlasmaExtras.Representation {
         "itaalia": "IT", "italy": "IT",
         "taani": "DK", "denmark": "DK",
         "poola": "PL", "poland": "PL",
-        "holland": "NL", "madalmaad": "NL",
-        "ukraina": "UA", "ungari": "HU",
-        "šveits": "CH", "austria": "AT",
-        "jaapan": "JP", "hiina": "CN",
-        "kanada": "CA", "austraalia": "AU",
-        "brasiilia": "BR", "türgi": "TR"
+        "holland": "NL", "madalmaad": "NL", "netherlands": "NL",
+        // The tail of the map drifted Estonian-only while the UI speaks
+        // English — "jazz in japan" scoped nothing while "jazz in jaapan"
+        // worked. Both spellings, like every entry above.
+        "ukraina": "UA", "ukraine": "UA",
+        "ungari": "HU", "hungary": "HU",
+        "šveits": "CH", "switzerland": "CH",
+        "austria": "AT",
+        "jaapan": "JP", "japan": "JP",
+        "hiina": "CN", "china": "CN",
+        "kanada": "CA", "canada": "CA",
+        "austraalia": "AU", "australia": "AU",
+        "brasiilia": "BR", "brazil": "BR",
+        "türgi": "TR", "turkey": "TR", "ireland": "IE"
     })
+
+    // The map re-keyed through the same fold every name comparison uses:
+    // the table spells "türgi" and "šveits", but a searcher without the
+    // accents on their keyboard types "turgi" — and everywhere else in the
+    // search that already finds them.
+    readonly property var _countryMapFolded: {
+        var m = Object.create(null)
+        for (var k in _countryMap) m[SearchLogic.fold(k)] = _countryMap[k]
+        return m
+    }
 
     // A prototype-safe country-map lookup: a plain `in` also matched
     // Object.prototype keys, so searching "constructor" went to the
-    // country branch with an undefined code.
+    // country branch with an undefined code (the null-prototype folded
+    // map keeps that guarantee without the hasOwnProperty dance).
     function _countryCodeOf(q) {
-        var key = q.toLowerCase()
-        return Object.prototype.hasOwnProperty.call(_countryMap, key)
-               ? _countryMap[key] : ""
+        var code = _countryMapFolded[SearchLogic.fold(q)]
+        return code === undefined ? "" : code
     }
 
-    function runWebSearch(q) {
+    // Open-and-type: a printable key anywhere in the lists lands in the
+    // search field, cursor at the end — the field itself is one focus jump
+    // away and nobody should have to know that. Modifier chords (Ctrl+Up
+    // reorder, Ctrl+Return star) pass through untouched.
+    function typeToSearch(event) {
+        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier)) return false
+        // Space stays with the list (play/pause there), and control
+        // characters are keys, not text — including DEL (0x7f), which xkb
+        // hands the Delete key as event.text and which sorts ABOVE space:
+        // one Delete press was blanking the whole list into a %7F search.
+        if (!event.text || event.text.length !== 1) return false
+        var cc = event.text.charCodeAt(0)
+        if (cc <= 0x20 || cc === 0x7f) return false
+        filterField.forceActiveFocus()
+        filterField.text = filterField.text + event.text
+        filterField.cursorPosition = filterField.text.length
+        return true
+    }
+
+    function runWebSearch(q, releaseScope) {
         q = (q || "").trim()
         // A chip click runs the search NOW — a debounce still pending from
         // typing would fire the same query a beat later as a duplicate.
@@ -399,11 +538,22 @@ PlasmaExtras.Representation {
         // query re-pins the chip.
         const scoped = (fullRepresentation.webSearchMode !== "country" && cc === "")
                        ? SearchLogic.scopedQuery(q, _countryCodeOf) : null
+        // A ✕-released scope stays released for THIS text: a mode or order
+        // chip re-runs the same string and must not pin the country back.
+        // releaseScope marks the text released; new text clears the mark
+        // (the searchFilter handler) — new text is new intent.
+        if (releaseScope && scoped)
+            fullRepresentation._webScopeReleasedFor = q
+        const released = releaseScope
+                         || (scoped !== null && fullRepresentation._webScopeReleasedFor === q)
         // History remembers what was TYPED — "70s in UK" replays the whole
         // scoped search from its chip; the bare text would lose the country.
         // The property mirror lets the stem chain (called via _webFinish,
         // which only carries the working text) remember the same full string.
-        const qTyped = q
+        // A RELEASED run records the bare text instead: what actually ran
+        // was the global search, and replaying the scoped string would
+        // re-pin the very chip the ✕ dismissed.
+        const qTyped = (released && scoped) ? scoped.text : q
         fullRepresentation._webLastTyped = qTyped
         // The country READING of the query applies only where a country
         // search can actually run: in "all" (the cc branch below) and in
@@ -412,8 +562,15 @@ PlasmaExtras.Representation {
         const mode0 = fullRepresentation.webSearchMode
         const ccActive = cc !== "" && (mode0 === "all" || mode0 === "country")
         if (scoped) {
-            fullRepresentation.webScopeCc = scoped.cc
-            fullRepresentation.webScopeName = scoped.country
+            // The chip's ✕ passes releaseScope — the "in UK" tail is still
+            // sitting in the field, and pinning from it here would undo the
+            // very release the tap asked for. The stem is the real query
+            // either way. `released` keeps that promise across the mode and
+            // order chips, which re-run the same text without the flag.
+            if (!released) {
+                fullRepresentation.webScopeCc = scoped.cc
+                fullRepresentation.webScopeName = scoped.country
+            }
             q = scoped.text
         } else if (ccActive || mode0 === "country") {
             // A country search takes the country role over — a chip still
@@ -423,7 +580,8 @@ PlasmaExtras.Representation {
             fullRepresentation.webScopeCc = ""
             fullRepresentation.webScopeName = ""
         }
-        const scopeCc = scoped ? scoped.cc
+        const scopeCc = released ? ""
+                      : scoped ? scoped.cc
                       : (!ccActive && mode0 !== "country"
                          ? fullRepresentation.webScopeCc : "")
         const ccTail = scopeCc !== "" ? "&countrycode=" + scopeCc : ""
@@ -472,16 +630,27 @@ PlasmaExtras.Representation {
                     if (webResultsModel.count > 0)
                         _webRememberQuery(qTyped)
                     // If the tag pass is what filled the list, "Show more"
-                    // must page IT, not the name query that ran short.
-                    if (webResultsModel.count > beforeTag)
+                    // must page IT, not the name query that ran short — and
+                    // from the tag list's own consumed position: the model
+                    // still counts the name rows, which the tag query never
+                    // served, and offset=count was skipping that many of
+                    // the tag list's best rows on every page.
+                    if (webResultsModel.count > beforeTag) {
                         fullRepresentation._webLastQs = tagQs + tail
+                        fullRepresentation._webSkipAhead =
+                            fullRepresentation._webLastConsumed - webResultsModel.count
+                    }
                     _probeKick(seq)
                     // A scoped multiword query that the tag reading didn't
                     // satisfy still deserves the word pass — "nova radio in
                     // uk" must find Radio Nova inside GB like it would
                     // outside. Returning here without it lost that.
+                    // gotAnswer is earned, not assumed: a tag pass whose
+                    // mirrors all died, over an empty list, is a network
+                    // failure and must say so — rows on screen out-vote it.
                     if (!_webWordPass(q, qTyped, seq, tail))
-                        _webFinish(q, seq, tail, true)
+                        _webFinish(q, seq, tail,
+                                   xhr2 !== null || webResultsModel.count > 0)
                 })
                 return
             }
@@ -518,7 +687,9 @@ PlasmaExtras.Representation {
             // this pass has no honest next page to offer.
             fullRepresentation.webResultCap = webResultsModel.count + 1
             _probeKick(seq)
-            _webFinish(q, seq, tail, true)
+            // Same honesty as the tag pass: dead mirrors over an empty
+            // list are a network answer, not "no results".
+            _webFinish(q, seq, tail, xhr2 !== null || webResultsModel.count > 0)
         })
         return true
     }
@@ -551,10 +722,12 @@ PlasmaExtras.Representation {
         })
     }
 
-    // One country's best stations — the road the scope chip, the locale
-    // shortcut and the roulette all share. Pins the chip so follow-up typed
-    // queries stay inside the country until its ✕ releases them.
-    function runWebCountry(cc, label, autoPreview) {
+    // One country's best stations — the road the scope chip and the home
+    // shortcut share. Pins the chip so follow-up typed queries stay inside
+    // the country until its ✕ releases them. It hands back a LIST and starts
+    // nothing: every sound in this widget comes from a row the listener
+    // pointed at.
+    function runWebCountry(cc, label) {
         // Every caller hands a code from a validated source, but the URL is
         // built here — so the gate lives here too.
         cc = String(cc || "").toUpperCase()
@@ -568,80 +741,65 @@ PlasmaExtras.Representation {
         fullRepresentation._webSkipAhead = 0
         fullRepresentation.webSearching = true
         fullRepresentation.webScopeCc = cc
-        // The label reaches a styled-text-capable sink (the chip button) and
-        // can come from the directory (roulette) — plain characters only.
-        fullRepresentation.webScopeName =
-            String(label || cc).replace(/[<>&]/g, " ").replace(/\s+/g, " ").trim() || cc
+        // The label reaches a styled-text-capable sink (the chip button) —
+        // plain characters only.
+        fullRepresentation.webScopeName = SearchLogic.cleanLabel(label || cc) || cc
+        // Always the country's TOP list: this road wears a "Popular in X"
+        // label, but it used to inherit whatever order chip the last typed
+        // search left behind — a Bitrate leftover quietly turned "popular"
+        // into "loudest encoder wins".
         const qs = "/json/stations/search?countrycode=" + cc
-                   + "&hidebroken=true&order=" + fullRepresentation.webSearchOrder
-                   + "&reverse=true&limit=50"
+                   + "&hidebroken=true&order=votes&reverse=true&limit=50"
         fullRepresentation._webLastQs = qs
         root._rbFetch(qs, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
             _probeKick(seq)
             fullRepresentation.webSearching = false
-            // The roulette promised sound, not a list: the country's top row
-            // starts as a preview — the same honest audition a row tap gives,
-            // nothing is saved anywhere. Already previewing that exact row
-            // (two spins landed on one giant) — leave it playing; the toggle
-            // contract would read the second spin as "stop".
-            if (autoPreview && webResultsModel.count > 0) {
-                var top = webResultsModel.get(0)
-                if (!(root._previewUrl === top.url && isPlaying()))
-                    root.previewStation(top.name, top.url, top.favicon,
-                                        top.rbUuid, top.rawUrl)
-            }
         })
     }
 
-    // The world's countries, fetched once per session for the roulette —
-    // only entries with a real ISO code and enough stations to have a
-    // worthwhile top row. Names are sanitized on the way in: they come from
-    // a semi-trusted mirror and end up on a chip label.
-    property var _rbCountries: []
-    property bool _rbCountriesLoading: false
-    function webRouletteSpin() {
-        if (fullRepresentation._rbCountries.length > 0) {
-            _rouletteGo()
-            return
-        }
-        if (fullRepresentation._rbCountriesLoading) return
-        // The spin owns the search state from the moment of the click: a
-        // late countries answer must not wipe a search the user started
-        // meanwhile, let alone start playing audio over it.
-        const seq = ++fullRepresentation._webSearchSeq
-        fullRepresentation._rbCountriesLoading = true
-        fullRepresentation.webSearching = true
-        root._rbFetch("/json/countries", 4000, function(xhr) {
-            fullRepresentation._rbCountriesLoading = false
+    // The genres a chip may offer. The directory decides the ORDER and
+    // whether a genre is worth showing at all — its tag counts are real —
+    // but not the vocabulary: that namespace is user-typed slush, and a
+    // "shape and station count" filter alone put "entretenimiento" and
+    // "moi merino" on an English rail. These are genre words a listener
+    // recognizes, in the spelling the directory uses.
+    readonly property var _genreVocab: ({
+        "pop": 1, "rock": 1, "jazz": 1, "classical": 1, "news": 1, "talk": 1,
+        "dance": 1, "electronic": 1, "house": 1, "techno": 1, "trance": 1,
+        "hits": 1, "top 40": 1, "oldies": 1, "80s": 1, "90s": 1, "70s": 1, "60s": 1,
+        "country": 1, "folk": 1, "blues": 1, "soul": 1, "funk": 1, "disco": 1,
+        "metal": 1, "punk": 1, "indie": 1, "alternative": 1, "hip hop": 1,
+        "rap": 1, "rnb": 1, "reggae": 1, "latin": 1, "salsa": 1, "chillout": 1,
+        "lounge": 1, "ambient": 1, "sport": 1, "sports": 1, "christian": 1,
+        "gospel": 1, "culture": 1, "comedy": 1, "schlager": 1, "chanson": 1,
+        "world": 1, "instrumental": 1, "soundtrack": 1, "kids": 1, "student": 1
+    })
+
+    // The directory's biggest genre tags, for the idle rail's chips. Never
+    // more than eight: the rail must not push the station list below the fold.
+    property var _rbTags: []
+    function _webFetchTags() {
+        root._rbFetch("/json/tags?order=stationcount&reverse=true&limit=120&hidebroken=true",
+                      5000, function(xhr) {
+            if (!xhr || xhr.status !== 200) return
             try {
-                var arr = JSON.parse((xhr && xhr.responseText) || "[]")
+                var arr = JSON.parse(xhr.responseText) || []
                 var out = []
-                for (var i = 0; i < arr.length; i++) {
-                    var c = arr[i] || {}
-                    var code = String(c.iso_3166_1 || "").toUpperCase()
-                    if (!/^[A-Z]{2}$/.test(code) || (c.stationcount || 0) < 30) continue
-                    var nm = String(c.name || code).replace(/[<>&]/g, " ")
-                             .replace(/\s+/g, " ").trim().substring(0, 60)
-                    out.push({ "cc": code, "name": nm || code })
+                for (var i = 0; i < arr.length && out.length < 8; i++) {
+                    var t = arr[i] || {}
+                    var nm = String(t.name || "").toLowerCase().replace(/\s+/g, " ").trim()
+                    if (!fullRepresentation._genreVocab.hasOwnProperty(nm)) continue
+                    if ((t.stationcount || 0) < 100) continue
+                    if (out.indexOf(nm) !== -1) continue
+                    out.push(nm)
                 }
-                fullRepresentation._rbCountries = out
-            } catch (e) {
-                console.log("[ARP] countries: " + e)
-            }
-            if (seq !== fullRepresentation._webSearchSeq) return
-            fullRepresentation.webSearching = false
-            if (fullRepresentation._rbCountries.length > 0) _rouletteGo()
-            else fullRepresentation.webSearchFailed = true
+                fullRepresentation._rbTags = out
+            } catch (e) { console.log("[ARP] tags: " + e) }
         })
     }
-    function _rouletteGo() {
-        var list = fullRepresentation._rbCountries
-        var pick = list[Math.floor(Math.random() * list.length)]
-        if (!pick) return
-        runWebCountry(pick.cc, pick.name, true)
-    }
+
 
     // The next page of whatever is showing — same query, same generation.
     function loadMoreWeb() {
@@ -661,15 +819,26 @@ PlasmaExtras.Representation {
             // one bad mirror moment.
             if (!_webAppendResults(xhr)) {
                 fullRepresentation.webResultCap = Math.max(30, fullRepresentation.webResultCap - 30)
-            } else if (fullRepresentation._webLastParsed > 0
-                       && webResultsModel.count === before) {
-                // The server page existed but the dedup ate every row of
-                // it — the next request must ask PAST it, and the cap
-                // falls back to the count so the button survives to ask.
-                // An empty page (_webLastParsed 0) is the honest end of
-                // the results and retires the button as before.
-                fullRepresentation._webSkipAhead += fullRepresentation._webLastParsed
-                fullRepresentation.webResultCap = webResultsModel.count
+                // The button coming back is not enough: without a word the
+                // screen is identical to before the click and the dead page
+                // reads as "there is no more". The failure notice under the
+                // list says what happened; the next successful page clears it.
+                fullRepresentation.webSearchFailed = true
+            } else {
+                fullRepresentation.webSearchFailed = false
+                // The fresh page appends after previously sunk dead rows —
+                // re-sink so the living stay on top.
+                _webSinkDead()
+                if (fullRepresentation._webLastParsed > 0
+                    && webResultsModel.count === before) {
+                    // The server page existed but the dedup ate every row of
+                    // it — the next request must ask PAST it, and the cap
+                    // falls back to the count so the button survives to ask.
+                    // An empty page (_webLastParsed 0) is the honest end of
+                    // the results and retires the button as before.
+                    fullRepresentation._webSkipAhead += fullRepresentation._webLastParsed
+                    fullRepresentation.webResultCap = webResultsModel.count
+                }
             }
             _probeKick(seq)
             fullRepresentation.webSearching = false
@@ -679,13 +848,27 @@ PlasmaExtras.Representation {
     function _webRememberQuery(q) {
         if (q.length < 3) return
         var ql = q.toLowerCase()
+        // Prefix-collapse must stay inside one scope: "jazz" half-typed on
+        // the way to "jazz in uk" is the same search, but a plain "jazz"
+        // typed LATER is a different one and must not eat the scoped chip.
+        var scopeOf = function(s) {
+            var p = SearchLogic.scopedQuery(s, _countryCodeOf)
+            return p ? p.cc : ""
+        }
+        var qScope = scopeOf(q)
         var h = fullRepresentation.webHistory.filter(function(e) {
             var el = e.toLowerCase()
             // A stored entry that is a prefix of the new query is the same
             // search half-typed (the debounce saved "eston" on the way to
-            // "estonia") — it collapses into the finished one. And typing
-            // BACKWARDS must not respawn the fragments.
-            return el !== ql && ql.indexOf(el) !== 0 && el.indexOf(ql) !== 0
+            // "estonia", "jazz" on the way to "jazz in uk") — it collapses
+            // into the finished one unconditionally. The OTHER direction is
+            // scope-guarded: typing backwards must not respawn fragments,
+            // but a plain "jazz" typed later is a different search from a
+            // stored "jazz in uk" and must not eat its chip.
+            if (el === ql) return false
+            if (ql.indexOf(el) === 0) return false
+            if (el.indexOf(ql) === 0) return scopeOf(e) !== qScope
+            return true
         })
         h.unshift(q)
         fullRepresentation.webHistory = h.slice(0, 8)
@@ -720,10 +903,23 @@ PlasmaExtras.Representation {
             for (var i = 0; i < stationsModel.count; i++)
                 existing[stationsModel.get(i).hostname] = true
             const seen = Object.create(null)
-            for (var j = 0; j < webResultsModel.count; j++)
+            for (var j = 0; j < webResultsModel.count; j++) {
                 seen[webResultsModel.get(j).url] = true
+                // The raw url must survive into later passes too, or the
+                // directory's twin entry (same wrapper url, url_resolved
+                // never crawled) reappears as a second row of one station.
+                var seenRaw = webResultsModel.get(j).rawUrl
+                if (seenRaw) seen[seenRaw] = true
+            }
+            var consumed = 0
             for (const r of results) {
                 if (webResultsModel.count >= fullRepresentation.webResultCap) break
+                consumed++
+                // One rotten row must not void a 200 answer with 29 good
+                // rows — the API types these fields as strings, but the
+                // mirrors are only semi-trusted and every read below
+                // assumes string methods exist.
+                try {
                 if (keepRow && !keepRow(r)) continue
                 const u = (r.url_resolved || r.url || "").toString()
                 // http(s) only — catalogue data is untrusted and these URLs
@@ -744,26 +940,33 @@ PlasmaExtras.Representation {
                 // scaled down. The old >1000 cutoff mangled honest high-rate
                 // streams (1411 kbps lossless became "1 kb/s").
                 if (br >= 8000) br = Math.round(br / 1000)
-                // The favicon lands in an Image.source — same http(s) gate
-                // the stream url gets, or a file:///data: favicon from the
-                // catalogue would probe local files behind the row.
-                var fav = (r.favicon || "").toString()
+                // The favicon lands in an Image.source — through the same
+                // gate every persisted favicon passes (scheme AND host), or
+                // a crafted catalogue row would probe local files, or aim a
+                // clickless GET at the listener's own LAN, behind the row.
+                var fav = FaviconLogic.webUrlOrEmpty(r.favicon)
+                // Length caps: these strings reach the text shaper, the
+                // accessibility layer and — after a ⭐ — the config file,
+                // and a hostile mirror can put megabytes into one "name".
                 webResultsModel.append({
-                    "name": (r.name || "").replace(/\s+/g, " ").trim() || u,
+                    "name": String(r.name || "").replace(/\s+/g, " ").trim().substring(0, 300) || u,
                     "url": u,
                     "rawUrl": (/^https?:\/\//i.test(rawU) && rawU !== u) ? rawU : "",
-                    "favicon": /^https?:\/\//i.test(fav) ? fav : "",
-                    "country": r.country || "",
+                    "favicon": fav,
+                    "country": String(r.country || "").substring(0, 80),
                     // The ISO code rides along for the flag — countryFlag
                     // validates it, so a garbage catalogue value renders as
                     // nothing, never as a broken glyph pair.
-                    "cc": (r.countrycode || "").toUpperCase(),
+                    "cc": String(r.countrycode || "").toUpperCase(),
                     "bitrate": br,
-                    "codec": (r.codec || "").toUpperCase(),
-                    "rbUuid": r.stationuuid || "",
+                    "codec": String(r.codec || "").toUpperCase().substring(0, 16),
+                    "votes": parseInt(r.votes) || 0,
+                    "rbUuid": String(r.stationuuid || ""),
                     "alive": -1
                 })
+                } catch (rowErr) { continue }
             }
+            fullRepresentation._webLastConsumed = consumed
             return true
         } catch (e) {
             console.log("[ARP] webSearch parse: " + e)
@@ -813,13 +1016,13 @@ PlasmaExtras.Representation {
 
             SequentialAnimation on x {
                 loops: Animation.Infinite
-                paused: running && !root.expanded
+                paused: running && (!root.expanded || root.thrifty)
                 NumberAnimation { to: fullRepresentation.width * 0.35; duration: 26000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: -blobA.width * 0.3; duration: 26000; easing.type: Easing.InOutSine }
             }
             SequentialAnimation on y {
                 loops: Animation.Infinite
-                paused: running && !root.expanded
+                paused: running && (!root.expanded || root.thrifty)
                 NumberAnimation { to: fullRepresentation.height * 0.2; duration: 19000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: -blobA.height * 0.25; duration: 19000; easing.type: Easing.InOutSine }
             }
@@ -846,13 +1049,13 @@ PlasmaExtras.Representation {
 
             SequentialAnimation on x {
                 loops: Animation.Infinite
-                paused: running && !root.expanded
+                paused: running && (!root.expanded || root.thrifty)
                 NumberAnimation { to: fullRepresentation.width * 0.1; duration: 31000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: fullRepresentation.width - blobB.width * 0.4; duration: 31000; easing.type: Easing.InOutSine }
             }
             SequentialAnimation on y {
                 loops: Animation.Infinite
-                paused: running && !root.expanded
+                paused: running && (!root.expanded || root.thrifty)
                 NumberAnimation { to: fullRepresentation.height * 0.35; duration: 23000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: fullRepresentation.height - blobB.height * 0.35; duration: 23000; easing.type: Easing.InOutSine }
             }
@@ -932,13 +1135,41 @@ PlasmaExtras.Representation {
                     onTextChanged: root.searchFilter = text
                     placeholderText: i18n("Search station or country… (e.g. Finland, jazz)")
                     // Both Return AND the numpad Enter (same pattern as CircleButton)
+                    // A query with no local matches used to dead-end here: the
+                    // web rows were on screen and Enter did literally nothing —
+                    // they are the results, land on them.
                     function jumpToList() {
                         if (stationView.count > 0) {
                             stationView.currentIndex = 0
                             stationView.forceActiveFocus()
+                        } else if (webRepeater.count > 0) {
+                            webRepeater.itemAt(0).forceActiveFocus()
                         }
                     }
-                    Keys.onDownPressed: stationView.forceActiveFocus()
+                    // Shell-style recall: Up in an empty field brings the last
+                    // search back — the history chips only render when the
+                    // field is empty, so re-running one otherwise meant
+                    // clearing the field first and losing the cursor. The walk
+                    // runs over a SNAPSHOT: a recalled search that succeeds
+                    // reorders webHistory underneath, and comparing against
+                    // the live list went dead one step into the walk.
+                    property var _histWalk: []
+                    property int _histAt: -1
+                    Keys.onUpPressed: (event) => {
+                        if (text === "") {
+                            _histWalk = fullRepresentation.webHistory.slice()
+                            _histAt = 0
+                        } else if (_histAt >= 0 && text === _histWalk[_histAt]) {
+                            _histAt = Math.min(_histAt + 1, _histWalk.length - 1)
+                        } else {
+                            event.accepted = false
+                            return
+                        }
+                        if (_histWalk.length === 0) { event.accepted = false; return }
+                        text = _histWalk[_histAt]
+                        cursorPosition = text.length
+                    }
+                    Keys.onDownPressed: jumpToList()
                     Keys.onReturnPressed: jumpToList()
                     Keys.onEnterPressed: jumpToList()
                 }
@@ -966,7 +1197,7 @@ PlasmaExtras.Representation {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
                 // Always present: the discovery row (Trending, Popular-in-…,
-                // the roulette) is the first-run door to the world catalog —
+                // the genres) is the first-run door to the world catalog —
                 // gating it on history hid it from exactly the people who
                 // hadn't searched yet.
                 visible: true
@@ -993,13 +1224,24 @@ PlasmaExtras.Representation {
                         fullRepresentation.webScopeName = ""
                         // With text in the field the same search re-runs
                         // worldwide; with none (the chip came from the
-                        // roulette / Popular-in) there is nothing to re-run —
+                        // Popular-in chip) there is nothing to re-run —
                         // clear the country list instead of leaving it to
-                        // masquerade as a global one.
-                        if (root.searchFilter !== "")
-                            runWebSearch(root.searchFilter)
-                        else
+                        // masquerade as a global one. The second argument
+                        // matters: without it a scope that came from the
+                        // typed text ("70s in UK") re-derives itself and the
+                        // chip snaps right back.
+                        if (root.searchFilter !== "") {
+                            runWebSearch(root.searchFilter, true)
+                        } else {
+                            // The bump is load-bearing: a country fetch still
+                            // in mirror failover would otherwise pass its seq
+                            // gate, refill the just-cleared list with rows no
+                            // chip explains. Every other invalidation bumps;
+                            // this one must too.
+                            ++fullRepresentation._webSearchSeq
+                            fullRepresentation.webSearching = false
                             webResultsModel.clear()
+                        }
                     }
                 }
 
@@ -1019,6 +1261,11 @@ PlasmaExtras.Representation {
                         onClicked: {
                             fullRepresentation.webSearchMode = modelData.key
                             runWebSearch(root.searchFilter)
+                            // Clicking the chip that is already on toggles it
+                            // off by itself, and writing the same mode back
+                            // signals nothing, so the binding never gets to
+                            // put it right — leaving no chip lit at all.
+                            checked = Qt.binding(() => fullRepresentation.webSearchMode === modelData.key)
                         }
                     }
                 }
@@ -1038,6 +1285,8 @@ PlasmaExtras.Representation {
                         onClicked: {
                             fullRepresentation.webSearchOrder = modelData.key
                             runWebSearch(root.searchFilter)
+                            // Same restore as the mode chips above.
+                            checked = Qt.binding(() => fullRepresentation.webSearchOrder === modelData.key)
                         }
                     }
                 }
@@ -1048,37 +1297,29 @@ PlasmaExtras.Representation {
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     onClicked: runWebTrending()
                 }
-                // The listener's own country, read from the system locale —
-                // zero setup, zero permissions, nothing leaves the machine.
+                // The listener's own country — timezone first, locale as the
+                // fallback (webHomeCc). Zero setup, zero permissions, nothing
+                // leaves the machine.
                 PlasmaComponents3.ToolButton {
-                    readonly property string localeCc: {
-                        // The territory is the LAST two-letter part: plain
-                        // "fi_FI" has it second, script-tagged locales
-                        // ("sr_Cyrl_RS", "zh_Hant_TW") third.
-                        var parts = Qt.locale().name.split("_")
-                        for (var i = parts.length - 1; i >= 1; i--)
-                            if (/^[A-Z]{2}$/.test(parts[i])) return parts[i]
-                        return ""
-                    }
-                    visible: root.searchFilter === "" && localeCc !== ""
-                    text: SearchLogic.countryFlag(localeCc) + " "
-                          + i18n("Popular in %1", Qt.locale().nativeTerritoryName
-                                                  || localeCc)
+                    visible: root.searchFilter === "" && fullRepresentation.webHomeCc !== ""
+                    text: SearchLogic.countryFlag(fullRepresentation.webHomeCc) + " "
+                          + i18n("Popular in %1", fullRepresentation.webHomeName)
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    onClicked: runWebCountry(localeCc,
-                                             Qt.locale().nativeTerritoryName || localeCc,
-                                             false)
+                    onClicked: runWebCountry(fullRepresentation.webHomeCc,
+                                             fullRepresentation.webHomeName)
                 }
-                // 🎲 — the world roulette: a random country's best station
-                // starts playing as a preview. Star it to keep it; tap play
-                // to stop, spin again to travel on.
-                PlasmaComponents3.ToolButton {
-                    visible: root.searchFilter === ""
-                    text: "🎲 " + i18n("Surprise me")
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    onClicked: webRouletteSpin()
-                    PlasmaComponents3.ToolTip {
-                        text: i18n("Tune in somewhere on Earth — a random country's top station starts playing")
+                // The field's own placeholder promises "e.g. jazz", but the
+                // genre axis was reachable only by typing. These are the
+                // directory's genuinely biggest tags, one tap from idle —
+                // the tap just types the word, so the whole existing search
+                // road (mixed passes, scope chip, history) applies as-is.
+                Repeater {
+                    model: root.searchFilter === "" ? fullRepresentation._rbTags : []
+                    delegate: PlasmaComponents3.ToolButton {
+                        required property string modelData
+                        text: modelData
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        onClicked: filterField.text = modelData
                     }
                 }
                 Repeater {
@@ -1162,6 +1403,15 @@ PlasmaExtras.Representation {
                             event.accepted = true
                             return
                         }
+                        // Down off the list's last row continues into the web
+                        // results — one column of arrows over what reads as
+                        // one list on screen.
+                        if (event.key === Qt.Key_Down && !(event.modifiers & Qt.ControlModifier)
+                            && currentIndex === count - 1 && webRepeater.count > 0) {
+                            webRepeater.itemAt(0).forceActiveFocus()
+                            event.accepted = true
+                            return
+                        }
                         // Ctrl+Up/Down = move the current row (same as the
                         // hover arrows, reachable without a mouse). UI
                         // first, like the arrows: the view moves, the
@@ -1236,12 +1486,18 @@ PlasmaExtras.Representation {
                         // contentHeight -> scrollbar -> ListView width, which would loop.
                         width: scrollView.width - stationView.leftMargin - stationView.rightMargin
                         spacing: 2
+                        // The failure notice keeps the footer alive on its own:
+                        // with local rows matching, the big empty state never
+                        // shows, and an offline search used to read as "the
+                        // catalogue has nothing" with no word about the network.
                         visible: webResultsModel.count > 0 || fullRepresentation.webSearching
+                                 || (fullRepresentation.webSearchFailed && stationView.count > 0)
                         height: visible ? implicitHeight : 0
 
                         Item { width: 1; height: Kirigami.Units.smallSpacing }
 
                         Row {
+                            visible: webResultsModel.count > 0 || fullRepresentation.webSearching
                             spacing: Kirigami.Units.smallSpacing
                             leftPadding: Kirigami.Units.smallSpacing
 
@@ -1272,6 +1528,7 @@ PlasmaExtras.Representation {
                         }
 
                         Repeater {
+                            id: webRepeater
                             model: webResultsModel
 
                             delegate: Item {
@@ -1293,10 +1550,48 @@ PlasmaExtras.Representation {
                                                  : i18n("Preview: %1", model.name)
                                 Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
                                 Keys.onPressed: (event) => {
-                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                                    // Ctrl+Return = the star, from the keyboard: the hover-only
+                                    // button was the single way to KEEP a found station, and it
+                                    // needed a pointer. Return alone stays the preview toggle.
+                                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                        && (event.modifiers & Qt.ControlModifier)) {
+                                        webItem.starThisRow()
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
                                         root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
                                         event.accepted = true
+                                    } else if (event.key === Qt.Key_Down) {
+                                        var next = webRepeater.itemAt(webItem.index + 1)
+                                        if (next) next.forceActiveFocus()
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_Up) {
+                                        if (webItem.index > 0) {
+                                            webRepeater.itemAt(webItem.index - 1).forceActiveFocus()
+                                        } else if (stationView.count > 0) {
+                                            stationView.currentIndex = stationView.count - 1
+                                            stationView.forceActiveFocus()
+                                        } else {
+                                            filterField.forceActiveFocus()
+                                        }
+                                        event.accepted = true
                                     }
+                                }
+
+                                // One exit for both the pointer star and Ctrl+Return: add,
+                                // drop the row, and keep the paging honest — the removal
+                                // shrinks the count below the cap, and the "Show more"
+                                // button's visibility (count >= cap) would retire for good
+                                // over a page the directory still has more of.
+                                function starThisRow() {
+                                    var wasIndex = webItem.index
+                                    root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid)
+                                    webResultsModel.remove(wasIndex)
+                                    fullRepresentation.webResultCap =
+                                        Math.max(webResultsModel.count, fullRepresentation.webResultCap - 1)
+                                    // Keyboard flow: the focused row just vanished — land on
+                                    // the row that took its place, or the last one left.
+                                    var land = webRepeater.itemAt(Math.min(wasIndex, webResultsModel.count - 1))
+                                    if (land) land.forceActiveFocus()
                                 }
 
                                 Rectangle {
@@ -1378,6 +1673,11 @@ PlasmaExtras.Representation {
                                                 text: {
                                                     var bits = []
                                                     if (webItem.model.alive === 0) bits.push(i18n("not answering"))
+                                                    // Votes ride early in the line: they are the
+                                                    // number "Top voted" sorts by, and the elide
+                                                    // must eat the long country name first.
+                                                    var vb = SearchLogic.formatVotes(webItem.model.votes)
+                                                    if (vb !== "") bits.push("▲ " + vb)
                                                     if (webItem.model.country) {
                                                         // Flag + name — the flag is an emoji built
                                                         // from the ISO code, no image assets.
@@ -1404,7 +1704,7 @@ PlasmaExtras.Representation {
                                         EqBars {
                                             anchors.verticalCenter: parent.verticalCenter
                                             visible: webItem.isPreviewing
-                                            animating: visible && root.expanded
+                                            animating: visible && root.expanded && !root.thrifty
                                             bars: 3
                                             barWidth: 3
                                             minHeight: 4
@@ -1435,10 +1735,7 @@ PlasmaExtras.Representation {
                                     iconScale: 0.55
                                     opacity: webHover.hovered ? 1.0 : 0.55
                                     tooltipText: i18n("Add to my stations + favorites")
-                                    onClicked: {
-                                        root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid)
-                                        webResultsModel.remove(webItem.index)
-                                    }
+                                    onClicked: webItem.starThisRow()
                                 }
 
                                 HoverHandler { id: webHover }
@@ -1463,6 +1760,32 @@ PlasmaExtras.Representation {
                             text: i18n("Show more results")
                             icon.name: "arrow-down"
                             onClicked: loadMoreWeb()
+                        }
+
+                        // A failed fetch with rows still on screen (a dead
+                        // "Show more" page, or an offline search over local
+                        // matches) has no empty state to speak through —
+                        // this line is its only voice. Same wording the
+                        // empty state uses, so the catalogs already carry it.
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: Kirigami.Units.smallSpacing
+                            visible: fullRepresentation.webSearchFailed
+                                     && !fullRepresentation.webSearching
+                                     && (stationView.count > 0 || webResultsModel.count > 0)
+                            Kirigami.Icon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                source: "network-disconnect"
+                                width: Kirigami.Units.iconSizes.small
+                                height: width
+                                opacity: 0.7
+                            }
+                            PlasmaComponents3.Label {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: i18n("The station directory is not reachable")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                opacity: 0.7
+                            }
                         }
 
                         Item { width: 1; height: Kirigami.Units.smallSpacing }
@@ -1652,7 +1975,7 @@ PlasmaExtras.Representation {
                                 to: 360
                                 duration: 9000
                                 loops: Animation.Infinite
-                                running: vinyl.visible && fullRepresentation._streamActive && root.view === 1 && root.expanded
+                                running: vinyl.visible && fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
                             }
 
                             Canvas {
@@ -1785,7 +2108,7 @@ PlasmaExtras.Representation {
                             anchors.bottom: parent.bottom
                             anchors.margins: Kirigami.Units.smallSpacing * 1.5
                             visible: fullRepresentation._streamActive
-                            animating: visible && root.expanded
+                            animating: visible && root.expanded && !root.thrifty
                             bars: 4
                             barWidth: 4
                             minHeight: 6
@@ -1987,16 +2310,21 @@ PlasmaExtras.Representation {
                         Layout.alignment: Qt.AlignVCenter
                         implicitWidth: Kirigami.Units.gridUnit * 4.5
                         implicitHeight: implicitWidth
-                        iconName: isPlaying() ? "media-playback-stop" : "media-playback-start"
+                        // A cast preview leaves the LOCAL player idle while the
+                        // speaker sounds — the same rule the result rows and
+                        // previewStation's toggle already follow. isPlaying()
+                        // alone showed Play here and started a second station
+                        // OVER the audible one.
+                        iconName: (isPlaying() || root._casting) ? "media-playback-stop" : "media-playback-start"
                         iconScale: 0.45
                         primary: true
                         glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded
-                        enabledState: stationsModel.count > 0 || isPlaying()
-                        tooltipText: isPlaying() ? i18n("Stop") : i18n("Play")
+                        enabledState: stationsModel.count > 0 || isPlaying() || root._casting
+                        tooltipText: (isPlaying() || root._casting) ? i18n("Stop") : i18n("Play")
                         onClicked: {
-                            // While playing = ALWAYS stop (including preview);
-                            // otherwise play the last / first station.
-                            if (isPlaying()) {
+                            // While audible = ALWAYS stop (preview and cast
+                            // included); otherwise play the last / first station.
+                            if (isPlaying() || root._casting) {
                                 stopWithFade()
                             } else {
                                 const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
@@ -2496,7 +2824,7 @@ PlasmaExtras.Representation {
                     EqBars {
                         Layout.alignment: Qt.AlignVCenter
                         visible: root.downloading
-                        animating: visible && root.expanded
+                        animating: visible && root.expanded && !root.thrifty
                         bars: 3
                         barWidth: 3
                         minHeight: 4
@@ -2537,7 +2865,7 @@ PlasmaExtras.Representation {
                     EqBars {
                         Layout.alignment: Qt.AlignVCenter
                         visible: root.recording
-                        animating: visible && root.expanded
+                        animating: visible && root.expanded && !root.thrifty
                         bars: 3
                         barWidth: 3
                         minHeight: 4
@@ -2900,7 +3228,7 @@ PlasmaExtras.Representation {
                                     EqBars {
                                         anchors.centerIn: parent
                                         visible: fileItem.isThisPlaying
-                                        animating: visible && root.expanded
+                                        animating: visible && root.expanded && !root.thrifty
                                         bars: 3
                                         barWidth: 3
                                         minHeight: 4
@@ -3097,11 +3425,39 @@ PlasmaExtras.Representation {
             // the folder — this is how a row knows it is downloaded. The
             // count reference makes every binding re-check when a download
             // lands or a file is deleted.
-            function localEpisodeUrl(title, url) {
-                var want = root.podcastFileName(title !== "" ? title : i18n("Episode"), url)
-                for (var i = 0; i < podcastFolder.count; i++)
-                    if (podcastFolder.get(i, "fileName") === want)
-                        return podcastFolder.get(i, "fileUrl").toString()
+            // Two names are accepted: the tagged one every new download
+            // carries, and the pre-tag name of files already on disk. The
+            // tagged one wins when both exist — it is the one that belongs
+            // to THIS show, and the bare name may be another show's episode
+            // that happens to share a title.
+            function localEpisodeUrl(title, url, guid) {
+                var t = title !== "" ? title : i18n("Episode")
+                var want = root.podcastFileName(t, url, root.podcastEpisodesFor, guid)
+                var legacy = root.podcastFileNameLegacy(t, url)
+                var fallback = ""
+                for (var i = 0; i < podcastFolder.count; i++) {
+                    var fn = podcastFolder.get(i, "fileName")
+                    if (fn === want) return podcastFolder.get(i, "fileUrl").toString()
+                    // The bare name is only accepted when the ledger does not
+                    // say it belongs to another show — otherwise the very
+                    // collision the tag ended would come back for every file
+                    // downloaded before the tag existed: the right title on
+                    // screen, the other show's audio out of the speaker.
+                    if (fn === legacy
+                        && root.podcastLegacyIsOurs(legacy, root.podcastEpisodesFor, guid, url))
+                        fallback = podcastFolder.get(i, "fileUrl").toString()
+                }
+                if (fallback !== "") return fallback
+                // Neither name matched. Before believing "not downloaded",
+                // ask the ledger by the episode's own key: a show that moved
+                // host has a new feed, so every name computed from it misses
+                // while the file is right there on disk under the old tag.
+                var byKey = root.podcastFileForKey(PodcastLogic.episodeKey(guid, url))
+                if (byKey !== "") {
+                    for (var j = 0; j < podcastFolder.count; j++)
+                        if (podcastFolder.get(j, "fileName") === byKey)
+                            return podcastFolder.get(j, "fileUrl").toString()
+                }
                 return ""
             }
 
@@ -3871,7 +4227,7 @@ PlasmaExtras.Representation {
                     delegate: EpisodeListItem {
                         localUrl: {
                             podcastFolder.count   // re-check when files change
-                            return podcastPage.localEpisodeUrl(title, url)
+                            return podcastPage.localEpisodeUrl(title, url, guid)
                         }
                         showArt: root.podcastEpisodesArt
                         expanded: podcastPage.expandedEpisodeKey === epKey
@@ -4440,6 +4796,10 @@ PlasmaExtras.Representation {
     Connections {
         target: root
         function onSearchFilterChanged() {
+            // New text, new intent: a scope released for the OLD string
+            // must not leak onto a query the user is typing now.
+            if (root.searchFilter !== fullRepresentation._webScopeReleasedFor)
+                fullRepresentation._webScopeReleasedFor = ""
             rebuildFilteredModel()
             webSearchDebounce.restart()
         }
@@ -4462,8 +4822,14 @@ PlasmaExtras.Representation {
         // representation; the results model lives HERE and does not. A fresh
         // representation reopened over inherited text used to show the old
         // query above an empty list — "the search broke" — until the text
-        // was edited. Re-run it ourselves.
-        if (root.searchFilter !== "") webSearchDebounce.restart()
+        // was edited. Re-run it ourselves — and put the text back into the
+        // field, or the list arrives filtered by a string the user cannot
+        // see and Esc has nothing visible to clear.
+        if (root.searchFilter !== "") {
+            filterField.text = root.searchFilter
+            webSearchDebounce.restart()
+        }
+        _webFetchTags()
     }
 
     // True when any text/form input (search field, scheduler SpinBoxes /
@@ -4512,6 +4878,12 @@ PlasmaExtras.Representation {
             event.accepted = true
         } else if (event.key === Qt.Key_M && !_inputFocused()) {
             root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+            event.accepted = true
+        } else if (root.view === 0 && !_inputFocused() && typeToSearch(event)) {
+            // Open-and-type: any letter nobody above claimed lands in the
+            // search field — from the header, the list, anywhere on the
+            // list page. Deliberately BELOW Space and M, so the transport
+            // toggle and mute keep working until real typing begins.
             event.accepted = true
         }
     }
@@ -4703,7 +5075,7 @@ PlasmaExtras.Representation {
 
             // Cast button — DLNA renderers (TVs, soundbars, network speakers)
             // work with no extra packages; Google Cast devices additionally
-            // appear when python-chromecast is installed. Hidden only when
+            // appear when pychromecast is installed. Hidden only when
             // the bridge itself is unusable (no python3).
             CircleButton {
                 id: castBtn
@@ -5024,35 +5396,85 @@ PlasmaExtras.Representation {
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             text: i18n("All local outputs, in sync")
                             icon.name: "speaker"
+                            // The persisted wish keeps this row on screen even
+                            // when the room is down to one output. The wish
+                            // rebuilds the group by itself the moment a second
+                            // sink appears — a headset connecting for a call is
+                            // enough — and a switch that hides while its
+                            // setting is armed leaves nowhere to turn that off.
+                            // Measured on a machine left exactly so: one USB
+                            // sink, combineWanted stuck true, and every
+                            // Bluetooth connect brought the whole group back.
+                            // The caretaker counts as a reason to show the row
+                            // too: it can park the music and click into the
+                            // room, and its own switch used to live only in
+                            // the settings dialog. Anything that can make
+                            // sound by itself must be switchable off from the
+                            // place the sound comes from.
                             visible: root.sync._combineAvailable
-                                     && (root.sync._combineWantActive || mediaDevices.audioOutputs.length >= 2)
-                            // Bound to the INTENT flag (flips with the click),
+                                     && (root.sync._combineWantActive
+                                         || Plasmoid.configuration.combineWanted === true
+                                         || Plasmoid.configuration.syncAutoCare === true
+                                         || mediaDevices.audioOutputs.length >= 2)
+                            // Bound to the intent flag OR the persisted wish,
                             // not the async pactl ack — and re-bound after
                             // every toggle, because the click itself severs a
-                            // declarative binding. A failed load resets the
-                            // intent and the box unchecks itself.
-                            // Wanted-but-idle-parked still reads as ON: the
-                            // graph is only sleeping and the next play wakes
-                            // it — an unchecked box here would let that wake
-                            // contradict what the user just looked at, and
-                            // unchecking a PARKED sync must genuinely turn
-                            // it off (the disable clears the wish before its
-                            // not-active early return).
+                            // declarative binding. A failed fresh load sets
+                            // neither and the box unchecks itself. Parked, or
+                            // waiting for hardware to return, still reads as
+                            // ON: the graph only sleeps and the next play or
+                            // device event wakes it — an unchecked box would
+                            // contradict what the user just looked at.
+                            // Unchecking genuinely turns it off: the disable
+                            // clears the wish and the resurrect knocks before
+                            // its not-active early return.
                             checked: root.sync._combineWantActive
-                                     || (root.sync._combineIdleParked
-                                         && Plasmoid.configuration.combineWanted === true)
+                                     || Plasmoid.configuration.combineWanted === true
                             onToggled: {
-                                if (checked) root.sync.combineOutputsEnable()
+                                // fromUser: only this click may sweep stale
+                                // per-speaker exclusions; the automatic
+                                // rebuild roads must not.
+                                if (checked) root.sync.combineOutputsEnable(true)
                                 else root.sync.combineOutputsDisable()
                                 checked = Qt.binding(function() {
                                     return root.sync._combineWantActive
-                                           || (root.sync._combineIdleParked
-                                               && Plasmoid.configuration.combineWanted === true)
+                                           || Plasmoid.configuration.combineWanted === true
                                 })
                             }
 
                             PlasmaComponents3.ToolTip {
                                 text: i18n("Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth.")
+                            }
+                        }
+
+                        // The caretaker's own switch, beside the sync it
+                        // tends. It lived only on a settings page before,
+                        // which is a poor home for the one setting that can
+                        // pause the music and send clicks around the room:
+                        // the listener who hears that wants it off HERE, not
+                        // after finding a dialog. Shown whenever the row
+                        // above is, so it can always be switched off — and
+                        // only offered where it can act, which needs a
+                        // Bluetooth member to drift against.
+                        PlasmaComponents3.CheckBox {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            text: i18n("Keep it in tune by itself")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            visible: root.sync._combineAvailable
+                                     && (root.sync._combineWantActive
+                                         || Plasmoid.configuration.combineWanted === true
+                                         || Plasmoid.configuration.syncAutoCare === true)
+                            checked: Plasmoid.configuration.syncAutoCare === true
+                            onToggled: {
+                                Plasmoid.configuration.syncAutoCare = checked
+                                checked = Qt.binding(function() {
+                                    return Plasmoid.configuration.syncAutoCare === true
+                                })
+                            }
+
+                            PlasmaComponents3.ToolTip {
+                                text: i18n("Listens now and then while music plays and puts the speakers back in step on its own. Nothing is audible and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you.")
                             }
                         }
 
@@ -5071,6 +5493,16 @@ PlasmaExtras.Representation {
                                 text: i18n("Sync fine-tune")
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.7
+
+                                // Named out loud because the automatic check
+                                // prints a number in the same unit two lines
+                                // below, and the two answer different
+                                // questions: this is the delay being applied,
+                                // that is the error still left over.
+                                PlasmaComponents3.ToolTip {
+                                    text: i18n("How far behind the Bluetooth speaker runs — the other outputs are held back by this much to match it. The automatic check below reports something else: how far apart they still land.")
+                                }
+                                HoverHandler { id: syncTuneHover }
                             }
                             PlasmaComponents3.Slider {
                                 id: syncSlider
@@ -5160,13 +5592,22 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             visible: root.sync._combineWantActive && root.sync.calibPhase === ""
+                                     && Plasmoid.configuration.syncManualOnly !== true
                             enabled: root.sync.calibPairReady()
                             text: i18n("Calibrate with the microphone")
                             icon.name: "audio-input-microphone"
                             onClicked: root.sync.calibrateSync()
 
                             PlasmaComponents3.ToolTip {
-                                text: i18n("Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically.")
+                                // The tooltip has to say which sound this
+                                // button will actually make: with the
+                                // inaudible setting on it measures the delay
+                                // with the sweep and leaves the balance
+                                // alone, because matching loudness needs a
+                                // sound the microphone can weigh.
+                                text: Plasmoid.configuration.syncUltrasonic !== false
+                                      ? i18n("Measures with a tone too high to hear how far the Bluetooth speaker trails, and sets the delay automatically. Speaker balance is left as it is — matching loudness needs a sound you would hear.")
+                                      : i18n("Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically.")
                             }
                         }
 
@@ -5185,21 +5626,30 @@ PlasmaExtras.Representation {
                             wrapMode: Text.WordWrap
                         }
 
-                        // The opt-in caretaker: a passive microphone check
-                        // on the playing audio every few minutes, one
-                        // automatic click-verify when it confirms a drift.
+                        // The opt-in caretaker: a sweep through each speaker
+                        // every few minutes, pitched above what most adults
+                        // hear, and one automatic re-verify when it confirms
+                        // a drift.
                         PlasmaComponents3.CheckBox {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
-                            visible: root.sync._combineWantActive
-                                     || (root.sync._combineIdleParked
-                                         && Plasmoid.configuration.combineWanted === true)
+                            visible: (root.sync._combineWantActive
+                                      || (root.sync._combineIdleParked
+                                          && Plasmoid.configuration.combineWanted === true))
+                                     && Plasmoid.configuration.syncManualOnly !== true
                             checked: Plasmoid.configuration.syncAutoCare === true
-                            onToggled: Plasmoid.configuration.syncAutoCare = checked
+                            onToggled: {
+                                Plasmoid.configuration.syncAutoCare = checked;
+                                // Tick it and the first check starts now,
+                                // not at the next tick of a six-minute
+                                // timer — the answer belongs to the moment
+                                // the box was clicked.
+                                if (checked) root.sync.noteAutoCareEnabled();
+                            }
                             text: i18n("Keep sync tuned automatically")
 
                             PlasmaComponents3.ToolTip {
-                                text: i18n("Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. Audio is processed on this computer only — never stored, never sent anywhere.")
+                                text: i18n("Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only — never stored, never sent anywhere.")
                             }
                         }
 
@@ -5219,6 +5669,78 @@ PlasmaExtras.Representation {
                             wrapMode: Text.WordWrap
                         }
 
+                        // The number the automatic checks actually settled
+                        // on. The slider above shows the seed the user set;
+                        // corrections land in the per-device map, so a
+                        // speaker that has been quietly retuned for a week
+                        // was playing at a delay nothing on screen admitted.
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2.2
+                            // The map and the seed are named so the binding
+                            // re-runs when a correction lands — a bare
+                            // function call would show the startup value
+                            // forever.
+                            readonly property string tuned: {
+                                var mapDep = Plasmoid.configuration.syncOffsetMap;
+                                var seedDep = Plasmoid.configuration.syncOffsetMs;
+                                return root.sync.autoTunedSummary();
+                            }
+                            visible: tuned !== ""
+                                     && (root.sync._combineWantActive
+                                         || (root.sync._combineIdleParked
+                                             && Plasmoid.configuration.combineWanted === true))
+                            text: i18n("Tuned automatically — %1", tuned)
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.6
+                            wrapMode: Text.WordWrap
+                        }
+
+                        // The whole microphone road, refused in one place.
+                        // Some people would simply rather set it by ear than
+                        // have a widget listen to their room, and that is a
+                        // complete answer — the slider alone does the job.
+                        PlasmaComponents3.CheckBox {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            visible: root.sync._combineWantActive
+                                     || (root.sync._combineIdleParked
+                                         && Plasmoid.configuration.combineWanted === true)
+                            checked: Plasmoid.configuration.syncManualOnly === true
+                            onToggled: {
+                                Plasmoid.configuration.syncManualOnly = checked;
+                                // Turning it on has to stop what is already
+                                // running, not just hide the switch for it —
+                                // an armed caretaker would otherwise keep
+                                // measuring behind a hidden checkbox.
+                                if (checked) Plasmoid.configuration.syncAutoCare = false;
+                            }
+                            text: i18n("Set the delay by ear (no microphone)")
+
+                            PlasmaComponents3.ToolTip {
+                                text: i18n("Hides the microphone measurement and the automatic checks, and never listens to the room. Use the fine-tune slider above until the speakers sound together.")
+                            }
+                        }
+
+                        // The sweep is inaudible to people, not to pets.
+                        // Off means every measurement uses the audible
+                        // click and wants a quiet room, which is exactly
+                        // how this worked before the sweep existed.
+                        PlasmaComponents3.CheckBox {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            visible: root.sync._combineWantActive
+                                     || (root.sync._combineIdleParked
+                                         && Plasmoid.configuration.combineWanted === true)
+                            checked: Plasmoid.configuration.syncUltrasonic !== false
+                            onToggled: Plasmoid.configuration.syncUltrasonic = checked
+                            text: i18n("Measure with a tone too high to hear")
+
+                            PlasmaComponents3.ToolTip {
+                                text: i18n("Measures with an 18–19 kHz sweep, which most adults cannot hear and music does not reach, so the room can stay noisy. Younger ears often can hear it, and dogs and cats certainly do — turn it off and measurement uses a short audible click instead, which needs a quiet room.")
+                            }
+                        }
+
                         // A remembered sync member whose sink is gone right
                         // now (speaker asleep or powered off) used to just
                         // VANISH from the rows above — which read as "the
@@ -5236,7 +5758,17 @@ PlasmaExtras.Representation {
                                          && (root.sync._combineWantActive
                                              || (root.sync._combineIdleParked
                                                  && Plasmoid.configuration.combineWanted === true))
+                                // The balance rides along as a bare number:
+                                // the slider cannot be shown for a speaker
+                                // with no sink to bind to, and its VALUE was
+                                // the part worth knowing — the row said
+                                // "remembered" while withholding at what
+                                // level. A percentage needs no translation,
+                                // so the sentence itself stays as it is in
+                                // all twelve catalogs.
                                 text: i18n("%1 is remembered for the sync — connect it and it rejoins automatically.", name)
+                                      + (root._syncTrimTextFor(mac) !== ""
+                                         ? "  " + root._syncTrimTextFor(mac) : "")
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.6
                                 wrapMode: Text.WordWrap
@@ -5493,10 +6025,32 @@ PlasmaExtras.Representation {
                                 PlasmaComponents3.CheckDelegate {
                                     id: btRowDelegate
                                     Layout.fillWidth: true
+                                    // Connected is not the same as audible, and
+                                    // the tick used to claim it was: a JBL that
+                                    // links up without its A2DP profile answers
+                                    // "Connected: yes" while no sink of its own
+                                    // ever appears — the speaker chirps, the row
+                                    // ticks, and the music keeps coming out of
+                                    // the computer with nothing on screen to
+                                    // explain it. The audio node is the honest
+                                    // witness, so the row says which of the two
+                                    // it has.
+                                    readonly property bool audioReady: {
+                                        var m = btRow.mac.replace(/:/g, "_").toUpperCase()
+                                        var outs = mediaDevices.audioOutputs
+                                        for (var i = 0; i < outs.length; i++)
+                                            if (String(outs[i].id).toUpperCase().indexOf(m) !== -1)
+                                                return true
+                                        return false
+                                    }
                                     text: root._btConnectingMac === btRow.mac
-                                          ? i18n("%1 — connecting…", btRow.name) : btRow.name
-                                    icon.name: "network-bluetooth"
-                                    checked: btRow.connected
+                                          ? i18n("%1 — connecting…", btRow.name)
+                                          : (btRow.connected && !audioReady
+                                             ? i18n("%1 — linked, no sound yet", btRow.name)
+                                             : btRow.name)
+                                    icon.name: btRow.connected && !audioReady
+                                               ? "dialog-warning" : "network-bluetooth"
+                                    checked: btRow.connected && audioReady
                                     enabled: root._btConnectingMac === "" && root._btPairingMac === ""
                                     onToggled: {
                                         // The click itself severed the binding
@@ -5505,7 +6059,9 @@ PlasmaExtras.Representation {
                                         // flicker against every later model
                                         // refresh instead of tracking it.
                                         var wasConnected = btRow.connected
-                                        checked = Qt.binding(function() { return btRow.connected })
+                                        checked = Qt.binding(function() {
+                                            return btRow.connected && btRowDelegate.audioReady
+                                        })
                                         if (wasConnected) root.btDisconnect(btRow.mac)
                                         else root.btConnect(btRow.mac, btRow.name)
                                     }

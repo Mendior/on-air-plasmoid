@@ -1,0 +1,97 @@
+# Maintainer: Egon Greenberg <Egon.greenberg@gmail.com>
+#
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+#
+# shellcheck shell=bash disable=SC2034,SC2154
+
+pkgname=plasma6-applets-on-air
+pkgver=2026.23
+pkgrel=1
+pkgdesc="Internet radio and podcasts in a Plasma 6 panel widget"
+arch=('any')
+url="https://github.com/Mendior/on-air-plasmoid"
+license=('LGPL-2.0-or-later')
+# plasma5support is not optional: without it the widget loads to an empty
+# popup, because every shell call in it goes through that plugin. The FFmpeg
+# media backend is a separate package from qt6-multimedia and pacman will
+# happily pick the GStreamer one instead, which fails on a good share of
+# station streams.
+depends=('plasma-workspace' 'plasma5support' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
+# The translation catalogs are compiled here — the source tree carries .po
+# files only, since committing .mo binaries would be worse than building them.
+# python3 belongs here too: build(), check() and package() all call it to read
+# the applet id and version out of metadata.json, so a clean chroot without it
+# fails at build time rather than at install time.
+makedepends=('gettext' 'python')
+optdepends=(
+    'python-requests: live track titles from the stream'
+    'python-dbus: media keys and the desktop media controller'
+    'python-gobject: media keys and the desktop media controller'
+    'ffmpeg: recording, podcast dead-air skip and chapter menus'
+    'yt-dlp: track downloads'
+    'python-mutagen: covers and tags on downloaded tracks'
+    'curl: podcast episode downloads and station logo caching'
+    'inotify-tools: media controller channel without polling'
+    'python-pychromecast: casting to Chromecast and Nest devices'
+    'bluez-utils: Bluetooth speaker list, connecting and pairing'
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# A tag tarball is immutable, so a real checksum belongs here before the AUR
+# submission: run `updpkgsums` in this directory once the tag exists and commit
+# the value it writes. SKIP is only correct while the tag is still moving.
+sha256sums=('SKIP')
+
+# The applet id is the one the published package was registered under and it
+# also names the translation domain. It comes out of metadata.json rather than
+# being repeated here, so the two can never drift apart.
+_appletid() {
+    python3 -c "import json;print(json.load(open('$1/package/metadata.json'))['KPlugin']['Id'])"
+}
+
+build() {
+    cd "on-air-plasmoid-$pkgver" || return 1
+    local id domain lang dir
+    id="$(_appletid .)"
+    domain="plasma_applet_$id"
+    for po in po/*.po; do
+        lang="$(basename "$po" .po)"
+        dir="package/contents/locale/$lang/LC_MESSAGES"
+        install -d "$dir"
+        msgfmt --check -o "$dir/$domain.mo" "$po"
+    done
+}
+
+check() {
+    cd "on-air-plasmoid-$pkgver" || return 1
+    # Catch the one mismatch that silently ships the wrong thing: pacman would
+    # install $pkgver while the panel reads its own version out of metadata.
+    local meta
+    meta="$(python3 -c "import json;print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")"
+    [ "$meta" = "$pkgver" ] || {
+        echo "metadata.json says $meta, PKGBUILD says $pkgver" >&2
+        return 1
+    }
+}
+
+package() {
+    cd "on-air-plasmoid-$pkgver" || return 1
+    local id dest
+    id="$(_appletid .)"
+    dest="$pkgdir/usr/share/plasma/plasmoids/$id"
+
+    # Copied rather than run through kpackagetool6, which installs into the
+    # building user's home instead of $pkgdir.
+    install -d "$dest"
+    cp -r package/contents "$dest/"
+    install -Dm644 package/metadata.json "$dest/metadata.json"
+
+    # Nothing is executed directly — the QML side calls python3 and bash with
+    # the script path as an argument — so root-owned 0644 is correct.
+    find "$dest" -type f -exec chmod 644 {} +
+    find "$dest" -type d -exec chmod 755 {} +
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

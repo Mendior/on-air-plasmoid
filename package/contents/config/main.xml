@@ -85,9 +85,21 @@
             <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
             <default>{}</default>
         </entry>
+        <entry name="syncMicName" type="String">
+            <label>The microphone the last calibration measured as the best ear in this machine — asked for again by name so later checks listen through the same one</label>
+            <default></default>
+        </entry>
         <entry name="syncAutoCare" type="Bool">
-            <label>Keep the sync tuned automatically: a passive microphone drift check on the playing audio, and one automatic re-verify when it confirms a drift. Audio is processed in place and never stored or transmitted.</label>
+            <label>Keep the sync tuned automatically: a sweep through each speaker every few minutes, pitched above what most adults hear, and one automatic re-verify when it confirms a drift. Audio is processed in place and never stored or transmitted.</label>
             <default>false</default>
+        </entry>
+        <entry name="syncManualOnly" type="Bool">
+            <label>Tune the speakers by ear with the slider only. The microphone is never used: no test tones, no automatic checks, nothing measured.</label>
+            <default>false</default>
+        </entry>
+        <entry name="syncUltrasonic" type="Bool">
+            <label>Measure with an 18-19 kHz sweep instead of an audible click. Most adults cannot hear this range, but younger ears often can, and dogs and cats certainly do — so it can be switched off; measurement then uses the click and needs a quiet room.</label>
+            <default>true</default>
         </entry>
         <entry name="syncRefLatMap" type="String">
             <label>Bluetooth sink's PipeWire-reported latency in ms at calibration time, keyed by MAC (JSON) — the reference the silent recompensation shifts against</label>
@@ -126,8 +138,8 @@
             <default></default>
         </entry>
         <entry name="combineMasterPct" type="Int">
-            <label>Combined output master level the room was left at — the next enable's ramp ends here instead of at full passthrough</label>
-            <default>100</default>
+            <label>Combined output master level the room was left at — the next enable's ramp ends here instead of at full passthrough. 0 means never set: the first enable then inherits the level the machine was already playing at, which is the whole point of not blasting a fresh install</label>
+            <default>0</default>
         </entry>
         <entry name="combineWanted" type="bool">
             <label>The sync switch as the user left it — a login rebuilds the group instead of silently dropping it</label>
@@ -224,6 +236,10 @@
         <entry name="followSystemAccent" type="bool">
             <label>Use the system accent color instead of the built-in emerald theme</label>
             <default>false</default>
+        </entry>
+        <entry name="saveOnBattery" type="bool">
+            <label>Go easy on the battery when the laptop is unplugged</label>
+            <default>true</default>
         </entry>
         <entry name="recordMaxMinutes" type="Int">
             <label>Hard cap for a single recording, in minutes (disk-fill protection)</label>

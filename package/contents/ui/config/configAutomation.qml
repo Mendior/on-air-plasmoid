@@ -11,8 +11,9 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import org.kde.kcmutils as KCM
 
-Kirigami.FormLayout {
+KCM.SimpleKCM {
     id: root
 
     // A plain property, not an alias: currentValue is read-only, and the
@@ -24,82 +25,89 @@ Kirigami.FormLayout {
     property alias cfg_podcastSkipSilence: skipSilence.checked
     property alias cfg_syncAutoCare: autoCare.checked
 
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Podcasts")
-        Kirigami.FormData.isSection: true
-    }
+    // Wrapped like every other settings page. A bare FormLayout has no
+    // title property for Plasma to set, and no scroll area — so this page
+    // alone came up without the header the others have, and its last
+    // switch went out of reach in a shortened window.
+    Kirigami.FormLayout {
 
-    QQC2.ComboBox {
-        id: refreshHours
-        Kirigami.FormData.label: i18n("Check the shows for new episodes:")
-        textRole: "text"
-        valueRole: "value"
-        model: [
-            { text: i18n("Never"), value: 0 },
-            { text: i18n("Every 6 hours"), value: 6 },
-            { text: i18n("Every 12 hours"), value: 12 },
-            { text: i18n("Once a day"), value: 24 }
-        ]
-        currentIndex: {
-            for (var i = 0; i < model.length; i++)
-                if (model[i].value === root.cfg_podcastAutoRefreshHours) return i
-            return 2
+        Kirigami.Separator {
+            Kirigami.FormData.label: i18n("Podcasts")
+            Kirigami.FormData.isSection: true
         }
-        onActivated: root.cfg_podcastAutoRefreshHours = currentValue
-    }
 
-    QQC2.CheckBox {
-        id: autoDownload
-        Kirigami.FormData.label: i18n("New episodes:")
-        text: i18n("Download the newest one automatically")
-    }
-    QQC2.Label {
-        text: i18n("When a check finds a show has something new, its newest episode is queued for download — ready before the commute, no taps needed.")
-        font: Kirigami.Theme.smallFont
-        opacity: 0.7
-        wrapMode: Text.WordWrap
-        Layout.maximumWidth: Kirigami.Units.gridUnit * 24
-    }
+        QQC2.ComboBox {
+            id: refreshHours
+            Kirigami.FormData.label: i18n("Check the shows for new episodes:")
+            textRole: "text"
+            valueRole: "value"
+            model: [
+                { text: i18n("Never"), value: 0 },
+                { text: i18n("Every 6 hours"), value: 6 },
+                { text: i18n("Every 12 hours"), value: 12 },
+                { text: i18n("Once a day"), value: 24 }
+            ]
+            currentIndex: {
+                for (var i = 0; i < model.length; i++)
+                    if (model[i].value === root.cfg_podcastAutoRefreshHours) return i
+                return 2
+            }
+            onActivated: root.cfg_podcastAutoRefreshHours = currentValue
+        }
 
-    QQC2.CheckBox {
-        id: autoClean
-        Kirigami.FormData.label: i18n("Storage:")
-        text: i18n("Quietly remove old played downloads")
-    }
-    QQC2.Label {
-        text: i18n("Played episodes older than three days go, and past ten files per show the oldest played go. An unheard episode is never touched.")
-        font: Kirigami.Theme.smallFont
-        opacity: 0.7
-        wrapMode: Text.WordWrap
-        Layout.maximumWidth: Kirigami.Units.gridUnit * 24
-    }
+        QQC2.CheckBox {
+            id: autoDownload
+            Kirigami.FormData.label: i18n("New episodes:")
+            text: i18n("Download the newest one automatically")
+        }
+        QQC2.Label {
+            text: i18n("When a check finds a show has something new, its newest episode is queued for download — ready before the commute, no taps needed.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
 
-    QQC2.CheckBox {
-        id: continuous
-        Kirigami.FormData.label: i18n("Listening:")
-        text: i18n("Continue the show when an episode ends")
-    }
+        QQC2.CheckBox {
+            id: autoClean
+            Kirigami.FormData.label: i18n("Storage:")
+            text: i18n("Quietly remove old played downloads")
+        }
+        QQC2.Label {
+            text: i18n("Played episodes older than three days go, and past ten files per show the oldest played go. An unheard episode is never touched.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
 
-    QQC2.CheckBox {
-        id: skipSilence
-        text: i18n("Skip stretches of dead air in episodes")
-    }
+        QQC2.CheckBox {
+            id: continuous
+            Kirigami.FormData.label: i18n("Listening:")
+            text: i18n("Continue the show when an episode ends")
+        }
 
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Speaker sync")
-        Kirigami.FormData.isSection: true
-    }
+        QQC2.CheckBox {
+            id: skipSilence
+            text: i18n("Skip stretches of dead air in episodes")
+        }
 
-    QQC2.CheckBox {
-        id: autoCare
-        Kirigami.FormData.label: i18n("Auto-care:")
-        text: i18n("Keep sync tuned automatically")
-    }
-    QQC2.Label {
-        text: i18n("Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. The check clicks audibly and pauses music for about a minute — the popup shows a Stop button whenever one runs. Audio never leaves this computer.")
-        font: Kirigami.Theme.smallFont
-        opacity: 0.7
-        wrapMode: Text.WordWrap
-        Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        Kirigami.Separator {
+            Kirigami.FormData.label: i18n("Speaker sync")
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: autoCare
+            Kirigami.FormData.label: i18n("Auto-care:")
+            text: i18n("Keep sync tuned automatically")
+        }
+        QQC2.Label {
+            text: i18n("Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. The check clicks audibly and pauses music for about a minute — the popup shows a Stop button whenever one runs. Audio never leaves this computer.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
     }
 }

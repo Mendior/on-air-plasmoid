@@ -112,6 +112,11 @@ MouseArea {
         // Don't tick while the panel window isn't on screen at all
         // (auto-hidden panel, screen off) — nobody is watching.
         animating: visible && panelIconWidget.Window.visibility !== Window.Hidden
+                   // On battery the bars hold still: this is the one thing that
+                   // samples on the PANEL, so it runs whenever music plays even
+                   // with the popup shut — the exact shape of the 10% CPU report
+                   // that issue #2 was about.
+                   && !root.thrifty
         bars: 3
         barWidth: Math.max(2, Math.round(parent.width * 0.07))
         minHeight: Math.max(2, parent.height * 0.1)
@@ -135,8 +140,12 @@ MouseArea {
 
         SequentialAnimation on opacity {
             loops: Animation.Infinite
-            // longDuration is 0 when animations are disabled system-wide
-            running: recDot.visible && Kirigami.Units.longDuration > 0
+            // longDuration is 0 when animations are disabled system-wide.
+            // On battery the dot stays lit instead of breathing: a scheduled
+            // recording can run for hours with the popup shut, and a pulse
+            // nobody is watching is the panel repainting for nothing. Solid
+            // red still says "recording" — that is the part that matters.
+            running: recDot.visible && Kirigami.Units.longDuration > 0 && !root.thrifty
             NumberAnimation { from: 1.0; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
             NumberAnimation { from: 0.35; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
             // Speed flipped to Instant mid-cycle: restore full dot, not a dim one

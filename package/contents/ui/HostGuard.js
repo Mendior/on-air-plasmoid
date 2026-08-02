@@ -70,6 +70,9 @@ function _v4Private(a) {
     if (b1 === 172 && b2 >= 16 && b2 <= 31) return true;
     if (b1 === 192 && b2 === 168) return true;
     if (b1 === 169 && b2 === 254) return true;
+    // 100.64/10 is carrier-grade NAT space — and where Tailscale puts every
+    // node, so a crafted catalogue row could knock on the tailnet with it.
+    if (b1 === 100 && b2 >= 64 && b2 <= 127) return true;
     return false;
 }
 
@@ -107,12 +110,41 @@ function _v6Groups(h6) {
     return out;
 }
 
+// Whether an answer actually CAME from somewhere we are allowed to talk
+// to. Gating the requested URL covers the first hop only: Qt follows
+// redirects inside the network layer and the 3xx never reaches QML —
+// measured on Qt 6.11.1, a request to http://github.com/ arrives as
+// status 200 with responseURL https://github.com/ and no Location header
+// in sight. So a catalogue row with a public address can still answer
+// "302 → http://192.168.1.1/…" and hand the caller an internal host's
+// reply. responseURL names where the bytes really came from; an answer
+// from private space is refused, so no verdict, badge or parsed body is
+// ever built out of it. A build that does not report it (empty) keeps
+// the old behaviour rather than refusing every request.
+function answerFromPublicHost(xhr) {
+    var u = "";
+    try { u = (xhr && xhr.responseURL) ? String(xhr.responseURL) : ""; } catch (e) { u = ""; }
+    if (u === "") return true;
+    var host = hostOf(u);
+    return host !== "" && !isPrivateHost(host);
+}
+
 // Whether a host (as returned by hostOf) targets the machine itself or
 // the private/link-local space — in ANY spelling. An unparseable bracket
 // literal counts as private: refusing a malformed address is the safe
 // answer for both callers.
 function isPrivateHost(host) {
+    // Case-fold here too, not only in hostOf: this function is the gate's
+    // public face and new callers reach for it directly — "LocalHost"
+    // must not read as a public name just because it skipped hostOf.
+    host = String(host || "").toLowerCase();
     if (host === "") return true;
+    // Judge what Qt will DIAL, not what the string shows: QUrl percent-
+    // decodes the host and IDN-normalizes unicode before connecting, so
+    // "%31%32%37.0.0.1" reaches 127.0.0.1 while reading as neither an IP
+    // nor localhost here. Any spelling this parser cannot take literally
+    // is refused — the same safe answer the malformed-bracket case gives.
+    if (host.indexOf("%") !== -1 || /[^\x21-\x7e]/.test(host)) return true;
     if (host.charAt(host.length - 1) === ".")
         host = host.slice(0, -1);                 // DNS root dot: "localhost."
     if (host.charAt(0) === "[") {

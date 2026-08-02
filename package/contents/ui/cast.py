@@ -214,7 +214,7 @@ def _discover_cast(seconds):
     _cache_save(snapshot)
 
 
-def cmd_play(host, port, uuid, model, url, ctype, title, art):
+def cmd_play(host, port, uuid, model, url, ctype, title, art, start_at=None):
     try:
         pychromecast = _import()
     except Exception:
@@ -225,13 +225,25 @@ def cmd_play(host, port, uuid, model, url, ctype, title, art):
         cast = _connect_host(pychromecast, host, port, uuid, model)
         mc = cast.media_controller
         # stream_type LIVE tells the receiver there is no seekable duration —
-        # correct for radio and it hides a bogus scrubber on the device.
+        # correct for radio, and it hides a bogus scrubber on the device. A
+        # podcast episode is the opposite: it HAS a duration, the listener
+        # owns a position in it, and LIVE denied both. BUFFERED gives the
+        # receiver its scrubber back and lets the resume bookmark ride along
+        # as the start position.
+        # VOD is opt-in from the caller — only it knows whether what plays is
+        # an episode or an endless stream. A radio URL marked BUFFERED would
+        # gain a scrubber that leads nowhere.
+        vod = start_at is not None
+        kw = {}
+        if vod and start_at > 0.0:
+            kw["current_time"] = float(start_at)
         mc.play_media(
             url,
             content_type=ctype or "audio/mpeg",
             title=title or None,
             thumb=art or None,
-            stream_type="LIVE",
+            stream_type="BUFFERED" if vod else "LIVE",
+            **kw,
         )
         mc.block_until_active(timeout=CONNECT_TIMEOUT)
         _out(OK)
@@ -300,6 +312,11 @@ ST_RENDERER = "urn:schemas-upnp-org:device:MediaRenderer:1"
 _DEVNS = "{urn:schemas-upnp-org:device-1-0}"
 AVT_SERVICE = "urn:schemas-upnp-org:service:AVTransport:1"
 RC_SERVICE = "urn:schemas-upnp-org:service:RenderingControl:1"
+
+# Ceiling on the mDNS-visible hosts we probe directly. Each one costs two
+# threads, and a home network never approaches this — it exists for the guest
+# or office network where avahi reads out hundreds of names.
+MAX_MDNS_CANDIDATES = 64
 
 # Well-known descriptor locations, probed directly as a fallback for setups
 # where a local firewall drops SSDP replies (multicast responses create no
@@ -635,9 +652,24 @@ def _discover_dlna(seconds):
         threading.Thread(target=collect, args=(ST_RENDERER, min(3.0, seconds))),
         threading.Thread(target=collect, args=("ssdp:all", min(3.0, seconds))),
     ]
+    # These two go out before the mDNS lookup rather than after it: they listen
+    # on multicast and need nothing from it, while avahi-browse below can sit
+    # there for seconds. Starting everything together spent a third of the
+    # budget with no packet on the wire, taken straight out of the answer.
+    for t in threads:
+        t.daemon = True
+        t.start()
+    started = len(threads)
+
     # Firewall fallback: unicast M-SEARCH + well-known descriptor probes
-    # against every mDNS-visible device.
+    # against every mDNS-visible device. Each candidate costs two threads, so
+    # the count is capped: a guest network with a few hundred announced hosts
+    # would otherwise put several hundred threads against a budget that only
+    # ever pays for a handful of them, and the renderer is not likelier to be
+    # the two-hundredth name avahi read out than the tenth.
     candidates = _mdns_candidates()
+    if len(candidates) > MAX_MDNS_CANDIDATES:
+        candidates = dict(list(candidates.items())[:MAX_MDNS_CANDIDATES])
     # Known devices from earlier rounds re-verify with one direct TCP
     # request each — immune to the UDP lottery.
     cached = _cache_load()
@@ -664,11 +696,17 @@ def _discover_dlna(seconds):
     for ip, extra_paths in candidates.items():
         threads.append(threading.Thread(target=probe_known, args=(ip, extra_paths)))
 
-    for t in threads:
+    for t in threads[started:]:
         t.daemon = True
         t.start()
+    # One shared deadline, not a floor for each thread in turn. The floor was
+    # per-thread and sequential, so the overshoot grew with the number of
+    # devices on the network — the busiest networks, where discovery matters
+    # most, were the ones that ran out of budget before reporting anything.
+    # Stragglers are daemons and their finds are picked up under the lock
+    # below, so abandoning them costs nothing.
     for t in threads:
-        t.join(max(0.1, deadline - time.time()))
+        t.join(max(0.0, deadline - time.time()))
 
     # The join above is bounded, so a straggler thread may still be adding
     # locations — snapshot under the lock or iteration can die mid-loop.
@@ -1001,7 +1039,15 @@ def main():
         host, port, uuid, model, url, ctype = args[0:6]
         title = args[6] if len(args) > 6 else ""
         art = args[7] if len(args) > 7 else ""
-        cmd_play(host, port, uuid, model, url, ctype, title, art)
+        # An eighth argument means "this is an episode, not a stream": its
+        # value is the resume position in seconds. Absent = radio, as before.
+        start_at = None
+        if len(args) > 8 and args[8] != "":
+            try:
+                start_at = max(0.0, float(args[8]))
+            except ValueError as exc:
+                _dbg("play start_at arg", exc)
+        cmd_play(host, port, uuid, model, url, ctype, title, art, start_at)
     elif command == "stop" and len(args) >= 4:
         cmd_stop(args[0], args[1], args[2], args[3])
     elif command == "volume" and len(args) >= 5:

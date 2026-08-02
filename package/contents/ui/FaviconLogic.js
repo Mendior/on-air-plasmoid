@@ -9,16 +9,25 @@
 // that stands in when no logo can be obtained at all. No QML types, no
 // I/O — everything here runs under qmltestrunner (tests/qml/).
 .pragma library
+.import "HostGuard.js" as HostGuard
 
 // The single gate between untrusted favicon strings (publicly writable
 // catalog rows, hand edits, .arp imports) and Image.source / the shell:
 // only plain web URLs pass; file://, data:, "null", scheme-less and
 // garbage all become "" — which the UI renders as a monogram and the
 // backfill treats as "please find one".
+//
+// The host is judged too, by the same gate the liveness probe uses. A
+// scheme test alone let a crafted catalogue row aim an Image.source (and
+// syncFavicons' curl, at every widget start) at http://192.168.1.1 — a
+// blind GET into the user's LAN with no click. Nothing is readable back,
+// but reachability is not ours to hand out.
 function webUrlOrEmpty(v) {
     var s = (v === undefined || v === null) ? "" : String(v).trim();
     if (s === "null") return "";
-    return /^https?:\/\//i.test(s) ? s : "";
+    if (!/^https?:\/\//i.test(s)) return "";
+    var host = HostGuard.hostOf(s);
+    return (host !== "" && !HostGuard.isPrivateHost(host)) ? s : "";
 }
 
 // First usable favicon from a radio-browser result array. With wantNorm

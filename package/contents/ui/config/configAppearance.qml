@@ -27,6 +27,7 @@ KCM.SimpleKCM {
     property alias cfg_autoHeal: autoHealCheck.checked
     property alias cfg_reportClicks: reportClicksCheck.checked
     property alias cfg_followSystemAccent: accentCheck.checked
+    property alias cfg_saveOnBattery: batteryCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
     property string cfg_downloadFormat
@@ -122,6 +123,21 @@ KCM.SimpleKCM {
             id: accentCheck
             Kirigami.FormData.label: i18n("Accent color:")
             text: i18n("Follow the system accent color instead of the built-in emerald")
+        }
+
+        QQC2.CheckBox {
+            id: batteryCheck
+            Kirigami.FormData.label: i18n("On battery:")
+            text: i18n("Hold the animations still and check less often")
+        }
+
+        QQC2.Label {
+            Layout.fillWidth: true
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            text: i18n("Unplugged, the record stops spinning and the equalizer bars hold still; background checks slow down. Sound and every control work exactly as before. The system's power-saver profile counts too.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.Wrap
         }
 
         Kirigami.Separator {

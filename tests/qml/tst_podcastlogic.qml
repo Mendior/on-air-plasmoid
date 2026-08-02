@@ -491,6 +491,65 @@ TestCase {
         verify(out.length <= 4001)
     }
 
+    function test_a_feed_of_unclosed_tags_does_not_hang() {
+        // The same quadratic shape as the notes test above, one layer up: the
+        // feed parser, not the note formatter. Fixing it in notesToPlain left
+        // _tagBody and the item scanner open, and the background refresh
+        // reaches them without anyone clicking. Measured before the closing-tag
+        // probe went in: a 4 MiB body of these took over eight minutes with
+        // the panel frozen. A regression times the suite out, which is the point.
+        // <title> and not some other tag: the channel header is scanned for
+        // exactly this one, so a body of <description> would sail past the
+        // parser without ever reaching the expensive path. Measured on the
+        // unguarded parser, 600 KiB of these took 19.4 s.
+        var body = ""
+        while (body.length < 600000) body += "<title>"
+        var out = PL.parseFeed(body, 50)
+        compare(out.episodes.length, 0)
+        compare(out.title, "")
+
+        // A tail with no </item> must not restart the scan either — the whole
+        // body still contains one, so a body-wide check would wave this through.
+        var tail = ""
+        while (tail.length < 1000000) tail += "<item>"
+        var mixed = "<item><title>x</title>"
+              + "<enclosure url=\"https://h/a.mp3\" type=\"audio/mpeg\"/></item>" + tail
+        var out2 = PL.parseFeed(mixed, 50)
+        compare(out2.episodes.length, 1)
+    }
+
+    function test_a_close_ahead_of_the_opens_does_not_hang_either() {
+        // The first cut of the probe asked only "is a close present" — one
+        // </title> in FRONT of the wall answered yes and the quadratic scan
+        // ran anyway. Measured on that build: 19.2 s at 600 KiB, the same
+        // freeze the probe was made against. The linear scan settles all of
+        // these in one pass; a regression times the suite out.
+        var body = "</title>"
+        while (body.length < 600000) body += "<title>"
+        var out = PL.parseFeed(body, 50)
+        compare(out.episodes.length, 0)
+        compare(out.title, "")
+
+        // Attribute wall: the close exists, but every open is stuck inside
+        // one giant attribute run — backtracking through it was the other
+        // quadratic corner the presence probe left open.
+        var attrs = ""
+        while (attrs.length < 600000) attrs += "<title "
+        var out2 = PL.parseFeed(attrs + "</title>", 50)
+        compare(out2.title, "")
+
+        // And a tail whose only close is a bare "</item" prefix must not
+        // re-arm the item scanner: the probe has to demand the ">" the
+        // scanner itself needs.
+        var tail = ""
+        while (tail.length < 600000) tail += "<item>"
+        var mixed = "<item><title>x</title>"
+              + "<enclosure url=\"https://h/a.mp3\" type=\"audio/mpeg\"/></item>"
+              + tail + "</item"
+        var out3 = PL.parseFeed(mixed, 50)
+        compare(out3.episodes.length, 1)
+    }
+
     function test_links_are_extracted_and_deduped() {
         var t = "See https://a.com/1, also https://a.com/1 and http://b.org/x."
         var l = PL.extractLinks(t)
@@ -516,5 +575,62 @@ TestCase {
         compare(PL.skipTarget(595000, 30, 600000), 600000) // fwd past end -> end
         compare(PL.skipTarget(0, -15, 0), 0)               // unknown duration, back
         compare(PL.skipTarget(50000, 15, 0), 65000)        // unknown duration, fwd ok
+    }
+
+    function test_episode_file_name_keeps_two_shows_apart() {
+        // Two shows both publishing "Trailer" landed on one file: the badge,
+        // the ledger and auto-clean all key off the name, so the second show
+        // played the first one's audio and never fetched its own.
+        var a = PL.episodeFileName("Trailer", "https://a.fm/e.mp3",
+                                   "https://a.fm/feed", "guid-a")
+        var b = PL.episodeFileName("Trailer", "https://b.fm/e.mp3",
+                                   "https://b.fm/feed", "guid-b")
+        verify(a !== b)
+        verify(a.indexOf("Trailer") === 0)
+        verify(/\.mp3$/.test(a))
+        // Same episode, same name — every time.
+        compare(PL.episodeFileName("Trailer", "https://a.fm/e.mp3",
+                                   "https://a.fm/feed", "guid-a"), a)
+        // The pre-tag name stays available for files already on disk.
+        compare(PL.legacyEpisodeFileName("Trailer", "https://a.fm/e.mp3"),
+                "Trailer.mp3")
+    }
+
+    function test_one_show_keeps_one_tag_across_url_spellings() {
+        // A directory can hand out http/https, a port or a trailing slash
+        // for the same show. The raw string gave each spelling its own tag,
+        // and every file downloaded under the other one read as missing.
+        var a = PL.episodeFileName("Ep 12", "https://a.fm/e.mp3", "https://a.fm/rss", "g1")
+        var b = PL.episodeFileName("Ep 12", "https://a.fm/e.mp3", "https://a.fm/rss/", "g1")
+        var c = PL.episodeFileName("Ep 12", "https://a.fm/e.mp3", "http://A.FM:80/rss", "g1")
+        compare(a, b); compare(a, c)
+        // A genuinely different show still gets its own tag.
+        verify(a !== PL.episodeFileName("Ep 12", "https://a.fm/e.mp3", "https://b.fm/rss", "g1"))
+    }
+
+    function test_a_long_guid_stays_its_own_episode() {
+        // Ad-served feeds chain tracking hosts and put the episode id LAST,
+        // so two guids can share their first 256 characters. A plain cut
+        // made them one episode: one played mark, one file, one queue slot.
+        var pre = ""
+        for (var i = 0; i < 300; i++) pre += "x"
+        var k1 = PL.episodeKey(pre + "AAA", "")
+        var k2 = PL.episodeKey(pre + "BBB", "")
+        verify(k1 !== k2)
+        verify(k1.length <= 256 && k2.length <= 256)
+        verify(PL.episodeFileName("T", "https://a.fm/e.mp3", "https://a.fm/rss", pre + "AAA")
+               !== PL.episodeFileName("T", "https://a.fm/e.mp3", "https://a.fm/rss", pre + "BBB"))
+    }
+
+    function test_episode_key_is_capped() {
+        // The key is persisted into the plasma config, which the shell
+        // rewrites whole on every change; a feed's guid is publisher text.
+        var long = ""
+        for (var i = 0; i < 500; i++) long += "x"
+        // 240 kept + "#" + an 8-char tag of the whole string: bounded,
+        // and still an identity (see the long-guid test above).
+        compare(PL.episodeKey(long, "").length, 249)
+        compare(PL.episodeKey("", "https://a.fm/e.mp3"), "https://a.fm/e.mp3")
+        compare(PL.episodeKey("g", "u"), "g")
     }
 }

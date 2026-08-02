@@ -25,6 +25,21 @@ TestCase {
         compare(FL.webUrlOrEmpty("javascript:alert(1)"), "")
         compare(FL.webUrlOrEmpty("sky.ee/favicon.ico"), "")   // scheme-less
         compare(FL.webUrlOrEmpty("null"), "")
+    }
+
+    function test_web_url_refuses_private_hosts() {
+        // A catalogue row is publicly writable and this string reaches an
+        // Image.source and syncFavicons' curl — an http(s) scheme aimed at
+        // the listener's own network is still a clickless GET into it.
+        compare(FL.webUrlOrEmpty("http://127.0.0.1/f.png"), "")
+        compare(FL.webUrlOrEmpty("http://192.168.1.1:8080/f.png"), "")
+        compare(FL.webUrlOrEmpty("http://[::1]/f.png"), "")
+        compare(FL.webUrlOrEmpty("http://localhost/f.png"), "")
+        compare(FL.webUrlOrEmpty("http://%31%32%37.0.0.1/f.png"), "")
+        compare(FL.webUrlOrEmpty("http://10.0.0.5/f.png"), "")
+        // Public logo hosts are untouched.
+        compare(FL.webUrlOrEmpty("https://cdn.example.com/logo.png"),
+                "https://cdn.example.com/logo.png")
         compare(FL.webUrlOrEmpty(" null "), "")
         compare(FL.webUrlOrEmpty(""), "")
         compare(FL.webUrlOrEmpty(undefined), "")

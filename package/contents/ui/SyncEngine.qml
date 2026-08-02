@@ -28,6 +28,16 @@ Item {
     // Plasmoid's configuration object in production; a plain object in tests.
     required property var cfg
 
+    // Seconds to allow verify per member. calibrate.py measures each one in
+    // two rounds of up to three captures, and a capture is a 0.6 s warm-up
+    // plus a 3.2 s recording — so a member that needs its retry round costs
+    // about 25 s, and a Bluetooth one a little more for its wake-up sleeps.
+    // The old 14 killed the process partway through exactly that retry, which
+    // exists because real speakers (a JBL Flip, per calibrate.py) sleep
+    // through the first round. Both the budget and the guard timer read this,
+    // so the two cannot drift apart again.
+    readonly property int _verifySecondsPerMember: 27
+
     // Everything the engine started at startup() — availability probe, the
     // crash sweep, restore-key consumption, the steal-watch seed and the
     // persisted per-device maps.
@@ -40,7 +50,10 @@ Item {
         // python clicking into the room with nobody holding its leash — the
         // one phantom no UI could stop. Orphans only (reparented to init):
         // a run belonging to a LIVE session keeps its parent and is spared.
-        app.exec(": PW_ORPHANS; for p in $(pgrep -f 'python3 .*calibrate\\.py' 2>/dev/null); do"
+        // Anchored: pgrep -f matches the WHOLE command line, so the
+        // unanchored pattern also hit the `timeout` and `sh -c` wrappers
+        // that merely carry the script's path in their arguments.
+        app.exec(": PW_ORPHANS; for p in $(pgrep -f '^python3 .*calibrate\\.py' 2>/dev/null); do"
                  + " [ \"$(ps -o ppid= -p \"$p\" 2>/dev/null | tr -d ' ')\" = 1 ] && kill \"$p\" 2>/dev/null; done; true");
         // A session that died mid-measurement left its park levels (and the
         // verify's hardware mutes) behind — the restore file it never got
@@ -50,7 +63,7 @@ Item {
         // would let another local user pre-plant commands (or a symlink to
         // redirect the park writes). /run/user/<uid> is 0700 and ours; with
         // no runtime dir the park recovery is simply skipped.
-        app.exec(": PW_PARKREST; d=\"$XDG_RUNTIME_DIR\"; f=\"$d/onair_park_" + app.instanceId + ".sh\";"
+        app.exec(": PW_PARKREST; d=\"$XDG_RUNTIME_DIR\"; f=" + _parkFile + ";"
                  + " [ -n \"$d\" ] && [ -f \"$f\" ] && { sh \"$f\" 2>/dev/null; rm -f \"$f\"; }; true");
         refreshPortStates();
         // A crashed session can orphan the combined-output module — PipeWire
@@ -127,6 +140,16 @@ Item {
                 return;
             }
         }
+        // A Bluetooth member that LEAVES. Its sink does not come back on its
+        // own — the link itself is down, so there is nothing for the missing-
+        // loopback check below to find and nothing for the signature to
+        // compare: the speaker is simply gone from the device list and the
+        // group plays on without it. Measured on this desk at 06:13:08, the
+        // JBL's A2DP transport terminated mid-check ("terminated
+        // unexpectedly" from the far end) and it took a human reconnect to
+        // bring it back. The join watchdog already knows how to walk a
+        // Bluetooth speaker in — it was only ever armed when one CONNECTS.
+        if (_combineActive) _btWatchLostMembers();
         // A hardware sink came or went while the combined output is live —
         // rebuild the loopbacks for the CURRENT set. Snapshot-compared, or
         // the null sink's own appearance would trigger a rebuild and double
@@ -134,6 +157,37 @@ Item {
         if (_combineActive
             && _combineGroupSignature() !== _combineSinksSnapshot)
             syncOffsetDebounce.restart();
+        // The signature is built from NAMES, and a Bluetooth sink that dies
+        // and comes back wears the same one. So a speaker whose transport
+        // failed — its loopback dying with the sink — rejoined the device
+        // list without changing a single character of the signature, and
+        // nothing ever rebuilt: the group played on without it, silently,
+        // for the rest of the session. Measured on this desk exactly so, a
+        // JBL that worked alone and never in the group. The membership the
+        // loopbacks ACTUALLY implement is the honest thing to compare.
+        if (_combineActive && !_combineReloopBusy && !syncOffsetDebounce.running
+            && _combineMemberMissingLoopback())
+            syncOffsetDebounce.restart();
+    }
+
+    // A group member with no loopback feeding it — the state the signature
+    // cannot see. The map is written by every build and cleared with the
+    // group, so "in the group but not in the map" is exactly the hole.
+    function _combineMemberMissingLoopback() {
+        var fed = {};
+        for (var mod in _combineLoopbackSinkByModule)
+            fed[_combineLoopbackSinkByModule[mod]] = true;
+        var members = _combineRealSinks();
+        for (var i = 0; i < members.length; i++) {
+            if (fed[members[i]]) continue;
+            // A sink that is not registered yet is the LBMISS retry's job,
+            // not this one — only a member the system can see right now
+            // counts as missing.
+            var outs = app.mediaDevs.audioOutputs;
+            for (var o = 0; o < outs.length; o++)
+                if (String(outs[o].id) === members[i]) return true;
+        }
+        return false;
     }
 
     // The null sink vanished under a live group. Reset the module
@@ -165,18 +219,7 @@ Item {
         // A measurement mid-flight measures a dead group — same cancel the
         // disable does, generation bump included. The isolation's hardware
         // mutes sit on REAL sinks that are (or will be) back: lift them.
-        if (_calibrating || _verifyPending) {
-            _calibrating = false;
-            _verifyPending = false;
-            _verifyCorrected = false;
-            _rebuildHeld = false;
-            calibGuardTimer.stop();
-            verifySettleTimer.stop();
-            verifyGuardTimer.stop();
-            _verifyUnmuteAll();
-            _calibRestoreVolume();
-            _calibRunSeq++;
-        }
+        if (_calibrating || _verifyPending) _calibAbort(false);
         _resurrectTries = 6;
         combineOutputsEnable();
     }
@@ -184,10 +227,17 @@ Item {
     // Every engine-owned shell round-trip lands here from main.qml's exec
     // handler; true = the command was ours and is fully handled.
     function handleExec(cmd, stdout, stderr) {
+        if (cmd.indexOf(": PW_RAMP;") === 0) {
+            // The ramp's own end is the only honest "the master is where the
+            // room wants it" moment — see _combineRamping.
+            _combineRamping = false;
+            return true;
+        }
         if (cmd.indexOf(": PW_UNCOMBINE;") === 0 || cmd.indexOf(": PW_COMBINE_CLEAN;") === 0
             || cmd.indexOf(": PW_TRIM;") === 0 || cmd.indexOf(": PW_STEALBACK;") === 0
-            || cmd.indexOf(": PW_RAMP;") === 0 || cmd.indexOf(": PW_PARKREST;") === 0
-            || cmd.indexOf(": PW_CALIBKILL;") === 0 || cmd.indexOf(": PW_ORPHANS;") === 0) {
+            || cmd.indexOf(": PW_PARKREST;") === 0
+            || cmd.indexOf(": PW_CALIBKILL;") === 0 || cmd.indexOf(": PW_DRIFTKILL;") === 0
+            || cmd.indexOf(": PW_ORPHANS;") === 0) {
             return true; // fire-and-forget
         }
         // The kick-abort's own disconnect landed — only the menu wants to
@@ -233,13 +283,13 @@ Item {
         // shows up in mediaDevices (usually instantly).
         if (/^: PW_COMBINE \d+;/.test(cmd)) {
             var pwOut = stdout || "";
-            var nullM = pwOut.match(/NULL (\d+)/);
+            var nullM = pwOut.match(/^NULL (\d+)/m);
             // What was the default before this load switched it? ANY
             // combined name — this instance's, another's, a superseded
             // enable's from a fast toggle, a pre-2026.14 leftover — means
             // there is nothing real to restore: persisting it would point
             // the default at a dead node on the next disable.
-            var prevDefM = pwOut.match(/PREVDEF (\S+)/);
+            var prevDefM = pwOut.match(/^PREVDEF (\S+)/m);
             var prevDef = (prevDefM && prevDefM[1].indexOf("onair_combined") !== 0)
                           ? prevDefM[1] : "";
             var restoreDef = prevDef !== ""
@@ -375,13 +425,32 @@ Item {
             // curve is −42 dB, and the widget's own slider rides the
             // stream, not the master: a room left parked there read as
             // "the speakers don't play" (measured live on a running JBL).
-            var rampTo = Math.max(10, Math.min(100, cfg.combineMasterPct || 100));
+            // Nothing remembered yet? Then the room's CURRENT level is the
+            // honest starting point, not full scale: the combined sink
+            // becomes the system output, so assuming 100% hands the machine
+            // a volume nobody asked for. Only a room whose level could not
+            // be read at all falls back to acoustic passthrough.
+            // The stored level starts at 0 on purpose — "never set" — so
+            // this branch is reachable on a fresh install. It used to default
+            // to 100, which made the whole inheritance below dead code and
+            // handed the first enable a full-scale ramp: the very thing the
+            // read-back exists to prevent.
+            var prevVolM = pwOut.match(/^PREVVOL (\d+)/m);
+            var inherited = prevVolM ? parseInt(prevVolM[1], 10) : 0;
+            var rampTo = Math.max(10, Math.min(100,
+                cfg.combineMasterPct || (inherited > 0 ? inherited : 100)));
             var rampCmd = "";
             var rampSteps = [35, 50, 65, 80, 90, 100].filter(function(rs) { return rs < rampTo; });
             rampSteps.push(rampTo);
             for (var rp = 0; rp < rampSteps.length; rp++)
                 rampCmd += "pactl set-sink-volume " + _combineSinkName + " "
                          + rampSteps[rp] + "% 2>/dev/null; sleep 0.12; ";
+            // The ramp climbs through half a dozen levels the user never
+            // chose. A disable landing inside that window read one of them
+            // off the sink and filed it as "the level the room was left at",
+            // and each such round shrank the memory again.
+            _combineRamping = true;
+            rampGuard.restart();
             app.exec(": PW_RAMP; " + rampCmd + "true # " + app.nextSeq());
             _combinePendingRoute = true;
             _combineTryRoute();
@@ -463,13 +532,14 @@ Item {
         // volume keys were trimming all evening, and the next enable's ramp
         // ends there instead of at a full-blast 100% the user never chose.
         if (cmd.indexOf(": PW_UNCOMBINE_DONE;") === 0) {
-            var mM = (stdout || "").match(/MASTER (\d+)/);
+            var mM = (stdout || "").match(/^MASTER (\d+)/m);
             if (mM) cfg.combineMasterPct = Math.max(10, Math.min(100, parseInt(mM[1], 10)));
             if (!_combineActive && !_combineWantActive)
                 cfg.combinePrevDefault = "";
             // The park's unload has fully landed — a wake that arrived
             // mid-tail can now take the clean road.
             _combineParkTail = false;
+            parkTailGuard.stop();
             if (_combineWakeQueued && _combineIdleParked
                 && cfg.combineWanted === true && !_combineActive && !_combineWantActive
                 && _appPlaying)
@@ -486,13 +556,36 @@ Item {
             if (!calSeqM || parseInt(calSeqM[1], 10) !== _calibRunSeq) return true;
             _calibrating = false;
             calibGuardTimer.stop();
-            var okM = (stdout || "").match(/CALIB_OK (\d+)/);
+            // Every token is read at the START of its own line. The script
+            // prints one device-supplied string (CALIB_MIC's description),
+            // and an unanchored search would have found a forged token
+            // sitting INSIDE it — a speaker naming itself a measurement.
+            var okM = (stdout || "").match(/^CALIB_OK (\d+)/m);
             var macM = cmd.match(/^: PW_CALIB \d+ ([0-9A-F:]{17}) /);
             // The park level this very run measured at — the sentinel
             // carries it so a louder retry's levels fold with the right
             // reference (pre-park commands default to the historic 55).
             var parkM = cmd.match(/ P(\d+) ;/);
             var calPark = parkM ? Math.max(1, parseInt(parkM[1], 10)) : 55;
+            // The run's whole story goes to the journal, verdict or not:
+            // which stimulus timed the pair, which build of calibrate.py
+            // measured, and every raw capture behind the number. The 44 ms
+            // mis-credit of 2026-07-28 took a day to explain because none
+            // of this was written down — the road was a guess, the code
+            // build had to be dug out of filesystem timestamps, and the
+            // captures were simply gone.
+            var calBy = (stdout || "").match(/^CALIB_BY (\S+)/m);
+            var calSrc = (stdout || "").match(/^CALIB_SRC (\S+)/m);
+            var calFail = (stdout || "").match(/^CALIB_FAIL (.+)$/m);
+            var calRaw = (stdout || "").match(/^CALIB_RAW .+$/gm) || [];
+            console.log("[ARP] sync: calibration "
+                        + (okM ? "verdict " + okM[1] + " ms"
+                               : "no verdict" + (calFail ? " (" + calFail[1] + ")" : ""))
+                        + (calBy ? ", timed by " + calBy[1] : "")
+                        + (calSrc ? ", code " + calSrc[1] : "")
+                        + ((stdout || "").indexOf("CALIB_NOLEVELS") !== -1
+                           ? ", balance left as it was (inaudible run)" : "")
+                        + (calRaw.length > 0 ? "; " + calRaw.join(" | ") : ""));
             if (okM) {
                 // Same ceiling as calibrate.py's own sanity window — a
                 // 600 ms television is a real measurement, not an error,
@@ -501,21 +594,75 @@ Item {
                 cfg.syncOffsetMs = calMs;
                 try {
                     var calMap = JSON.parse(cfg.syncOffsetMap || "{}");
+                    // The run's reference speaker is this frame's zero, and
+                    // it has to be SAID so — every other number the run
+                    // produced is a difference against it. Whatever that
+                    // sink was carrying belongs to an older frame, and
+                    // leaving it there quietly eats the compensation:
+                    // measured on this desk, a stale 154 under a fresh 171
+                    // left 17 ms of delay between two speakers the
+                    // microphone had just measured 156 ms apart, and the
+                    // room reported itself calibrated while it was a sixth
+                    // of a second out. Cleared rather than set to zero —
+                    // absent already reads as zero in _lagForSink, and an
+                    // explicit 0 would be one more number to keep honest.
+                    var calRefM = (stdout || "").match(/^CALIB_REF (\S+)/m);
+                    if (calRefM) delete calMap[_btMacOfSink(calRefM[1]) || calRefM[1]];
                     if (macM) calMap[macM[1]] = calMs;
                     // Wired/extra sinks measured in the same run: CALIB_XLAG
                     // is each one's real lag against the wired reference — a
                     // USB DAC or an HDMI TV stops being assumed zero. Same
-                    // map, keyed by sink name (names cannot collide with
-                    // MACs); negative = faster than the reference.
+                    // map; negative = faster than the reference. A SECOND
+                    // Bluetooth member arrives here too, and it must be keyed
+                    // by MAC like the verify fold does: _lagForSink reads a
+                    // bluez sink only by MAC, so a lag filed under the sink
+                    // name would be written once and never read again.
                     var xRe = /^CALIB_XLAG (\S+) (-?\d+)/gm, xM;
                     while ((xM = xRe.exec(stdout || "")) !== null)
-                        calMap[xM[1]] = Math.max(-100, Math.min(900, parseInt(xM[2], 10)));
+                        calMap[_btMacOfSink(xM[1]) || xM[1]] =
+                            Math.max(-100, Math.min(900, parseInt(xM[2], 10)));
+                    _anchorLags(calMap, _combineRealSinks());
                     cfg.syncOffsetMap = JSON.stringify(calMap);
                 } catch (e) {}
                 // Snapshot the transport's reported latency as the
                 // reference this fresh number was measured under — the
                 // silent recompensation shifts against it from now on.
-                if (macM) _refLatProbe(macM[1], true);
+                // EVERY Bluetooth speaker this run re-measured, not just the
+                // headline one. A second Bluetooth member arrives as a
+                // CALIB_XLAG line and its lag was just rewritten above — but
+                // its reference stayed at the old reading and its session
+                // shift was never retired, so _lagForSink went on adding a
+                // correction measured against a calibration that no longer
+                // exists. One stale speaker in a group of two is the whole
+                // group out of step.
+                var calBtMacs = {};
+                if (macM) calBtMacs[macM[1]] = true;
+                var xbRe = /^CALIB_XLAG (\S+) -?\d+/gm, xbM;
+                while ((xbM = xbRe.exec(stdout || "")) !== null) {
+                    var xbMac = _btMacOfSink(xbM[1]);
+                    if (xbMac !== "") calBtMacs[xbMac] = true;
+                }
+                for (var cbm in calBtMacs) {
+                    // The probe stores the new reference and retires the
+                    // shift — but its answer comes back a beat later, and
+                    // the rebuild plus the verify below launch NOW. A stale
+                    // shift riding through that gap deploys the fresh lag
+                    // plus a correction measured against a calibration that
+                    // no longer exists, and the verify then folds the
+                    // mismatch into the map. Retire it before anything is
+                    // built; the probe's own retire stays as the idempotent
+                    // second hand.
+                    if (_refLatShiftByMac[cbm] !== undefined) {
+                        console.log("[ARP] sync: retiring " + _refLatShiftByMac[cbm]
+                                    + " ms transport shift for " + cbm
+                                    + " with the fresh calibration");
+                        var mSh = {};
+                        for (var kSh in _refLatShiftByMac)
+                            if (kSh !== cbm) mSh[kSh] = _refLatShiftByMac[kSh];
+                        _refLatShiftByMac = mSh;
+                    }
+                    _refLatProbe(cbm, true);
+                }
                 // Loudness matching, from the same run: each level line is
                 // one speaker's click peak at the microphone, all taken at
                 // the same sink volume. The QUIETEST speaker becomes the
@@ -547,6 +694,16 @@ Item {
                 // speaker was heard, so they count for the heard-map too;
                 // without them the verify's eviction kicked the loudest
                 // speaker in the room out as "silent through both rounds".
+                // The wired reference, when the run measured it inaudibly.
+                // CALIB_REF names the sink every other lag was timed
+                // against, so the sweep provably reached it — but an
+                // inaudible run prints no level line for anyone
+                // (CALIB_NOLEVELS), and without this the reference was the
+                // one member missing from the map. The verify's eviction
+                // then read that absence as "silent through both rounds"
+                // and ticked the healthy wired speaker out of its own group.
+                var refHeardM = (stdout || "").match(/^CALIB_REF (\S+)/m);
+                if (refHeardM) heard[refHeardM[1]] = true;
                 var hxRe = /^CALIB_XLAG (\S+) -?\d+/gm, hxM;
                 while ((hxM = hxRe.exec(stdout || "")) !== null) heard[hxM[1]] = true;
                 var hcRe = /^CALIB_CLIP (\S+)/gm, hcM;
@@ -571,23 +728,48 @@ Item {
                 for (var hh in heard) delete _verifyPartialStrikes[hh];
                 var leveled = false;
                 var trimsReplaced = false;
+                var masterLifted = 0;
                 if (lvls.length >= 2) {
                     var refAmp = lvls[0].amp;
                     for (var li = 1; li < lvls.length; li++)
                         if (lvls[li].amp < refAmp) refAmp = lvls[li].amp;
+                    // The quietest speaker is the ceiling — nothing is ever
+                    // boosted, because a boost is where clipping comes from.
+                    // So matching always means pulling the LOUD ones down,
+                    // and the room ends quieter than it started.
+                    var deepestTrim = 1;
                     for (var lj = 0; lj < lvls.length; lj++) {
                         var trimKey = _trimKeyForSink(lvls[lj].sink);
                         var newTrim = Math.pow(refAmp / lvls[lj].amp, 1 / 3);
+                        var applied = Math.max(0.05, Math.min(1, newTrim));
+                        if (applied < deepestTrim) deepestTrim = applied;
                         // The measurement wins — that is what the button
                         // promises — but replacing a balance somebody set
                         // by hand must never happen without a word.
                         if (_deviceTrims[trimKey] !== undefined
-                            && Math.abs(trimOf(trimKey)
-                                        - Math.max(0.05, Math.min(1, newTrim))) > 0.05)
+                            && Math.abs(trimOf(trimKey) - applied) > 0.05)
                             trimsReplaced = true;
                         setDeviceTrim(trimKey, newTrim);
                     }
                     leveled = true;
+                    // Give the loudness back on the master, which is what a
+                    // human doing this with an SPL meter does next: level the
+                    // channels, then bring the whole room back up. Only as far
+                    // as the master's own headroom reaches — at 100% there is
+                    // nothing left to give and the toast says so instead of
+                    // pretending. The lift is reported, not silent: the levels
+                    // the user hears did change.
+                    if (deepestTrim < 0.99) {
+                        var curMaster = Math.max(10, Math.min(100, cfg.combineMasterPct || 100));
+                        var wantMaster = Math.min(100, Math.round(curMaster / deepestTrim));
+                        if (wantMaster > curMaster + 1) {
+                            cfg.combineMasterPct = wantMaster;
+                            masterLifted = wantMaster - curMaster;
+                            app.exec(": PW_MASTERLIFT; pactl set-sink-volume "
+                                     + _combineSinkName + " " + wantMaster + "% 2>/dev/null;"
+                                     + " true # " + app.nextSeq());
+                        }
+                    }
                 }
                 _combineRebuildLoopbacks();
                 // The check-measure: with the rebuilt loopbacks live, click
@@ -612,6 +794,14 @@ Item {
                     : i18n("The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device.", calMs);
                 if (trimsReplaced)
                     calText += " " + i18n("Balance levels set earlier were replaced by the measured ones.");
+                // Matching means the loud speakers came DOWN to the quietest
+                // one, so the room is quieter than it was. Say which of the
+                // two happened next — the level the user hears is theirs.
+                if (leveled) {
+                    calText += " " + (masterLifted > 0
+                        ? i18n("The speakers were matched to the quietest one and the group's volume was raised by %1% to make up for it.", masterLifted)
+                        : i18n("The speakers were matched to the quietest one, so the room is quieter than before — turn the volume up if you want it back."));
+                }
                 // A saturated mic cannot measure loudness honestly — those
                 // speakers kept their old balance, and the user should know
                 // why (and how to fix it) instead of wondering.
@@ -623,6 +813,13 @@ Item {
                 // The default mic delivered exact zeros (a hardware mute the
                 // system cannot see) and another one stepped in — say which,
                 // or the user wonders why their good mic was "ignored".
+                // The measured winner is remembered by NAME, so every later
+                // check listens through the same ear the calibration chose
+                // instead of re-deciding from the desktop default. A name
+                // that stops existing simply falls back to a fresh pick.
+                var micN = (stdout || "").match(/^CALIB_MICNAME (\S{1,200})$/m);
+                if (micN && /^[A-Za-z0-9._:+-]+$/.test(micN[1]))
+                    cfg.syncMicName = micN[1];
                 var micM = (stdout || "").match(/^CALIB_MIC (.+)/m);
                 if (micM)
                     calText += " " + i18n("Measured with %1 — the default microphone stayed silent.", micM[1].trim());
@@ -632,6 +829,18 @@ Item {
                 // hardware mute (the touch button on the mic itself) that no
                 // software flag reports. Louder clicks cannot fix a deaf
                 // ear, so this failure never escalates the park.
+                // Asked to measure with a tone nobody hears, on a room that
+                // cannot carry one. The clicks would work — that is exactly
+                // what the listener said they did not want — so the run
+                // stops and hands the choice back.
+                if ((stdout || "").indexOf("inaudible unavailable") !== -1) {
+                    _calibRestoreVolume();
+                    if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
+                    app.notify(i18n("Calibration did not succeed"),
+                               i18n("The inaudible tone did not reach the microphone from these speakers. Move the microphone closer, or turn off \"Measure with a tone too high to hear\" to measure with the audible clicks."),
+                               "audio-input-microphone");
+                    return true;
+                }
                 if ((stdout || "").indexOf("microphone silent") !== -1) {
                     _calibRestoreVolume();
                     if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
@@ -645,9 +854,16 @@ Item {
                 // click that an 85% one clears with room to spare (measured
                 // here: 1976 vs 6550 over a floor of ~570). One louder pass
                 // before giving up; the stream stays muted across the retry
-                // so no music blasts between the rounds.
+                // so no music blasts between the rounds. Readings that were
+                // heard but scattered past the settle rule earn the louder
+                // pass too, on either road: scattered clicks are noise peaks
+                // outshouting quiet bursts, and the sweep genuinely gains
+                // level with the park — its stream compensation is capped at
+                // 171%, which a 55% park cannot fill (a cubic 55% needs 6x)
+                // and an 85% one can.
                 if (calPark < 85 && _combineActive
-                    && (stdout || "").indexOf("no click heard") !== -1) {
+                    && ((stdout || "").indexOf("no click heard") !== -1
+                        || (stdout || "").indexOf("would not settle") !== -1)) {
                     // The louder pass may refuse to launch (the Bluetooth
                     // member vanished mid-run — the very reason no click was
                     // heard — or a rebuild emptied the group): only a retry
@@ -658,8 +874,13 @@ Item {
                     // silent-forever bug the guard timer exists to prevent.
                     calibrateSync(85);
                     if (_calibrating) {
+                        // Name the stimulus the retry actually plays — the
+                        // clicks wording on a sweep run would promise noise
+                        // to a listener who asked for silence.
                         app.notify(i18n("Calibration"),
-                                   i18n("The clicks were too quiet for this room — trying once more, louder."),
+                                   (stdout || "").indexOf("inaudible") !== -1
+                                       ? i18n("The inaudible reading would not settle at this level — trying once more, louder.")
+                                       : i18n("The clicks were too quiet for this room — trying once more, louder."),
                                    "audio-input-microphone");
                         return true;
                     }
@@ -671,9 +892,34 @@ Item {
                 // old routing. Success releases it via the verify's unmute;
                 // failure has no verify, so it must release its own.
                 if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
-                app.notify(i18n("Calibration did not succeed"),
-                           i18n("Make sure the microphone is not covered and both speakers can be heard, then try again."),
-                           "dialog-warning");
+                // Three different failures used to share one sentence about
+                // the microphone, and two of them were being told a lie.
+                //
+                // An implausible pair is the loudest example, caught on the
+                // home desk: six clean captures from both speakers sat in
+                // the same stdout as the refusal, and the widget still said
+                // "check the microphone". That reading — the Bluetooth
+                // speaker timed 174 ms AHEAD of the wired one — is what a
+                // freshly re-rolled A2DP stream looks like before it
+                // settles, and the same room's own check contradicted it by
+                // ~370 ms twelve minutes later. Waiting is the cure, so say
+                // so; the refusal itself is correct and stays.
+                if ((stdout || "").indexOf("implausible result") !== -1)
+                    app.notify(i18n("Calibration did not succeed"),
+                               i18n("The two speakers timed impossibly far apart, so nothing was changed. A speaker that has just reconnected usually needs a minute to settle — try again shortly."),
+                               "dialog-warning");
+                // An unsettled reading is its own story: the microphone
+                // heard the speakers fine, the captures just disagreed —
+                // "check the microphone" advice would send the user the
+                // wrong way after the louder pass already failed.
+                else if ((stdout || "").indexOf("would not settle") !== -1)
+                    app.notify(i18n("Calibration did not succeed"),
+                               i18n("The reading would not settle even with the speakers turned up — nothing was changed. Trying again usually does it."),
+                               "dialog-warning");
+                else
+                    app.notify(i18n("Calibration did not succeed"),
+                               i18n("Make sure the microphone is not covered and both speakers can be heard, then try again."),
+                               "dialog-warning");
             }
             return true;
         }
@@ -692,8 +938,40 @@ Item {
             verifyGuardTimer.stop();
             if (!_verifyPending) return true;
             _verifyPending = false;
-            var vM = (stdout || "").match(/VERIFY_OK (\d+)/);
+            // A member the check sat out because the LISTENER muted it. Not
+            // deaf, not partial — but a verdict that quietly excludes a
+            // speaker reads as covering it, so each one is named. When the
+            // whole run failed for it, the failure branch below speaks once
+            // instead of a notification per member.
+            var vMutedFail = (stdout || "").indexOf("VERIFY_FAIL members muted") !== -1;
+            var vMutedRe = /^VERIFY_MUTED (\S+)$/gm, vMutedHit;
+            var vSat = {};
+            while ((vMutedHit = vMutedRe.exec(stdout || "")) !== null) {
+                console.log("[ARP] sync: " + vMutedHit[1]
+                            + " is muted — sat this check out");
+                vSat[vMutedHit[1]] = true;
+                if (!vMutedFail && !_verifyMutedSaid[vMutedHit[1]]) {
+                    _verifyMutedSaid[vMutedHit[1]] = true;
+                    app.notify(i18n("Sync check"),
+                               i18n("%1 is muted, so the check skipped it. Unmute it and check again to include it.",
+                                    outputDescription(vMutedHit[1])),
+                               "dialog-information");
+                }
+            }
+            _verifySatOut = vSat;
+            var vM = (stdout || "").match(/^VERIFY_OK (\d+)/m);
             cfg.syncVerifiedMs = vM ? parseInt(vM[1], 10) : -1;
+            // The verify's whole story goes to the journal, same contract
+            // as the calibration's: the 419 ms garbage pair that inverted
+            // this room on 2026-07-29 left no trace of what either pass
+            // had measured, and the fold below was the only witness.
+            var vLagRaw = (stdout || "").match(/^VERIFY_LAG .+$/gm) || [];
+            var vByM = (stdout || "").match(/^VERIFY_BY (\S+)/m);
+            console.log("[ARP] sync: verify verdict "
+                        + (vM ? vM[1] + " ms" : "no verdict")
+                        + (vByM ? ", by " + vByM[1] : "")
+                        + (vLagRaw.length > 0 ? "; " + vLagRaw.join(" | ") : "")
+                        + "; shifts " + JSON.stringify(_refLatShiftByMac));
             // THE CLOSED LOOP. A Bluetooth path's buffering is re-rolled on
             // every stream lifecycle (measured live: the same speaker sat
             // 213 ms one session, 2.3 s the next after a codec switch, and
@@ -705,34 +983,165 @@ Item {
             // buffer, cured by bouncing the sink, not by waiting longer.
             if (vM && !_verifyCorrected && parseInt(vM[1], 10) > 25) {
                 var vSpreadNow = parseInt(vM[1], 10);
-                var lagRe = /VERIFY_LAG (\S+) (\d+)/g, lagM;
+                var lagRe = /^VERIFY_LAG (\S+) (\d+)/gm, lagM;
                 var residuals = {};
                 while ((lagM = lagRe.exec(stdout || "")) !== null)
                     residuals[lagM[1]] = parseInt(lagM[2], 10);
-                _verifyCorrected = true;
                 var vText, vIcon;
                 if (vSpreadNow <= 900) {
+                    // ONE reading may not move the map. The machinery has
+                    // always run a second pass — it just reported instead of
+                    // voting, and a single pair of captures agreeing on
+                    // garbage (spawn jitter reads as a member arriving late)
+                    // rewrote a healthy room in one stroke. The reading that
+                    // wants to change the map now has to happen twice.
+                    if (!_verifyProposal) {
+                        _verifyProposal = { spread: vSpreadNow, residuals: residuals };
+                        _verifyUnmuteAll();
+                        _verifyPending = true;
+                        _verifyArmTimers();
+                        app.notify(i18n("Sync check"),
+                                   i18n("The speakers were %1 ms apart — measuring once more to confirm.", vSpreadNow),
+                                   "audio-input-microphone");
+                        return true;
+                    }
+                    var vProp = _verifyProposal;
+                    _verifyProposal = null;
+                    // Only members BOTH passes measured get a vote or a
+                    // fold. A member one pass sat out (muted mid-chain, a
+                    // port gone) has a single reading, and the pass that
+                    // never saw it did not measure zero — fabricating one
+                    // vetoed corrections the members measured twice had
+                    // agreed on.
+                    var vKeys = {}, vAgree = true, vAny = false;
+                    for (var pk in vProp.residuals)
+                        if (residuals[pk] !== undefined) { vKeys[pk] = true; vAny = true; }
+                    if (!vAny) vAgree = false;
+                    for (var vk in vKeys) {
+                        var vr1 = vProp.residuals[vk] || 0, vr2 = residuals[vk] || 0;
+                        // Same window the caretaker's twin confirmation
+                        // uses: flat where the number is small, 20% where
+                        // it is large enough to be unambiguous.
+                        if (Math.abs(vr1 - vr2) > Math.max(25, Math.round(0.2 * Math.max(vr1, vr2)))) {
+                            vAgree = false;
+                            break;
+                        }
+                    }
+                    if (!vAgree) {
+                        console.log("[ARP] sync: verify passes disagree — "
+                                    + JSON.stringify(vProp.residuals) + " then "
+                                    + JSON.stringify(residuals) + " — nothing changed");
+                        _verifyCorrected = true;
+                        _verifyUnmuteAll();
+                        _calibRestoreVolume();
+                        _trimReconcile(_combineLoopbackSinkByModule);
+                        app.notify(i18n("Sync check"),
+                                   i18n("Two measurements disagreed about the room, so nothing was changed. If the speakers sound apart, press Calibrate."),
+                                   "dialog-warning");
+                        return true;
+                    }
+                    _verifyCorrected = true;
                     // Write the corrected map BEFORE unmuting: _verifyUnmuteAll
                     // releases any rebuild held during the measurement, and a
                     // rebuild that fires here must carry the NEW delays — or
-                    // pass 2 measures the old ones and reports "still N apart".
+                    // the confirming pass measures the old ones and reports
+                    // "still N apart". What lands is the MEAN of the two
+                    // agreed passes — inside the window they are the same
+                    // reading, and the average sheds half of either one's
+                    // capture noise.
+                    var vFolded = 0;
                     try {
                         var vMap = JSON.parse(cfg.syncOffsetMap || "{}");
-                        for (var vs in residuals) {
-                            if (residuals[vs] === 0) continue;
-                            var vKey = _btMacOfSink(vs) || vs;
+                        var vBefore = cfg.syncOffsetMap || "{}";
+                        for (var vs in vKeys) {
+                            var vMean = Math.round(((vProp.residuals[vs] || 0)
+                                                    + (residuals[vs] || 0)) / 2);
+                            if (vMean === 0) continue;
+                            // The closed loop exists because a BLUETOOTH
+                            // path's buffering re-rolls per stream — that is
+                            // the sentence this whole block opens with. A
+                            // wired chain does not re-roll, and on this desk
+                            // the verify read the wired member 508 then 493
+                            // ms late minutes after the direct calibration
+                            // had measured the same room tight three times —
+                            // a systematic artifact of the measurement, not
+                            // the room, and it repeats, so the vote above
+                            // waves it through. A residual sitting on a
+                            // wired member is a reason to distrust the
+                            // reading, never a number to persist.
+                            // What this stopgap COSTS, said out loud because
+                            // nothing else here says it: a residual on the
+                            // wired line has three causes, not one. The
+                            // wired chain got slower, the measurement woke
+                            // that speaker late (the artifact this refusal
+                            // is aimed at), or the BLUETOOTH chain got
+                            // FASTER — the "149 ms EARLY after a flush" case
+                            // named a few lines above. The third one is
+                            // real and is now uncorrectable. Retire this
+                            // refusal once the verify stops waking a member
+                            // mid-measurement; the honest successor folds
+                            // the difference onto the Bluetooth member,
+                            // since only differences ever mattered and
+                            // _anchorLags normalises either form.
+                            if (_btMacOfSink(vs) === "") {
+                                console.log("[ARP] sync: verify residual "
+                                            + vMean + " ms sits on wired " + vs
+                                            + " — not a re-rolling chain, not folded");
+                                continue;
+                            }
+                            var vKey = _btMacOfSink(vs);
                             var vOld = parseInt(vMap[vKey], 10);
-                            if (!isFinite(vOld)) vOld = 0;
-                            var vStep = Math.max(-600, Math.min(600, residuals[vs]));
+                            if (!isFinite(vOld)) {
+                                // No stored entry does NOT mean the member
+                                // played at zero: _lagForSink deploys its
+                                // fallback — for Bluetooth the global offset
+                                // plus the silent REFLAT shift. The residual
+                                // folds onto what the room actually played,
+                                // or the "correction" jumps the speaker.
+                                //
+                                // What goes back into the map is REFERENCE-
+                                // time, though, because _lagForSink adds the
+                                // shift again on every read. Seeding with the
+                                // deployed value wrote the shift in twice:
+                                // bench with syncOffsetMs 500 and a 340 ms
+                                // shift, the pair went from 500 ms apart to
+                                // 840 where 540 was intended, and the sibling
+                                // branch above (a stored entry) landed on
+                                // target from the same inputs.
+                                vOld = Math.max(0, Math.min(2000, cfg.syncOffsetMs || 0));
+                            }
+                            var vStep = Math.max(-600, Math.min(600, vMean));
                             vMap[vKey] = Math.max(-100, Math.min(2000, vOld + vStep));
+                            vFolded++;
                         }
-                        cfg.syncOffsetMap = JSON.stringify(vMap);
+                        if (vFolded > 0) {
+                            _anchorLags(vMap, _combineRealSinks());
+                            cfg.syncOffsetMap = JSON.stringify(vMap);
+                            console.log("[ARP] sync: verify fold, twice-confirmed — map "
+                                        + vBefore + " -> " + cfg.syncOffsetMap);
+                            _mirrorTunedToSlider();
+                        }
                     } catch (e) {}
+                    if (vFolded === 0) {
+                        // The whole confirmed difference sat on wired
+                        // members. An honest stop: a rebuild would change
+                        // nothing and the "adjusted" toast would be a lie.
+                        _verifyUnmuteAll();
+                        _calibRestoreVolume();
+                        _trimReconcile(_combineLoopbackSinkByModule);
+                        app.notify(i18n("Sync check"),
+                                   i18n("The room still reads %1 ms apart, but the difference sits on the wired speaker's road, which does not drift by itself — nothing was changed. If the speakers sound apart, press Calibrate.", vSpreadNow),
+                                   "dialog-warning");
+                        return true;
+                    }
                     vText = i18n("The speakers were %1 ms apart — adjusted from the measurement, checking once more.", vSpreadNow);
                     vIcon = "audio-input-microphone";
                 } else {
                     // Bounce the Bluetooth members: suspend/resume flushes a
-                    // wedged buffer where more delay never could.
+                    // wedged buffer where more delay never could. One pass is
+                    // enough here — the flush changes no stored number, so
+                    // there is nothing a second reading could vote on.
+                    _verifyCorrected = true;
                     var bounce = "";
                     var vSinks = _combineRealSinks();
                     for (var vb = 0; vb < vSinks.length; vb++)
@@ -772,25 +1181,66 @@ Item {
             // Other audio (a browser video, another player) reads as extra
             // arrivals and would make the verdict a dice roll — the script
             // discards polluted recordings and says why.
+            // Muting silenced so much of the group that nothing was left to
+            // compare. The room stays unverified and the reason is the
+            // listener's own mute switch, so say that, not "deaf".
+            if (vMutedFail) {
+                app.notify(i18n("Sync check"),
+                           i18n("The check compares speakers, and too many are muted to compare. Unmute them and check again."),
+                           "dialog-warning");
+                return true;
+            }
             if ((stdout || "").indexOf("VERIFY_FAIL room not quiet") !== -1) {
                 app.notify(i18n("Sync check"),
-                           i18n("The room was not quiet enough to verify — pause other audio and calibrate once more."),
+                           i18n("This speaker does not carry the inaudible test tone, so the check needed the audible one — and the room was too noisy for it. Pause other audio and try again."),
                            "dialog-warning");
                 return true;
             }
             // The mic went hardware-mute between the rounds (its own touch
             // button — no software flag reports it): the calibration stands,
             // the check just could not listen.
+            // The check was asked to stay inaudible and this chain cannot
+            // carry the sweep. Clicking anyway is what the setting exists to
+            // prevent, so the run stops and says what would let it measure.
+            // (A CALIB_NOLEVELS log used to sit here too, but that token
+            // only ever arrives with a CALIBRATION's stdout — the line was
+            // dead in this handler and lives in the PW_CALIB one now.)
+            if ((stdout || "").indexOf("VERIFY_FAIL inaudible unavailable") !== -1) {
+                _verifyPending = false;
+                verifyGuardTimer.stop();
+                _verifyUnmuteAll();
+                _calibRestoreVolume();
+                app.notify(i18n("Sync check skipped"),
+                           i18n("The speakers here do not carry the inaudible tone to the microphone. Move the microphone closer, or turn off \"Measure with a tone too high to hear\" to use the audible clicks."),
+                           "audio-input-microphone");
+                driftLastText = i18n("Auto-check: cannot measure without a sound you would hear");
+                return true;
+            }
             if ((stdout || "").indexOf("VERIFY_FAIL microphone silent") !== -1) {
                 app.notify(i18n("Sync check"),
                            i18n("Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."),
                            "dialog-warning");
                 return true;
             }
+            // Heard, but the captures would not settle: an honest
+            // non-verdict, not a diagnosis. Before this branch existed the
+            // tightened settle window filed the same moment under PARTIAL,
+            // and PARTIAL under the sweep means "band-deaf" — a shelf a
+            // healthy speaker then sits on for the life of the group, with
+            // the drift watch no longer looking at it.
+            var uM = (stdout || "").match(/^VERIFY_UNSTEADY (\S+)/m);
+            if (uM) {
+                console.log("[ARP] sync: verify reading from " + uM[1]
+                            + " would not settle — nothing changed");
+                app.notify(i18n("Sync check"),
+                           i18n("The reading from %1 would not settle, so nothing was changed. Trying again usually does it.", outputDescription(uM[1])),
+                           "audio-input-microphone");
+                return true;
+            }
             // A speaker the presence phase could not hear: the room is NOT
             // confirmed, and saying so honestly beats a soothing verdict
             // computed from the survivors — the calibration itself stands.
-            var pM = (stdout || "").match(/VERIFY_PARTIAL (\S+)/);
+            var pM = (stdout || "").match(/^VERIFY_PARTIAL (\S+)/m);
             if (pM) {
                 // Silent through BOTH rounds of the same run — the loud
                 // calibration clicks straight at the sink and the check
@@ -804,6 +1254,24 @@ Item {
                 // silently kick a healthy speaker out of the group — the
                 // empty-jack filter already catches the true holes-in-the-
                 // air before any click is spent on them.
+                // A silence under the INAUDIBLE sweep says nothing about the
+                // speaker: a codec that stops before 18 kHz is ordinary, and
+                // this rule was written for the audible click ("an output
+                // with nothing audible behind it"). Evicting on it is how a
+                // healthy Bluetooth speaker ended up ticked out of its own
+                // group with the user never touching the box — measured
+                // here, exactly that, on a JBL that plays music perfectly.
+                // The band-deaf list already remembers those; that is the
+                // right shelf for this fact.
+                if ((stdout || "").indexOf("VERIFY_BY sweep") !== -1) {
+                    if (!_ultraDeaf[pM[1]]) {
+                        _ultraDeaf[pM[1]] = true;
+                        _ultraDeafSig = _combineGroupSignature();
+                    }
+                    console.log("[ARP] sync: " + pM[1] + " does not carry the inaudible"
+                                + " band — kept in the group, measured with the others");
+                    return true;
+                }
                 if (_calibHeard[pM[1]] === undefined) {
                     var evStrikes = (_verifyPartialStrikes[pM[1]] || 0) + 1;
                     _verifyPartialStrikes[pM[1]] = evStrikes;
@@ -847,11 +1315,23 @@ Item {
         // the user clicked Disconnect while the cycle was mid-flight:
         // its reconnect phase just reverted their choice — undo that.
         if (cmd.indexOf(": PW_DRIFT;") === 0) {
+            // One answer retires one probe. Whichever branch below handles
+            // this ack, the stale mark belonged to THIS probe and must not
+            // survive to eat the next one's answer.
+            var deStale = _driftProbeStale;
+            _driftProbeStale = false;
             // Liveness gate, kin of the seq gates on PW_CALIB/PW_VERIFY: the
             // probe is out for up to 20 s, and a stale ack must not arm the
             // audible verify after the user toggled auto-care off or the
             // group died. Consume without acting.
-            if (cfg.syncAutoCare !== true || !_combineActive) return true;
+            if (cfg.syncAutoCare !== true || !_combineActive) {
+                // Consumed without acting — but the popup is still showing
+                // "listening…" from the launch, and a word that never ends
+                // reads as a check that hung. Retire it.
+                driftGuardTimer.stop();
+                if (driftLastText.indexOf("…") !== -1) driftLastText = "";
+                return true;
+            }
             // The same busy states that gate the probe's LAUNCH gate its
             // ack: a manual calibration, a recording or an alarm that began
             // inside the probe's window must not have an automatic verify
@@ -859,58 +1339,187 @@ Item {
             // measure silence and persist garbage lags.
             if (_calibrating || _verifyPending || _combineReloopBusy
                 || _btKickInFlight || app.recording === true
-                || app.alarmEngaged === true) return true;
+                || app.alarmEngaged === true) {
+                driftGuardTimer.stop();
+                driftLastText = i18n("Auto-check %1: skipped, something else was using the speakers",
+                                     Qt.formatTime(new Date(), "hh:mm"));
+                return true;
+            }
+            driftGuardTimer.stop();
             var deWhen = Qt.formatTime(new Date(), "hh:mm");
-            var deM = (stdout || "").match(/DRIFT_EST (\d+)/);
+            var deM = (stdout || "").match(/^DRIFT_EST (\d+)/m);
+            // The whole verdict, not its first line: DRIFT_PARTIAL now comes
+            // out ahead of DRIFT_EST, and logging only line one hid the
+            // number the check exists to produce.
             console.log("[ARP] sync: auto-care result — "
-                        + ((stdout || "").trim().split("\n")[0] || "no output"));
-            if (!deM) {
-                _driftPendingMs = -1;   // quiet/no signal
+                        + ((stdout || "").trim().replace(/\n/g, " | ") || "no output"));
+            // A speaker the sweep could not reach is a speaker whose drift
+            // nobody is watching. It does not stop the check any more, but
+            // it must not pass unmentioned either.
+            var dPart = (stdout || "").match(/^DRIFT_PARTIAL (\d+)/m);
+            if (dPart)
+                console.log("[ARP] sync: " + dPart[1] + " speaker(s) do not carry the"
+                            + " inaudible band — measured without them");
+            // A rebuild landed while this probe was out, so every number in
+            // this answer describes the room that was just replaced — the
+            // deaf list included, since the group itself may have changed.
+            // Dropped whole. The skip stays armed for the first reading of
+            // the room as it now stands.
+            if (deStale) {
+                driftLastText = i18n("Auto-check %1: settling after the adjustment", deWhen);
+                return true;
+            }
+            // Remember them by name and stop PLAYING into them. Opening a
+            // stream is not free even when nothing comes back: two of the
+            // outputs on this desk are UCM devices of ONE USB card, and
+            // waking the second switches the card's output path with an
+            // audible relay click. Reported twice, seconds after a periodic
+            // check, while the sweep itself measures clean.
+            var dDeaf = /^DRIFT_DEAF (.+)$/gm;
+            var dHit, dLearned = false;
+            while ((dHit = dDeaf.exec(stdout || "")) !== null) {
+                if (!_ultraDeaf[dHit[1]]) { _ultraDeaf[dHit[1]] = true; dLearned = true; }
+            }
+            if (dLearned) {
+                // Stamped with the group it was learned about, so a rebuild
+                // that only moved a delay does not throw it away.
+                _ultraDeafSig = _combineGroupSignature();
+                console.log("[ARP] sync: will not play the sweep into those again"
+                            + " while this group stands");
+            }
+            // A member that answered but never twice the same. Saying "too
+            // quiet" there is a lie the listener can hear through — the room
+            // was not quiet, the reading simply would not settle. Naming it
+            // is also what stops the next question: a number that changes by
+            // 130 ms between rounds is not a room that changed.
+            if (/^DRIFT_UNSTEADY /m.test(stdout || "")) {
+                driftLastText = i18n("Auto-check %1: reading would not settle — the microphone may be too far from the speakers", deWhen);
+                return true;
+            }
+            if (!deM) {   // quiet / no signal — nothing to remember
                 driftLastText = i18n("Auto-check %1: too quiet to tell", deWhen);
                 return true;
             }
             var deMs = parseInt(deM[1], 10);
+            // Where each speaker actually landed, which the spread throws
+            // away. This is the road that measures in the state the listener
+            // listens in — music flowing, the Bluetooth link warm, nobody
+            // muted — and on this desk it put the ideal fine-tune within a
+            // millisecond while the button, measuring a silent room and a
+            // cold link minutes earlier, was fifteen out.
+            var deEars = {}, deEarRe = /^DRIFT_EAR (\S+) (-?\d+)/gm, deEarM;
+            while ((deEarM = deEarRe.exec(stdout || "")) !== null)
+                deEars[deEarM[1]] = parseInt(deEarM[2], 10);
+            // The probe right after a fold measures the fold's own re-roll.
+            // Spend it: it may report, but it may not become half of the
+            // next correction.
+            if (_driftSkipNext) {
+                _driftSkipNext = false;
+                // The correction moved the room; everything measured before
+                // it describes a room that no longer exists.
+                _driftHistory = [];
+                _driftHistoryAt = [];
+                _driftEstHistory = [];
+                driftLastText = i18n("Auto-check %1: settling after the adjustment", deWhen);
+                return true;
+            }
+            // Every reading joins the history, in step or not: the median is
+            // taken over what the room has been doing, and throwing away the
+            // small readings would bias it away from zero.
+            var deNow = Date.now();
+            var deH = [], deHA = [], deHE = [];
+            for (var dhi = 0; dhi < _driftHistory.length; dhi++) {
+                // Stale readings describe a different afternoon.
+                if (deNow - _driftHistoryAt[dhi] > _driftPendingMaxAgeMs) continue;
+                deH.push(_driftHistory[dhi]);
+                deHA.push(_driftHistoryAt[dhi]);
+                deHE.push(_driftEstHistory[dhi]);
+            }
+            deH.push(deEars);
+            deHA.push(deNow);
+            // The spread rides along by value: the passive road reports an
+            // estimate with no landings at all, and the toast's own median
+            // has to hear those readings too.
+            deHE.push(deMs);
+            while (deH.length > _driftHistoryMax) {
+                deH.shift(); deHA.shift(); deHE.shift();
+            }
+            _driftHistory = deH;
+            _driftHistoryAt = deHA;
+            _driftEstHistory = deHE;
+            // The quiet correction costs nothing — no muting, no parked
+            // music, nothing anyone hears — so it is worth making even below
+            // the line where the ear stops caring. "In sync" and "exactly in
+            // sync" are the same minute of silence to the listener and a
+            // measurable difference to the room.
+            if (_driftFoldEars()) {
+                // A room just put back in step deserves to be told again if
+                // it ever drifts for real.
+                _driftHintShown = false;
+                _driftCalmStreak = 0;
+                return true;
+            }
             if (deMs < 25) {
-                _driftPendingMs = -1;
-                driftLastText = i18n("Auto-check %1: in sync", deWhen);
+
+                // Back in step, so a later drift is worth mentioning again.
+                // Said once per spell, never once per session: a room that
+                // goes out, comes back and goes out again is two pieces of
+                // news, and the listener hears about both. But a spell ends
+                // when the room STAYS back — two readings in a row — not on
+                // the first sub-25 number the scatter happens to produce.
+                _driftCalmStreak++;
+                if (_driftCalmStreak >= 2) _driftHintShown = false;
+                var deSugIn = _driftSuggestion(deEars);
+                driftLastText = deSugIn >= 0
+                    ? i18n("Auto-check %1: in sync — measured %2 ms", deWhen, deSugIn)
+                    : i18n("Auto-check %1: in sync", deWhen);
                 return true;
             }
-            driftLastText = i18n("Auto-check %1: %2 ms apart", deWhen, deMs);
-            // Twin confirmation, same philosophy as REFLAT: one estimate is
-            // a hypothesis, two within 15 ms are a fact.
-            if (_driftPendingMs < 0 || Math.abs(_driftPendingMs - deMs) > 15) {
-                _driftPendingMs = deMs;
+            // "still" and the target, because the number right above it in
+            // the popup is the delay being APPLIED (234 ms on this desk) and
+            // this one is the error that REMAINS (404). Two numbers of the
+            // same unit, one under the other, and nothing said which was
+            // which — the listener read them as two answers to one question.
+            var deSug = _driftSuggestion(deEars);
+            driftLastText = deSug >= 0
+                ? i18n("Auto-check %1: %2 ms apart — measured %3 ms", deWhen, deMs, deSug)
+                : i18n("Auto-check %1: still %2 ms apart (0 = in step)", deWhen, deMs);
+            _driftCalmStreak = 0;
+            // The quiet fold above has already had this reading and declined:
+            // too few in the history yet, the room cannot agree which way it
+            // is out, or there is no wired member to measure against. Nothing
+            // louder happens as a result — the listener is simply told, once.
+            if (_driftHistory.length < _driftHistoryMin) {
                 return true;
             }
-            _driftPendingMs = -1;
-            if (!_autoCareVerifyDone) {
-                _autoCareVerifyDone = true;
-                console.log("[ARP] sync: program material shows " + deMs
-                            + " ms split — running the automatic verify");
-                // The verify's one-shot correction is re-armed: the last
-                // calibration's pass already spent it, and an auto-care
-                // verify without its correction would measure and shrug.
-                _verifyCorrected = false;
-                // Park our own stream, same as calibrateSync: this verify
-                // launches over live music by definition, so the room-quiet
-                // precheck would hear On Air itself and fail with a
-                // misleading toast — after an audible level jump. Every
-                // terminal verify path restores via _calibRestoreVolume().
-                if (_calibVolumeBefore < 0)
-                    _calibVolumeBefore = app.playerOutput.volume;
-                // The park runs with the popup closed and the panel still
-                // reading "playing" — announce it once (manual calibrate has
-                // its own started-toast). The flag folds a volume nudge during
-                // the window onto the real pre-park level.
-                _autoCareParked = true;
-                app.playerOutput.volume = 0;
-                _verifyPending = true;
-                _verifyArmTimers();
-                app.notify(i18n("Sync check"),
-                           i18n("Speakers drifted — checking sync. Music pauses for about a minute."),
-                           "audio-speakers");
-            } else if (!_driftHintShown) {
+            // The loud road NEVER starts itself. It parks the music, mutes the
+            // speakers in turn and takes about a minute, and a listener does
+            // not get that in the middle of a song because a number crossed a
+            // line. The line is not even a firm one: measured on this desk
+            // over twenty consecutive checks, the check's own scatter is
+            // sd 21 ms, so a single reading over the 25 ms threshold can be
+            // noise — and on 2026-08-01 one such pair started the minute of
+            // silence off two readings that pointed in OPPOSITE directions
+            // (-21 then +29). The quiet fold had already refused that same
+            // pair, correctly, for exactly that reason.
+            //
+            // What is left is honest: the check corrects silently whenever it
+            // can, and when it cannot it says so once and the listener
+            // chooses when to spend the minute. The button is right there.
+            //
+            // Said on the strength of the HISTORY's middle, the same bar the
+            // fold holds itself to. This reading alone crossed 25, but with
+            // sd 21 ms one crossing is a coin toss, and a tuned room's
+            // single flyer was toasting "audibly apart" at a listener whose
+            // speakers were fine.
+            var deSpr = _driftEstHistory.slice().sort(function(a, b) { return a - b; });
+            var deSprMed = deSpr.length % 2
+                ? deSpr[(deSpr.length - 1) / 2]
+                : 0.5 * (deSpr[deSpr.length / 2 - 1] + deSpr[deSpr.length / 2]);
+            if (deSprMed >= 25 && !_driftHintShown) {
                 _driftHintShown = true;
+                console.log("[ARP] sync: program material shows " + deMs
+                            + " ms split — saying so, not interrupting");
                 app.notify(i18n("Sync has drifted"),
                            i18n("The speakers are audibly apart again — run Calibrate when convenient."),
                            "audio-speakers");
@@ -920,7 +1529,7 @@ Item {
         if (cmd.indexOf(": PW_REFLAT ") === 0) {
             var rlM = cmd.match(/^: PW_REFLAT ([CS]) ([0-9A-F:]{17})/);
             if (!rlM) return true;
-            var rlUs = (stdout || "").match(/REFLAT (\d+)/);
+            var rlUs = (stdout || "").match(/^REFLAT (\d+)/m);
             var rlMs = rlUs ? Math.round(parseInt(rlUs[1], 10) / 1000) : -1;
             // A suspended sink reports 0; anything past 3 s is not a report.
             // Either way an unusable reading also RETIRES a pending first
@@ -996,6 +1605,19 @@ Item {
             if (Math.abs(shift) < 25) shift = 0;
             var prevShift = _refLatShiftByMac[rlM[2]] || 0;
             if (Math.abs(shift - prevShift) < 25) return true;
+            // A recompensation rebuilds the loopbacks, and the rebuild's own
+            // suspend-flush RE-ROLLS the very buffering this reading measured
+            // — so a correction can hand the next probe a fresh reason to
+            // correct again, and the room quietly re-rolls itself in a loop.
+            // One recompensation per speaker per two minutes: a real move
+            // (codec switch, reconnect) is still caught within a breath, a
+            // drumbeat cannot start.
+            var nowRl = Date.now();
+            if (nowRl - (_refLatActedAt[rlM[2]] || 0) < 120000) return true;
+            var ma = {};
+            for (var ka in _refLatActedAt) ma[ka] = _refLatActedAt[ka];
+            ma[rlM[2]] = nowRl;
+            _refLatActedAt = ma;
             var m1 = {};
             for (var k1 in _refLatShiftByMac) m1[k1] = _refLatShiftByMac[k1];
             m1[rlM[2]] = shift;
@@ -1012,7 +1634,15 @@ Item {
                            i18n("A Bluetooth speaker came back noticeably off its calibration — the sync compensated automatically. Recalibrate when convenient for exact ears."),
                            "audio-speakers");
             }
-            if (_combineActive && !_combineReloopBusy && !syncOffsetDebounce.running)
+            // A reloop already in flight is no reason to drop the
+            // recompensation on the floor: the rebuild path parks it in
+            // _combineReloopPending and the reloop's own ack releases it.
+            // Skipping here instead left the shift recorded but never
+            // deployed — later probes of the same transport return early
+            // on the unchanged-shift check, so nothing ever rescheduled
+            // it, and the room played the whole move out loud until some
+            // unrelated rebuild happened by.
+            if (_combineActive && !syncOffsetDebounce.running)
                 syncOffsetDebounce.restart();
             return true;
         }
@@ -1300,6 +1930,18 @@ Item {
     // default sink and the remembered master level, so it queues instead.
     property bool _combineParkTail: false
     property bool _combineWakeQueued: false
+    // True while the enable's volume ramp is walking the master upward.
+    property bool _combineRamping: false
+
+    Timer {
+        id: rampGuard
+        // The ramp is fire-and-forget; if its ack is lost the flag would
+        // suppress the master memory forever. Its own steps take under a
+        // second — this only ever fires when something ate the answer.
+        interval: 8000
+        repeat: false
+        onTriggered: _combineRamping = false
+    }
 
     function _idleTeardownTick() {
         if (!_combineActive || cfg.combineWanted !== true) return;
@@ -1316,7 +1958,30 @@ Item {
         console.log("[ARP] sync: idle — parking the combined graph");
         _combineIdleParked = true;
         _combineParkTail = true;
+        parkTailGuard.restart();
         combineOutputsDisable(true);
+    }
+
+    Timer {
+        id: parkTailGuard
+        // The tail flag is cleared by the unload's ack — and ONLY by it. An
+        // ack that never comes (a wedged pactl, a shell that died with its
+        // session) left the flag standing, and from then on every wake was
+        // queued behind an event already in the past: sound returned and the
+        // speakers stayed dark for the rest of the session. Generous enough
+        // that a slow-but-honest unload always wins the race.
+        interval: 15000
+        repeat: false
+        onTriggered: {
+            if (!_combineParkTail) return;
+            console.log("[ARP] sync: park tail never acked — releasing the wake");
+            _combineParkTail = false;
+            if (_combineWakeQueued && _combineIdleParked
+                && cfg.combineWanted === true && !_combineActive && !_combineWantActive
+                && _appPlaying)
+                _combineWakeFromPark();
+            else _combineWakeQueued = false;
+        }
     }
 
     function _combineWakeFromPark() {
@@ -1466,55 +2131,224 @@ Item {
     // report silently (no clicks, no interruption) and the rebuild applies
     // the shift, so "fine yesterday, doubled today" corrects itself.
     property var _refLatShiftByMac: ({})
+    // When each speaker last had its compensation acted on — the brake on
+    // the flush→re-roll→compensate loop.
+    property var _refLatActedAt: ({})
     // A large reading waiting for its confirming twin (mac → ms).
     property var _refLatPending: ({})
     // One drift hint per session — a wandering link must not nag.
     property bool _refLatHintShown: false
 
-    // ── Automatic care (opt-in): passive drift check + one auto-verify ──
-    // Every few minutes while music plays, calibrate.py listens to the
-    // room next to the combined sink's monitor and cross-correlates their
-    // envelopes — no clicks, nothing stored, nothing leaves the machine.
-    // A twin-confirmed audible split arms ONE automatic verify (which
-    // measures with clicks and corrects, machinery that already exists);
-    // any later confirmation in the same session only says a quiet word.
-    property int _driftPendingMs: -1
-    property bool _autoCareVerifyDone: false
+    // ── Automatic care (opt-in): the inaudible drift check, and only that ──
+    // Every few minutes while music plays, calibrate.py plays its inaudible
+    // sweep into each member of ONE recording and reads where they land —
+    // nothing audible, nothing stored, nothing leaves the machine. Two
+    // checks that agree correct the map quietly.
+    //
+    // It used to arm ONE automatic verify as well, and that verify parks the
+    // music, mutes the speakers in turn and takes about a minute. It is gone.
+    // Automatic is fine as long as it is silent; two minutes of dead air in
+    // the middle of a song is not something a widget gets to decide for the
+    // person listening. When the quiet road cannot fix it, it says so and the
+    // listener presses the button.
+    // No flag gates an automatic verify any more, because there is no
+    // automatic verify: the loud road is the listener's to start.
     property bool _driftHintShown: false
+    // Consecutive in-step readings. Re-arming the drift toast took ONE,
+    // and one is exactly as cheap as one flyer: a room sitting near the
+    // 25 ms line crossed it both ways all evening (scatter is sd 21 ms)
+    // and every downward crossing opened a fresh "spell" for the next
+    // upward one to toast about. Two in a row is a room that is back,
+    // not a reading that wobbled.
+    property int _driftCalmStreak: 0
     // The caretaker's last word, for the popup — silence would read as
     // "is this thing even on?", and trust needs a heartbeat.
     property string driftLastText: ""
 
     Timer {
         id: driftMonitorTimer
-        interval: 6 * 60 * 1000
+        // Six minutes on the wall, twelve on battery: the probe is cheap
+        // but not free, and on a laptop the group is usually one speaker
+        // that was just calibrated anyway.
+        interval: (app.thrifty === true ? 12 : 6) * 60 * 1000
         repeat: true
-        running: cfg.syncAutoCare === true && _combineActive
+        running: cfg.syncAutoCare === true && cfg.syncManualOnly !== true
+                 && _combineActive
                  && app.anythingPlaying === true
+                 && _combineHasBtMember()
         onTriggered: _driftProbe()
         // The first heartbeat comes early: 45 s into the music the fade-in
         // is long over and the listener gets a "yes, it is running" line
         // without waiting out the full period.
-        onRunningChanged: running ? driftFirstCheck.restart() : driftFirstCheck.stop()
+        // The running condition above reads the device list, and that list is
+        // rebuilt on every refresh — so this signal fires far more often than
+        // a speaker actually joining or music actually starting. Restarting
+        // the early check on each one turned "a probe every six minutes" into
+        // probes 33 to 104 s apart (measured live), and every probe opens a
+        // stream on each member: that is what was breaking up the audio.
+        // One early check per settled stretch, not one per flicker.
+        onRunningChanged: {
+            if (!running) { driftFirstCheck.stop(); return; }
+            if (Date.now() - _lastDriftProbeMs < 5 * 60 * 1000) return;
+            driftFirstCheck.restart();
+        }
     }
 
     Timer {
         id: driftFirstCheck
-        interval: 45000
+        // 45 s when the check arms itself (music started, the speaker
+        // joined): no one is watching, and on the passive fallback road a
+        // fade-in would be measured as "too quiet". 2 s when the user just
+        // ticked the box — then someone IS watching, and the sweep plays
+        // its own signal, so the music's level stops mattering.
+        interval: _autoCareJustArmed ? 2000 : 45000
         repeat: false
-        onTriggered: _driftProbe()
+        onTriggered: {
+            _autoCareJustArmed = false;
+            _driftProbe();
+        }
+    }
+
+    // Set by the checkbox itself, not inferred from the config value: the
+    // same value turns true when a saved setting loads at startup, and
+    // that is not someone waiting at the popup for an answer.
+    property bool _autoCareJustArmed: false
+    // When a probe last really went out. The early check reads this so a
+    // flickering device list cannot turn it into a second poll timer.
+    property double _lastDriftProbeMs: 0
+
+    // Tests only: whether the periodic check is actually armed. The timer's
+    // running condition carries four gates and asserting on the flags one
+    // by one would not prove the timer agreed with them.
+    function _driftTimerRunningForTest() { return driftMonitorTimer.running; }
+
+    function noteAutoCareEnabled() {
+        _autoCareJustArmed = true;
+        // A deliberate tick outranks the quiet period above — the person is
+        // standing at the popup waiting for an answer.
+        _lastDriftProbeMs = 0;
+        // Something in the line immediately, because a checkbox that
+        // answers in six minutes reads as a checkbox that does nothing.
+        driftLastText = i18n("Auto-check: listening…");
+        if (driftMonitorTimer.running) driftFirstCheck.restart();
+    }
+
+    // Drift needs a Bluetooth ear to happen to: wired members resample
+    // against the graph's own clock, while a BT link buffers behind a clock
+    // of its own — that wander is what the passive check exists to catch.
+    // Without a BT member in the group the capture could only ever confirm
+    // silence, so the microphone stays untouched.
+    function _combineHasBtMember() {
+        var s = _combineRealSinks();
+        for (var i = 0; i < s.length; i++)
+            if (_btMacOfSink(s[i]) !== "") return true;
+        return false;
     }
 
     function _driftProbe() {
         // Never over a measurement, a recovery cure, a recording or an
-        // alarm — the check must be invisible, in every sense.
+        // alarm — the check must be invisible, in every sense. And never
+        // without a BT member (the timer gate, re-checked here in case the
+        // speaker left between the arm and the tick).
         if (_calibrating || _verifyPending || _combineReloopBusy
             || _btKickInFlight || app.recording === true
             || app.alarmEngaged === true) return;
+        if (!_combineHasBtMember()) return;
+        if (cfg.syncManualOnly === true) return;
+        _lastDriftProbeMs = Date.now();
         console.log("[ARP] sync: auto-care listening (periodic drift check)");
+        // What each member is credited with, spelled out. A check that
+        // reported 151 ms on a room whose RAW spread is 158 had to have
+        // given every member the same delay — which taken away leaves the
+        // bare hardware difference and reads as a room in ruins. If two
+        // members show the same number below, that is the bug, visible at
+        // a glance instead of inferred from an arithmetic coincidence.
+        var dDbg = _combineRealSinks();
+        var dSay = [];
+        for (var dd = 0; dd < dDbg.length; dd++)
+            dSay.push(outputDescription(dDbg[dd]).substring(0, 18)
+                      + "=" + Math.round(_deployedDelayMs(dDbg[dd], dDbg)) + "ms"
+                      + "(lag " + Math.round(_lagForSink(dDbg[dd])) + ")");
+        console.log("[ARP] sync: delays credited — " + dSay.join(", "));
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
-        app.exec(": PW_DRIFT; timeout 20 python3 '" + script + "' drift "
-                 + _combineSinkName + " ''; true # " + app.nextSeq());
+        // Each member is named so the sweep can measure it one at a time,
+        // and each goes out with the delay it is ALREADY being played with.
+        // That second half is not decoration: the sweep is aimed straight
+        // at the member sink and so goes round the loopback carrying the
+        // compensation, timing the bare hardware. Take those arrivals at
+        // face value and a room in perfect tune reports the whole spread
+        // the calibration exists to cancel — measured here, 1 ms of real
+        // error read as 299 — and the caretaker sets an automatic re-verify
+        // going every six minutes forever.
+        var dAll = _combineRealSinks();
+        // Anything already proved deaf to the band is left alone: playing
+        // into it can only cost a relay click and a wasted capture.
+        var dMembers = [];
+        for (var dk = 0; dk < dAll.length; dk++)
+            if (!_ultraDeaf[dAll[dk]]) dMembers.push(dAll[dk]);
+        if (dMembers.length < 2) {
+            // Putting the deaf ones back was the whole promise undone. In a
+            // two-speaker room — the ordinary case — one deaf member leaves
+            // one that can hear, and this line handed the sweep straight
+            // back to the speaker just proved unable to carry it. Measured
+            // on this desk: the same JBL was re-learned as deaf at 17:17,
+            // 17:18 and 17:37, so it was being played into on every check,
+            // and an 18 kHz sweep pushed through a codec that cannot hold
+            // it is exactly where an audible artefact comes from. That is
+            // the beeping that kept arriving with the radio playing.
+            // Nothing measurable left means nothing to play: say so.
+            console.log("[ARP] sync: fewer than two members carry the"
+                        + " inaudible band — nothing to compare, not playing");
+            driftLastText = i18n("Auto-check %1: only one speaker can hear the inaudible tone — nothing to compare",
+                                 Qt.formatTime(new Date(), "hh:mm"));
+            return;
+        }
+        var dArgv = "";
+        for (var di = 0; di < dMembers.length && di < 8; di++)
+            // The delay comes from the WHOLE group, not the measured subset:
+            // the schedule's floor is set by the slowest device in the room,
+            // deaf or not.
+            dArgv += " '" + String(dMembers[di]).replace(/'/g, "'\\''") + "'"
+                   + " " + Math.round(_deployedDelayMs(dMembers[di], dAll));
+        // Eight is the verify's ceiling too. A bigger group takes the
+        // passive road rather than running past its leash halfway through
+        // and reporting nothing — said out loud, because a check that
+        // quietly measures less than it claims is worse than one that fails.
+        if (dMembers.length > 8) {
+            dArgv = "";
+            console.log("[ARP] sync: " + dMembers.length + " speakers is past the"
+                        + " sweep's limit of 8 — using the passive check");
+        }
+        // Warm-up capture plus one per member, each a 3.2 s recording with
+        // its play and analysis around it — measured at about 8 s a head.
+        // The passive road needs only its own 8 s window, so this budget
+        // covers both roads with the fallback still inside it.
+        var dBudget = 14 + Math.min(8, dMembers.length) * 8;
+        // The word in the popup gets the same budget as the probe. A shell
+        // that dies with its leash, or an ack lost across a plasmashell
+        // restart, used to leave "listening…" standing as the last thing the
+        // check ever said — indistinguishable from one that hung.
+        driftLastText = i18n("Auto-check: listening…");
+        // A fresh launch measures the room as it stands now. If the LAST
+        // probe was marked stale and its answer never came back (guard
+        // timeout), the mark must not carry over and eat this one's.
+        _driftProbeStale = false;
+        driftGuardTimer.interval = (dBudget + 15) * 1000;
+        driftGuardTimer.restart();
+        app.exec(": PW_DRIFT;" + _ultraEnv()
+                 + _calibRunCmd(dBudget, script,
+                                " drift " + _combineSinkName + " " + _micArg() + dArgv,
+                                _driftPidFile)
+                 + " true # " + app.nextSeq());
+    }
+
+    Timer {
+        id: driftGuardTimer
+        repeat: false
+        onTriggered: {
+            driftLastText = i18n("Auto-check %1: no answer came back",
+                                 Qt.formatTime(new Date(), "hh:mm"));
+        }
     }
 
     function _lagForSink(sinkId) {
@@ -1537,6 +2371,26 @@ Item {
                ? Math.max(0, Math.min(2000, (cfg.syncOffsetMs || 0)
                                             + (_refLatShiftByMac[mac] || 0)))
                : 0;
+    }
+
+    // What each speaker is ACTUALLY delayed by, when that has drifted away
+    // from the fine-tune slider's number. The slider shows the seed the
+    // user set; every automatic correction lands in the per-device map
+    // instead, so a room the caretaker has been quietly retuning for a week
+    // still showed the original number and nothing else. Empty string when
+    // the two agree — no line is better than a line that says nothing.
+    function autoTunedSummary() {
+        var s = _combineRealSinks();
+        var seed = cfg.syncOffsetMs || 0;
+        var out = [];
+        for (var i = 0; i < s.length; i++) {
+            if (_btMacOfSink(s[i]) === "") continue;
+            var lag = _lagForSink(s[i]);
+            // Under 5 ms is the map agreeing with the slider, not a tune.
+            if (Math.abs(lag - seed) < 5) continue;
+            out.push(i18n("%1: %2 ms", outputDescription(s[i]), lag));
+        }
+        return out.join("  ·  ");
     }
 
     // Read one Bluetooth sink's PipeWire-reported latency. forCalib stores
@@ -1588,6 +2442,15 @@ Item {
     // worst lag, a faster Bluetooth device waits the difference. Stereo is
     // pinned.
     function _combineLoopbackCmds(sinks) {
+        // No anchoring here either, and the reason is the OPPOSITE of the
+        // fold's: a rebuild sees only the members connected right now, and
+        // anchoring that subset rewrites their entries against a floor the
+        // absent member never agreed to — a Bluetooth speaker walking out
+        // of range for one rebuild would come back to a map whose frame
+        // moved under it. The map's floor drifts back to zero at the next
+        // write that anchors with the full group present (calibration,
+        // slider, verify); until then a non-zero floor costs nothing,
+        // because only differences ever reach a speaker.
         // EVERY sink carries its measured lag now — Bluetooth from its MAC
         // calibration (or the slider), wired from its CALIB_XLAG (or the
         // assumed zero it always had). The slowest device sets the schedule
@@ -1599,10 +2462,50 @@ Item {
             lags[sinks[j]] = _lagForSink(sinks[j]);
             if (lags[sinks[j]] > maxLag) maxLag = lags[sinks[j]];
         }
+        // Remember what is going out, because the map and the room stop
+        // agreeing the moment a quiet fold writes one and leaves the other.
+        var bl = {}, blChanged = false;
+        for (var bk in _builtLags) bl[bk] = _builtLags[bk];
+        for (var bj = 0; bj < sinks.length; bj++) {
+            if (bl[sinks[bj]] !== undefined && bl[sinks[bj]] !== lags[sinks[bj]])
+                blChanged = true;
+            bl[sinks[bj]] = lags[sinks[bj]];
+        }
+        _builtLags = bl;
+        // Accreted exactly like _builtLags above, never rebuilt from the
+        // current sinks alone: a member absent for one rebuild keeps its
+        // _builtLags entry, so it must keep the shift that entry was baked
+        // with — wiping one side of the pair hands the fold a deployed
+        // number whose shift it can no longer see, and the whole shift
+        // walks into the map on the next fold after a leave-and-rejoin.
+        var bsh = {};
+        for (var bso in _builtShiftByMac) bsh[bso] = _builtShiftByMac[bso];
+        for (var bsi = 0; bsi < sinks.length; bsi++) {
+            var bsm = _btMacOfSink(sinks[bsi]);
+            if (bsm !== "") bsh[bsm] = _refLatShiftByMac[bsm] || 0;
+        }
+        _builtShiftByMac = bsh;
+        // THIS is the moment a pending correction actually reaches the room
+        // — a fold, the slider, a calibration, whoever wrote the map. The
+        // drift bookkeeping resets HERE and not where the map was written:
+        // everything measured before this line describes the previous room,
+        // and the first probe after a reload reads the Bluetooth re-roll,
+        // not the drift. Resetting at fold time instead left the history
+        // primed to re-confirm a correction that had not landed yet, and
+        // one calibration mid-history had its fix folded right back out.
+        if (blChanged) {
+            _driftSkipNext = true;
+            _driftHistory = [];
+            _driftHistoryAt = [];
+            _driftEstHistory = [];
+            // The guard timer runs exactly while a probe is out. That probe
+            // was launched at the room this rebuild just replaced.
+            if (driftGuardTimer.running) _driftProbeStale = true;
+        }
         var cmds = "";
         for (var i = 0; i < sinks.length; i++) {
             var s = sinks[i].replace(/'/g, "'\\''");
-            var d = 60 + (maxLag - lags[sinks[i]]);
+            var d = _loopbackFloorMs + (maxLag - lags[sinks[i]]);
             // The sink rides along in the echo so the handler can pair module
             // ids with sinks for the balance — /LB (\d+)/ readers are
             // unaffected. The balance itself is baked in right here, in the
@@ -1645,6 +2548,50 @@ Item {
         return cmds;
     }
 
+    // The levels a measurement parked and has not put back yet. Written the
+    // moment they are read, deleted by the same shell after the restore —
+    // so its EXISTENCE is the honest answer to "is the room still parked?",
+    // true across a cancel, a guard expiry and a dead session alike.
+    readonly property string _parkFile:
+        "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\""
+
+    // Where a running measurement writes down the pid a cancel must kill.
+    // XDG_RUNTIME_DIR only (0700, ours), per-instance: two widgets on one
+    // desktop each own their own run and neither may stop the other's.
+    readonly property string _calibPidFile:
+        "\"$XDG_RUNTIME_DIR/onair_calib_" + app.instanceId + ".pid\""
+    // The periodic probe writes its own name. It used to share the file
+    // above, and then a calibration started while a probe was in flight had
+    // its pid overwritten and, seconds later, deleted by the probe's own
+    // cleanup — leaving Cancel with nothing to kill while the clicks kept
+    // coming for the rest of the python's leash. Two runs, two files.
+    readonly property string _driftPidFile:
+        "\"$XDG_RUNTIME_DIR/onair_drift_" + app.instanceId + ".pid\""
+
+    // The one way calibrate.py is launched. The python goes to the
+    // BACKGROUND so its pid can be written down, and the shell then waits
+    // for it exactly as if it had run in front — the restore lines that
+    // follow are unchanged and still only reachable through this wait.
+    // Why the bookkeeping: cancelling used to `pgrep -f 'python3
+    // .*calibrate\.py'`, which matches the sh and the timeout wrappers too
+    // (their command line CARRIES that text), so the cancel killed the very
+    // shell holding the saved sink levels and left the room parked at 55%
+    // with the loopbacks at full. Measured on this machine: killing the
+    // timeout pid alone ends the python (wait → 143) and the shell runs its
+    // restore to the end.
+    // ONAIR_LEASH_PID is this shell's own pid: the script watches it and
+    // ends itself when the session that asked for the measurement is gone.
+    // Its old test (getppid()==1) could never fire — `timeout` sits between
+    // the two, so the shell is what gets reparented, never the python.
+    function _calibRunCmd(budgetSec, script, argvStr, pidFile) {
+        var f = pidFile || _calibPidFile;
+        return " ONAIR_LEASH_PID=$$ timeout " + budgetSec + " python3 '" + script + "'" + argvStr + " &"
+             + " cp=$!;"
+             + " if [ -n \"$XDG_RUNTIME_DIR\" ]; then echo \"$cp\" > " + f + "; fi;"
+             + " wait \"$cp\";"
+             + " if [ -n \"$XDG_RUNTIME_DIR\" ]; then rm -f " + f + "; fi;";
+    }
+
     // Whether the calibration has both of its reference speakers IN the
     // group — the button grays out instead of silently doing nothing when
     // the only Bluetooth (or only wired) speaker was ticked out.
@@ -1654,22 +2601,204 @@ Item {
     // sync's on/off state; the generation bump makes the run's in-flight
     // shell ack stale, and the shell's own in-line restore still puts the
     // parked sink levels back when it finally exits.
-    function calibrateCancel() {
-        if (!_calibrating && !_verifyPending) return;
+    // The remembered microphone as a shell word, always quoted, always
+    // safe: a device name is machine text but it still reaches a command
+    // line, and '' means "you decide" to the script.
+    // The inaudible sweep is a setting, and calibrate.py reads it from the
+    // environment rather than argv so that all three commands (calibrate,
+    // verify, drift) obey one switch without three argument parsers. Placed
+    // AFTER the sentinel by every caller — the sync dispatcher matches on
+    // the command's opening ": PW_x;" and anything in front of it orphans
+    // the handler.
+    // Every loopback gets at least this much, so the schedule has room to
+    // hold the fast devices back rather than trying to rush the slow one.
+    readonly property int _loopbackFloorMs: 60
+
+    // Sinks that came back with an empty 18-19 kHz band. Kept for the
+    // session only: a speaker replugged into a live jack, or a group the
+    // user rebuilds, deserves a fresh hearing — _combineRebuildLoopbacks
+    // clears this for exactly that reason.
+    property var _ultraDeaf: ({})
+    // The group the deaf list belongs to. Anything else about the build may
+    // change without reopening the question.
+    property string _ultraDeafSig: ""
+
+    // Slide the group's stored lags so the smallest of them is zero.
+    //
+    // Nothing a speaker HEARS changes: _combineLoopbackCmds turns lags into
+    // delays by subtracting each from the group's maximum, so the whole set
+    // can move up or down together without shifting a single millisecond of
+    // sound. What does change is that the numbers stay attached to
+    // something. The verify's correction can only ADD — its residuals are
+    // measured against the earliest arrival and are never negative — so
+    // without an anchor the set walks upward forever: this room's slider
+    // went 145, then 214, then 267 while the sound stayed exactly where it
+    // was. Far enough up and the 2000 ms clamp in _lagForSink starts biting
+    // the differences too, at which point the walk stops being cosmetic.
+    //
+    // A member with no entry counts as the zero it already reads as
+    // everywhere else, which means a healthy frame (someone sitting at
+    // zero) is left completely alone — this only moves a set that has
+    // drifted off its anchor as a whole.
+    //
+    // Only the CURRENT group is touched. A lag stored for a speaker that is
+    // not here was measured in its own group's frame and is not ours to
+    // shift.
+    function _anchorLags(map, sinks) {
+        if (!sinks || sinks.length === 0) return map;
+        var keys = [], lo = null;
+        for (var i = 0; i < sinks.length; i++) {
+            var k = _btMacOfSink(sinks[i]) || sinks[i];
+            var v = parseInt(map[k], 10);
+            if (!isFinite(v)) {
+                // A member with no entry is NOT a member at zero. That is
+                // what _lagForSink says: a Bluetooth sink with no entry
+                // deploys the global offset, a wired one deploys nothing.
+                // Reading the absence as zero made this function fabricate
+                // an entry that wiped the offset the speaker was actually
+                // playing with — bench with map {DAC:-60}, offset 250 and an
+                // entry-less Bluetooth member: the pair went from 250 ms
+                // apart to 0. It also planted the spurious zeros that made
+                // the early-out below fire on nearly every run, which is why
+                // the map has been free to inflate for so long.
+                v = _btMacOfSink(sinks[i]) !== "" ? (cfg.syncOffsetMs || 0) : 0;
+            }
+            keys.push({ k: k, v: v });
+            if (lo === null || v < lo) lo = v;
+        }
+        if (lo === null || lo === 0) return map;   // already anchored
+        for (var j = 0; j < keys.length; j++)
+            map[keys[j].k] = keys[j].v - lo;
+        return map;
+    }
+
+    // The delay a member is ACTUALLY played with. This is NOT its stored
+    // lag: the slowest device sets the schedule and gets the floor, and
+    // everyone faster waits out the difference. Getting this wrong is easy
+    // and silent — the drift probe first passed the stored lag, and on this
+    // desk that turned a room 13 ms out (which is in tune) into 299 ms.
+    // _combineRebuild builds the loopbacks from the same formula and a test
+    // pins the two together.
+    // What the loopbacks were LAST BUILT with, per sink. The map is where a
+    // correction is written; this is what the room is actually hearing, and
+    // between a quiet fold and the next rebuild the two differ on purpose.
+    property var _builtLags: ({})
+
+    // The transport shift each Bluetooth member was BUILT with, keyed by
+    // MAC. A shift can be recorded while a reloop is mid-flight, and until
+    // the next rebuild lands the loopbacks carry the old one — the fold's
+    // frame conversion has to subtract what the room is actually playing
+    // with, not what the ledger says now, or an undeployed 400 ms re-roll
+    // reaches the map at full weight through the subtraction.
+    property var _builtShiftByMac: ({})
+
+    // What the map says this speaker SHOULD be played with. The slider and
+    // the anchor reason in these terms, and for them the map is the truth.
+    function _appliedDelayMs(sink, sinks) {
+        var maxLag = 0;
+        for (var j = 0; j < sinks.length; j++)
+            maxLag = Math.max(maxLag, _lagForSink(sinks[j]));
+        return _loopbackFloorMs + (maxLag - _lagForSink(sink));
+    }
+
+    // What this speaker is ACTUALLY being played with, which is what the
+    // check has to add back. The two part company on purpose: a quiet fold
+    // writes the map and leaves the loopbacks alone until a rebuild that
+    // costs the listener nothing.
+    //
+    // Crediting the map instead is a feedback loop, and it ran: on
+    // 2026-08-01 the map walked 207 -> 173 -> 150 while every loopback still
+    // carried 207. Each fold's own step came back to the next check looking
+    // like fresh drift in the same direction and earned another fold. The
+    // room never moved; only the number did.
+    function _deployedDelayMs(sink, sinks) {
+        var maxLag = 0, known = _builtLags[sink] !== undefined;
+        for (var j = 0; j < sinks.length && known; j++) {
+            if (_builtLags[sinks[j]] === undefined) known = false;
+            else maxLag = Math.max(maxLag, _builtLags[sinks[j]]);
+        }
+        // Nothing built yet — the map is the only thing there is to go on.
+        return known ? _loopbackFloorMs + (maxLag - _builtLags[sink])
+                     : _appliedDelayMs(sink, sinks);
+    }
+
+    // The lag this MAC's member is actually playing with, or -1 when
+    // nothing is deployed for it. The fold and the popup's suggestion
+    // reason from here for the same reason the probe credits
+    // _deployedDelayMs: between a fold and the rebuild that lands it, the
+    // map is a promise and the loopbacks are the room.
+    function _deployedLagForMac(mac) {
+        var s = _combineRealSinks();
+        for (var i = 0; i < s.length; i++)
+            if (_btMacOfSink(s[i]) === mac && _builtLags[s[i]] !== undefined)
+                return _builtLags[s[i]];
+        return -1;
+    }
+
+    function _ultraEnv() {
+        return cfg.syncUltrasonic === false ? " export ONAIR_NO_ULTRA=1;" : "";
+    }
+
+    function _micArg() {
+        var m = String(cfg.syncMicName || "");
+        if (!/^[A-Za-z0-9._:+-]{1,200}$/.test(m)) return "''";
+        return "'" + m + "'";
+    }
+
+    // Every road that calls a measurement off, in one place. Four of them
+    // exist — the user's own button, the disable, the resurrect and the two
+    // guard timers — and only the button used to end the PROCESS: the others
+    // cleared the flags and left the python clicking and muting into a room
+    // that was being torn down under it, while every busy-gate read idle.
+    // rebuildToo: the disable is about to rebuild everything anyway, so it
+    // does not want the held rebuild released a moment before the teardown.
+    function _calibAbort(rebuildToo) {
         _calibrating = false;
         _verifyPending = false;
         _verifyCorrected = false;
+        _verifyProposal = null;
+        _verifyMutedSaid = ({});
         calibGuardTimer.stop();
         verifySettleTimer.stop();
         verifyGuardTimer.stop();
         _verifyUnmuteAll();
         _calibRestoreVolume();
+        // The cancelled run's shell is still out there and its ack still
+        // carries the CURRENT generation — without a bump it would pass the
+        // staleness gate minutes later and act on a group that no longer
+        // exists: a CALIB_OK arming the verify against nothing, or a 'no
+        // click heard' launching an unasked-for 85% run over the music.
         _calibRunSeq++;
-        if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
-        // The measurement's own process must not keep clicking into the
-        // room after the state is gone — orphan-checked, ours only.
-        app.exec(": PW_CALIBKILL; for p in $(pgrep -f 'python3 .*calibrate\\.py' 2>/dev/null); do"
-                 + " kill \"$p\" 2>/dev/null; done; true # " + app.nextSeq());
+        if (rebuildToo && _rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
+        else _rebuildHeld = false;
+        // By pid, from the run's own file: OUR run, not every calibrate.py
+        // this user happens to have, and not the shell that still owes the
+        // room its volume restore. A missing or unreadable file is a no-op,
+        // which is what makes this safe to call from every road.
+        app.exec(": PW_CALIBKILL; f=" + _calibPidFile + ";"
+                 + " if [ -n \"$XDG_RUNTIME_DIR\" ] && [ -r \"$f\" ]; then"
+                 + " p=$(cat \"$f\" 2>/dev/null);"
+                 + " case \"$p\" in ''|*[!0-9]*) ;; *) kill \"$p\" 2>/dev/null;; esac;"
+                 + " fi; true # " + app.nextSeq());
+    }
+
+    // The drift probe writes its pid and, until now, nobody ever read it
+    // back: there was no road at all that could stop a probe already
+    // sweeping. Unticking the caretaker therefore left it playing for the
+    // rest of its budget — up to 78 s of tones after the switch said stop.
+    function _driftKill() {
+        driftGuardTimer.stop();
+        driftLastText = "";
+        app.exec(": PW_DRIFTKILL; f=" + _driftPidFile + ";"
+                 + " if [ -n \"$XDG_RUNTIME_DIR\" ] && [ -r \"$f\" ]; then"
+                 + " p=$(cat \"$f\" 2>/dev/null);"
+                 + " case \"$p\" in ''|*[!0-9]*) ;; *) kill \"$p\" 2>/dev/null;; esac;"
+                 + " fi; true # " + app.nextSeq());
+    }
+
+    function calibrateCancel() {
+        if (!_calibrating && !_verifyPending) return;
+        _calibAbort(true);
     }
 
     function calibPairReady() {
@@ -1723,6 +2852,44 @@ Item {
 
     function calibrateSync(parkPct) {
         if (_calibrating || _verifyPending || !_combineActive) return;
+        // By-ear mode: the microphone is off the table entirely. The button
+        // is hidden in that mode, but a hidden button is a UI fact and this
+        // is the contract — nothing here may reach a microphone.
+        if (cfg.syncManualOnly === true) return;
+        // A recording is running: this road plays audible clicks, parks the
+        // master and hardware-mutes members for a minute. It does not spoil
+        // the file — that comes off the stream, not the room — but silencing
+        // someone's speakers mid-recording without a word is not on. The
+        // periodic check has refused during a recording from the start; the
+        // louder road that a person actually presses did not, which was the
+        // wrong way round. Said out loud rather than silently ignored: this
+        // one is a button press, and a button that does nothing is a bug.
+        if (app.recording === true) {
+            // One literal, not a concatenation: xgettext extracts only the
+            // first piece of "a" + "b", so the msgid it writes never matches
+            // the string i18n() is given at runtime and the translation is
+            // silently skipped in every language.
+            app.notify(i18n("Sync measurement"),
+                       i18n("A recording is running. The measurement plays test tones and quiets the speakers, so it waits until the recording is done."),
+                       "media-record");
+            return;
+        }
+        // The caretaker's own probe may be out sweeping right now. It is not
+        // covered by the guards above — those watch _calibrating and
+        // _verifyPending, and a drift probe sets neither — so two processes
+        // could measure the same room at once, each hearing the other's
+        // tones, and the contaminated lag was the one that got stored. The
+        // person pressing the button wins: stop the background probe first.
+        _driftKill();
+        // Nothing used to mark the start of a hand-started run in the log,
+        // so a report of "it clicked" could not be told apart from hardware
+        // waking up. Now it can — and it names the stimulus honestly. This
+        // line used to say "audible clicks" on every run, and in the
+        // 2026-07-28 forensics it read as proof the sweep never played,
+        // when the words were just a leftover from before the sweep existed.
+        console.log("[ARP] sync: measuring by hand ("
+                    + (cfg.syncUltrasonic !== false ? "inaudible sweep" : "audible clicks")
+                    + ", speakers parked)");
         // Jack state can be stale: plugging a speaker into a previously empty
         // port usually fires no device-list change, so the empty-jack filter
         // below would still skip a now-audible speaker. Refresh first — the
@@ -1748,6 +2915,9 @@ Item {
         _calibParkPct = park;
         _calibrating = true;
         _verifyCorrected = false;
+        _verifyProposal = null;
+        _verifyMutedSaid = ({});
+        _verifySatOut = ({});
         // The natural moment to calibrate is WHILE listening — but program
         // audio through the live loopbacks either drowns the clicks (every
         // measurement fails) or a drum hit beats them in the peak search and
@@ -1776,7 +2946,15 @@ Item {
         // for paplay's full 5 s timeout — a fixed 60 s fired mid-run with a
         // full group, unmuting the radio INTO the tail measurements and
         // persisting music-contaminated levels.
-        calibGuardTimer.interval = 60000 + (calSinks.length - 2) * 15000;
+        // The run now measures the timing pair TWICE over: once with the
+        // inaudible sweep, which is what the fine-tune number comes from,
+        // and once with the clicks, which is the only stimulus a microphone
+        // can read a loudness off. Seven sweep captures at 2.6 s each is
+        // about 18 s on top of the clicks' own ~35 s, so the old 60 s base
+        // would have killed a healthy four-speaker run partway through the
+        // extras — the same shape of failure the 14 s verify guard used to
+        // produce.
+        calibGuardTimer.interval = 90000 + (calSinks.length - 2) * 15000;
         calibGuardTimer.restart();
         // A balance-trimmed loopback would mute the clicks on that speaker
         // and the measurement would read as silence — raise OUR sink-inputs
@@ -1806,8 +2984,12 @@ Item {
             // volume falls back to the park the calibration itself used.
             restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-" + park + "%};";
             argv += " \"$s" + si + "\"";
-            if (si === 1) argv += " ''"; // the mic placeholder sits between
-                                         // the timing pair and the extras
+            // The microphone the last calibration MEASURED as the best ear
+            // in this machine, asked for again by name. Empty on the first
+            // run (or after the device left), and calibrate.py then picks —
+            // the desktop's default source is a routing preference, not a
+            // judgement about which microphone hears the room.
+            if (si === 1) argv += " " + _micArg();
         }
         // The timeout must beat the guard timer: only the SHELL knows the
         // saved sink levels ($vN) and the balance percentages to put back —
@@ -1833,16 +3015,24 @@ Item {
         // replayed with sh at startup, so it must never live in a shared,
         // predictable /tmp path. No runtime dir → the save is skipped and
         // the calibration's own restore commands still put levels back.
-        var parkFile = "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\"";
+        var parkFile = _parkFile;
         var parkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + parkFile + ";";
         for (var pf = 0; pf < calSinks.length; pf++)
             parkSave += " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
                       + " \"$s" + pf + "\" \"${v" + pf + ":-" + park + "%}\" >> " + parkFile + ";";
+        // The setting is a promise, not a preference — and it holds for the
+        // button too. A listener who ticked "measure with a tone too high to
+        // hear" and then pressed Calibrate was still getting the clicks,
+        // because the inaudible road was only ever a first choice here. If
+        // this room cannot carry the sweep, the honest answer is to say so
+        // and let them decide, not to fall back behind their back.
         app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " P" + park + " ;"
+            + _ultraEnv()
+            + (cfg.syncUltrasonic !== false ? " export ONAIR_ULTRA_ONLY=1;" : "")
             + setup
             + parkSave
             + " " + pre
-            + " timeout " + calBudget + " python3 '" + script + "'" + argv + ";"
+            + _calibRunCmd(calBudget, script, argv)
             + restore
             + " " + post
             + " rm -f " + parkFile + "; true # " + app.nextSeq());
@@ -1852,7 +3042,13 @@ Item {
         // at half-time is worse than none. The louder retry announces itself
         // from the failure handler instead — no second "started" toast.
         if (park === 55) {
-            var calNote = i18n("Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes.");
+            // Say what this run will actually play. With the inaudible
+            // setting on there are no clicks at all, and promising "two
+            // rounds of clicks" to someone who has just asked for silence
+            // reads as the widget ignoring them.
+            var calNote = cfg.syncUltrasonic !== false
+                ? i18n("Measuring with a tone too high to hear — about two minutes in total. The music stays silent until the check finishes.")
+                : i18n("Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes.");
             if (skipped.length > 0)
                 calNote += " " + i18n("Skipped (empty jack): %1.", skipped.join(", "));
             app.notify(i18n("Calibration started"), calNote, "audio-input-microphone");
@@ -1873,7 +3069,7 @@ Item {
     // live generation's ack adopts it; see the PW_COMBINE handler.
     property string _combinePrevDefaultFallback: ""
 
-    function combineOutputsEnable() {
+    function combineOutputsEnable(fromUser) {
         if (!_combineAvailable || _combineWantActive) return;
         // Two pieces of hardware make a sync; how many of them PLAY is the
         // user's per-speaker choice (one alone is a valid evening).
@@ -1885,6 +3081,12 @@ Item {
             // wins over the leftovers of some earlier evening. Only the
             // speakers standing here return: an absent device (a headset
             // excluded for good) keeps its choice for when it comes back.
+            // And only for the user's OWN click: the startup probe, the
+            // resurrect knocks and the wake replay a remembered wish, and a
+            // wish must not overrule per-speaker choices that were each an
+            // explicit act — every speaker unticked and the wish left on
+            // would otherwise come back playing on all of them.
+            if (fromUser !== true) return;
             var m = {};
             for (var xk in _syncExcluded) m[xk] = _syncExcluded[xk];
             var all = _combineAllSinks();
@@ -1944,6 +3146,17 @@ Item {
         // microphone, live to the room.
         app.exec(": PW_COMBINE " + (++_combineLoadSeq) + ";"
                         + " d=$(pactl get-default-sink); echo \"PREVDEF $d\";"
+                        // The level the room is at RIGHT NOW, before the
+                        // combined sink takes the default over. With nothing
+                        // remembered the ramp used to assume 100% — and the
+                        // combined sink IS the system output while the sync
+                        // runs, so a first enable (or a fresh install) put
+                        // the whole machine at full blast. At night that is
+                        // the whole house. Read it here, where the answer is
+                        // still the user's own setting.
+                        + " pv=$(pactl get-sink-volume \"$d\" 2>/dev/null"
+                        + " | grep -o '[0-9]*%' | head -1 | tr -d %);"
+                        + " echo \"PREVVOL ${pv:-0}\";"
                         // Pin the null sink to the graph's clock rate: the
                         // common-mode-resample guarantee (any station rate
                         // resamples UPSTREAM of the split) must not depend
@@ -2006,7 +3219,7 @@ Item {
         // remember the PARK as "the level the user left the room at", or
         // the next morning's enable ramps to a full blast the user never
         // chose — the very regression the memory exists to prevent.
-        var masterParked = _calibrating || _verifyPending;
+        var masterParked = _calibrating || _verifyPending || _combineRamping;
         // Generation boundary: an in-flight rebuild's ack is stale from here
         // on and deliberately keeps its hands off these flags — a leftover
         // busy would deadlock every rebuild of the next enable.
@@ -2017,24 +3230,9 @@ Item {
         // its mutes would all land on a dead group, and a stranded
         // _verifyPending would hold every rebuild of the NEXT enable. Cancel
         // the whole measurement, restore the stream, drop the held rebuild.
-        if (_calibrating || _verifyPending) {
-            _calibrating = false;
-            _verifyPending = false;
-            _verifyCorrected = false;
-            _rebuildHeld = false;
-            calibGuardTimer.stop();
-            verifySettleTimer.stop();
-            verifyGuardTimer.stop();
-            _verifyUnmuteAll();
-            _calibRestoreVolume();
-            // The cancelled run's shell is still out there and its ack still
-            // carries the CURRENT generation — without a bump it would pass
-            // the staleness gate minutes later and act on a group that no
-            // longer exists: a CALIB_OK arming the verify against nothing,
-            // or a 'no click heard' launching an unasked-for 85% run over
-            // whatever the user is listening to by then.
-            _calibRunSeq++;
-        }
+        // The group is going away under the measurement — end the process
+        // too, not just the flags.
+        if (_calibrating || _verifyPending) _calibAbort(false);
         _btJoinWatchStop();
         // Route away FIRST — with the choice already off the combined sink,
         // its removal is not a "device vanished" event worth a notification.
@@ -2050,18 +3248,34 @@ Item {
             // trimmed all evening — dies with the sink. It is echoed back and
             // remembered so the next enable's ramp ends where the user left
             // the room, not at a 100% they never chose.
+            // The flags answer "is a measurement running RIGHT NOW", which
+            // is not the same question. A cancelled or guard-expired run
+            // clears them while its shell is still walking the restore, and
+            // the read below then caught the 100% park and filed it as the
+            // user's own level. The park file outlives the flags and is
+            // deleted only once the levels are actually back — ask IT too.
             un = "d=$(pactl get-default-sink 2>/dev/null);"
                + (masterParked ? " " :
-                  " cm=$(pactl get-sink-volume " + _combineSinkName
+                  " if [ -z \"$XDG_RUNTIME_DIR\" ] || [ ! -e " + _parkFile + " ]; then"
+                  + " cm=$(pactl get-sink-volume " + _combineSinkName
                   + " 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%');"
-                  + " echo \"MASTER ${cm:-100}\";")
+                  + " echo \"MASTER ${cm:-100}\"; fi;")
                + " " + unMods;
         }
         // Hand the system default back to whoever held it before the sync —
         // but only if it is still OURS to hand back: a default the user moved
         // elsewhere mid-session is their word, not a leftover to revert.
         if (_combinePrevDefault !== "") {
-            un += "[ \"$d\" = \"" + _combineSinkName + "\" ] && pactl set-default-sink '"
+            // Two conditions, not one. "$d" was read before the unloads, so
+            // it answers "was the sync holding the default when we started".
+            // The second half asks whether our sink is gone FOR GOOD: a
+            // disable followed quickly by an enable rebuilds it under the
+            // same name, and this shell — still walking its tail — would
+            // otherwise hand the default away from the live new group.
+            un += "[ \"$d\" = \"" + _combineSinkName + "\" ]"
+                  + " && ! pactl list short sinks 2>/dev/null | cut -f2"
+                  + " | grep -Fxq '" + _combineSinkName + "'"
+                  + " && pactl set-default-sink '"
                   + _combinePrevDefault.replace(/'/g, "'\\''") + "' 2>/dev/null; ";
             _combinePrevDefault = "";
         }
@@ -2090,6 +3304,16 @@ Item {
     property bool _rebuildHeld: false
 
     function _combineRebuildLoopbacks() {
+        // Only a changed GROUP reopens the question of what each speaker can
+        // carry. A rebuild also happens every time a delay moves — dragging
+        // the fine-tune slider is one — and a speaker deaf to 18 kHz at
+        // 145 ms is just as deaf at 200. Forgetting on every rebuild would
+        // hand the user a fresh relay click for each nudge of the slider.
+        var sigNow = _combineGroupSignature();
+        if (sigNow !== _ultraDeafSig) {
+            _ultraDeaf = ({});
+            _ultraDeafSig = sigNow;
+        }
         if (!_combineActive) return;
         if (_calibrating || _verifyPending) { _rebuildHeld = true; return; }
         if (_combineReloopBusy) { _combineReloopPending = true; return; }
@@ -2133,6 +3357,53 @@ Item {
         refLatProbeTimer.restart();
     }
 
+    // One number on screen, and it should be the number in force. The
+    // fine-tune slider reads syncOffsetMs while every automatic correction
+    // lands in the per-device map, so a speaker the caretaker had been
+    // quietly retuning still showed whatever was set by hand once. With a
+    // single Bluetooth speaker there is no doubt about which number the
+    // slider stands for, so it follows the correction; with several there
+    // is, and the "Tuned automatically" line lists them by name instead.
+    // Writing it changes nothing about playback — _lagForSink prefers the
+    // map for a speaker that has an entry, and setSyncOffset writes both
+    // when the slider is dragged, so the two can never disagree in silence.
+    // The floor _anchorLags would subtract, without writing anything: the
+    // frame's free constant over the current group, absences read the same
+    // way _lagForSink reads them.
+    function _anchorFloor(map, sinks) {
+        var lo = null;
+        for (var i = 0; i < sinks.length; i++) {
+            var k = _btMacOfSink(sinks[i]) || sinks[i];
+            var v = parseInt(map[k], 10);
+            if (!isFinite(v))
+                v = _btMacOfSink(sinks[i]) !== "" ? (cfg.syncOffsetMs || 0) : 0;
+            if (lo === null || v < lo) lo = v;
+        }
+        return lo === null ? 0 : lo;
+    }
+
+    function _mirrorTunedToSlider() {
+        var s = _combineRealSinks();
+        var bt = [];
+        for (var i = 0; i < s.length; i++)
+            if (_btMacOfSink(s[i]) !== "") bt.push(s[i]);
+        if (bt.length !== 1) return;
+        var lag = _lagForSink(bt[0]);
+        // The slider's number is the anchored-frame DIFFERENCE — that is
+        // what setSyncOffset writes after anchoring — so the mirror has to
+        // speak the same frame. The raw entry can ride a floor the quiet
+        // fold no longer flattens; mirroring the lifted absolute made the
+        // first one-tick nudge move the room by the whole floor at once.
+        try {
+            lag -= _anchorFloor(JSON.parse(cfg.syncOffsetMap || "{}"), s);
+        } catch (e) {}
+        // The slider's own scale. A lag past its ceiling would show as a
+        // pinned slider, which reads as a wrong number rather than a big one.
+        if (lag < 0 || lag > 900) return;
+        if (Math.round(lag) !== Math.round(cfg.syncOffsetMs || 0))
+            cfg.syncOffsetMs = Math.round(lag);
+    }
+
     function setSyncOffset(ms) {
         cfg.syncOffsetMs = Math.round(ms);
         // The slider speaks for the CONNECTED device(s) — remember the value
@@ -2140,6 +3411,17 @@ Item {
         try {
             var map = JSON.parse(cfg.syncOffsetMap || "{}");
             var sinks = _combineRealSinks();
+            // Anchor BEFORE writing, or the number typed here is not the
+            // number the room gets. The slider means "hold the Bluetooth
+            // speaker back this much MORE than the wired one" — a
+            // difference — but it only ever wrote the Bluetooth entry, so a
+            // wired member carrying a lag of its own quietly subtracted
+            // itself from every value the user chose. Measured on this
+            // desk: 145 typed against a wired member sitting at 154 reached
+            // the speakers as 17 ms, and no amount of dragging could fix it
+            // from here. With the frame anchored first, the typed number is
+            // the difference, which is what the slider has always claimed.
+            _anchorLags(map, sinks);
             var touched = false;
             for (var i = 0; i < sinks.length; i++) {
                 var mac = _btMacOfSink(sinks[i]);
@@ -2176,6 +3458,45 @@ Item {
     // session. Fold the gesture onto the pre-park level, drop the now unwanted
     // verify, and let setUserVolume persist the corrected absolute. Manual
     // calibration never sets _autoCareParked, so its semantics are untouched.
+    // Off means off, the moment it is switched. The clicks are armed by a
+    // settle timer and launched later, and nothing between those two points
+    // read the setting again — so a listener who heard the announcement,
+    // went to the settings page and unticked the caretaker still got the
+    // full click round, twice over if the correction round followed. The
+    // switch now reaches the machinery it governs: an armed run is dropped,
+    // a running one is killed with the same road the manual cancel uses,
+    // and the stream is handed back its level.
+    Connections {
+        target: cfg
+        function onSyncAutoCareChanged() {
+            if (cfg.syncAutoCare === true) return;
+            // Only the caretaker's OWN run is dropped. A calibration the
+            // user started by hand is their business and keeps going —
+            // _autoCareParked is what tells the two apart, and it is set
+            // before the arm, so a run announced but not yet clicking is
+            // caught as well as one already underway.
+            if (_autoCareParked) calibrateCancel();
+            // A probe already sweeping is the caretaker's too, and it is
+            // NOT covered by the line above: _autoCareParked is set when the
+            // probe's result comes back, so during the probe itself it is
+            // still false. Unticking used to leave it measuring — the switch
+            // said stop and the room went on being swept.
+            _driftKill();
+            // The 6-minute listening stops with the switch through the
+            // timer's own binding; the early first check has no such
+            // binding and would still fire once.
+            driftFirstCheck.stop();
+            // The half-finished measurement SURVIVES the switch. It is an
+            // observation about the room, not about the checkbox, and
+            // throwing it away punished the one gesture a listener makes
+            // when they want the widget to hurry up: toggling the switch
+            // after a reading discarded it and started the pair over. Age
+            // is what makes a remembered reading stale, and the history's
+            // own timestamps are what enforce that.
+            _driftHintShown = false;
+        }
+    }
+
     Connections {
         target: app.playerOutput
         // The check is DEFERRED past the write for two reasons: setUserVolume
@@ -2216,13 +3537,19 @@ Item {
     function _cancelAutoCareVerify() {
         _verifyPending = false;
         _verifyCorrected = false;
-        _rebuildHeld = false;
+        _verifyProposal = null;
+        _verifyMutedSaid = ({});
         verifySettleTimer.stop();
         verifyGuardTimer.stop();
         _verifyUnmuteAll();
         _autoCareParked = false;
         _calibVolumeBefore = -1;
         _calibRunSeq++;
+        // A rebuild held back for the measurement's sake is still OWED: a
+        // speaker the user unticked mid-verify keeps playing until some
+        // unrelated rebuild happens by. Dropping the flag alone left that
+        // debt unpaid — run it, exactly as the manual cancel does.
+        if (_rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
     }
 
     Timer {
@@ -2272,8 +3599,13 @@ Item {
         for (var m = 0; m < _verifyMembers.length; m++)
             if (vs.indexOf(_verifyMembers[m]) === -1) vs.push(_verifyMembers[m]);
         _verifyMembers = [];
-        for (var i = 0; i < vs.length; i++)
+        for (var i = 0; i < vs.length; i++) {
+            // A member the script sat out is under the LISTENER's mute,
+            // not ours. Unmuting it here would turn the speaker back on
+            // in the middle of whatever the mute was for.
+            if (_verifySatOut[vs[i]]) continue;
             un += "pactl set-sink-mute '" + vs[i].replace(/'/g, "'\\''") + "' 0; ";
+        }
         if (un !== "")
             app.exec(": PW_UNMUTE; " + un + "true # " + app.nextSeq());
         // A rebuild held back during the measurement runs now.
@@ -2285,6 +3617,266 @@ Item {
     // One correction round per calibration: the loop must converge, not
     // chase its own tail. Reset when a new calibration starts.
     property bool _verifyCorrected: false
+    // The last few readings' per-speaker landings, newest last, each with the
+    // moment it was taken. A measurement is about the room, so it outlives a
+    // switch toggle — but not an afternoon: readings that agree an hour apart
+    // are two different rooms agreeing by coincidence.
+    property var _driftHistory: []
+    property var _driftHistoryAt: []
+    // What each reading said the spread WAS, by value — the passive road
+    // reports an estimate with no landings, and the toast's median listens
+    // to those readings too.
+    property var _driftEstHistory: []
+    readonly property int _driftHistoryMax: 5
+    // Three is the fewest a median can be taken of without becoming a mean
+    // with extra steps, and it is what makes the one flyer in twelve harmless.
+    readonly property int _driftHistoryMin: 3
+    // Readings age out of the median. Twenty minutes covers the mains
+    // cadence (6 min) three times over, but on battery the probe runs every
+    // twelve — three readings span 24+, and a fixed twenty starved both the
+    // fold and the notification: the history could never hold three at
+    // once. The window follows the cadence instead of assuming it.
+    readonly property int _driftPendingMaxAgeMs:
+        Math.max(20 * 60 * 1000, Math.round(2.5 * driftMonitorTimer.interval))
+    // Below this a reading is the room's own noise, not an error. It has to
+    // hold for EACH reading, not just their average.
+    readonly property int _driftDeadbandMs: 5
+    // Armed by the REBUILD that lands a new delay, not by the fold that
+    // writes it — between those two moments nothing about the room has
+    // changed and a probe is as good as any other. The reload re-rolls the
+    // very Bluetooth buffering the next probe is about to measure (seen
+    // live: the probe right after a reload read -17 where the one after
+    // that read 0), so that one reading is spent, not stored: it describes
+    // the correction, not the room.
+    property bool _driftSkipNext: false
+
+    // A rebuild that lands while a probe is still OUT makes that probe's
+    // answer a letter from the previous room. Consuming the skip on it
+    // spends the one free pass meant for the first post-rebuild reading —
+    // the one that actually measures the Bluetooth re-roll — and that
+    // reading then sits in a fresh history as a wrong-signed flyer with a
+    // veto over the next fold. The flag marks the in-flight probe stale;
+    // its ack is dropped whole, and the skip stays armed for the reading
+    // the skip exists for.
+    property bool _driftProbeStale: false
+
+    // What the last check measured the fine-tune SHOULD be, or -1 when it
+    // cannot say. The popup used to show only how far apart the room was,
+    // which left the right number sitting in the journal behind a
+    // subtraction nobody should have to do: the listener could see "31 ms
+    // out" and still not know whether to type 141 or 203.
+    function _driftSuggestion(ears) {
+        if (!ears) return -1;
+        var ref = -1, btKey = "", btEar = -1, seen = 0;
+        for (var k in ears) {
+            if (_btMacOfSink(k) === "") { ref = ears[k]; continue; }
+            seen++; btKey = k; btEar = ears[k];
+        }
+        // One Bluetooth member is the room this can speak about plainly;
+        // with two there is no single number to put on one slider.
+        if (ref < 0 || seen !== 1) return -1;
+        // The reading says how far off the DEPLOYED lag is, so that is the
+        // base the advertised number stands on. Reading the map here
+        // compounded a pending fold into the advice: seen live, the popup
+        // said "measured 265" for a room whose right answer was 167, and a
+        // listener typing that in would have done the walking by hand.
+        var cur = _builtLags[btKey] !== undefined ? _builtLags[btKey]
+                                                  : _lagForSink(btKey);
+        // Both bases include the session's transport shift, but the number
+        // advertised here gets TYPED INTO THE MAP, and every read of the map
+        // adds the shift again. Advertise the map-frame value, or the
+        // listener following the advice re-applies the shift by hand.
+        cur -= (_refLatShiftByMac[_btMacOfSink(btKey)] || 0);
+        return Math.max(0, Math.round(cur + (btEar - ref)));
+    }
+
+    // Where every member sat relative to the wired one, per reading. The
+    // capture's own offset is common to a reading and drops out of the
+    // difference, which is why this is the only quantity worth keeping.
+    function _driftOffsetsFromHistory(hist) {
+        var per = {};
+        for (var i = 0; i < (hist || []).length; i++) {
+            var ears = hist[i], ref = null;
+            for (var rk in ears)
+                if (_btMacOfSink(rk) === "") { ref = ears[rk]; break; }
+            // No wired member in that reading means no still point in it.
+            if (ref === null) continue;
+            for (var k in ears) {
+                var mac = _btMacOfSink(k);
+                if (mac === "") continue;
+                if (!per[mac]) per[mac] = [];
+                per[mac].push(ears[k] - ref);
+            }
+        }
+        return per;
+    }
+
+    // The step each member has earned, from the readings collected so far.
+    // Pure arithmetic on numbers, so the tests can drive it without a room.
+    //
+    // A median, not a pair. Two consecutive readings within 15 ms of each
+    // other was too thin a basis: measured on this desk over twenty checks
+    // the scatter is sd 21 ms, so a pair lands inside the window barely half
+    // the time — and on 2026-08-01 the room sat audibly out at 49, 36, 65 and
+    // 61 ms while the widget printed the right answer in the popup and its
+    // own rule forbade it from using it. The median of those four is 55, and
+    // 55 is exactly the correction the room wanted.
+    //
+    // The direction rule survives, because that one is not noise-fighting but
+    // arithmetic: a room that cannot agree which way it is out is not out, it
+    // is unsettled, and nudging it walks it somewhere on its own. All but one
+    // reading must point the same way.
+    function _driftStepsFromOffsets(per) {
+        var steps = {};
+        for (var m in per) {
+            var v = per[m];
+            if (v.length < _driftHistoryMin) continue;
+            var pos = 0, neg = 0;
+            for (var j = 0; j < v.length; j++) {
+                if (v[j] > 0) pos++;
+                else if (v[j] < 0) neg++;
+            }
+            // With only three readings every one of them has to point the
+            // same way: two against one is not a room that is out, it is a
+            // room that cannot say, and "all but one" would have called
+            // -40, +40, +40 a forty-millisecond correction. One dissenter is
+            // allowed once there are four or more, which is where a single
+            // flyer stops being half the evidence.
+            if (Math.min(pos, neg) > (v.length >= 4 ? 1 : 0)) continue;
+            var s = v.slice().sort(function(a, b) { return a - b; });
+            var med = s.length % 2 ? s[(s.length - 1) / 2]
+                                   : 0.5 * (s[s.length / 2 - 1] + s[s.length / 2]);
+            if (Math.abs(med) < _driftDeadbandMs) continue;
+            steps[m] = Math.round(med);
+        }
+        return steps;
+    }
+
+    // Correct the map from the readings collected so far — no muting, no
+    // parked music, no clicks. Returns true when it acted.
+    //
+    // Where a speaker is heard is `arrival + the delay it is played with`,
+    // and the calibration's own job is to make those equal. So the step is
+    // simply how far a member sits from the wired reference: a Bluetooth
+    // speaker heard LATE needs its stored lag to grow, because a bigger lag
+    // buys it a smaller loopback delay. Measured against the room before
+    // writing a line of this: ear(wired) - ear(bt) came out at +1.3 ms over
+    // seven rounds with the fine-tune at 152, and 152 - 1.3 is exactly where
+    // an independent sweep of the same room put the ideal.
+    //
+    // Only MAC-keyed members move, for the same reason the verify fold has
+    // that rule: a Bluetooth path re-rolls its buffering per stream and a
+    // wired one does not.
+    function _driftFoldEars() {
+        var steps = _driftStepsFromOffsets(_driftOffsetsFromHistory(_driftHistory));
+        var foldedEars = _driftHistory.length
+                       ? _driftHistory[_driftHistory.length - 1] : null;
+        var moved = false, before = cfg.syncOffsetMap || "{}";
+        try {
+            var map = JSON.parse(before);
+            for (var mk in steps) {
+                if (Math.abs(steps[mk]) < _driftDeadbandMs) continue;   // inside its own noise
+                // The step was measured against what the loopbacks CARRY,
+                // so it lands on that same base — never on the map, which
+                // may hold an earlier fold still waiting for its rebuild.
+                // Adding to the map compounded the wait: watched live on
+                // 2026-08-02, a room 46 ms out walked the map 124 -> 170
+                // -> 213 across two folds while every loopback still
+                // carried 124, each fold re-adding the same unfixed error.
+                // On the deployed base the same arithmetic is idempotent:
+                // 124 + 46 is 170 however many times it is computed.
+                var cur = _deployedLagForMac(mk);
+                if (cur >= 0) {
+                    // The deployed number carries the transport shift it was
+                    // BUILT with on top of the map, and the map must stay
+                    // clean of it: _lagForSink adds the shift back on every
+                    // read, so a fold that writes the deployed value raw
+                    // doubles the shift at the next rebuild. The verify fold
+                    // learned this first (840 where 540 was intended). The
+                    // as-built record, not the live ledger: a re-roll
+                    // recorded mid-reloop is not in these loopbacks yet, and
+                    // subtracting it here would push the whole undeployed
+                    // move into the map.
+                    cur -= (_builtShiftByMac[mk] || 0);
+                } else {
+                    cur = parseInt(map[mk], 10);
+                }
+                if (!isFinite(cur)) cur = Math.max(0, Math.min(2000, cfg.syncOffsetMs || 0));
+                // Bounded, because this runs every few minutes: a correction
+                // that cannot leap cannot run away either, and anything
+                // larger is a room the microphone should look at properly.
+                var step = Math.max(-60, Math.min(60, steps[mk]));
+                map[mk] = Math.max(-100, Math.min(2000, cur + step));
+                moved = true;
+            }
+            if (!moved) return false;
+            // No anchoring here. The anchor slides the whole MAP frame, and
+            // between a fold and its rebuild the deployed lags stay in the
+            // old frame — a second fold reading its base from _builtLags
+            // would then write an old-frame number next to re-anchored
+            // entries and land the room out by the anchor delta, sign
+            // flipped. A floor above zero waits for the next write that
+            // anchors with the room present; it deploys the same sound.
+            cfg.syncOffsetMap = JSON.stringify(map);
+            _mirrorTunedToSlider();
+        } catch (e) { return false; }
+        // No probe is spent here: the room has not changed yet. The rebuild
+        // that lands this correction arms the skip, in _combineLoopbackCmds.
+        var foldedFrom = _driftHistory.length;
+        // The readings describe the room BEFORE the correction. Keeping them
+        // would let the room it used to be vote on the room it now is.
+        _driftHistory = [];
+        _driftHistoryAt = [];
+        _driftEstHistory = [];
+        console.log("[ARP] sync: quiet fold from the median of "
+                    + foldedFrom + " checks — map "
+                    + before + " -> " + cfg.syncOffsetMap
+                    + " (applies at the next rebuild)");
+        // The map is written; the LOOPBACKS are deliberately left alone.
+        //
+        // Swapping a loopback mid-stream is not the small gap it was assumed
+        // to be: the listener described a startling clatter from the
+        // speakers the first time a correction landed under real music. A
+        // delay lives in the module's own parameter, so applying it means
+        // tearing a live stream down and building another, and a Bluetooth
+        // codec fed a discontinuity makes a noise nobody asked for.
+        //
+        // Nothing is lost by waiting. The map is what every rebuild reads,
+        // and rebuilds happen on their own — the graph parks after fifteen
+        // idle minutes and comes back on the next play, a speaker joins or
+        // leaves, the slider moves. The correction lands then, in a moment
+        // that costs the room nothing. Until the swap itself is proven
+        // quiet, a measurement worth keeping is not worth startling anyone
+        // for.
+        // Honest about what it costs. A loopback carries its delay in the
+        // module's own parameter, so a new delay means a new module — the
+        // stream restarts and the speaker whose delay changed skips a
+        // moment. That is a fraction of a second against the minute of
+        // parked music the older road spent, but "no music interrupted"
+        // was a promise this code does not keep, and the listener heard it.
+        var dfSug = _driftSuggestion(foldedEars);
+        driftLastText = dfSug >= 0
+            ? i18n("Auto-check: measured %1 ms — takes effect the next time the music pauses", dfSug)
+            : i18n("Auto-check: adjusted — takes effect the next time the music pauses");
+        return true;
+    }
+
+    // Pass 1's proposed correction, waiting for pass 2 to agree. The fold
+    // used to write the map off ONE reading; on 2026-07-29 a single pair of
+    // captures that agreed on garbage (419 ms late through spawn jitter)
+    // inverted a healthy room in one stroke. Now the reading that wants to
+    // move the map has to happen twice.
+    property var _verifyProposal: null
+    // Members already named as sitting a verify out muted, so the two-pass
+    // correction does not say the same thing once per pass.
+    property var _verifyMutedSaid: ({})
+    // Members the LAST verify ack reported sat out because the listener
+    // had muted them. Their mute belongs to the listener: the cleanup's
+    // blanket unmute must step around it, or the very run that promised
+    // "skipped it" turns the speaker back on mid-phone-call — and pass two
+    // would then measure a member pass one never saw, handing the vote a
+    // fabricated zero to veto the correction with.
+    property var _verifySatOut: ({})
     // Sinks the microphone actually heard during the LAST calibration's
     // click rounds — the partial verdict's evidence for telling a shy
     // speaker from an output with nothing audible behind it.
@@ -2327,13 +3919,20 @@ Item {
         // member; then generous headroom before anyone panics.
         verifySettleTimer.interval = 8000 + bt * 3000;
         verifyGuardTimer.interval = verifySettleTimer.interval
-                                    + (10 + n * 14) * 1000 + 12000;
+                                    + (10 + n * _verifySecondsPerMember) * 1000 + 12000;
         verifySettleTimer.restart();
         verifyGuardTimer.restart();
     }
 
     // Test seams — the timers themselves are private ids.
+    // Whether a rebuild is queued — the debounce is private, and a test
+    // cannot otherwise tell "noticed and queued" from "did nothing".
+    function offsetDebounceRunning() { return syncOffsetDebounce.running; }
+
     function verifySettleInterval() { return verifySettleTimer.interval; }
+    // Whether a click round is armed but not yet launched — the window the
+    // off switch has to reach, and the one a test cannot see from outside.
+    function verifySettleRunning() { return verifySettleTimer.running; }
     function verifyGuardInterval() { return verifyGuardTimer.interval; }
 
     Timer {
@@ -2348,6 +3947,12 @@ Item {
 
     function _verifyLaunch() {
         if (!_verifyPending) return;
+        // Each run's sat-out set belongs to that run's own ack. Carrying
+        // the last one into a fresh launch let a guard timeout skip the
+        // blanket unmute for a member THIS run had hardware-muted itself —
+        // the exact half-silenced machine the blanket exists to prevent.
+        // Until the new ack lands, nobody is exempt.
+        _verifySatOut = ({});
         // Disabled between arm and launch: the group is gone — parking and
         // hardware-muting the sinks the user just routed back to would turn
         // a cancelled measurement into waves of silence over their music.
@@ -2356,6 +3961,25 @@ Item {
             verifyGuardTimer.stop();
             _verifyUnmuteAll();
             _calibRestoreVolume();
+            return;
+        }
+        // A recording started between the arm and the launch. This road can
+        // fall back to audible clicks and it parks and mutes for a minute —
+        // an automatic thing must never do that over a recording. Held, not
+        // cancelled: the drift that armed it is still real, so the next
+        // check re-arms once the recording is done.
+        if (app.recording === true) {
+            _verifyPending = false;
+            verifyGuardTimer.stop();
+            // The arm already pulled the player to 0 and told the listener
+            // the music would pause for a minute. Holding here without
+            // giving that back left the stream silent for the rest of the
+            // session: the release rides on a verdict this road never
+            // reaches. Only the volume is handed back — the script has not
+            // run, so nothing in the room was hardware-muted by us, and
+            // unmuting on the way out would undo a mute the listener set.
+            _calibRestoreVolume();
+            console.log("[ARP] sync: verify held — a recording is running");
             return;
         }
         var script = Qt.resolvedUrl("calibrate.py").toString().substring(7).replace(/'/g, "'\\''");
@@ -2406,13 +4030,13 @@ Item {
         }
         // Warm-up plus up to three captures per member — the same
         // arithmetic the guard was armed with.
-        var vBudget = 10 + Math.min(8, sinks.length) * 14;
+        var vBudget = 10 + Math.min(8, sinks.length) * _verifySecondsPerMember;
         // Same logout insurance as the calibration's: parks, the master and
         // the isolation's hardware mutes all land in a runtime file that
         // only a completed restore deletes — startup() replays a dead
         // session's leftovers.
         // XDG_RUNTIME_DIR only, same reason as the calibration's park file.
-        var vParkFile = "\"$XDG_RUNTIME_DIR/onair_park_" + app.instanceId + ".sh\"";
+        var vParkFile = _parkFile;
         var vParkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + vParkFile + ";"
                       + " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n' "
                       + _combineSinkName + " \"${cm:-100%}\" >> " + vParkFile + ";";
@@ -2420,9 +4044,19 @@ Item {
             vParkSave += " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
                        + " \"$w" + vf + "\" \"${y" + vf + ":-" + park + "%}\" >> " + vParkFile + ";"
                        + " printf 'pactl set-sink-mute '\\''%s'\\'' 0\\n' \"$w" + vf + "\" >> " + vParkFile + ";";
-        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + setup + vParkSave + " " + pre2
-                 + " timeout " + vBudget + " python3 '" + script + "' verify '"
-                 + _combineSinkName + "' ''" + argv + ";"
+        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + _ultraEnv() + setup + vParkSave + " " + pre2
+                 // The same promise the calibration makes two thousand lines
+                 // up, and for the same reason: the setting reads "measure
+                 // with a tone too high to hear", not "prefer to". This used
+                 // to require _autoCareParked, which is set on exactly one
+                 // road (the drift probe's), so every check that followed a
+                 // manual Calibrate fell back to audible clicks with the box
+                 // still ticked. That fallback is where the beeps the user
+                 // reported were coming from, and it also fed the eviction
+                 // below: a clicks-road VERIFY_PARTIAL against a heard-map
+                 // that an inaudible calibration never filled.
+                 + (cfg.syncUltrasonic !== false ? " export ONAIR_ULTRA_ONLY=1;" : "")
+                 + _calibRunCmd(vBudget, script, " verify '" + _combineSinkName + "' " + _micArg() + argv)
                  + restore + " " + post2 + " rm -f " + vParkFile + "; true # " + app.nextSeq());
     }
 
@@ -2436,6 +4070,14 @@ Item {
         interval: 35000
         repeat: false
         onTriggered: {
+            // The guard must be a generation boundary too, exactly like
+            // calibGuardTimer's: only the python sits under `timeout`, so
+            // the shell's restore pactl can wedge on a drowsy Bluetooth
+            // sink past this guard, and without the bump its eventual ack
+            // would pass the seq gate — into a LATER verify that reused
+            // the number — and fold stale residuals into the offset map.
+            // This was the only cancel road of the six without the bump.
+            _calibRunSeq++;
             _verifyPending = false;
             _calibRestoreVolume();
             _verifyUnmuteAll();
@@ -2555,6 +4197,35 @@ Item {
     // silently orphaned the FIRST speaker's watch. {mac, name} entries.
     property var _btJoinWatchQueue: []
 
+    // Bluetooth members this group has actually seen playing. A speaker whose
+    // transport dies leaves the device list entirely: the signature it was
+    // part of is gone with it, the missing-loopback check has no member to
+    // find, and nothing is left that could notice. Remembering who was here
+    // is what turns that silence into something the watchdog can act on.
+    property var _btMembersSeen: ({})
+
+    function _btWatchLostMembers() {
+        var members = _combineRealSinks();
+        for (var i = 0; i < members.length; i++) {
+            var mac = _btMacOfSink(members[i]);
+            if (mac !== "") _btMembersSeen[mac] = members[i];
+        }
+        var outs = app.mediaDevs ? app.mediaDevs.audioOutputs : [];
+        for (var known in _btMembersSeen) {
+            var here = false;
+            for (var o = 0; o < outs.length; o++)
+                if (_btMacOfSink(String(outs[o].id)) === known) { here = true; break; }
+            if (here) continue;
+            var lastName = _btMembersSeen[known];
+            delete _btMembersSeen[known];
+            // A speaker the listener has sat out is not lost, it is dismissed.
+            if (!syncDeviceIncluded(String(known).toUpperCase())) continue;
+            console.log("[ARP] sync: " + lastName + " left the group without being"
+                        + " asked — walking it back in");
+            _btJoinWatchArm(known, lastName);
+        }
+    }
+
     function _btJoinWatchArm(mac, name) {
         if (!(_combineWantActive || _combineActive) || !app._btValidMac(mac)) return;
         if (_btJoinWatchMac !== "" && _btJoinWatchMac !== mac) {
@@ -2583,11 +4254,18 @@ Item {
             _btJoinWatchQueue = [];
             return;
         }
-        // The freed slot goes to the next speaker waiting its turn.
-        if (_btJoinWatchQueue.length > 0) {
+        // The freed slot goes to the next speaker waiting its turn — but a
+        // queued speaker can go stale while it waits. The RUNNING watch
+        // re-checks this on every tick and gives up when the user sits the
+        // speaker out; a queued one used to be armed regardless, so a
+        // speaker disconnected or unticked during the wait was paged, and
+        // the kick dragged it back into a group it had been dismissed from.
+        while (_btJoinWatchQueue.length > 0) {
             var nxt = _btJoinWatchQueue[0];
             _btJoinWatchQueue = _btJoinWatchQueue.slice(1);
+            if (!syncDeviceIncluded(String(nxt.mac).toUpperCase())) continue;
             _btJoinWatchArm(nxt.mac, nxt.name);
+            return;
         }
     }
 
@@ -2659,18 +4337,10 @@ Item {
             _btKickMac = _btJoinWatchMac;
             _btKickAbort = false;
             _btKickInFlight = true;
-            var kickMacU = _btJoinWatchMac.replace(/:/g, "_");
-            app.exec(": BT_KICK " + _btJoinWatchMac
-                + "; c=bluez_card." + kickMacU
-                // Remember the profile that was active — if BOTH standard
-                // A2DP names fail after the off, restoring it is the last
-                // resort that keeps the card from being left dead on "off".
-                + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + kickMacU + "/{f=1}"
-                + " f && /Active Profile:/{print $3; exit}')"
-                + "; timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
-                + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
-                + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
-                + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true"
+            // The bounce itself lives in main.qml — the solo kick walks the
+            // same road, and two copies of one shell drift apart.
+            app.exec(": BT_KICK " + _btJoinWatchMac + "; "
+                + app.btProfileBounceShell(_btJoinWatchMac)
                 + " # " + app.nextSeq());
         }
         if (_btJoinWatchTicks >= 15) {

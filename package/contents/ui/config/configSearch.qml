@@ -15,6 +15,7 @@ import QtMultimedia
 import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
 import ".." as ARP
+import "../FaviconLogic.js" as FaviconLogic
 
 KCM.ScrollViewKCM {
     id: root
@@ -46,7 +47,14 @@ KCM.ScrollViewKCM {
 
     function _appendRow(srv) {
         srv.name = (srv.name || "").replace(/\n/g, ' ').trim()
-        srv.favicon = _webUrlOrEmpty(srv.favicon)
+        // The logo goes through the shared gate, which judges the HOST as
+        // well as the scheme: an Image.source fetches by itself, with no
+        // click, so a crafted catalogue row pointed one at the user's own
+        // network — and it stayed on the station if the row was added. The
+        // stream and homepage keep the scheme test alone on purpose: those
+        // are opened by a deliberate tap, and a LAN stream is somebody's
+        // legitimate home server.
+        srv.favicon = FaviconLogic.webUrlOrEmpty(srv.favicon)
         srv.url_resolved = _webUrlOrEmpty(srv.url_resolved || srv.url)
         srv.homepage = _webUrlOrEmpty(srv.homepage)
         srv.added = false
@@ -138,7 +146,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.23")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.24")
     }
 
     function getStations(by, val) {
@@ -327,16 +335,66 @@ KCM.ScrollViewKCM {
                     root._lastSynced = external
                 } catch (e) {}
             } else {
+                // Unsaved local edits — the same three-way merge as
+                // configGeneral, against the _lastSynced base, so Apply
+                // loses neither side: rows this page never touched follow
+                // the external outcome (a deletion stays deleted, a healed
+                // hostname moves instead of duplicating), rows edited here
+                // win their conflicts, and externally added stations still
+                // come along. The append-only version that used to sit here
+                // resurrected deletions and duplicated healed rows.
                 try {
                     const ext = JSON.parse(external)
-                    const have = {}
-                    for (var i = 0; i < stationsModel.count; i++)
-                        have[stationsModel.get(i).hostname] = true
-                    var added = false
-                    for (const srv of ext) {
-                        if (!have[srv.hostname]) { stationsModel.append(srv); added = true }
+                    let base = []
+                    try { base = JSON.parse(root._lastSynced) || [] } catch (e2) {}
+                    // Key-order-stable serialization. The JSON round-trip
+                    // flattens ListModel rows to plain objects (for..in over
+                    // a model row drags wrapper internals along with the
+                    // roles) and the wrapper's objectName is not an edit.
+                    const norm = (o) => {
+                        const plain = JSON.parse(JSON.stringify(o))
+                        delete plain.objectName
+                        const keys = []
+                        for (const k in plain)
+                            if (plain[k] !== undefined) keys.push(k)
+                        keys.sort()
+                        const flat = {}
+                        for (const k of keys) flat[k] = plain[k]
+                        return JSON.stringify(flat)
                     }
-                    if (added) root.cfg_servers = JSON.stringify(getServersArray())
+                    const baseByHost = {}
+                    for (const b of base) baseByHost[b.hostname] = norm(b)
+                    const extByHost = {}
+                    for (const srv of ext) extByHost[srv.hostname] = srv
+                    var changed = false
+                    // Backwards: removals must not shift unvisited rows.
+                    for (var i = stationsModel.count - 1; i >= 0; i--) {
+                        const cur = stationsModel.get(i)
+                        const baseNorm = baseByHost[cur.hostname]
+                        if (baseNorm === undefined || norm(cur) !== baseNorm)
+                            continue // locally added or edited — local wins
+                        const extRow = extByHost[cur.hostname]
+                        if (extRow === undefined) {
+                            // Externally deleted, untouched here — do not
+                            // resurrect it.
+                            stationsModel.remove(i)
+                            changed = true
+                        } else if (norm(extRow) !== baseNorm) {
+                            stationsModel.set(i, extRow)
+                            changed = true
+                        }
+                    }
+                    const have = {}
+                    for (var j = 0; j < stationsModel.count; j++)
+                        have[stationsModel.get(j).hostname] = true
+                    for (const srv of ext) {
+                        if (!have[srv.hostname]) { stationsModel.append(srv); changed = true }
+                    }
+                    if (changed) root.cfg_servers = JSON.stringify(getServersArray())
+                    // The base advances to the state just merged — otherwise
+                    // an adopted row reads as a local edit next time and a
+                    // later external deletion would resurrect it.
+                    root._lastSynced = external
                 } catch (e) {}
             }
         }
@@ -382,7 +440,13 @@ KCM.ScrollViewKCM {
                         searchDrawer.close()
                     } else {
                         if (!root.isNoSearch) {
+                            // Same order as the non-empty branch: the row
+                            // being auditioned is about to vanish with the
+                            // reload, and audio without a visible stop
+                            // control kept sounding until the dialog closed.
+                            testPlay.stop()
                             searchModel.clear()
+                            root.currentUrl = ""
                             root.getStations()
                             searchDrawer.close()
                         }

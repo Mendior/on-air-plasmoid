@@ -91,12 +91,24 @@ TestCase {
         verify(!SL.isProbeSafeHost("http://localhost./x"));           // DNS root dot
         verify(!SL.isProbeSafeHost("http://sub.localhost/x"));        // RFC 6761 subdomains
         verify(!SL.isProbeSafeHost("http://a@b@127.0.0.1/x"));        // the LAST @ ends userinfo
+        // Qt DECODES before it dials: a percent-encoded or unicode host
+        // reads as gibberish here and as 127.0.0.1 on the wire. Anything
+        // the parser cannot take literally is refused.
+        verify(!SL.isProbeSafeHost("http://%31%32%37.0.0.1/x"));      // decodes to 127.0.0.1
+        verify(!SL.isProbeSafeHost("http://127.0.0.%31/x"));
+        verify(!SL.isProbeSafeHost("http://ⓛocalhost/x"));            // IDN-normalizes
+        verify(!SL.isProbeSafeHost("http://𝟏𝟐𝟕.0.0.1/x"));            // mathematical digits
+        // Carrier-grade NAT — and every Tailscale node's address.
+        verify(!SL.isProbeSafeHost("http://100.64.0.1/x"));
+        verify(!SL.isProbeSafeHost("http://100.127.255.254/x"));
         // ...and the spellings must not swallow the public internet.
         verify(SL.isProbeSafeHost("http://0x08.0x08.0x08.0x08/x"));   // 8.8.8.8
         verify(SL.isProbeSafeHost("http://[::ffff:8.8.8.8]/x"));      // mapped public
         verify(SL.isProbeSafeHost("http://10.or.at/x"));              // hostname, not a quad
         verify(SL.isProbeSafeHost("http://999.1.2.3/x"));             // not inet_aton-valid
         verify(SL.isProbeSafeHost("http://fcstation.example/x"));     // fc-prefixed NAME
+        verify(SL.isProbeSafeHost("http://100.63.255.254/x"));        // below the CGNAT range
+        verify(SL.isProbeSafeHost("http://100.128.0.1/x"));           // above it
     }
 
     function test_probe_safe_host_passes_public_and_dns_hosts() {
@@ -152,6 +164,23 @@ TestCase {
         compare(r.text, "stuck in the middle"); compare(r.cc, "GB")
     }
 
+
+    function test_a_short_artist_name_still_finds_its_record() {
+        // The old rule let a name under four characters match only by being
+        // identical, so a station line with the guests in it found nothing:
+        // measured, all three of these returned no cover at all.
+        verify(SL.nameAkin("nas & damian marley", "nas"))
+        verify(SL.nameAkin("sia", "sia feat. sean paul"))
+        verify(SL.nameAkin("eve", "eve feat. gwen stefani"))
+        // ...and the case the rule was written against still holds: a short
+        // name may not match its way through the middle of another name.
+        verify(!SL.nameAkin("ac", "dc and ac company"))
+        verify(!SL.nameAkin("ab", "abba"))          // no word boundary
+        verify(!SL.nameAkin("u", "u2"))             // one character names nobody
+        verify(SL.nameAkin("u2", "u2 & the edge"))
+        verify(!SL.nameAkin("u2", "u2 live"))     // not a collaboration line
+    }
+
     function test_country_flag_from_iso_code() {
         compare(SL.countryFlag("GB"), "🇬🇧")
         compare(SL.countryFlag("fi"), "🇫🇮")   // case-blind
@@ -159,5 +188,176 @@ TestCase {
         compare(SL.countryFlag("G"), "")
         compare(SL.countryFlag("GBR"), "")
         compare(SL.countryFlag("1!"), "")
+    }
+
+    function test_download_pick_treats_numbers_as_identity() {
+        // The measured case: the stream said episode 659, the search's #1
+        // was the more famous 600 Special. 659 in the query must appear in
+        // the title as its own number — 600 is not "close".
+        var found = ["Ori Uplift - Uplifting Only 600 Special [No Talking] (Aug 8, 2024)",
+                     "He Only Goes Outside for the Ice Cream Man | My 600-lb Life",
+                     "Ori Uplift - Uplifting Only Episode 659 (full set)"]
+        compare(SL.downloadPick("Ori Uplift - Uplifting Only Episode 659 Replay", found), 2)
+        // With the right episode absent, refusing beats the wrong one.
+        compare(SL.downloadPick("Ori Uplift - Uplifting Only Episode 659 Replay",
+                                [found[0], found[1]]), -1)
+        // No numbers in the query: words decide, search order breaks ties.
+        compare(SL.downloadPick("Armin van Buuren - Great Spirit",
+                                ["Armin van Buuren feat. Vini Vici - Great Spirit (Extended)",
+                                 "Something Else Entirely"]), 0)
+        // A candidate sharing no words at all never qualifies.
+        compare(SL.downloadPick("Great Spirit", ["Something Else Entirely"]), -1)
+        compare(SL.downloadPick("anything", []), -1)
+    }
+
+    function test_country_display_name_only_trusts_an_exact_locale() {
+        compare(SL.countryDisplayName("FI", "en_US"), "Finland")
+        compare(SL.countryDisplayName("DE", "en_US"), "Germany")
+        // The listener's own language when the CLDR really carries the pair…
+        compare(SL.countryDisplayName("EE", "et_EE"), "Eesti")
+        // …but Qt's silent fallback must not smuggle the wrong country in:
+        // measured, Qt.locale("et_FI") answers as et_EE ("Eesti") and
+        // Qt.locale("en_ZZ") as en_US ("United States"). The name check
+        // rejects both — et_FI falls through to English, ZZ to the bare code.
+        compare(SL.countryDisplayName("FI", "et_FI"), "Finland")
+        compare(SL.countryDisplayName("ZZ", "en_US"), "ZZ")
+        compare(SL.countryDisplayName("", "en_US"), "")
+        compare(SL.countryDisplayName("usa", "en_US"), "")
+    }
+
+    function test_stems_never_split_a_surrogate_pair() {
+        // A name ending in an emoji: the shave must drop the whole code
+        // point, or encodeURIComponent throws on the lone surrogate later.
+        var out = SL.stems("abcd🎶")
+        // Both cuts land on the emoji, the whole pair goes, dupes collapse.
+        compare(out.length, 1)
+        compare(out[0], "abcd")
+        for (var i = 0; i < out.length; i++)
+            encodeURIComponent(out[i])   // throws on a broken pair
+        compare(SL.stems("ab🎶").length, 0)
+        // The plain path is untouched: one letter, then two.
+        var el = SL.stems("Elmari")
+        compare(el.length, 2)
+        compare(el[0], "Elmar"); compare(el[1], "Elma")
+    }
+
+    function test_clean_label_strips_markup_and_caps_length() {
+        compare(SL.cleanLabel("  Radio   <b>X</b> & Co  "), "Radio b X /b Co")
+        compare(SL.cleanLabel("plain"), "plain")
+        compare(SL.cleanLabel(null), "")
+        compare(SL.cleanLabel("x".repeat(500), 60).length, 60)
+        compare(SL.cleanLabel("abcdef", 3), "abc")
+    }
+
+    function test_format_votes_reads_as_a_badge() {
+        compare(SL.formatVotes(0), "")
+        compare(SL.formatVotes(-5), "")
+        compare(SL.formatVotes(999), "999")
+        compare(SL.formatVotes(1250), "1.3k")
+        compare(SL.formatVotes("12304"), "12k")
+        compare(SL.formatVotes("junk"), "")
+        // The rounding must move up a unit instead of lying: 999500 used to
+        // render as "1000k".
+        compare(SL.formatVotes(999499), "999k")
+        compare(SL.formatVotes(999500), "1M")
+        compare(SL.formatVotes(2400000), "2.4M")
+        compare(SL.formatVotes(15000000), "15M")
+    }
+
+    function test_a_shaved_stem_never_ends_in_a_space() {
+        // "Elmar 😀" cut back to "Elmar " asked the directory for a name
+        // with a trailing blank, which matches nothing it holds.
+        var out = SL.stems("Elmar \u{1F600}")
+        for (var i = 0; i < out.length; i++) {
+            compare(out[i], out[i].replace(/\s+$/, ""))
+            verify(out[i].length >= 4)
+        }
+    }
+
+    function test_art_pick_refuses_somebody_elses_record() {
+        // The measured case: an Estonian dance remix called "Veel veel veel"
+        // was illustrated with a Tamil devotional album of the same name,
+        // because the lookup took the search engine's first hit on faith.
+        var cands = [{ artist: "Veeramanidaasan", title: "Veel veel veel" },
+                     { artist: "Anaconda", title: "Veel veel veel (Remix 2025)" }]
+        compare(SL.artPick("Anaconda", "Veel veel veel", cands), 1)
+        // Nobody by that name among the answers: no cover beats a wrong one.
+        compare(SL.artPick("Anaconda", "Veel veel veel",
+                           [{ artist: "Veeramanidaasan", title: "Veel veel veel" }]), -1)
+        // "feat." spellings are the same act.
+        compare(SL.artPick("Anaconda", "X",
+                           [{ artist: "Anaconda feat. Someone", title: "X" }]), 0)
+        // Accent- and case-blind, like every other comparison here.
+        compare(SL.artPick("Jarviradio", "X", [{ artist: "Järviradio", title: "X" }]), 0)
+        // No artist in the stream's metadata: the title has to carry it.
+        compare(SL.artPick("", "Dancing Queen", [{ artist: "ABBA", title: "Dancing Queen" }]), 0)
+        compare(SL.artPick("", "Dancing Queen", [{ artist: "X", title: "Something Else" }]), -1)
+        // The right artist AND the right song beats the right artist alone.
+        compare(SL.artPick("Curly Strings", "Kuu",
+                           [{ artist: "Curly Strings", title: "Kuule, mees!" },
+                            { artist: "Curly Strings", title: "Kuu" }]), 1)
+        // But one of their own records still beats a stranger's when no
+        // title lines up.
+        compare(SL.artPick("Curly Strings", "Kuu",
+                           [{ artist: "Curly Strings", title: "Kuule, mees!" }]), 0)
+        // The exact song must beat one that merely CONTAINS its name, even
+        // when the containing record is listed first. The "Kuu" case above
+        // passes for the wrong reason — three letters are below nameAkin's
+        // length guard, so containment never even applies there. At four
+        // letters it does, and both candidates used to score the same 2;
+        // the strict > then handed it to whoever the service listed first,
+        // and a played "Kiss" wore the sleeve of "Kiss the Sky".
+        compare(SL.artPick("Prince", "Kiss",
+                           [{ artist: "Prince", title: "Kiss the Sky" },
+                            { artist: "Prince", title: "Kiss" }]), 1)
+        compare(SL.artPick("The Beatles", "Hello",
+                           [{ artist: "The Beatles", title: "Hello Goodbye" },
+                            { artist: "The Beatles", title: "Hello" }]), 1)
+        // Same rule where the stream names no artist and the title decides
+        // alone — exact still outranks containment.
+        compare(SL.artPick("", "Yellow",
+                           [{ artist: "A", title: "Yellow Submarine" },
+                            { artist: "B", title: "Yellow" }]), 1)
+        // Containment is load-bearing and must survive the tie-break: a
+        // remaster carries the original artwork and is the right answer
+        // when no exact title is on offer.
+        compare(SL.artPick("Queen", "Radio Ga Ga",
+                           [{ artist: "Queen", title: "Radio Ga Ga - Remastered 2011" }]), 0)
+        // And an exact title under the WRONG artist still loses to the
+        // right artist — the artist keeps the final say.
+        compare(SL.artPick("Prince", "Kiss",
+                           [{ artist: "Somebody Else", title: "Kiss" },
+                            { artist: "Prince", title: "Kiss the Sky" }]), 1)
+        // Nothing to go on at all.
+        compare(SL.artPick("", "", [{ artist: "A", title: "B" }]), -1)
+        compare(SL.artPick("A", "B", []), -1)
+    }
+
+    function test_name_akin_needs_more_than_a_letter() {
+        verify(SL.nameAkin("anaconda", "anaconda"))
+        verify(SL.nameAkin("anaconda", "anaconda feat. x"))
+        verify(!SL.nameAkin("ac", "ac/dc"))      // too short to mean anything
+        verify(!SL.nameAkin("abba", "queen"))
+        verify(!SL.nameAkin("", "abba"))
+    }
+
+    function test_art_pick_drops_karaoke_and_knows_initials() {
+        // Measured on the panel: free text for "Bodies Without Organs —
+        // Sunshine In The Rain" returns three karaoke labels and nothing
+        // else. A karaoke sleeve is not this record's cover.
+        var junk = [{ artist: "Zoom Karaoke", title: "Sunshine In The Rain (In The Style Of 'Bodies Without Organs BWO')" },
+                    { artist: "Party Tyme Karaoke", title: "Sunshine in the Rain (Made Popular By Bodies Without Organs) [Karaoke Version]" }]
+        compare(SL.artPick("Bodies Without Organs", "Sunshine In The Rain", junk), -1)
+        // The catalogue files that band as "BWO" — neither name contains
+        // the other, so containment alone lost the record.
+        var real = [{ artist: "Shania Yan", title: "Sunshine in the Rain" },
+                    { artist: "BWO", title: "Sunshine in the Rain (Radio Edit)" }]
+        compare(SL.artPick("Bodies Without Organs", "Sunshine In The Rain (Radio Edit)", real), 1)
+        // The bracketed tail must not decide a match either way.
+        compare(SL.artCoreTitle("Enter Sandman (Remastered 2021)"), "enter sandman")
+        compare(SL.artInitials("Bodies Without Organs"), "bwo")
+        // A stranger with the right title is still refused — the Tamil case.
+        compare(SL.artPick("Anaconda", "Veel veel veel",
+                           [{ artist: "Veeramanidaasan", title: "Veel veel veel" }]), -1)
     }
 }

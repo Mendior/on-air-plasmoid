@@ -24,13 +24,13 @@
 - 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up — and a Forget button on the far side of the row retires a rotted pairing (tap twice, no accidents), so System Settings stays out of the loop in both directions
 - 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a fine-tune slider that applies when you let go — one drag, one adjustment, plus a field for an exact millisecond value — so nothing echoes; works on PipeWire and plain PulseAudio alike. Each speaker carries its own balance, can play stereo, left, right or a mono mix (two speakers on L and R make a true stereo pair), and any speaker can sit an evening out with one tick — all remembered per device. After fifteen idle minutes the whole sync graph parks itself (no CPU cost, no held Bluetooth link) and comes straight back on the next play or wake-up alarm, the switch untouched
 - 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker and the microphone does the rest: the Bluetooth lag is timed and set automatically, and every speaker's loudness is matched at the listening position — both remembered per device
-- 🩺 **The sync looks after itself** — an opt-in caretaker listens along every few minutes while music plays and, when two checks agree the speakers have audibly drifted apart, runs one automatic re-calibration; every Bluetooth reconnect also silently re-compensates the delay from the link's real reported latency, so a re-buffered speaker can't drag the room out of sync. Off by default, and audio never leaves the computer
+- 🩺 **The sync looks after itself** — an opt-in caretaker listens along every few minutes while music plays and, when two checks agree the speakers have audibly drifted apart, runs one automatic re-calibration; every Bluetooth reconnect also silently re-compensates the delay from the link's real reported latency, so a re-buffered speaker can't drag the room out of sync. Off by default, and audio never leaves the computer. Two things worth knowing before you switch it on: an automatic re-calibration pauses the music for about a minute while it measures, and the reconnect compensation reads a latency figure that only PipeWire reports — on plain PulseAudio the calibration and the sliders still work, that one automatic touch-up simply does not happen
 - 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, off by default — one switch in settings turns them on) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
 - 🪪 **Every station gets a face** — a station saved without a logo looks one up in the directory and keeps the find, a broken cached logo heals on sight, and a station with no obtainable logo wears its initials on its own fixed color, in the list and on the vinyl label — initials that speak Latin, Greek, Cyrillic, Hebrew, Arabic, kana, CJK and Hangul
 - ↕️ **Reorder stations right in the list** — drag a row and it rides your finger, or use the hover arrows / Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🎙️ **A full podcatcher** — search three directories at once (Apple Podcasts, fyyd, gpodder.net), browse the worldwide popular charts or paste any RSS address directly, subscribe, and either stream an episode instantly or download it for offline; every episode remembers where you stopped, with chapters, show notes, playback speed, dead-air skip and an Up-next queue. New episodes check themselves in on a schedule, the newest one downloads itself, old played files quietly make room (all switchable in Settings → Automation), OPML import/export moves your subscriptions in and out — and a wake-up alarm can play the newest episode of your favorite show
-- 🛡️ **Hardened like it faces the internet — because it does** — podcast feeds are parsed as hostile input (size caps, entity bombs, script in show notes, injected file names — all closed and tested), outbound probes refuse private-network addresses in every spelling, and a device name arriving from the LAN or Bluetooth can never render as markup; 320+ automated checks pin it all in place
+- 🛡️ **Hardened like it faces the internet — because it does** — podcast feeds are parsed as hostile input (size caps, entity bombs, script in show notes, injected file names — all closed and tested), outbound probes refuse private-network addresses in every spelling, and a device name arriving from the LAN or Bluetooth can never render as markup; 500+ automated checks pin it all in place
 - 🌐 **13 languages** — English, Finnish, Hindi, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
@@ -51,7 +51,8 @@ Optional (features degrade gracefully without them):
 | `python-mutagen` | Covers & tags embedded inside downloaded files (downloads work without it) |
 | `curl` | Podcast episode downloads and station logo caching (present on virtually every system) |
 | `inotify-tools` | Zero-polling MPRIS command channel |
-| `python-chromecast` (pychromecast) | Cast to Chromecast / Nest devices (DLNA TVs and speakers work without it) |
+| `python-pychromecast` | Cast to Chromecast / Nest devices (DLNA TVs and speakers work without it) |
+| `bluez-utils` | Bluetooth speaker list, one-click connect and pairing (playing to an already-connected speaker works without it) |
 | `claude` (Claude Code CLI) | Optional AI cleanup of messy radio titles |
 
 ## Network behavior
@@ -61,6 +62,7 @@ Besides the streams you play, the widget talks to:
 - **radio-browser.info** — station catalog search; self-healing of dead saved stream URLs; the optional auto-bitrate upgrade; mirror discovery at startup; logo lookup for saved stations that are missing one.
 - **Deezer / iTunes** — cover-art lookup for the playing track (its own switch in settings).
 - **Apple Podcasts / fyyd.de / gpodder.net** — podcast search; feeds, episodes and artwork come straight from each show's own servers.
+- **Station homepages + Google's favicon service** — only from the settings page's logo finder ("Fetch missing logos" / "Re-fetch all", or saving a station that has no logo): the station's own homepage is checked for an icon first, and `google.com/s2/favicons` is the last resort for the few domains nothing else answered.
 - **Station click reporting** — opt-in, off by default; sends the station id only.
 - **AI title cleanup** — opt-in; runs the local `claude` CLI, which talks to its own API.
 
@@ -70,11 +72,24 @@ Like any web server, these services see ordinary request metadata (your IP addre
 
 **From KDE Store (recommended):** right-click your desktop or panel → *Add Widgets* → *Get New Widgets* → search **On Air**, or get it from the [KDE Store page](https://store.kde.org/p/2364623).
 
-**Manual:**
+**Arch Linux:** a `PKGBUILD` lives in [`packaging/aur`](packaging/aur/PKGBUILD).
+
 ```bash
-kpackagetool6 --type Plasma/Applet --install package
-# or from the release file:
-kpackagetool6 --type Plasma/Applet --install on-air-2026.23.plasmoid
+cd packaging/aur && makepkg -si
+```
+
+**From the release file:**
+```bash
+kpackagetool6 --type Plasma/Applet --install on-air-2026.24.plasmoid
+```
+
+**From a clone:** build first, or you get an English-only widget — the
+translations are `.po` sources in the repo and only the build step turns them
+into the catalogs the package loads.
+
+```bash
+scripts/dev.sh build
+kpackagetool6 --type Plasma/Applet --install on-air-2026.24.plasmoid
 ```
 
 ## Usage tips

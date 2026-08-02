@@ -101,3 +101,90 @@ def test_the_readme_never_claims_more_checks_than_exist():
         f"README claims {claimed}+ automated checks, but only {actual} test "
         f"functions exist ({qml} QML + {py} Python). Lower the README figure "
         f"or write the missing tests.")
+
+
+def test_the_raw_episode_url_retires_with_its_siblings():
+    # _podPlayingRawUrl used to survive stops and station handoffs while
+    # Key/Url/Art/Show were cleared, so the episode row kept painting
+    # itself as playing and its first tap stopped the radio instead of
+    # starting the episode. The field set is cleared as a unit or the bug
+    # comes straight back — this pins every clearing block together.
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    blocks = list(re.finditer(r'_podPlayingUrl = "";', src))
+    assert len(blocks) >= 3, "expected the handoff + both stop paths"
+    for m in blocks:
+        window = src[max(0, m.start() - 300):m.end() + 300]
+        assert '_podPlayingRawUrl = "";' in window, (
+            "a block clears _podPlayingUrl without clearing "
+            "_podPlayingRawUrl nearby — the stale raw URL turns the "
+            "episode row into a stop button for whatever plays next")
+
+
+def test_the_podcast_download_keeps_its_url_off_the_transfer_argv():
+    # Same class as the 2026.23 reader.py fix: an enclosure URL can carry
+    # a private feed's token, and anything on argv sits world-readable in
+    # /proc for the life of the process. The transfer command may name
+    # paths only; the URL travels through the owner-only -K config that a
+    # separate, microsecond-lived printf staged.
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    stage = _function_body(src, "_podStartDownload")
+    assert ": POD_URL;" in stage and "umask 077" in stage, (
+        "the staging step no longer writes the URL file owner-only")
+    run = _function_body(src, "_podRunDownload")
+    assert "-K " in run, "curl lost its -K config — the URL is back on argv"
+    assert "shQuote(url)" not in run and "safeUrl" not in run, (
+        "the transfer command quotes the URL directly onto its own "
+        "command line again")
+
+
+def test_the_mute_button_asks_the_sink_instead_of_its_own_cache():
+    """A cached mute flag must never decide what the mute button SENDS.
+
+    The poll behind `_sinkMasterMuted` is two seconds behind on mains, and
+    the keyboard mute key is exactly the thing people press in between.
+    Computing an absolute `set-sink-mute 0/1` from a stale belief sends the
+    OPPOSITE of what was asked: mute from the keyboard, then press the
+    widget's speaker for sound, and it re-muted. pactl's own `toggle`
+    cannot be wrong about the state it is toggling.
+    """
+    body = _function_body((UI / "main.qml").read_text(encoding="utf-8"),
+                          "toggleSinkMasterMute")
+    assert "set-sink-mute @DEFAULT_SINK@ toggle" in body, (
+        "the mute button no longer lets pactl decide — an absolute 0/1 here "
+        "is wrong whenever the mute moved since the last poll")
+    assert "_sinkMasterMuted = !" not in body, (
+        "the cached flag is being flipped to choose the command again")
+
+
+def test_the_url_file_ack_asks_for_the_title_at_once():
+    """Writing the address must not cost a station its first title.
+
+    A station switch spends its one immediate getStreamInfo on writing the
+    URL to its owner-only file and returns without spawning the reader. If
+    the ack does not then ask, the first track name waits out a whole
+    infoTimer interval on top of the reader's own second — measured at
+    6.2 s on mains and 16.2 s on battery, with the cover queued behind it.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index('": ICY_SRC;"')
+    ack = src[i:i + 1800]
+    assert "getStreamInfo(" in ack, (
+        "the __ICY_SRC_OK__ ack no longer requests the title — the first "
+        "track name is back to waiting out a full poll interval")
+
+
+def test_the_popup_volume_poll_is_not_slowed_on_battery():
+    """This poll runs ONLY while the popup is open (`running: root.expanded`).
+
+    Stretching it on battery bought nothing worth having: the seconds saved
+    are seconds the user spends looking straight at the slider it feeds, and
+    an external volume or mute change then sat wrong on screen for all of
+    them. Pinned because it was tried and reverted.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("id: sinkMasterPoll")
+    block = src[i:i + 700]
+    m = re.search(r"^\s*interval:\s*(.+)$", block, re.M)
+    assert m, "sinkMasterPoll lost its interval"
+    assert "thrifty" not in m.group(1), (
+        "sinkMasterPoll is being slowed on battery again: %r" % m.group(1))

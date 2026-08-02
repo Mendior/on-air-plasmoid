@@ -16,18 +16,35 @@ PO_DIR = Path(__file__).resolve().parent.parent / "po"
 PLACEHOLDER = re.compile(r"%\d")
 
 
+_STRINGS = r'((?:"(?:[^"\\]|\\.)*"\s*)+)'
+
+
+def _join(raw):
+    return "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', raw))
+
+
 def _entries(text):
-    """Yield (msgid, msgstr) pairs, multiline strings joined."""
-    blocks = re.split(r"\n\n+", text)
-    for block in blocks:
+    """Yield (source, translation) pairs, multiline strings joined.
+
+    A plural entry has one source in two spellings and a translation per
+    form, so the source side is both spellings together and each form comes
+    back on its own. Matching msgstr on trailing whitespace alone used to
+    miss "msgstr[0]" entirely, which left the single plural string in these
+    catalogs — and it carries a %1 — as the one nobody was checking.
+    """
+    for block in re.split(r"\n\n+", text):
         if '#~' in block:  # obsolete entries do not ship
             continue
-        m_id = re.search(r'msgid\s+((?:"(?:[^"\\]|\\.)*"\s*)+)', block)
-        m_str = re.search(r'msgstr\s+((?:"(?:[^"\\]|\\.)*"\s*)+)', block)
-        if not m_id or not m_str:
+        m_id = re.search(r'^msgid\s+' + _STRINGS, block, re.MULTILINE)
+        if not m_id:
             continue
-        join = lambda s: "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', s))
-        yield join(m_id.group(1)), join(m_str.group(1))
+        source = _join(m_id.group(1))
+        m_plural = re.search(r'^msgid_plural\s+' + _STRINGS, block, re.MULTILINE)
+        if m_plural:
+            source += " " + _join(m_plural.group(1))
+        forms = re.findall(r'^msgstr(?:\[\d+\])?\s+' + _STRINGS, block, re.MULTILINE)
+        for form in forms:
+            yield source, _join(form)
 
 
 def test_every_translated_placeholder_matches_the_source():

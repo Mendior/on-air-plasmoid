@@ -23,7 +23,7 @@ from pathlib import Path
 import dbus
 import dbus.service
 import dbus.mainloop.glib
-from gi.repository import GLib
+from gi.repository import GLib, Gio
 
 # The public MPRIS name: what `playerctl -l` and media controls list.
 # Renamed from the inherited "advancedradio" to match the published id —
@@ -316,7 +316,27 @@ def main():
             print(f"[mpris] poll error: {exc!r}", flush=True)
         return True
 
-    GLib.timeout_add(300, poll_state)
+    # The state file is WATCHED, not polled. The old 300 ms tick woke this
+    # process 3.3 times a second for the whole session — silent on a desktop,
+    # but on a laptop those are wakeups the CPU cannot sleep through, and the
+    # widget spends most of its life with nothing playing. The file lives in
+    # XDG_RUNTIME_DIR (tmpfs), where inotify is exact.
+    #
+    # The slow tick stays as the safety net, not the mechanism: a monitor can
+    # miss an event if the writer replaces the file rather than writing into
+    # it, and a missed state change would leave the desktop's media controls
+    # showing yesterday's track. Two seconds is invisible to a human and is
+    # 6.6x fewer wakeups than the old poll even in the worst case.
+    monitor = None
+    try:
+        gfile = Gio.File.new_for_path(str(state_path))
+        monitor = gfile.monitor_file(Gio.FileMonitorFlags.NONE, None)
+        monitor.connect("changed", lambda *_: poll_state())
+        print("[mpris] watching the state file (no polling)", flush=True)
+    except Exception as exc:
+        print(f"[mpris] file monitor unavailable, polling instead: {exc!r}", flush=True)
+
+    GLib.timeout_add_seconds(2 if monitor is not None else 1, poll_state)
 
     # Self-termination watchdog: if the hosting process (plasmashell /
     # plasmoidviewer) is gone, there is nobody left to serve — exit cleanly
