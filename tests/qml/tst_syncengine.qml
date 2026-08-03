@@ -2378,6 +2378,70 @@ Item {
             }
         }
 
+        function test_a_correction_below_zero_lifts_the_room_instead_of_vanishing() {
+            // _lagForSink clamps a MAC entry at zero on every read, so map
+            // {wired:25, bt:-46} deploys exactly like {wired:25, bt:0}: the
+            // correction never reached the room, the fold rewrote the same
+            // -46 forever, and the journal claimed the room was cared for.
+            // A fold that dips under zero lifts the whole group instead —
+            // the wired member waits more, which is the same sound, and it
+            // deploys.
+            var m0 = {}; m0[wired] = 25; m0[btMac] = 0;
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
+            activate(r);
+            // The Bluetooth member lands 46 ms EARLY against the wired one.
+            var p = "DRIFT_EAR " + wired + " 1446\nDRIFT_EAR " + btSink + " 1400\nDRIFT_EST 46\n";
+            for (var i = 0; i < 3; i++) r.e.handleExec(": PW_DRIFT;", p, "");
+            var m1 = JSON.parse(r.cfg.syncOffsetMap);
+            compare(m1[btMac], 0);
+            compare(m1[wired], 71);      // 25 + the 46 the lift carried over
+            // Idempotent while nothing deploys: the same room measured again
+            // writes the same numbers, never a second lift.
+            for (var j = 0; j < 3; j++) r.e.handleExec(": PW_DRIFT;", p, "");
+            var m2 = JSON.parse(r.cfg.syncOffsetMap);
+            compare(m2[btMac], 0);
+            compare(m2[wired], 71);
+            // And the rebuild sees a changed schedule — the correction LANDS.
+            r.e._combineRebuildLoopbacks();
+            verify(r.e._driftSkipNext);
+        }
+
+        function test_the_mirror_speaks_the_map_frame_not_the_shifted_one() {
+            // The mirrored number is what the slider writes back into the
+            // map, and every read of the map adds the live transport shift
+            // again. A mirror built on _lagForSink advertised map+shift —
+            // 137 under a 150 ms shift mirrored 287 — and one slider tick
+            // would have deployed the shift twice.
+            var m0 = {}; m0[btMac] = 137;
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
+            activate(r);
+            var sh = {}; sh[btMac] = 150;
+            r.e._refLatShiftByMac = sh;
+            r.e._mirrorTunedToSlider();
+            compare(r.cfg.syncOffsetMs, 137);
+        }
+
+        function test_the_advertised_number_lands_in_the_frame_the_slider_writes() {
+            // setSyncOffset anchors the map before writing, so the number
+            // the listener is invited to type lands in the post-anchor
+            // frame. With map {wired:300, bt:387} the mirror says 87;
+            // advertising the raw 387 had one popup speak two frames at
+            // once, and typing the advertised number moved the room by
+            // exactly the floor.
+            var m0 = {}; m0[wired] = 300; m0[btMac] = 387;
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
+            activate(r);
+            // In step: both land together, so the advertised number is the
+            // current tune itself.
+            var p = "DRIFT_EAR " + wired + " 1446\nDRIFT_EAR " + btSink + " 1446\nDRIFT_EST 0\n";
+            r.e.handleExec(": PW_DRIFT;", p, "");
+            verify(r.e.driftLastText.indexOf("measured 87 ms") >= 0,
+                   r.e.driftLastText);
+        }
+
         function test_the_advertised_number_stands_on_the_deployed_lag() {
             // Seen live 2026-08-02: with a fold pending, the popup said
             // "measured 265" for a room whose right answer was 167 — a

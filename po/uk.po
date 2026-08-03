@@ -2054,7 +2054,7 @@ msgstr "Перевірка синхронізації"
 
 #: package/contents/ui/SyncEngine.qml:953
 msgid "%1 is muted, so the check skipped it. Unmute it and check again to include it."
-msgstr ""
+msgstr "%1 вимкнено, тому перевірка його пропустила. Увімкніть звук і перевірте ще раз, щоб його врахувати."
 
 #: package/contents/ui/SyncEngine.qml:999
 msgid "The speakers were %1 ms apart — measuring once more to confirm."
@@ -2078,7 +2078,7 @@ msgstr "Маршрут однієї колонки застряг на %1 мс �
 
 #: package/contents/ui/SyncEngine.qml:1177
 msgid "The check compares speakers, and too many are muted to compare. Unmute them and check again."
-msgstr ""
+msgstr "Перевірка порівнює колонки, а надто багато з них вимкнено, щоб порівнювати. Увімкніть звук і перевірте ще раз."
 
 #: package/contents/ui/SyncEngine.qml:1183
 msgid "This speaker does not carry the inaudible test tone, so the check needed the audible one — and the room was too noisy for it. Pause other audio and try again."

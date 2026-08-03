@@ -80,7 +80,7 @@ cd packaging/aur && makepkg -si
 
 **From the release file:**
 ```bash
-kpackagetool6 --type Plasma/Applet --install on-air-2026.25.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.26.plasmoid
 ```
 
 **From a clone:** build first, or you get an English-only widget — the
@@ -89,7 +89,7 @@ into the catalogs the package loads.
 
 ```bash
 scripts/dev.sh build
-kpackagetool6 --type Plasma/Applet --install on-air-2026.25.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.26.plasmoid
 ```
 
 ## Usage tips

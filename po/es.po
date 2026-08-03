@@ -2053,7 +2053,7 @@ msgstr "Comprobación de sincronización"
 
 #: package/contents/ui/SyncEngine.qml:953
 msgid "%1 is muted, so the check skipped it. Unmute it and check again to include it."
-msgstr ""
+msgstr "%1 está silenciado, así que la comprobación lo omitió. Quita el silencio y comprueba de nuevo para incluirlo."
 
 #: package/contents/ui/SyncEngine.qml:999
 msgid "The speakers were %1 ms apart — measuring once more to confirm."
@@ -2077,7 +2077,7 @@ msgstr "La ruta de un altavoz estaba atascada %1 ms — se vació, comprobando u
 
 #: package/contents/ui/SyncEngine.qml:1177
 msgid "The check compares speakers, and too many are muted to compare. Unmute them and check again."
-msgstr ""
+msgstr "La comprobación compara altavoces, y hay demasiados silenciados para comparar. Quita el silencio y comprueba de nuevo."
 
 #: package/contents/ui/SyncEngine.qml:1183
 msgid "This speaker does not carry the inaudible test tone, so the check needed the audible one — and the room was too noisy for it. Pause other audio and try again."

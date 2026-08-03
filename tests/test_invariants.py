@@ -207,11 +207,18 @@ def test_no_reserved_word_is_used_as_an_identifier():
     decl = re.compile(
         r"\b(?:var|let|const)\s+(?:%s)\b"
         r"|\bfunction\s+(?:%s)\s*\("
-        r"|\bfunction\s+\w+\s*\([^)]*\b(?:%s)\b[^)]*\)"
-        r"|\bproperty\s+\w+\s+(?:%s)\b" % (reserved, reserved, reserved, reserved))
+        r"|\bfunction\s*\w*\s*\([^)]*\b(?:%s)\b[^)]*\)"
+        r"|\bcatch\s*\(\s*(?:%s)\s*\)"
+        r"|\([^()]*\b(?:%s)\b[^()]*\)\s*=>"
+        r"|\b(?:%s)\s*=>"
+        r"|\bproperty\s+\w+\s+(?:%s)\b"
+        % ((reserved,) * 7))
     hits = []
-    for p in sorted(UI.glob("*.qml")) + sorted(UI.glob("*.js")) \
-            + sorted((UI / "config").glob("*.qml")):
+    # Every shipped QML and JS file, not just ui/: the widget's own
+    # contents/config/config.qml parses with the same Qt 6.10 parser, and a
+    # glob that stopped at ui/ left it unguarded.
+    for p in sorted((ROOT / "package").rglob("*.qml")) \
+            + sorted((ROOT / "package").rglob("*.js")):
         for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             stripped = line.strip()
             if stripped.startswith("//") or stripped.startswith("*"):

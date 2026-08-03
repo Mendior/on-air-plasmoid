@@ -3388,15 +3388,24 @@ Item {
         for (var i = 0; i < s.length; i++)
             if (_btMacOfSink(s[i]) !== "") bt.push(s[i]);
         if (bt.length !== 1) return;
-        var lag = _lagForSink(bt[0]);
-        // The slider's number is the anchored-frame DIFFERENCE — that is
-        // what setSyncOffset writes after anchoring — so the mirror has to
-        // speak the same frame. The raw entry can ride a floor the quiet
-        // fold no longer flattens; mirroring the lifted absolute made the
-        // first one-tick nudge move the room by the whole floor at once.
+        // The slider's number is the anchored-frame MAP difference — that
+        // is what setSyncOffset writes after anchoring — so the mirror has
+        // to speak exactly that frame. Neither the anchor floor NOR the
+        // live transport shift belongs in it: the map is kept clean of the
+        // shift and every read adds it back, so a mirror built on
+        // _lagForSink re-applied the shift to the very number the slider
+        // types into the map — a 137 ms map under a 150 ms shift mirrored
+        // as 287, and one tick of the slider would have deployed the shift
+        // twice. Read the raw entry instead, floor subtracted, shift never
+        // added.
+        var lag;
         try {
-            lag -= _anchorFloor(JSON.parse(cfg.syncOffsetMap || "{}"), s);
-        } catch (e) {}
+            var mm = JSON.parse(cfg.syncOffsetMap || "{}");
+            lag = parseInt(mm[_btMacOfSink(bt[0])], 10);
+            if (!isFinite(lag))
+                lag = Math.max(0, Math.min(2000, cfg.syncOffsetMs || 0));
+            lag -= _anchorFloor(mm, s);
+        } catch (e) { return; }
         // The slider's own scale. A lag past its ceiling would show as a
         // pinned slider, which reads as a wrong number rather than a big one.
         if (lag < 0 || lag > 900) return;
@@ -3687,6 +3696,16 @@ Item {
         // adds the shift again. Advertise the map-frame value, or the
         // listener following the advice re-applies the shift by hand.
         cur -= (_refLatShiftByMac[_btMacOfSink(btKey)] || 0);
+        // And the anchor floor, for the same reason: setSyncOffset anchors
+        // the map before it writes, so the typed number lands in the
+        // post-anchor frame. The mirror already speaks it — advertising the
+        // pre-anchor absolute left the popup and the slider a floor apart
+        // in one popup, and typing the advertised number moved the room by
+        // exactly the floor.
+        try {
+            cur -= _anchorFloor(JSON.parse(cfg.syncOffsetMap || "{}"),
+                                _combineRealSinks());
+        } catch (e) {}
         return Math.max(0, Math.round(cur + (btEar - ref)));
     }
 
@@ -3774,6 +3793,7 @@ Item {
         var moved = false, before = cfg.syncOffsetMap || "{}";
         try {
             var map = JSON.parse(before);
+            var target = {};
             for (var mk in steps) {
                 if (Math.abs(steps[mk]) < _driftDeadbandMs) continue;   // inside its own noise
                 // The step was measured against what the loopbacks CARRY,
@@ -3806,7 +3826,7 @@ Item {
                 // that cannot leap cannot run away either, and anything
                 // larger is a room the microphone should look at properly.
                 var step = Math.max(-60, Math.min(60, steps[mk]));
-                map[mk] = Math.max(-100, Math.min(2000, cur + step));
+                target[mk] = cur + step;
                 moved = true;
             }
             if (!moved) return false;
@@ -3817,6 +3837,43 @@ Item {
             // entries and land the room out by the anchor delta, sign
             // flipped. A floor above zero waits for the next write that
             // anchors with the room present; it deploys the same sound.
+            //
+            // A floor BELOW zero does not. _lagForSink clamps a MAC entry
+            // at zero on every read, so the part of a correction that dips
+            // under the line simply never deploys: a Bluetooth link that
+            // re-rolled FASTER earned map {wired:25, bt:-46}, the rebuild
+            // played it as {25, 0}, and the fold rewrote the same -46
+            // forever while the journal said the room was being corrected.
+            // When any moved entry lands negative, the whole CURRENT group
+            // is lifted together — every member rewritten from its own
+            // deployed base, so a second fold recomputes the same numbers
+            // instead of stacking lifts, and absent members' entries stay
+            // untouched in their own frame.
+            var lift = 0;
+            for (var lk in target)
+                if (-target[lk] > lift) lift = -target[lk];
+            if (lift > 0) {
+                var lg = _combineRealSinks();
+                for (var li = 0; li < lg.length; li++) {
+                    var lkey = _btMacOfSink(lg[li]) || lg[li];
+                    if (target[lkey] !== undefined) continue;
+                    var lcur;
+                    if (_btMacOfSink(lg[li]) !== "") {
+                        lcur = _deployedLagForMac(lkey);
+                        if (lcur >= 0) lcur -= (_builtShiftByMac[lkey] || 0);
+                        else lcur = parseInt(map[lkey], 10);
+                        if (!isFinite(lcur))
+                            lcur = Math.max(0, Math.min(2000, cfg.syncOffsetMs || 0));
+                    } else {
+                        lcur = _builtLags[lg[li]] !== undefined
+                             ? _builtLags[lg[li]] : parseInt(map[lkey], 10);
+                        if (!isFinite(lcur)) lcur = 0;
+                    }
+                    target[lkey] = lcur;
+                }
+            }
+            for (var wk in target)
+                map[wk] = Math.max(-100, Math.min(2000, target[wk] + lift));
             cfg.syncOffsetMap = JSON.stringify(map);
             _mirrorTunedToSlider();
         } catch (e) { return false; }

@@ -1418,7 +1418,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1445,7 +1445,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1483,7 +1483,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1524,7 +1524,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1598,7 +1598,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1654,7 +1654,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1796,7 +1796,7 @@ PlasmoidItem {
         // The config file is spent the moment curl exits, either way.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.25' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.26' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1994,7 +1994,7 @@ PlasmoidItem {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -4324,7 +4324,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.25");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or

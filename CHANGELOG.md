@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026.26
+
+- The muted-speaker notices added in 2026.24 now speak all twelve languages
+  the widget ships in — they had gone out in English everywhere.
+- Sync fine-tune fixes: a correction that would dip below zero now reaches
+  the speakers instead of quietly vanishing, and the fine-tune slider, the
+  popup's advice and the applied delay always quote the same number — they
+  could drift apart after an automatic adjustment or a Bluetooth reconnect.
+- A speaker muted during the microphone check is no longer at risk of being
+  remembered as muted by the listener when the check itself failed to
+  restore it.
+
 ## 2026.25
 
 On Air loads again on distributions shipping Qt 6.10 — Kubuntu 26.04 LTS

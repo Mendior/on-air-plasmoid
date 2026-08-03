@@ -7,7 +7,7 @@
 # shellcheck shell=bash disable=SC2034,SC2154
 
 pkgname=plasma6-applets-on-air
-pkgver=2026.23
+pkgver=2026.25
 pkgrel=1
 pkgdesc="Internet radio and podcasts in a Plasma 6 panel widget"
 arch=('any')
@@ -38,10 +38,10 @@ optdepends=(
     'bluez-utils: Bluetooth speaker list, connecting and pairing'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# A tag tarball is immutable, so a real checksum belongs here before the AUR
-# submission: run `updpkgsums` in this directory once the tag exists and commit
-# the value it writes. SKIP is only correct while the tag is still moving.
-sha256sums=('SKIP')
+# The tag tarball is immutable, so this is pinned to the real digest. On every
+# version bump: raise pkgver, run `updpkgsums` here, and let check() below
+# catch a metadata.json that disagrees before anything ships.
+sha256sums=('fa0554d650ac8b2acc4bdfc9771f971575103aa26ca373bb6723b351e9f8ff22')
 
 # The applet id is the one the published package was registered under and it
 # also names the translation domain. It comes out of metadata.json rather than

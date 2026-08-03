@@ -1608,6 +1608,14 @@ def cmd_verify(argv):
         # those reads keep this current -- and it is what tells a mute the
         # listener threw from one our own restore failed to lift.
         listener_intent = dict(vmuted)
+        # Sinks OUR OWN hands have muted at least once. Only an untouched
+        # sink can testify about the listener: the round-entry read runs
+        # right after the previous round's restore, and a restore that
+        # wedged on a drowsy sink leaves a mute standing that reads exactly
+        # like the listener's. Recording that residue as intent turned the
+        # repair branch around -- the leaked mute got re-asserted as the
+        # listener's own and the member sat silenced past every safety net.
+        script_touched = set()
         # Same mic discipline as the calibration: a hardware-muted default
         # (or a monitor) must fail fast and honestly — or hand over to a
         # microphone that actually hears the room.
@@ -1706,10 +1714,18 @@ def cmd_verify(argv):
                         # what it managed to read, so the restore is right
                         # however far either call got.
                         was = _mute_states(others)
-                        # Read before OUR mute lands: this is the listener's
-                        # own hand, and the conviction below leans on it.
-                        listener_intent.update(was)
+                        # Read before OUR mute lands — but only a sink our
+                        # own hands have never touched can testify: after
+                        # the first round this read runs right on top of the
+                        # previous restore, and a restore that wedged leaves
+                        # a mute standing that reads exactly like the
+                        # listener's. Filing that residue as intent flipped
+                        # the repair branch below into re-asserting our own
+                        # leak as the listener's word.
+                        listener_intent.update({s: m for s, m in was.items()
+                                                if s not in script_touched})
                         _set_mutes(others, True)
+                        script_touched.update(others)
                         # let the mutes land — and give a Bluetooth chain
                         # its post-mute wake-up time (longer on the retry).
                         time.sleep((0.9 + 0.5 * round_no)
