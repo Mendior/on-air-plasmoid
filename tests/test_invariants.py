@@ -188,3 +188,36 @@ def test_the_popup_volume_poll_is_not_slowed_on_battery():
     assert m, "sinkMasterPoll lost its interval"
     assert "thrifty" not in m.group(1), (
         "sinkMasterPoll is being slowed on battery again: %r" % m.group(1))
+
+
+def test_no_reserved_word_is_used_as_an_identifier():
+    """Qt 6.10's QML parser rejects `var final = ...` outright — "Expected
+    token `identifier`" at install, the whole widget dead on Kubuntu 26.04
+    LTS — while the newer parsers on the development machines accept it
+    silently. Reported on the KDE forum the day after 2026.24 shipped; two
+    declarations were enough. Every machine here is too new to reproduce
+    the failure, so the class is pinned by grep: none of ECMAScript's
+    future-reserved words may be DECLARED as a name. Member access like
+    obj.final stays legal and is not matched."""
+    reserved = (
+        "abstract|boolean|byte|char|double|enum|final|float|goto|"
+        "implements|int|interface|long|native|package|private|protected|"
+        "public|short|static|synchronized|throws|transient|volatile"
+    )
+    decl = re.compile(
+        r"\b(?:var|let|const)\s+(?:%s)\b"
+        r"|\bfunction\s+(?:%s)\s*\("
+        r"|\bfunction\s+\w+\s*\([^)]*\b(?:%s)\b[^)]*\)"
+        r"|\bproperty\s+\w+\s+(?:%s)\b" % (reserved, reserved, reserved, reserved))
+    hits = []
+    for p in sorted(UI.glob("*.qml")) + sorted(UI.glob("*.js")) \
+            + sorted((UI / "config").glob("*.qml")):
+        for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("//") or stripped.startswith("*"):
+                continue
+            if decl.search(line):
+                hits.append("%s:%d: %s" % (p.name, i, stripped[:70]))
+    assert not hits, (
+        "Reserved words declared as identifiers — Qt 6.10 refuses to parse "
+        "these files at all:\n" + "\n".join(hits))

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026.25
+
+On Air loads again on distributions shipping Qt 6.10 — Kubuntu 26.04 LTS
+among them. Two variables were named `final`, which newer Qt quietly accepts
+but Qt 6.10's QML parser rejects as a reserved word, so the whole widget
+failed right at install with "Expected token `identifier`". Reported by a
+listener on the KDE forum the day after 2026.24 shipped — thank you. Nothing
+else changed: if 2026.24 already runs on your system, this release changes
+nothing you can see.
+
 ## 2026.24
 
 The multi-speaker sync now looks after itself. A periodic check listens to

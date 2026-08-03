@@ -412,17 +412,19 @@ PlasmaComponents3.ItemDelegate {
                     view.dragActive = false
                     const from = startVis
                     startVis = -1
-                    const final = model.index
-                    if (from < 0 || final === from) return
+                    // `final` is a reserved word to Qt 6.10's QML parser,
+                    // and one of these broke the whole widget on an LTS.
+                    const landing = model.index
+                    if (from < 0 || landing === from) return
                     var ok = false
                     if (commit) {
                         ok = root.favoritesOnly
                              ? root.moveFavoriteTo(startName,
-                                                   ReorderLogic.commitSlot(from, final))
+                                                   ReorderLogic.commitSlot(from, landing))
                              : root.moveStationTo(from, startName, startHostname,
-                                                  ReorderLogic.commitSlot(from, final))
+                                                  ReorderLogic.commitSlot(from, landing))
                     }
-                    if (!ok) view.model.move(final, from, 1)
+                    if (!ok) view.model.move(landing, from, 1)
                 }
             }
         }
