@@ -89,7 +89,11 @@ PlasmaExtras.Representation {
                                                   || playMusic.mediaStatus === MediaPlayer.BufferingMedia))
     // A local track is playback too, but it is not an "eter": no LIVE pill,
     // no "Connecting…" — it plays from disk or it does not play at all.
-    readonly property bool _localPlayback: playMusic.source.toString().indexOf("file://") === 0
+    // The timeshift buffer is a file as well but keeps its RADIO face: the
+    // episode seek/speed rows stay away and the timeshift pill owns the
+    // story instead.
+    readonly property bool _localPlayback: (playMusic.source.toString().indexOf("file://") === 0
+                                            && !root.tsShifted)
                                            || (root._podPlayingKey !== ""
                                                && playMusic.source.toString() === root._podPlayingUrl)
     // A podcast episode is playing (as opposed to a station or a plain My
@@ -2124,12 +2128,20 @@ PlasmaExtras.Representation {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Kirigami.Units.smallSpacing
                     spacing: Kirigami.Units.smallSpacing
-                    visible: fullRepresentation._streamActive
-                             && (!fullRepresentation._localPlayback
-                                 || fullRepresentation._nowBitrate > 0)
+                    // The shift states must keep the row alive on their own:
+                    // a parked pause leaves playbackState at Stopped, so
+                    // _streamActive is false exactly when the timeshift pill
+                    // is the one thing worth showing.
+                    visible: (fullRepresentation._streamActive
+                              && (!fullRepresentation._localPlayback
+                                  || fullRepresentation._nowBitrate > 0))
+                             || root.tsShifted || root._tsPaused
 
                     Rectangle {
+                        // Behind the broadcast is not LIVE — the timeshift
+                        // pill below carries that state instead.
                         visible: !fullRepresentation._localPlayback
+                                 && !root.tsShifted && !root._tsPaused
                         implicitHeight: liveRow.implicitHeight + Kirigami.Units.smallSpacing
                         implicitWidth: liveRow.implicitWidth + Kirigami.Units.largeSpacing
                         radius: height / 2
@@ -2167,6 +2179,53 @@ PlasmaExtras.Representation {
                                 font.letterSpacing: 1.2
                                 color: Kirigami.Theme.negativeTextColor
                             }
+                        }
+                    }
+
+                    // The timeshift pill takes the LIVE pill's place while
+                    // the listener is behind the broadcast (the buffer is a
+                    // file, so _localPlayback hides LIVE on its own). One
+                    // tap catches back up.
+                    Rectangle {
+                        id: tsPill
+                        visible: root.tsShifted || root._tsPaused
+                        implicitHeight: tsPillLabel.implicitHeight + Kirigami.Units.smallSpacing
+                        implicitWidth: tsPillLabel.implicitWidth + Kirigami.Units.largeSpacing
+                        radius: height / 2
+                        color: Qt.alpha(root.accent, 0.14)
+                        border.width: 1
+                        border.color: Qt.alpha(root.accent, 0.4)
+
+                        // Behind-live counts on wall time, so the label must
+                        // tick even while the player is paused and no
+                        // position events arrive to re-run the binding.
+                        property int tick: 0
+                        Timer {
+                            interval: 1000
+                            repeat: true
+                            running: tsPill.visible && root.expanded
+                            onTriggered: tsPill.tick++
+                        }
+
+                        PlasmaComponents3.Label {
+                            id: tsPillLabel
+                            anchors.centerIn: parent
+                            text: {
+                                void tsPill.tick;
+                                return root._tsPaused
+                                    ? i18n("Paused · %1 behind live", root.tsBehindText(playMusic.position))
+                                    : i18n("%1 behind live — tap to catch up", root.tsBehindText(playMusic.position));
+                            }
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            font.weight: Font.Bold
+                            color: root.accent
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            Accessible.name: i18n("Back to live")
+                            onClicked: root.timeshiftBackToLive()
                         }
                     }
 
@@ -2315,17 +2374,29 @@ PlasmaExtras.Representation {
                         // previewStation's toggle already follow. isPlaying()
                         // alone showed Play here and started a second station
                         // OVER the audible one.
-                        iconName: (isPlaying() || root._casting) ? "media-playback-stop" : "media-playback-start"
+                        iconName: (isPlaying() || root._casting)
+                                  ? ((root.tsPauseAvailable || root.tsShifted) ? "media-playback-pause"
+                                                                               : "media-playback-stop")
+                                  : "media-playback-start"
                         iconScale: 0.45
                         primary: true
                         glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded
                         enabledState: stationsModel.count > 0 || isPlaying() || root._casting
-                        tooltipText: (isPlaying() || root._casting) ? i18n("Stop") : i18n("Play")
+                                      || root._tsPaused || root.tsShifted
+                        tooltipText: (isPlaying() || root._casting)
+                                     ? ((root.tsPauseAvailable || root.tsShifted) ? i18n("Pause") : i18n("Stop"))
+                                     : i18n("Play")
                         onClicked: {
-                            // While audible = ALWAYS stop (preview and cast
-                            // included); otherwise play the last / first station.
+                            // While audible: pause into the timeshift buffer
+                            // when one is ready, stop otherwise (preview and
+                            // cast included). Silent: resume the parked
+                            // shift, or play the last / first station.
                             if (isPlaying() || root._casting) {
-                                stopWithFade()
+                                if (!root.timeshiftPause()) stopWithFade()
+                            } else if (root._tsPaused) {
+                                root.timeshiftResume()
+                            } else if (root.tsShifted) {
+                                playMusic.play()
                             } else {
                                 const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
                                 refreshServer(idx)
@@ -4868,9 +4939,14 @@ PlasmaExtras.Representation {
             // A true play/stop toggle: anything audible right now — a station,
             // a preview, a local file, a cast session — stops. Without the
             // stop branch, Space during a preview (lastPlay === -1) started
-            // station 0 over it instead of stopping.
+            // station 0 over it instead of stopping. Timeshift takes the
+            // same roads here as the play button and the panel click.
             if (isPlaying() || root._casting) {
-                stopWithFade()
+                if (!root.timeshiftPause()) stopWithFade()
+            } else if (root._tsPaused) {
+                root.timeshiftResume()
+            } else if (root.tsShifted) {
+                playMusic.play()
             } else if (stationsModel.count > 0) {
                 const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
                 refreshServer(idx)

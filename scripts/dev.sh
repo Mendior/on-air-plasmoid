@@ -270,7 +270,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       if (cd "$REPO_DIR" && git ls-files \
             | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
             | grep -vE '\.(png|ogg)$' \
-            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te' -q 3); then
+            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi

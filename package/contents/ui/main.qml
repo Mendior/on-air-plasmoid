@@ -22,9 +22,13 @@ import "HostGuard.js" as HostGuard
 import "HealLogic.js" as HealLogic
 import "OpmlLogic.js" as OpmlLogic
 import "PodcastLogic.js" as PodcastLogic
+import "RecLogic.js" as RecLogic
 import "PlaylistLogic.js" as PlaylistLogic
 import "PathLogic.js" as PathLogic
 import "SearchLogic.js" as SearchLogic
+import "StreamLogic.js" as StreamLogic
+import "TimeshiftLogic.js" as TimeshiftLogic
+import "TrackLogic.js" as TrackLogic
 
 PlasmoidItem {
     id: root
@@ -441,11 +445,17 @@ PlasmoidItem {
         // bitrate cache, and the "stop" click used to restart them instead.
         const stopping = _casting
                          ? (lastPlay === index && _currentOrigUrl === origHost)
-                         : (isPlaying()
-                            && (playMusic.source == origHost || playMusic.source == resolved
-                                || (_currentOrigUrl === origHost
-                                    && playMusic.source.toString() === _currentResolvedUrl))
-                            && lastPlay === index);
+                         // A shifted or parked timeshift plays the BUFFER
+                         // file, so the source comparisons below can never
+                         // match — the row's stop click would restart the
+                         // station over the shift instead of stopping it.
+                         : ((timeshift.shifted || root._tsPaused)
+                            ? (lastPlay === index && _currentOrigUrl === origHost)
+                            : (isPlaying()
+                               && (playMusic.source == origHost || playMusic.source == resolved
+                                   || (_currentOrigUrl === origHost
+                                       && playMusic.source.toString() === _currentResolvedUrl))
+                               && lastPlay === index));
         if (stopping) {
             stopWithFade();
         } else {
@@ -754,11 +764,7 @@ PlasmoidItem {
 
     // Fast local title cleanup (always works, without AI)
     function _cleanQueryLocal(s) {
-        return (s || "")
-            .replace(/\s*\([^)]*\)\s*/g, " ")
-            .replace(/\s*\[[^\]]*\]\s*/g, " ")
-            .replace(/\b\d{2,3}\s?kbps\b/gi, " ")
-            .replace(/\s+/g, " ").trim();
+        return TrackLogic.cleanQueryLocal(s);
     }
 
     // Open a feed-supplied link externally — gated exactly like every other
@@ -1418,7 +1424,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1445,7 +1451,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1483,7 +1489,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1524,7 +1530,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1598,7 +1604,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1654,7 +1660,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1796,7 +1802,7 @@ PlasmoidItem {
         // The config file is spent the moment curl exits, either way.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.26' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.27' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1994,7 +2000,7 @@ PlasmoidItem {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -2302,7 +2308,11 @@ PlasmoidItem {
         var src = playMusic.source.toString();
         var local = (src.indexOf("file://") === 0
                      || (root._podPlayingKey !== "" && src === root._podPlayingUrl))
-                    && src !== _alarmToneUrl.toString();
+                    && src !== _alarmToneUrl.toString()
+                    // The timeshift buffer is a file too, but it IS the
+                    // radio — a leftover 1.5x show speed would chipmunk
+                    // every resumed broadcast.
+                    && src !== "file://" + timeshift.bufPath;
         playMusic.playbackRate = local ? PodcastLogic.clampRate(podcastRate) : 1.0;
         // Preserve pitch where the backend offers it; AlwaysOn needs no
         // action, Unavailable degrades honestly (voices speed up in pitch).
@@ -2426,6 +2436,18 @@ PlasmoidItem {
             if (playMusic.mediaStatus === MediaPlayer.LoadedMedia
                 || playMusic.mediaStatus === MediaPlayer.BufferedMedia)
                 root._applyPlaybackRate();
+            // The timeshift resume/reopen seek, same shape as the podcast
+            // one below: pending until THIS source loads, dropped when the
+            // source changed underneath.
+            if (root._tsPendingSeekUrl !== "") {
+                if (playMusic.source.toString() !== root._tsPendingSeekUrl) {
+                    root._tsPendingSeekUrl = "";
+                } else if (playMusic.mediaStatus === MediaPlayer.LoadedMedia
+                           || playMusic.mediaStatus === MediaPlayer.BufferedMedia) {
+                    playMusic.position = root._tsPendingSeekMs;
+                    root._tsPendingSeekUrl = "";
+                }
+            }
             if (root._podPendingSeekUrl === "") return;
             if (playMusic.source.toString() !== root._podPendingSeekUrl) {
                 root._podPendingSeekUrl = "";
@@ -2846,28 +2868,17 @@ PlasmoidItem {
 
     function _pad2(n) { return ("0" + n).slice(-2); }
 
+    // All three live in RecLogic.js with their tests.
     function recElapsedText() {
-        var h = Math.floor(recElapsedSec / 3600);
-        var m = Math.floor((recElapsedSec % 3600) / 60);
-        var s = recElapsedSec % 60;
-        return (h > 0 ? h + ":" + _pad2(m) : m) + ":" + _pad2(s);
+        return RecLogic.elapsedText(recElapsedSec);
     }
 
-    // Station names come from an external catalogue — make them file-name safe
-    // (and quote-free, so they are also shell-safe after the dir escaping).
     function _recSanitizeName(name) {
-        var s = (name || "").replace(/[\/\\:*?"<>|'\t\r\n]/g, "-").replace(/\s+/g, " ").trim();
-        if (s.length > 60) s = s.substring(0, 60).trim();
-        return s || "Radio";
+        return RecLogic.sanitizeStationName(name);
     }
 
-    // HLS/playlist wrappers don't survive a plain "-c copy"; anything that
-    // is not an http(s) stream (local files, odd schemes) can't be recorded.
     function canRecordUrl(url) {
-        var s = (url || "").toString();
-        if (!/^https?:\/\//i.test(s)) return false;
-        var fmt = _streamFormat(s);
-        return fmt !== "hls" && fmt !== "playlist";
+        return RecLogic.canRecordUrl(url);
     }
 
     // REC button: record what is playing right now.
@@ -4113,47 +4124,17 @@ PlasmoidItem {
     // Queries radio-browser.info for higher-quality variants of the same station
     // and plays the best one. Falls back to the user's original URL on error.
 
+    // All three live in StreamLogic.js, next to the upgrade picker they feed.
     function _hostOf(url) {
-        // Strip userinfo and keep IPv6 brackets whole — "user@host" or
-        // "[::1]:8000" would otherwise yield the wrong host.
-        const m = String(url).match(/^https?:\/\/(?:[^\/?#@]*@)?(\[[^\]]*\]|[^\/:?#]+)/i);
-        return m ? m[1].toLowerCase() : "";
+        return StreamLogic.hostOf(url);
     }
 
     function _baseDomain(domain) {
-        if (!domain) return "";
-        // An IP literal has no registrable "base" — exact match only.
-        if (domain.charAt(0) === "[" || /^\d+(\.\d+){3}$/.test(domain)) return domain;
-        const parts = domain.split(".");
-        if (parts.length <= 2) return domain;
-        // ccSLD heuristic (no bundled public-suffix list): under a
-        // "co.uk"-style pair the registrable name is THREE labels — two
-        // would make every *.co.uk host look like the same station.
-        const n = /(^|\.)(co|com|net|org|gov|edu|ac|or|ne|go)\.[a-z]{2}$/.test(parts.slice(-2).join(".")) ? 3 : 2;
-        return parts.slice(-n).join(".");
+        return StreamLogic.baseDomain(domain);
     }
 
-    // strict: extension-only verdict, used by the RECORDER's container
-    // choice — a substring guess ("mp3" somewhere in the path) written with
-    // -c copy into .mp3 produces a broken file when the codec is anything
-    // else; "unknown" routes to mka, which holds any codec. Playback
-    // heuristics (canRecordUrl, auto-bitrate) keep the fuzzy match, where
-    // a wrong guess costs nothing.
     function _streamFormat(url, strict) {
-        const lower = String(url).toLowerCase();
-        const noQuery = lower.split("?")[0];
-        if (noQuery.endsWith(".m3u8")) return "hls";
-        if (noQuery.endsWith(".m3u")) return "playlist";
-        if (noQuery.endsWith(".pls")) return "playlist";
-        if (noQuery.endsWith(".aac") || noQuery.endsWith(".aacp")) return "aac";
-        if (noQuery.endsWith(".ogg")) return "ogg";
-        if (noQuery.endsWith(".opus")) return "opus";
-        if (noQuery.endsWith(".flac")) return "flac";
-        if (noQuery.endsWith(".mp3")) return "mp3";
-        if (strict) return "unknown";
-        if (noQuery.indexOf("aacp") !== -1 || noQuery.indexOf("aac") !== -1) return "aac";
-        if (noQuery.indexOf("mp3") !== -1) return "mp3";
-        return "unknown";
+        return StreamLogic.streamFormat(url, strict);
     }
 
     function _autoSelectBitrate(station, onPicked) {
@@ -4181,67 +4162,11 @@ PlasmoidItem {
             const answered = !!(xhr && xhr.status === 200);
             if (answered) {
                 try {
+                    // The whole two-pass choice (orig-URL floor, same base
+                    // domain, no playlist/HLS, no silent codec switch) lives
+                    // in StreamLogic.pickBitrateUpgrade with its tests.
                     const results = JSON.parse(xhr.responseText) || [];
-                    const nameLower = stationName.toLowerCase();
-                    const origFmt = _streamFormat(origUrl);
-                    const origUrlNoProto = origUrl.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
-
-                    // First pass: find the user's exact URL in the results so we
-                    // know its reported bitrate. Without this floor, the first
-                    // same-bitrate candidate would be picked as a false "upgrade".
-                    let origBr = 0;
-                    let foundOrig = false;
-                    for (const r of results) {
-                        const rn = (r.name || "").replace(/\s+/g, " ").trim().toLowerCase();
-                        if (rn !== nameLower) continue;
-                        const u = (r.url_resolved || r.url || "").toString();
-                        if (!u) continue;
-                        const uNoProto = u.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
-                        if (uNoProto !== origUrlNoProto) continue;
-                        let br = parseInt(r.bitrate) || 0;
-                        if (br >= 8000) br = Math.round(br / 1000);
-                        origBr = br;
-                        foundOrig = true;
-                        break;
-                    }
-                    // If we can't find the user's URL in radio-browser we can't
-                    // judge "higher bitrate" safely — skip the upgrade entirely.
-                    // Same when its reported bitrate is 0: that is the
-                    // directory's "unknown", not a floor, and treating it as
-                    // one let any low-rate sibling replace an unreported
-                    // main mount as an "upgrade". No baseline, no switch.
-                    if (!foundOrig || origBr === 0) {
-                        _bitrateCachePut(origUrl, origUrl);
-                        onPicked(origUrl);
-                        return;
-                    }
-
-                    // Second pass: pick the candidate with the highest bitrate
-                    // that's STRICTLY greater than what the user already has.
-                    let bestBr = origBr;
-                    let bestUrl = origUrl;
-                    for (const r of results) {
-                        const rn = (r.name || "").replace(/\s+/g, " ").trim().toLowerCase();
-                        if (rn !== nameLower) continue;
-                        const url = (r.url_resolved || r.url || "").toString();
-                        if (!url) continue;
-                        if (_baseDomain(_hostOf(url)) !== origBase) continue;
-                        const urlFmt = _streamFormat(url);
-                        // Reject playlist wrappers — Qt may follow them but our
-                        // ICY reader cannot, and HLS support differs by backend.
-                        if (urlFmt === "playlist" || urlFmt === "hls") continue;
-                        // Don't silently switch codecs (mp3→aac etc).
-                        if (origFmt !== "unknown" && urlFmt !== "unknown"
-                            && origFmt !== urlFmt) continue;
-                        let br = parseInt(r.bitrate) || 0;
-                        if (br >= 8000) br = Math.round(br / 1000);
-                        if (br <= 0 || br > 2000) continue;
-                        if (br > bestBr) {
-                            bestBr = br;
-                            bestUrl = url;
-                        }
-                    }
-                    pickedUrl = bestUrl;
+                    pickedUrl = StreamLogic.pickBitrateUpgrade(results, stationName, origUrl);
                 } catch (e) {
                     console.log("[ARP] auto-bitrate parse error: " + e);
                 }
@@ -4324,7 +4249,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4596,6 +4521,129 @@ PlasmoidItem {
         cfg: Plasmoid.configuration
     }
 
+    // ── Timeshift (pause live radio) ─────────────────────────────────────────
+    // The engine owns the state machine (see TimeshiftEngine.qml and its
+    // mock tests); everything here is plumbing between it and the player.
+    TimeshiftEngine {
+        id: timeshift
+        app: root
+        cfg: Plasmoid.configuration
+    }
+
+    // The buffer file the player is expected on — pending until the media
+    // loads, exactly like the podcast resume seek above.
+    property string _tsPendingSeekUrl: ""
+    property double _tsPendingSeekMs: 0
+    // The pause parked playback into the buffer: the station identity and
+    // the writer survive, only the sound stopped. The play button resumes
+    // from the parked sentence instead of restarting the stream.
+    property bool _tsPaused: false
+    readonly property bool tsShifted: timeshift.shifted
+    // Whether the pause button may promise a pause (the click itself
+    // re-checks and falls back to a plain stop when the buffer is not
+    // ready after all — an optimistic icon for the first seconds is
+    // cheaper than a flickering one).
+    readonly property bool tsPauseAvailable: timeshift.active && timeshift.writerUp
+                                             && !_casting && _previewUrl === ""
+                                             && _podPlayingKey === "" && !timeshift.shifted
+
+    function tsBufferDir() {
+        var loc = String(Labs.StandardPaths.writableLocation(Labs.StandardPaths.CacheLocation));
+        if (loc.indexOf("file://") === 0) loc = loc.substring(7);
+        return loc === "" ? "" : loc + "/onair-timeshift";
+    }
+
+    // How far behind the broadcast the listener is, as m:ss. Reads the
+    // wall clock, so the caller re-binds on a tick (or on position moves).
+    function tsBehindText(posMs) {
+        var pos = _tsPaused ? timeshift.shiftPosMs : posMs;
+        // A reset engine (bufStartMs 0) would read as an epoch of lag.
+        if (timeshift.bufStartMs <= 0 || pos < 0) return "0:00";
+        var s = Math.round(TimeshiftLogic.behindLiveMs(timeshift.bufStartMs, Date.now(), pos) / 1000);
+        var m = Math.floor(s / 60);
+        s = s % 60;
+        return m + ":" + (s < 10 ? "0" + s : s);
+    }
+
+    function tsPlayBuffer(fileUrl, posMs) {
+        fadeOutAnimation.stop();
+        _abortSleepFade();
+        bitrateFallbackTimer.stop();
+        bitrateFallbackTimer.fallbackUrl = "";
+        // A file has no ICY titles and needs no connect watchdog — and the
+        // recovery roads must stay asleep: a buffer that ends is the
+        // engine's business (reopen or back to live), never the heal road's.
+        infoTimer.stop();
+        connectWatchdog.stop();
+        stallTimer.stop();
+        root._tsPaused = false;
+        playMusic.stop();
+        playMusic.source = "";
+        playMusic.loops = 1;
+        playMusicOutput.volume = targetVolume();
+        playMusic.source = fileUrl;
+        // Armed only AFTER the source lands: QMediaPlayer delivers
+        // mediaStatusChanged SYNCHRONOUSLY from inside stop() and the
+        // source writes above (reproduced on this stack), so a pending
+        // armed any earlier is cancelled by those very events before the
+        // buffer ever loads — and every resume would restart at 0:00.
+        // The podcast road survives for exactly this ordering reason.
+        root._tsPendingSeekUrl = fileUrl;
+        root._tsPendingSeekMs = posMs;
+        playMusic.play();
+    }
+
+    function tsPlayLive(streamUrl) {
+        root._tsPaused = false;
+        root._tsPendingSeekUrl = "";
+        // Back to live restores the standing order — the pause dropped it
+        // so the recovery roads would not restart a silenced stream, but a
+        // listener who returned to the broadcast wants the heal ladder and
+        // the network-back resume watching over them again.
+        root._wantsPlaying = true;
+        startWithFade({ "name": root.currentStation, "hostname": streamUrl,
+                        "favicon": root.currentStationFavicon, "active": true });
+    }
+
+    // The pause button while something plays. Three answers: a shifted
+    // player pauses in place like any file; a live player with a ready
+    // buffer parks into it; everything else declines and the caller does
+    // what it always did — a full stop.
+    function timeshiftPause() {
+        if (timeshift.shifted) {
+            playMusic.pause();
+            return true;
+        }
+        if (_casting || _previewUrl !== "" || _podPlayingKey !== "") return false;
+        var pos = timeshift.pauseGesture(Date.now());
+        if (pos < 0) return false;
+        infoTimer.stop();
+        connectWatchdog.stop();
+        stallTimer.stop();
+        root._wantsPlaying = false;
+        fadeOutAnimation.stop();
+        _abortSleepFade();
+        playMusic.stop();
+        root._tsPaused = true;
+        return true;
+    }
+
+    function timeshiftResume() {
+        if (!root._tsPaused) return false;
+        if (!timeshift.resumeGesture()) {
+            // The engine no longer has a buffer behind this park (writer
+            // died, arm torn down) — a stale flag must not eat every
+            // future play click.
+            root._tsPaused = false;
+            return false;
+        }
+        return true;
+    }
+
+    function timeshiftBackToLive() {
+        timeshift.backToLive();
+    }
+
     // ── Bluetooth (paired speakers/headphones in the cast menu) ─────────────
     // One-shot bluetoothctl commands, same sentinel pattern as cast.py. A
     // paired-but-unconnected speaker is one click away: connect it here and
@@ -4828,8 +4876,9 @@ PlasmoidItem {
             btRouteTimeout.stop();
         }
         // The user sent this device away — the watchdog must not fight them
-        // by reconnecting it.
-        if (sync._btJoinWatchMac === mac) sync._btJoinWatchStop();
+        // by reconnecting it, whether it holds the active slot, a queued
+        // turn, or only the memory to page it when its sink disappears.
+        sync._btJoinWatchDismiss(mac);
         // A kick already in flight for it will reconnect it in a few seconds
         // regardless — flag it so the kick's landing undoes that.
         if (sync._btKickMac === mac) sync._btKickAbort = true;
@@ -4872,7 +4921,7 @@ PlasmoidItem {
             _btPendingSinkName = "";
             btRouteTimeout.stop();
         }
-        if (sync._btJoinWatchMac === mac) sync._btJoinWatchStop();
+        sync._btJoinWatchDismiss(mac);
         executable.exec(": BT_FORGET; timeout 8 bluetoothctl remove " + mac + " >/dev/null 2>&1;"
                         + " true # " + (++_execSeq));
     }
@@ -5764,6 +5813,11 @@ PlasmoidItem {
         // An explicit stop cancels the standing order — every automatic
         // recovery road (retry backoff, network-back resume) dies with it.
         root._wantsPlaying = false;
+        // A full stop ends the timeshift session too: writer down, buffer
+        // deleted, parked position forgotten.
+        timeshift.disarm();
+        root._tsPaused = false;
+        root._tsPendingSeekUrl = "";
         root._orphanOrder = null;
         root._healRetryAttempts = 0;
         healRetryTimer.stop();
@@ -5882,6 +5936,10 @@ PlasmoidItem {
                 root.title = Plasmoid.title;
                 root.currentStation = station.name || "";
                 root.currentStationFavicon = station.favicon || "";
+                // Cast-only playback cannot be shifted — the buffer sits on
+                // this computer and the sound sits on the TV.
+                timeshift.disarm();
+                root._tsPaused = false;
                 return;
             }
         }
@@ -5902,6 +5960,10 @@ PlasmoidItem {
         root._icyEmptyCount = 0;
         root._qtMetaWorks = false;
         root._stallAttempts = 0;
+        // Whatever starts now is not the parked shift — a stale flag here
+        // turned the play button into a resume of a buffer long gone.
+        root._tsPaused = false;
+        root._tsPendingSeekUrl = "";
         root.title = Plasmoid.title;
         root.currentStation = station.name || "";
         playMusic.stop();
@@ -5945,6 +6007,28 @@ PlasmoidItem {
         // No ICY polling for an episode: reader.py would re-download the
         // enclosure's head over and over hunting titles a FILE cannot have.
         if (!root._podStarting) infoTimer.restart();
+        // Timeshift catches the station from its first note. Never for a
+        // preview audition, an episode or a cast group — those roads take
+        // the writer down instead, or an orphan ffmpeg would keep copying
+        // a stream nobody can shift. A re-play of the SAME stream (back to
+        // live, stall recovery) keeps the buffer it already has, but the
+        // shifted state ends: what plays now is the broadcast.
+        if (root._previewUrl === "" && !root._podStarting && _castTargets.length === 0) {
+            var tsUrl = (station.hostname || "").toString();
+            var tsFam = StreamLogic.streamFormat(tsUrl);
+            if (tsFam === "flac" || tsFam === "ogg" || tsFam === "opus") {
+                // Live Ogg-family streams wedge the ffmpeg backend on the
+                // socket (issue #3, reproduced here at a frozen 256 ms) —
+                // they play through the relay buffer instead, always.
+                timeshift.armRelay(tsUrl, station.name || "", Date.now());
+            } else if (timeshift.active && timeshift.streamUrl === tsUrl) {
+                timeshift.noteLivePlayback();
+            } else {
+                timeshift.armForStation(tsUrl, station.name || "", Date.now());
+            }
+        } else {
+            timeshift.disarm();
+        }
     }
 
     function getStreamInfo(streamUrl, metadata) {
@@ -6027,36 +6111,13 @@ PlasmoidItem {
     // Also used for the art-cache key: trackArtistTitleKey() and the lookup
     // query MUST normalize identically, or fetched art is silently never
     // shown (the stale-result guard in _artFinish compares the two).
+    // Both live in TrackLogic.js with the measured cases that shaped them.
     function _normalizeQuery(s) {
-        // The broadcast dressing radio stations wrap around a track name —
-        // measured live: "NOW PLAYING: ABBA - Dancing Queen" and
-        // "ABBA - Dancing Queen | Elmar" both return EMPTY from Deezer
-        // while the undressed string finds the cover. This also fixes the
-        // negative-cache key: a dressed query's definitive "no cover"
-        // used to pin the track coverless for the whole TTL.
-        return (s || "").replace(/^\s*(now\s+playing|playing\s+now|np)\s*[:\-–]\s*/i, "")
-                        .replace(/^\s*\d{1,3}[\.\)]\s+/, "")
-                        .replace(/\*{2,}/g, " ")
-                        .replace(/\s*\|.*$/, "")
-                        .replace(/\s*\([^)]*\)\s*/g, " ")
-                        .replace(/\s*\[[^\]]*\]\s*/g, " ")
-                        .replace(/\b\d{2,3}\s?kbps\b/gi, " ")
-                        .replace(/\s+/g, " ").trim();
+        return TrackLogic.normalizeQuery(s);
     }
 
-    // Undress the RAW track string before the artist/title split: the
-    // same broadcast prefixes and tails, plus the third " - " segment —
-    // Estonian stations love "Artist - Title - Station", and the station
-    // name poisons every search it rides into.
     function _preCleanTrack(s) {
-        var t = (s || "").replace(/^\s*(now\s+playing|playing\s+now|np)\s*[:\-–]\s*/i, "")
-                         .replace(/^\s*\d{1,3}[\.\)]\s+/, "")
-                         .replace(/\*{2,}/g, " ")
-                         .replace(/\s*\|.*$/, "")
-                         .trim();
-        var parts = t.split(" - ");
-        if (parts.length >= 3) t = parts[0] + " - " + parts[1];
-        return t;
+        return TrackLogic.preCleanTrack(s);
     }
 
     // definitive=false means the empty result came from a transient failure
@@ -6240,17 +6301,7 @@ PlasmoidItem {
     }
 
     function _primaryArtist(artist) {
-        if (!artist) return "";
-        var s = artist;
-        var splitters = [" & ", " feat. ", " feat ", " ft. ", " ft ", " with ", " vs. ", " vs ", ", ", " and ", " x ", " X "];
-        for (var i = 0; i < splitters.length; i++) {
-            var idx = s.toLowerCase().indexOf(splitters[i].toLowerCase());
-            if (idx > 0) {
-                s = s.substring(0, idx);
-                break;
-            }
-        }
-        return s.trim();
+        return TrackLogic.primaryArtist(artist);
     }
 
     // A flapping StreamTitle (rotating ad text, titles carrying elapsed
@@ -6388,18 +6439,7 @@ PlasmoidItem {
     }
 
     function parseTrackString(s) {
-        if (!s) return { artist: "", title: "" };
-        // Stations separate artist and title with more than the ASCII " - ":
-        // en-dash, em-dash and slash (all space-padded) are just as common.
-        // Only the FIRST separator splits — the rest belongs to the title.
-        // The surrounding spaces are required: a bare "-" would break
-        // hyphenated names like "Jay-Z".
-        var m = s.match(/\s+[-–—\/]\s+/);
-        if (m) {
-            return { artist: s.substring(0, m.index).trim(),
-                     title: s.substring(m.index + m[0].length).trim() };
-        }
-        return { artist: "", title: s.trim() };
+        return TrackLogic.parseTrackString(s);
     }
 
     function _abortSleepFade() {
@@ -6536,7 +6576,10 @@ PlasmoidItem {
         // while a device carries the stream, but to the desk's media keys
         // the music is very much on.
         var state = {
-            status: (isPlaying() || _casting) ? "Playing" : "Stopped",
+            // A parked or file-paused shift reads as Paused, so desktop
+            // controllers offer resume instead of a dead play button.
+            status: (isPlaying() || _casting) ? "Playing"
+                    : ((_tsPaused || timeshift.shifted) ? "Paused" : "Stopped"),
             station: root.currentStation,
             artist: root.trackArtist,
             title: root.trackTitle,
@@ -6546,7 +6589,7 @@ PlasmoidItem {
             canGoNext: stationsModel.count > 1,
             canGoPrevious: stationsModel.count > 1,
             canPlay: stationsModel.count > 0,
-            canPause: isPlaying() || _casting
+            canPause: isPlaying() || _casting || _tsPaused || timeshift.shifted
         };
         var json = JSON.stringify(state).replace(/'/g, "'\\''");
         var safe = _mprisStateFile.replace(/'/g, "'\\''");
@@ -6555,18 +6598,29 @@ PlasmoidItem {
 
     function _handleMprisCommand(cmd) {
         if (!cmd) return;
-        if (cmd === "Stop" || cmd === "Pause") {
-            // Stop/Pause must NEVER start playback — only stop if playing.
+        if (cmd === "Stop") {
+            // Stop must NEVER start playback — only stop if playing.
             // Cast-only playback counts: the media key must reach the
             // bedroom speaker too. And a standing order mid-recovery counts
             // as well — silence is what the key asked for, and the retry
             // ladder (up to 10 min between knocks) would otherwise restart
-            // the stream the user just refused.
+            // the stream the user just refused. A parked or shifted
+            // timeshift counts too: Stop means the whole session ends.
+            if (isPlaying() || _casting || _wantsPlaying || _tsPaused || timeshift.shifted)
+                stopWithFade();
+        } else if (cmd === "Pause") {
+            // The media key's Pause takes the timeshift road when one is
+            // ready; without a buffer it keeps its old meaning, a stop.
+            if (isPlaying() && timeshiftPause()) return;
             if (isPlaying() || _casting || _wantsPlaying) stopWithFade();
         } else if (cmd === "PlayPause") {
             // PlayPause is the only toggle.
             if (isPlaying() || _casting) {
-                stopWithFade();
+                if (!timeshiftPause()) stopWithFade();
+            } else if (_tsPaused) {
+                timeshiftResume();
+            } else if (timeshift.shifted) {
+                playMusic.play();
             } else if (stationsModel.count > 0) {
                 // Same fallback as the UI play button: if lastPlay is out of
                 // bounds after the list shrank, play the first station.
@@ -6575,7 +6629,11 @@ PlasmoidItem {
                 refreshServer(idx);
             }
         } else if (cmd === "Play") {
-            if (!isPlaying() && !_casting && stationsModel.count > 0) {
+            if (_tsPaused) {
+                timeshiftResume();
+            } else if (timeshift.shifted && !isPlaying()) {
+                playMusic.play();
+            } else if (!isPlaying() && !_casting && stationsModel.count > 0) {
                 const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0;
                 lastPlay = idx;
                 refreshServer(idx);
@@ -6770,6 +6828,10 @@ PlasmoidItem {
     }
 
     Component.onDestruction: {
+        // The buffer writer is a child of no one once the shell exits — an
+        // undisarmed ffmpeg would keep copying the stream until its wall
+        // cap, invisible and alone.
+        timeshift.disarm();
         _flushHistory();
         // The podcast position rides a 5 s stamp and a 3 s persist debounce —
         // a teardown mid-episode used to eat up to eight seconds of "where
@@ -6806,6 +6868,24 @@ PlasmoidItem {
     }
 
     Connections {
+        function onTimeshiftEnabledChanged() {
+            if (Plasmoid.configuration.timeshiftEnabled === true) {
+                // Flipped on mid-play: start catching the current station
+                // now instead of waiting for the next one.
+                var src = playMusic.source.toString();
+                if (isPlaying() && src.indexOf("file://") !== 0
+                    && root._previewUrl === "" && root._podPlayingKey === ""
+                    && _castTargets.length === 0)
+                    timeshift.armForStation(src, root.currentStation, Date.now());
+                return;
+            }
+            // Flipped off mid-session: whoever is behind live goes back to
+            // the broadcast first, then the writer and the buffer go — an
+            // unchecked box must not leave an ffmpeg copying in the dark.
+            if (timeshift.shifted || root._tsPaused) tsPlayLive(timeshift.streamUrl);
+            timeshift.disarm();
+            root._tsPaused = false;
+        }
         function onServersChanged() {
             // A reorder only changes positions, never the set of stations —
             // stopping playback for it would punish the user for tidying
@@ -6975,6 +7055,7 @@ PlasmoidItem {
             // Whole-room sync: every PW_*/BT_KICK round-trip belongs to
             // the engine, which answers true when the command was its own.
             if (syncEngine.handleExec(cmd, stdout, stderr)) return;
+            if (timeshift.handleExec(cmd, stdout, Date.now())) return;
             // The download's first half came home: the URL is in the
             // owner-only config file (or the write failed, which ends the
             // job on the same road a failed transfer takes). Only now does
@@ -8053,6 +8134,16 @@ PlasmoidItem {
                 // outage, not a finished track: send it down the heal road
                 // like any other death. A local file legitimately ends.
                 var endedSrc = playMusic.source.toString();
+                // The timeshift reader hit the horizon Qt froze at open —
+                // the engine either reopens further into the grown file or
+                // hands back to live (measured on the bench 2026-08-03:
+                // duration never updates after open, the player just stops).
+                // Either way this EndOfMedia belongs to the buffer, not to
+                // the podcast/heal roads below.
+                if (timeshift.shifted && endedSrc === "file://" + timeshift.bufPath) {
+                    timeshift.playerEndOfMedia(playMusic.position, Date.now());
+                    return;
+                }
                 // The PODCAST identity wins over the scheme: a streamed
                 // episode (played straight off its enclosure URL, no
                 // download) ends over http, and the old file-only guard sent

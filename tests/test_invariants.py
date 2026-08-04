@@ -228,3 +228,19 @@ def test_no_reserved_word_is_used_as_an_identifier():
     assert not hits, (
         "Reserved words declared as identifiers — Qt 6.10 refuses to parse "
         "these files at all:\n" + "\n".join(hits))
+
+
+def test_every_pragma_library_has_its_own_test_file():
+    """The quality strategy in one rule: logic lives in .pragma library
+    files and every one of them answers to a test file of its own. This
+    is the ratchet for shrinking main.qml — an extraction that arrives
+    without tests fails here instead of passing silently."""
+    missing = []
+    for lib in sorted(UI.glob("*.js")):
+        if ".pragma library" not in lib.read_text(encoding="utf-8"):
+            continue
+        expected = TESTS / "qml" / ("tst_%s.qml" % lib.stem.lower())
+        if not expected.exists():
+            missing.append("%s -> %s" % (lib.name, expected.name))
+    assert not missing, (
+        "Library files without a matching test file:\n" + "\n".join(missing))

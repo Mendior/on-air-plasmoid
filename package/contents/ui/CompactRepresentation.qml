@@ -61,8 +61,13 @@ MouseArea {
                 if (isPlaying() || root._casting) {
                     // Toggle semantics also while a preview/local file plays
                     // (lastPlay is -1 then and refreshServer would no-op) and
-                    // while casting — stopWithFade stops cast devices too
-                    stopWithFade();
+                    // while casting — stopWithFade stops cast devices too.
+                    // A ready timeshift buffer turns the toggle into a pause.
+                    if (!root.timeshiftPause()) stopWithFade();
+                } else if (root._tsPaused) {
+                    root.timeshiftResume();
+                } else if (root.tsShifted) {
+                    playMusic.play();
                 } else if (stationsModel.count > 0) {
                     const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0;
                     lastPlay = idx;

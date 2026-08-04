@@ -7,7 +7,7 @@
 # shellcheck shell=bash disable=SC2034,SC2154
 
 pkgname=plasma6-applets-on-air
-pkgver=2026.25
+pkgver=2026.27
 pkgrel=1
 pkgdesc="Internet radio and podcasts in a Plasma 6 panel widget"
 arch=('any')
@@ -41,7 +41,7 @@ source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # The tag tarball is immutable, so this is pinned to the real digest. On every
 # version bump: raise pkgver, run `updpkgsums` here, and let check() below
 # catch a metadata.json that disagrees before anything ships.
-sha256sums=('fa0554d650ac8b2acc4bdfc9771f971575103aa26ca373bb6723b351e9f8ff22')
+sha256sums=('ba00023708f2c18103c72010eb765a6988ca48b613ae2ff382719bfdecc04bbf')
 
 # The applet id is the one the published package was registered under and it
 # also names the translation domain. It comes out of metadata.json rather than

@@ -24,6 +24,8 @@ KCM.SimpleKCM {
     property alias cfg_podcastContinuous: continuous.checked
     property alias cfg_podcastSkipSilence: skipSilence.checked
     property alias cfg_syncAutoCare: autoCare.checked
+    property alias cfg_timeshiftEnabled: tsEnabled.checked
+    property alias cfg_timeshiftWindowMin: tsWindow.value
 
     // Wrapped like every other settings page. A bare FormLayout has no
     // title property for Plasma to set, and no scroll area — so this page
@@ -103,11 +105,40 @@ KCM.SimpleKCM {
             text: i18n("Keep sync tuned automatically")
         }
         QQC2.Label {
-            text: i18n("Listens to the playing audio with the microphone every few minutes and re-checks the sync when the speakers drift apart. The check clicks audibly and pauses music for about a minute — the popup shows a Stop button whenever one runs. Audio never leaves this computer.")
+            text: i18n("Listens with the microphone every few minutes while music is playing and quietly re-tunes the sync when the speakers have drifted apart. The check rides on a tone too high to hear — the music keeps playing and nothing audible happens. It runs only while a Bluetooth speaker is in the group, never during a recording or an alarm, and audio never leaves this computer.")
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             wrapMode: Text.WordWrap
             Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.label: i18n("Live radio")
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: tsEnabled
+            Kirigami.FormData.label: i18n("Timeshift:")
+            text: i18n("Pause live radio")
+        }
+        QQC2.Label {
+            text: i18n("While a station plays, a rolling copy is kept on this computer. Pause parks the broadcast; play resumes exactly where you left off, behind live, and one tap on the pill catches back up. The copy is deleted when playback stops and never leaves this machine.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
+
+        QQC2.SpinBox {
+            id: tsWindow
+            Kirigami.FormData.label: i18n("Buffer up to:")
+            enabled: tsEnabled.checked
+            from: 5
+            to: 240
+            stepSize: 5
+            textFromValue: function(v) { return i18n("%1 min", v) }
+            valueFromText: function(t) { return parseInt(t) || 60 }
         }
     }
 }

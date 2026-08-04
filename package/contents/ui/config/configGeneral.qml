@@ -1,5 +1,6 @@
 import ".." as ARP
 import "../HostGuard.js" as HostGuard
+import "../StreamLogic.js" as StreamLogic
 import Qt.labs.platform as Labs
 /*
 * SPDX-FileCopyrightText: 2022-2023 Yuri Saurov <dr@i-glu4it.ru>
@@ -246,7 +247,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -297,7 +298,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -484,7 +485,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         var keptPrefix = "";
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.26)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.27)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
@@ -585,20 +586,16 @@ KCM.ScrollViewKCM {
     }
 
     function _hostDomainOnly(url) {
-        // strip port and path -> bare domain (e.g. radio.streemlion.com:2525 -> radio.streemlion.com)
-        const m = String(url).match(/^https?:\/\/([^\/:]+)/i);
-        return m ? m[1] : "";
+        // The player's parser, so userinfo and IPv6 brackets read the same
+        // here as everywhere else.
+        return StreamLogic.hostOf(url);
     }
 
     function _baseDomain(domain) {
-        // strip sub-domain: s5.radio.co -> radio.co, cast4.asurahosting.com -> asurahosting.com
-        // simple heuristic: keep last 2 labels (works for .com, .ee, .fi etc but not .co.uk style)
-        if (!domain)
-            return "";
-        const parts = domain.split(".");
-        if (parts.length <= 2)
-            return domain;
-        return parts.slice(-2).join(".");
+        // The shared heuristic knows co.uk-style pairs and IP literals.
+        // This page's own copy did not: it asked Google for the favicon
+        // of "co.uk", and made "1.5" out of an IP-hosted stream.
+        return StreamLogic.baseDomain(domain);
     }
 
     function _googleFaviconCandidates() {
@@ -680,7 +677,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.26");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             // A "logo" that streams past 512 KiB is not a logo — cap the

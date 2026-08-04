@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026.27
+
+- Pause live radio. An opt-in timeshift keeps a rolling copy of the playing
+  station on your computer: pause parks the broadcast, play resumes exactly
+  where you left off, and a pill above the controls shows how far behind
+  live you are — one tap catches back up. Works from the popup, the panel
+  icon, the Space key and the media keys. Off by default (Settings →
+  Automation → Live radio); the copy is deleted when playback stops and
+  never leaves the machine.
+- Ogg and FLAC stations play again. Live Ogg-family streams (FLAC, Vorbis,
+  Opus) stalled within the first quarter second of playback. They now play
+  through a small local relay, a few seconds behind the broadcast.
+  Reported on GitHub by a listener — thank you.
+- Disconnecting a Bluetooth speaker by hand no longer gets it paged and
+  reconnected by the sync watchdog a moment later.
+- The auto-care description in the settings now matches what the check
+  actually does: it listens on a tone too high to hear while the music
+  keeps playing. Nothing clicks, nothing pauses. Described in all
+  thirteen languages.
+
 ## 2026.26
 
 - The muted-speaker notices added in 2026.24 now speak all twelve languages

@@ -1376,6 +1376,46 @@ Item {
             compare(r.e._btJoinWatchQueue.length, 0);
         }
 
+        function test_a_dismissed_speaker_loses_its_queued_turn_too() {
+            // Disconnect/forget used to clear only the active slot: a QUEUED
+            // speaker was still paged and kicked after the slot freed up.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._btJoinWatchArm(btMac, "JBL");
+            r.e._btJoinWatchArm("11:22:33:44:55:66", "Sony");
+            compare(r.e._btJoinWatchQueue.length, 1);
+            r.e._btJoinWatchDismiss("11:22:33:44:55:66");
+            compare(r.e._btJoinWatchQueue.length, 0);
+            compare(r.e._btJoinWatchMac, btMac);            // the active watch stays
+            r.e._btJoinWatchStop();
+            compare(r.e._btJoinWatchMac, "");               // and Sony is not armed
+        }
+
+        function test_dismissing_the_active_watch_promotes_the_next_in_line() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._btJoinWatchArm(btMac, "JBL");
+            r.e._btJoinWatchArm("11:22:33:44:55:66", "Sony");
+            r.e._btJoinWatchDismiss(btMac);
+            compare(r.e._btJoinWatchMac, "11:22:33:44:55:66");
+            compare(r.e._btJoinWatchQueue.length, 0);
+        }
+
+        function test_a_dismissal_also_forgets_the_lost_member() {
+            // The lost-members sweep remembers who played in the group; a
+            // hand-disconnected speaker must not be "walked back in" when
+            // its sink disappears a moment later.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._btWatchLostMembers();                      // seeds _btMembersSeen
+            verify(r.e._btMembersSeen[btMac] !== undefined);
+            r.e._btJoinWatchDismiss(btMac);
+            verify(r.e._btMembersSeen[btMac] === undefined);
+            r.mock.mediaDevs = { audioOutputs: [dev(wired)] };   // the sink is gone
+            r.e._btWatchLostMembers();
+            compare(r.e._btJoinWatchMac, "");               // nobody is paged
+        }
+
         function test_watchdog_stop_clears_a_stranded_kick_flag() {
             // A kick whose ack never lands used to leave _btKickInFlight
             // stuck true — every later watch's tick hold froze forever.

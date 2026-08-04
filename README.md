@@ -24,7 +24,8 @@
 - 🎧 **Bluetooth speakers, one click — pairing included** — paired devices are listed right in the cast menu, and "Pair a new speaker…" finds nearby ones and pairs, trusts and connects them in a single click; playback moves over as soon as the system picks the speaker up — and a Forget button on the far side of the row retires a rotted pairing (tap twice, no accidents), so System Settings stays out of the loop in both directions
 - 🔊 **All local outputs, in sync** — one switch plays through every local speaker at once, with real per-output buffer delays and a fine-tune slider that applies when you let go — one drag, one adjustment, plus a field for an exact millisecond value — so nothing echoes; works on PipeWire and plain PulseAudio alike. Each speaker carries its own balance, can play stereo, left, right or a mono mix (two speakers on L and R make a true stereo pair), and any speaker can sit an evening out with one tick — all remembered per device. After fifteen idle minutes the whole sync graph parks itself (no CPU cost, no held Bluetooth link) and comes straight back on the next play or wake-up alarm, the switch untouched
 - 🎤 **Microphone auto-calibration** — one button plays clicks through each speaker and the microphone does the rest: the Bluetooth lag is timed and set automatically, and every speaker's loudness is matched at the listening position — both remembered per device
-- 🩺 **The sync looks after itself** — an opt-in caretaker listens along every few minutes while music plays and, when two checks agree the speakers have audibly drifted apart, runs one automatic re-calibration; every Bluetooth reconnect also silently re-compensates the delay from the link's real reported latency, so a re-buffered speaker can't drag the room out of sync. Off by default, and audio never leaves the computer. Two things worth knowing before you switch it on: an automatic re-calibration pauses the music for about a minute while it measures, and the reconnect compensation reads a latency figure that only PipeWire reports — on plain PulseAudio the calibration and the sliders still work, that one automatic touch-up simply does not happen
+- 🩺 **The sync looks after itself** — an opt-in caretaker listens along every few minutes while music plays and quietly re-tunes the sync when the speakers have drifted apart; the check rides on a tone too high to hear, so the music keeps playing and nothing audible happens. Every Bluetooth reconnect also silently re-compensates the delay from the link's real reported latency, so a re-buffered speaker can't drag the room out of sync. Off by default, and audio never leaves the computer. One thing worth knowing: the reconnect compensation reads a latency figure that only PipeWire reports — on plain PulseAudio the calibration and the sliders still work, that one automatic touch-up simply does not happen
+- ⏸️ **Pause live radio** — an opt-in timeshift keeps a rolling copy of the playing station on your computer, so pause parks the broadcast and play resumes exactly where you left off; a pill above the controls shows how far behind live you are and one tap catches back up. The copy is deleted when playback stops and never leaves the machine
 - 👍 **Thank the stations** — a vote button and anonymous listening clicks (station id only, off by default — one switch in settings turns them on) feed the radio-browser.info rankings, so the stations you love become easier to find for everyone; ❤️ saves songs to a local liked list
 - 🩹 **Self-healing stations** — when a saved station's stream dies because it moved servers, the widget finds its current address on radio-browser.info; a move on the station's own domain is saved, anything else plays as a session-only backup so nothing in the directory can rewrite your list
 - 🪪 **Every station gets a face** — a station saved without a logo looks one up in the directory and keeps the find, a broken cached logo heals on sight, and a station with no obtainable logo wears its initials on its own fixed color, in the list and on the vinyl label — initials that speak Latin, Greek, Cyrillic, Hebrew, Arabic, kana, CJK and Hangul
@@ -80,7 +81,7 @@ cd packaging/aur && makepkg -si
 
 **From the release file:**
 ```bash
-kpackagetool6 --type Plasma/Applet --install on-air-2026.26.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.27.plasmoid
 ```
 
 **From a clone:** build first, or you get an English-only widget — the
@@ -89,7 +90,7 @@ into the catalogs the package loads.
 
 ```bash
 scripts/dev.sh build
-kpackagetool6 --type Plasma/Applet --install on-air-2026.26.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.27.plasmoid
 ```
 
 ## Usage tips

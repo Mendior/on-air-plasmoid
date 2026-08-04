@@ -97,6 +97,14 @@
             <label>Tune the speakers by ear with the slider only. The microphone is never used: no test tones, no automatic checks, nothing measured.</label>
             <default>false</default>
         </entry>
+        <entry name="timeshiftEnabled" type="Bool">
+            <label>Pause live radio: while a station plays, a background copy is kept on this computer so pausing resumes exactly where the listener left off, behind the broadcast. The buffer is deleted when playback stops.</label>
+            <default>false</default>
+        </entry>
+        <entry name="timeshiftWindowMin" type="Int">
+            <label>How many minutes of live radio the pause buffer can hold before it stops growing.</label>
+            <default>60</default>
+        </entry>
         <entry name="syncUltrasonic" type="Bool">
             <label>Measure with an 18-19 kHz sweep instead of an audible click. Most adults cannot hear this range, but younger ears often can, and dogs and cats certainly do — so it can be switched off; measurement then uses the click and needs a quiet room.</label>
             <default>true</default>

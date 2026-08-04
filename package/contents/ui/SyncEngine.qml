@@ -4326,6 +4326,24 @@ Item {
         }
     }
 
+    // The user disconnected or forgot this speaker by hand — every claim
+    // the watchdog holds on it goes too: the queued turn, the active slot,
+    // and the lost-members memory that would otherwise page it again the
+    // moment its sink disappears. Dismissal used to clear only the active
+    // slot, so a QUEUED speaker still got its profile bounce and a false
+    // "did not join the sync" toast once the slot freed up.
+    function _btJoinWatchDismiss(mac) {
+        var want = String(mac).toUpperCase();
+        if (_btMembersSeen[want] !== undefined) delete _btMembersSeen[want];
+        var keep = [];
+        for (var i = 0; i < _btJoinWatchQueue.length; i++)
+            if (String(_btJoinWatchQueue[i].mac).toUpperCase() !== want)
+                keep.push(_btJoinWatchQueue[i]);
+        if (keep.length !== _btJoinWatchQueue.length) _btJoinWatchQueue = keep;
+        if (_btJoinWatchMac !== "" && String(_btJoinWatchMac).toUpperCase() === want)
+            _btJoinWatchStop();
+    }
+
     Timer {
         id: btJoinWatch
         interval: 2000
