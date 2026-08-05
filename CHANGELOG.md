@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026.28
+
+- The panel icon no longer depends on your icon theme. Both names it asked
+  for are Breeze's own, so switching to another icon theme left the panel
+  empty — reported on GitHub, thank you. The widget now carries its own
+  icon and falls back to it; on Breeze nothing changes.
+- **The panel icon can be chosen in Settings → Appearance**, with a Reset,
+  and it says so when your icon theme does not have the one selected.
+- The cast button asked for an icon name that exists in no theme at all,
+  Breeze included, so it drew a placeholder while casting.
+- Text in the accent colour is readable on light colour schemes now. The
+  emerald was drawn for a dark panel and sat far under the contrast
+  minimum on a light one — the "behind live" pill among the twelve places
+  it was used. Fills, icons and the backdrop keep the full colour.
+- **Catalan**, contributed by Joan Josep — fourteen languages.
+
 ## 2026.27
 
 - Pause live radio. An opt-in timeshift keeps a rolling copy of the playing

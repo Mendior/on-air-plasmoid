@@ -12,6 +12,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
+import org.kde.iconthemes as KIconThemes
 
 KCM.SimpleKCM {
     id: root
@@ -31,9 +32,59 @@ KCM.SimpleKCM {
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
     property string cfg_downloadFormat
+    property string cfg_icon
 
 
     Kirigami.FormLayout {
+        Item {
+            Kirigami.FormData.label: i18n("Panel")
+            Kirigami.FormData.isSection: true
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Panel icon:")
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Button {
+                id: iconButton
+                icon.name: root.cfg_icon
+                text: root.cfg_icon
+                onClicked: iconPicker.open()
+                KIconThemes.IconDialog {
+                    id: iconPicker
+                    onIconNameChanged: if (iconName !== "") root.cfg_icon = iconName
+                }
+            }
+
+            QQC2.Button {
+                text: i18n("Reset")
+                icon.name: "edit-undo"
+                enabled: root.cfg_icon !== "audio-radio-symbolic"
+                onClicked: root.cfg_icon = "audio-radio-symbolic"
+            }
+        }
+
+        // Said plainly, because the alternative is a listener staring at an
+        // empty panel with nothing to go on. Reported from openSUSE: the
+        // default name is Breeze's own, and a different icon theme simply
+        // does not carry it.
+        QQC2.Label {
+            visible: iconProbe.status === Kirigami.Icon.Error
+            text: i18n("Your icon theme does not have this icon — the widget is using its own.")
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+            opacity: 0.75
+            font: Kirigami.Theme.smallFont
+
+            Kirigami.Icon {
+                id: iconProbe
+                source: root.cfg_icon
+                visible: false
+                width: 1
+                height: 1
+            }
+        }
+
         Item {
             Kirigami.FormData.label: i18n("Audio")
             Kirigami.FormData.isSection: true

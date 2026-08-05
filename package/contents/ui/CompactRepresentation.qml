@@ -99,8 +99,28 @@ MouseArea {
     }
 
     Kirigami.Icon {
-        source: Plasmoid.configuration.icon
-        fallback: Plasmoid.configuration.iconFallback
+        id: panelGlyph
+        // The panel icon is the widget's face and must not depend on the icon
+        // theme. Both names it defaults to — audio-radio-symbolic and
+        // radio-symbolic — are Breeze's own; neither is in the freedesktop
+        // naming spec, and a listener on openSUSE reported an empty panel
+        // after switching themes (GitHub #4). Measured here: of the icon
+        // themes installed on this desk, only breeze and breeze-dark carry
+        // the first name. So the last rung is a copy that ships inside the
+        // widget, which no theme can take away.
+        //
+        // The themed names still come first: on Breeze the panel keeps the
+        // system's own glyph and follows it when the theme is restyled.
+        readonly property url ownIcon: Qt.resolvedUrl("../icons/on-air.svg")
+        readonly property string wantedIcon: Plasmoid.configuration.icon
+        // One-way, and re-armed when the listener picks a different icon —
+        // otherwise a name fixed in settings would stay overridden forever.
+        property bool themeMissedIt: false
+        onWantedIconChanged: themeMissedIt = false
+        onStatusChanged: if (status === Kirigami.Icon.Error) themeMissedIt = true
+
+        source: themeMissedIt ? ownIcon : wantedIcon
+        fallback: themeMissedIt ? ownIcon : Plasmoid.configuration.iconFallback
         anchors.fill: parent
         isMask: true
         color: (isPlaying() || root._casting) ? root.accent : Kirigami.Theme.textColor

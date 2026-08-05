@@ -1519,7 +1519,7 @@ PlasmaExtras.Representation {
                                       : i18n("%1 (%2)", i18n("From the web"), webResultsModel.count)
                                 font.weight: Font.DemiBold
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                color: root.accent
+                                color: root.accentText
                                 opacity: 0.9
                             }
                             PlasmaComponents3.BusyIndicator {
@@ -2218,7 +2218,7 @@ PlasmaExtras.Representation {
                             }
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             font.weight: Font.Bold
-                            color: root.accent
+                            color: root.accentText
                         }
 
                         MouseArea {
@@ -2243,7 +2243,7 @@ PlasmaExtras.Representation {
                             anchors.centerIn: parent
                             text: i18n("%1 kb/s", fullRepresentation._nowBitrate)
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            color: root.accentBright
+                            color: root.accentText
                         }
                     }
                 }
@@ -2909,7 +2909,7 @@ PlasmaExtras.Representation {
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         maximumLineCount: 1
-                        color: root.accent
+                        color: root.accentText
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
                 }
@@ -2985,7 +2985,7 @@ PlasmaExtras.Representation {
                                libraryPage.showLiked ? likedModel.count : historyModel.count)
                     font.weight: Font.DemiBold
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    color: root.accent
+                    color: root.accentText
                 }
                 // ❤️/🕐 — flip between the play history and the liked songs
                 CircleButton {
@@ -3208,7 +3208,7 @@ PlasmaExtras.Representation {
                     Layout.fillWidth: true
                     text: i18n("%1 (%2)", i18n("My Music"), musicFolder.count)
                     font.weight: Font.DemiBold
-                    color: root.accent
+                    color: root.accentText
                 }
                 CircleButton {
                     implicitWidth: Kirigami.Units.gridUnit * 2
@@ -3660,7 +3660,7 @@ PlasmaExtras.Representation {
                     // Untrusted (feed/directory content) — never HTML
                     textFormat: Text.PlainText
                     font.weight: Font.DemiBold
-                    color: root.accent
+                    color: root.accentText
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -3846,7 +3846,7 @@ PlasmaExtras.Representation {
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
                         text: i18n("Open this feed")
-                        color: root.accent
+                        color: root.accentText
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                     }
@@ -3888,7 +3888,7 @@ PlasmaExtras.Representation {
                         : root.podcastTrendingBusy ? i18n("Loading the charts…")
                         : root.podcastFeedError
                     color: root.podcastFeedError !== "" && !root.podcastFeedLoading
-                           ? "#E0463C" : Kirigami.Theme.textColor
+                           ? root.recordRedText : Kirigami.Theme.textColor
                     opacity: 0.85
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     elide: Text.ElideRight
@@ -4366,7 +4366,7 @@ PlasmaExtras.Representation {
                                 Layout.fillWidth: true
                                 text: i18n("Sleep timer")
                                 font.weight: Font.DemiBold
-                                color: root.accent
+                                color: root.accentText
                             }
                             PlasmaComponents3.Label {
                                 visible: root.sleepRemainingSec > 0
@@ -4435,7 +4435,7 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             text: i18n("Wake-up alarms")
                             font.weight: Font.DemiBold
-                            color: root.accent
+                            color: root.accentText
                         }
                     }
 
@@ -4637,7 +4637,7 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             text: i18n("Scheduled recordings")
                             font.weight: Font.DemiBold
-                            color: root.accent
+                            color: root.accentText
                         }
                     }
 
@@ -5100,7 +5100,7 @@ PlasmaExtras.Representation {
                 clip: true
                 color: {
                     if (root.recording)
-                        return "#E0463C"
+                        return root.recordRedText
                     if (isError || !isConnected)
                         return Kirigami.Theme.negativeTextColor
                     else if (fullRepresentation._streamActive)
@@ -5163,8 +5163,14 @@ PlasmaExtras.Representation {
                 // and Bluetooth sections inside stay gated on _castAvailable,
                 // so a machine without python3 still gets volume and output.
                 visible: true
-                iconName: root._casting ? "media-playback-cast"
-                          : root._castAvailable ? "video-display" : "audio-volume-high"
+                // media-playback-cast was a guess and it exists in no icon
+                // theme at all — not even Breeze, which ships everything else
+                // this widget asks for. So the button lost its glyph in the
+                // one state where feedback matters most: while casting. The
+                // checked state already says "active", so the same
+                // video-display carries both.
+                iconName: (root._casting || root._castAvailable) ? "video-display"
+                          : "audio-volume-high"
                 iconScale: 0.55
                 checkable: true
                 checked: root._casting
@@ -5327,7 +5333,7 @@ PlasmaExtras.Representation {
                             Layout.margins: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
                             Kirigami.Icon {
-                                source: "media-playback-cast"
+                                source: "video-display"
                                 color: root.accent
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
                                 Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium

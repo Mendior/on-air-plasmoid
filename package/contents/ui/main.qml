@@ -59,6 +59,25 @@ PlasmoidItem {
     readonly property color accentBright: _followAccent ? Qt.lighter(Kirigami.Theme.highlightColor, 1.2) : "#3BEE96"
     readonly property color accentTeal: _followAccent ? Kirigami.Theme.highlightColor : "#2BB3A3"
     readonly property color accentTextOn: _followAccent ? Kirigami.Theme.highlightedTextColor : "#04140B"
+    // The accent WRITTEN AS TEXT, which is a different job from the accent
+    // used as a fill. The emerald was picked against a dark panel and it is
+    // beautiful there — measured 8.8:1 on Breeze Dark. On a light colour
+    // scheme the same green sits at 1.85:1 against the popup background,
+    // where readable body text wants 4.5:1, and the popup has no backdrop of
+    // its own: it uses whatever Plasma paints. Twelve labels went with it,
+    // the timeshift pill among them.
+    //
+    // Darkening the same green keeps the brand and buys the contrast:
+    // Qt.darker(accent, 1.8) measures 5.4:1 on a light scheme. Only glyphs
+    // change — fills, borders, icons and the aurora keep the full colour,
+    // because contrast rules are about what you read, not what you look at.
+    readonly property bool _lightSurface: Kirigami.Theme.backgroundColor.hslLightness >= 0.5
+    readonly property color accentText: _lightSurface ? Qt.darker(accent, 1.8) : accent
+    // Recording red, same treatment: 4.0:1 as text on either scheme is just
+    // under the line, and it is the colour that carries error messages.
+    readonly property color recordRed: "#E0463C"
+    readonly property color recordRedText: _lightSurface ? Qt.darker(recordRed, 1.35)
+                                                         : Qt.lighter(recordRed, 1.25)
 
     // Panel-icon tooltip: while something plays, show the track and station
     // instead of the stock widget name + description (issue #4). References
@@ -1424,7 +1443,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1451,7 +1470,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1489,7 +1508,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1530,7 +1549,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1604,7 +1623,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1660,7 +1679,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1802,7 +1821,7 @@ PlasmoidItem {
         // The config file is spent the moment curl exits, either way.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.27' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.28' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -2000,7 +2019,7 @@ PlasmoidItem {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -4249,7 +4268,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.27");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or

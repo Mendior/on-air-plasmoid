@@ -244,3 +244,60 @@ def test_every_pragma_library_has_its_own_test_file():
             missing.append("%s -> %s" % (lib.name, expected.name))
     assert not missing, (
         "Library files without a matching test file:\n" + "\n".join(missing))
+
+
+def test_the_widget_ships_its_own_panel_icon_and_falls_back_to_it():
+    """The panel icon must survive any icon theme.
+
+    Both names the widget defaults to — audio-radio-symbolic and its
+    fallback radio-symbolic — are Breeze's own; neither is in the
+    freedesktop naming spec. Measured on the reporting desk: of the icon
+    themes installed there, only breeze and breeze-dark carried the first
+    one. A listener on openSUSE switched themes and the panel went empty
+    (GitHub #4). So the widget carries a copy of its own and the compact
+    representation falls through to it when the theme has neither name.
+    """
+    svg = ROOT / "package" / "contents" / "icons" / "on-air.svg"
+    assert svg.is_file(), (
+        "package/contents/icons/on-air.svg is gone — without a bundled icon "
+        "the panel depends entirely on the user's icon theme")
+    body = svg.read_text(encoding="utf-8")
+    assert "<svg" in body and "</svg>" in body, "the bundled icon is not an SVG"
+
+    src = (UI / "CompactRepresentation.qml").read_text(encoding="utf-8")
+    assert "icons/on-air.svg" in src, (
+        "CompactRepresentation no longer references the bundled icon")
+    assert "Kirigami.Icon.Error" in src, (
+        "nothing watches the icon's status any more, so a theme that lacks "
+        "the configured name silently wins again")
+
+
+def test_every_icon_name_the_widget_asks_for_exists_in_breeze():
+    """Breeze ships with every Plasma install, so a name Breeze lacks is a
+    name nobody has.
+
+    This is how `media-playback-cast` went out: a plausible-looking name
+    that exists in no theme at all, on the cast button, blank in exactly
+    the state that needed feedback. Names missing only from OTHER themes
+    are a different matter — a widget may not carry the whole icon set —
+    but a name Breeze itself does not have is simply wrong.
+    """
+    import sys
+    sys.path.insert(0, str(TESTS))
+    import icon_theme_lookup as lookup
+
+    if lookup._theme_dir("breeze") is None:          # noqa: SLF001
+        import pytest
+        pytest.skip("breeze icons are not installed on this machine")
+
+    names = set()
+    pat = re.compile(
+        r'(?:source|fallback|placeholder|iconName|icon\.name)\s*:\s*"([a-z0-9][a-z0-9+.-]*)"')
+    for qml in list(UI.rglob("*.qml")):
+        for m in pat.finditer(qml.read_text(encoding="utf-8")):
+            names.add(m.group(1))
+
+    missing = sorted(n for n in names if lookup.find(n, "breeze") is None)
+    assert not missing, (
+        "icon names that exist in no theme, Breeze included — these render as "
+        "a placeholder wherever they are used: " + ", ".join(missing))

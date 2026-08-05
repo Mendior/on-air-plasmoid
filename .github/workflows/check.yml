@@ -34,6 +34,36 @@ jobs:
       - name: Lint without QML
         run: QMLLINT=none scripts/dev.sh lint
 
+  # The gate's blind spot until 2026.28: everything above runs on a rolling
+  # Arch container with the newest Qt. Qt 6.10 rejected `final` as a reserved
+  # word and the widget died at install on Kubuntu 26.04 LTS — no job here
+  # could have seen it. This one parses every shipped QML file with the Qt an
+  # LTS actually ships. It only parses; the logic tests stay on Arch.
+  lts-parse:
+    name: older Qt parses every QML file
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: kdeneon/plasma:user
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse with the distro's own Qt
+        run: |
+          set -eu
+          qmllint=$(command -v qmllint6 || command -v qmllint || echo /usr/lib/qt6/bin/qmllint)
+          echo "using $qmllint ($($qmllint --version 2>&1 | head -1))"
+          fail=0
+          for f in $(find package -name '*.qml'); do
+            # Parse errors only: an older Qt legitimately knows fewer types,
+            # so type warnings are noise here — a file that cannot be PARSED
+            # is the whole point.
+            if "$qmllint" "$f" 2>&1 | grep -qE 'Expected token|Syntax error|Unexpected token'; then
+              echo "PARSE ERROR: $f"
+              "$qmllint" "$f" 2>&1 | grep -E 'Expected token|Syntax error|Unexpected token' | head -3
+              fail=1
+            fi
+          done
+          exit $fail
+
   qml:
     name: qmllint + runtime smoke
     runs-on: ubuntu-latest
@@ -46,6 +76,7 @@ jobs:
           git which gettext python python-pytest ttf-dejavu dbus
           qt6-declarative qt6-multimedia-ffmpeg
           plasma-sdk plasma-workspace plasma-desktop plasma5support knotifications
+          breeze-icons
       - uses: actions/checkout@v4
       - name: Full check (lint + offscreen plasmoidviewer)
         run: dbus-run-session -- scripts/dev.sh check

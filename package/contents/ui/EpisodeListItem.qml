@@ -453,7 +453,7 @@ PlasmaComponents3.ItemDelegate {
                 textFormat: Text.PlainText
                 elide: Text.ElideRight
                 maximumLineCount: 1
-                color: root.accentBright
+                color: root.accentText
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 MouseArea {
                     anchors.fill: parent
