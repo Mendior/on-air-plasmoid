@@ -35,7 +35,7 @@ msgstr "Cerques"
 
 #: package/contents/config/config.qml:33
 msgid "Automation"
-msgstr "Automatitzacions"
+msgstr "Processos automàtics"
 
 #: package/contents/ui/CompactRepresentation.qml:51
 msgid "%1 — recording"
@@ -74,15 +74,15 @@ msgstr "Reinicia"
 
 #: package/contents/ui/config/configAppearance.qml:73
 msgid "Your icon theme does not have this icon — the widget is using its own."
-msgstr "El vostre tema d'icones no té aquesta icona; el giny utilitza la seva pròpia."
+msgstr "El vostre tema d'icones no té aquesta icona. El giny fa servir la seva pròpia."
 
 #: package/contents/ui/config/configAppearance.qml:94
 msgid "Default volume:"
-msgstr "Volum predeterminat"
+msgstr "Volum predeterminat:"
 
 #: package/contents/ui/config/configAppearance.qml:113
 msgid "Smooth fade:"
-msgstr "Fos encadenat"
+msgstr "Fos encadenat:"
 
 #: package/contents/ui/config/configAppearance.qml:114
 msgid "Fade volume when changing stations"
@@ -90,19 +90,19 @@ msgstr "Fon els volums quan es canvia d'emissora"
 
 #: package/contents/ui/config/configAppearance.qml:119
 msgid "Fade duration (ms):"
-msgstr "Durada del fos (ms)"
+msgstr "Durada del fos (ms):"
 
 #: package/contents/ui/config/configAppearance.qml:128
 msgid "Stream quality:"
-msgstr "Qualitat del flux:"
+msgstr "Qualitat de l'emissió:"
 
 #: package/contents/ui/config/configAppearance.qml:129
 msgid "Automatically switch to the highest-bitrate variant of a station"
-msgstr "Canvia automàticament a la variant de l'emissora amb la tassa de bits més alta"
+msgstr "Canvia automàticament a la variant de l'emissora amb la taxa de bits més alta"
 
 #: package/contents/ui/config/configAppearance.qml:132
 msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
-msgstr "Cerca l'estació al radio-browser.info i escull la URL del flux de més qualitat"
+msgstr "Cerca l'estació al radio-browser.info i escull la URL de l'emissió de més qualitat"
 
 #: package/contents/ui/config/configAppearance.qml:137
 msgid "Find a station's new address when its stream dies"
@@ -110,7 +110,7 @@ msgstr "Troba la nova adreça de l'emissora quan el flux s'interromp"
 
 #: package/contents/ui/config/configAppearance.qml:140
 msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
-msgstr "Les emissores canvien de servidors. Quan falla la reproducció, l'emissora es busca a radio-browser.info i l'adreça que funcioni es desa a la llista."
+msgstr "Les emissores canvien de servidor. Quan falla la reproducció, l'emissora es busca a radio-browser.info i l'adreça que funcioni es desa a la llista."
 
 #: package/contents/ui/config/configAppearance.qml:145
 msgid "Count my listening in the worldwide station catalog"
@@ -158,7 +158,7 @@ msgstr "Para les animacions i fes proves menys sovint"
 
 #: package/contents/ui/config/configAppearance.qml:188
 msgid "Unplugged, the record stops spinning and the equalizer bars hold still; background checks slow down. Sound and every control work exactly as before. The system's power-saver profile counts too."
-msgstr "Sense endollar, el disc deixa de girar i les barres de l'equalitzador es mantenen parades. Les proves en segon pla es fan menys sovint. El so i cada control funciona exactament igual que abans. El perfil d'estalvi d'energia del sistema també compta."
+msgstr "Quan no es fa servir el carregador sinó la bateria, el disc deixa de girar i les barres de l'equalitzador es mantenen parades. Les proves en segon pla es fan menys sovint. El so i cada control funciona exactament igual que abans. El perfil d'estalvi d'energia del sistema també compta."
 
 #: package/contents/ui/config/configAppearance.qml:199
 msgid "Integration"
@@ -219,15 +219,15 @@ msgstr "Velocitat de la marquesina:"
 
 #: package/contents/ui/config/configAppearance.qml:274
 msgid "Slower"
-msgstr "Més lent"
+msgstr "Més lenta"
 
 #: package/contents/ui/config/configAppearance.qml:276
 msgid "Faster"
-msgstr "Més ràpid"
+msgstr "Més ràpida"
 
 #: package/contents/ui/config/configAppearance.qml:282
 msgid "Panel click:"
-msgstr "Clic al panell:"
+msgstr "Clic al plafó:"
 
 #: package/contents/ui/config/configAppearance.qml:283
 msgid "Middle click to toggle last station"
@@ -235,7 +235,7 @@ msgstr "Clic amb el botó del mig per a reproduir/parar l'última emisora"
 
 #: package/contents/ui/config/configAppearance.qml:287
 msgid "Middle-click the panel icon to play or stop the last station"
-msgstr "Clic amb el botó del mig a la icona del panell per a reproduir/parar l'última emissora"
+msgstr "Amb un clic amb el botó del mig a la icona del plafó es reprodueix/para l'última emissora"
 
 #: package/contents/ui/config/configAutomation.qml:37
 #: package/contents/ui/FullRepresentation.qml:5051
@@ -277,7 +277,7 @@ msgstr "Quan es detecta que un programa té algun episodi nou, el més nou es po
 
 #: package/contents/ui/config/configAutomation.qml:75
 msgid "Storage:"
-msgstr "Emmagatzematge"
+msgstr "Emmagatzematge:"
 
 #: package/contents/ui/config/configAutomation.qml:76
 msgid "Quietly remove old played downloads"
@@ -310,11 +310,11 @@ msgstr "Manteniment:"
 #: package/contents/ui/config/configAutomation.qml:105
 #: package/contents/ui/FullRepresentation.qml:5731
 msgid "Keep sync tuned automatically"
-msgstr "Manté la sincronització ajustada automàticament"
+msgstr "Manté la sincronia automàticament"
 
 #: package/contents/ui/config/configAutomation.qml:108
 msgid "Listens with the microphone every few minutes while music is playing and quietly re-tunes the sync when the speakers have drifted apart. The check rides on a tone too high to hear — the music keeps playing and nothing audible happens. It runs only while a Bluetooth speaker is in the group, never during a recording or an alarm, and audio never leaves this computer."
-msgstr "Escolta amb el micròfon cada pocs minuts mentre sona la música i torna a ajustar la sincronització en silenci quan els altaveus s'han desviat. La comprovació viatja sobre un to massa agut per a sentir-lo: la música continua sonant i no passa res audible. Només s'executa mentre hi ha un altaveu Bluetooth al grup, mai durant una gravació o una alarma, i el so no surt mai d'aquest ordinador."
+msgstr "Escolta amb el micròfon cada pocs minuts mentre sona la música i, sense talls abruptes, torna a ajustar la sincronització quan els altaveus s'han desviat. El so que es fa servir per a sincronitzar-los es transmet amb un to massa agut per a sentir-lo: la música continua sonant i no es percep res audible. Només s'executa mentre hi ha un altaveu Bluetooth al grup, mai durant una gravació o una alarma i el so no surt mai d'aquest ordinador."
 
 #: package/contents/ui/config/configAutomation.qml:116
 msgid "Live radio"
@@ -322,7 +322,7 @@ msgstr "Ràdio en directe"
 
 #: package/contents/ui/config/configAutomation.qml:122
 msgid "Timeshift:"
-msgstr "Desplaçament temporal:"
+msgstr "Emissió en diferit:"
 
 #: package/contents/ui/config/configAutomation.qml:123
 msgid "Pause live radio"
@@ -330,11 +330,11 @@ msgstr "Posa en pausa la ràdio en directe"
 
 #: package/contents/ui/config/configAutomation.qml:126
 msgid "While a station plays, a rolling copy is kept on this computer. Pause parks the broadcast; play resumes exactly where you left off, behind live, and one tap on the pill catches back up. The copy is deleted when playback stops and never leaves this machine."
-msgstr "Mentre sona una emissora, se'n manté una còpia continuada en aquest ordinador. La pausa atura l'emissió; en reprendre-la continua exactament on la vau deixar, per darrere del directe, i amb un toc a l'etiqueta us hi poseu al dia. La còpia s'esborra quan s'atura la reproducció i no surt mai d'aquest equip."
+msgstr "Mentre sona una emissora, es manté una còpia continuada en aquest ordinador. La pausa atura l'emissió; en reprendre-la, continua exactament on la vau deixar, endarrerida respecte el directe. Amb un toc a l'etiqueta, s'avança directament fins al directe. La còpia s'esborra quan s'atura la reproducció i no surt mai d'aquest equip."
 
 #: package/contents/ui/config/configAutomation.qml:135
 msgid "Buffer up to:"
-msgstr "Memòria intermèdia fins a:"
+msgstr "Memòria intermèdia de fins a:"
 
 #: package/contents/ui/config/configAutomation.qml:140
 #: package/contents/ui/config/configRecording.qml:53
@@ -342,7 +342,7 @@ msgstr "Memòria intermèdia fins a:"
 #: package/contents/ui/FullRepresentation.qml:4669
 #: package/contents/ui/FullRepresentation.qml:4751
 msgid "%1 min"
-msgstr "%1 mín."
+msgstr "%1 min."
 
 #: package/contents/ui/config/configGeneral.qml:202
 msgid "All stations already have a logo."
@@ -468,7 +468,7 @@ msgstr "Flux original (copia exacta bit a bit; recomanat)"
 
 #: package/contents/ui/config/configRecording.qml:30
 msgid "MP3 (re-encode — max compatibility)"
-msgstr "MP3 (recodifica — màx. compatibilitat)"
+msgstr "MP3 (recodifica — compatibilitat màx.)"
 
 #: package/contents/ui/config/configRecording.qml:31
 msgid "WAV (uncompressed — very large files)"
@@ -476,7 +476,7 @@ msgstr "WAV (sense comprimir — fitxers molt grans)"
 
 #: package/contents/ui/config/configRecording.qml:40
 msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
-msgstr "Les emissions de ràdio ja estan comprimides — la còpia exacta bit a bit és de màxima qualitat. Si es recodifica (MP3) o es desempaqueta (WAV) mai s'aconseguirà més qualitat. Escolliu-les només per a compatibilitat amb dispositius o per a editar-les."
+msgstr "Les emissions de ràdio ja estan comprimides — la còpia exacta bit a bit és de màxima qualitat. Si es recodifica (MP3) o es desempaqueta (WAV), mai s'aconseguirà més qualitat. Escolliu-les només per compatibilitat amb dispositius o per a editar-les."
 
 #: package/contents/ui/config/configRecording.qml:49
 msgid "Max length:"
@@ -493,7 +493,7 @@ msgstr "Gravacions programades"
 
 #: package/contents/ui/config/configRecording.qml:75
 msgid "Schedules are managed in the widget itself: open the popup and go to the Timers tab. Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing. Schedules fire only while the widget is running — they pause while you are logged out or the computer is off or asleep; missed ones are reported when it returns."
-msgstr "Les programacions es gestionen des del giny mateix: obriu el panell emergent i aneu a la pestanya dels Temporitzadors. Escolliu una emissora, una hora d'inici, la durada i si cal repetir-ho diàriament o setmanalment. El giny grava en segon pla, encara que no hi hagi res reproduint-se. Les programacions només s'executen mentre el giny estigui en execució i es paren si teniu l'ordinador apagat, hibernant o no teniu la sessió oberta. Se us avisarà de les gravacions que s'han saltat."
+msgstr "Les programacions es gestionen des del giny mateix: obriu el plafó emergent i aneu a la pestanya dels Temporitzadors. Escolliu una emissora, una hora d'inici, la durada i si cal repetir-ho diàriament o setmanalment. El giny grava en segon pla, encara que no hi hagi res reproduint-se. Les programacions només s'executen mentre el giny estigui en execució i es paren si teniu l'ordinador apagat, hibernant o no teniu la sessió oberta. Se us avisarà de les gravacions que s'han saltat."
 
 #: package/contents/ui/config/configRecording.qml:82
 msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
@@ -701,11 +701,11 @@ msgstr "Mostra només les favorites"
 
 #: package/contents/ui/FullRepresentation.qml:1219
 msgid "Searching only in %1 — tap to search everywhere"
-msgstr "Se cerca només a %1 — toqueu per a cercar per qualsevol lloc."
+msgstr "Se cerca només a %1 — toqueu per a cercar per tot."
 
 #: package/contents/ui/FullRepresentation.qml:1223
 msgid "Results are limited to %1 — tap to search everywhere again"
-msgstr "Els resultats es limiten a %1 — toqueu per a cercar per qualsevol lloc una altra vegada."
+msgstr "Els resultats es limiten a %1 — toqueu per a cercar per tot una altra vegada."
 
 #: package/contents/ui/FullRepresentation.qml:1254
 msgid "All"
@@ -818,7 +818,7 @@ msgstr "No hi ha emissores."
 
 #: package/contents/ui/FullRepresentation.qml:1833
 msgid "Tap the heart on a station to add it here"
-msgstr "Toqueu el cor d'una emissora per a afegir-la aquí."
+msgstr "Toqueu la icona del cor d'una emissora per a afegir-la aquí."
 
 #: package/contents/ui/FullRepresentation.qml:1835
 msgid "Check the connection and type to search again"
@@ -834,11 +834,11 @@ msgstr "EN DIRECTE"
 
 #: package/contents/ui/FullRepresentation.qml:2216
 msgid "Paused · %1 behind live"
-msgstr "En pausa · %1 per darrere del directe"
+msgstr "En pausa · %1 endarrerit respecte el directe"
 
 #: package/contents/ui/FullRepresentation.qml:2217
 msgid "%1 behind live — tap to catch up"
-msgstr "%1 per darrere del directe; toqueu per posar-vos al dia"
+msgstr "%1 endarrerit respecte el directe. Toqueu per a avançar fins al directe."
 
 #: package/contents/ui/FullRepresentation.qml:2227
 msgid "Back to live"
@@ -914,11 +914,11 @@ msgstr "Trau-ho de les cançons que m'agraden"
 
 #: package/contents/ui/FullRepresentation.qml:2640
 msgid "Like this song (saved to My Music)"
-msgstr "M'agrada aquesta peça (es desa a La Meva Música)"
+msgstr "M'agrada aquesta peça (es desa a «La meva música»)"
 
 #: package/contents/ui/FullRepresentation.qml:2659
 msgid "Vote sent — thank you for supporting the station!"
-msgstr "Vot enviat — Gràcies per ajudar a aquesta emissora!"
+msgstr "Vot enviat — Gràcies per donar suport a aquesta emissora!"
 
 #: package/contents/ui/FullRepresentation.qml:2660
 msgid "Sending the vote…"
@@ -1118,7 +1118,7 @@ msgstr "Pòdcast"
 
 #: package/contents/ui/FullRepresentation.qml:3738
 msgid "Plays the newest unheard downloaded episode — works with no network at all."
-msgstr "Reprodueix l'episodi descarregat sense escoltar més nou. També funciona sense connexió."
+msgstr "Reprodueix l'episodi descarregat més nou sense reproduir. També funciona sense connexió."
 
 #: package/contents/ui/FullRepresentation.qml:3757
 msgid "Showing unplayed — tap for all"
@@ -1235,49 +1235,49 @@ msgstr "Alarmes despertador"
 #: package/contents/ui/FullRepresentation.qml:4663
 #: package/contents/ui/FullRepresentation.qml:4771
 msgid "Sun"
-msgstr "dg"
+msgstr "Dg"
 
 #: package/contents/ui/FullRepresentation.qml:4461
 #: package/contents/ui/FullRepresentation.qml:4556
 #: package/contents/ui/FullRepresentation.qml:4663
 #: package/contents/ui/FullRepresentation.qml:4771
 msgid "Mon"
-msgstr "dl"
+msgstr "Dl"
 
 #: package/contents/ui/FullRepresentation.qml:4461
 #: package/contents/ui/FullRepresentation.qml:4556
 #: package/contents/ui/FullRepresentation.qml:4663
 #: package/contents/ui/FullRepresentation.qml:4771
 msgid "Tue"
-msgstr "dm"
+msgstr "Dm"
 
 #: package/contents/ui/FullRepresentation.qml:4461
 #: package/contents/ui/FullRepresentation.qml:4556
 #: package/contents/ui/FullRepresentation.qml:4663
 #: package/contents/ui/FullRepresentation.qml:4771
 msgid "Wed"
-msgstr "dc"
+msgstr "Dc"
 
 #: package/contents/ui/FullRepresentation.qml:4462
 #: package/contents/ui/FullRepresentation.qml:4557
 #: package/contents/ui/FullRepresentation.qml:4664
 #: package/contents/ui/FullRepresentation.qml:4772
 msgid "Thu"
-msgstr "dj"
+msgstr "Dj"
 
 #: package/contents/ui/FullRepresentation.qml:4462
 #: package/contents/ui/FullRepresentation.qml:4557
 #: package/contents/ui/FullRepresentation.qml:4664
 #: package/contents/ui/FullRepresentation.qml:4772
 msgid "Fri"
-msgstr "dv"
+msgstr "Dv"
 
 #: package/contents/ui/FullRepresentation.qml:4462
 #: package/contents/ui/FullRepresentation.qml:4557
 #: package/contents/ui/FullRepresentation.qml:4664
 #: package/contents/ui/FullRepresentation.qml:4772
 msgid "Sat"
-msgstr "ds"
+msgstr "Ds"
 
 #: package/contents/ui/FullRepresentation.qml:4464
 #: package/contents/ui/FullRepresentation.qml:4548
@@ -1385,7 +1385,7 @@ msgstr "Les gravacions són només per a ús personal."
 #: package/contents/ui/FullRepresentation.qml:5025
 #: package/contents/ui/FullRepresentation.qml:5143
 msgid "Playing"
-msgstr "Es reprodueix"
+msgstr "Reproduint"
 
 #: package/contents/ui/FullRepresentation.qml:5064
 #: package/contents/ui/Heading.qml:26
@@ -1416,7 +1416,7 @@ msgstr "Escolliu una emissora i gaudiu…"
 
 #: package/contents/ui/FullRepresentation.qml:5178
 msgid "Casting to %1 — click to choose or stop"
-msgstr "S'envia a %1 — Feu-hi clic per a triar o parar-ho."
+msgstr "S'envia a %1 — Feu-hi clic per a triar-ne un altre o parar-ho."
 
 #: package/contents/ui/FullRepresentation.qml:5180
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
@@ -1460,7 +1460,7 @@ msgstr "Mantén afinat sol"
 
 #: package/contents/ui/FullRepresentation.qml:5559
 msgid "Listens now and then while music plays and puts the speakers back in step on its own. Nothing is audible and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you."
-msgstr "Se l'escolta de tant en tant mentre es reprodueix música i sincronitza els altaveus automàticament. No se sent res i la música no s'interromp mai. Si alguna vegada no pot corregir el desajust pel seu compte, avisa i us deixa que feu la mesura quan vulgueu."
+msgstr "Escolta de tant en tant mentre es reprodueix música i sincronitza els altaveus automàticament. No se sent res i la música no s'interromp mai. Si alguna vegada no pot corregir el desajust pel seu compte, avisa i us deixa que feu la mesura quan vulgueu."
 
 #: package/contents/ui/FullRepresentation.qml:5575
 #: package/contents/ui/FullRepresentation.qml:5592
@@ -1469,7 +1469,7 @@ msgstr "Ajust fi de la sincronia"
 
 #: package/contents/ui/FullRepresentation.qml:5585
 msgid "How far behind the Bluetooth speaker runs — the other outputs are held back by this much to match it. The automatic check below reports something else: how far apart they still land."
-msgstr "Quant d'endarrerit esta l'altaveu Bluetooth. Les altres sortides s'endarrereixen aquest temps per tal que tots vagin sincronitzats. La comprovació automàtica de sota informa d'una altra cosa: quina diferència de temps encara queda entre els altaveus."
+msgstr "Quant d'endarrerit està l'altaveu Bluetooth. Les altres sortides s'endarrereixen aquest temps per tal que tots vagin sincronitzats. La comprovació automàtica de sota informa d'una altra cosa: quina diferència de temps encara queda entre els altaveus."
 
 #: package/contents/ui/FullRepresentation.qml:5626
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
@@ -1505,7 +1505,7 @@ msgstr "Per a calibrar, cal que hi hagi un altaveu Bluetooth al grup. Connecteu-
 
 #: package/contents/ui/FullRepresentation.qml:5734
 msgid "Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
-msgstr "Reprodueix cada pocs minuts un to curt massa agut per a sentir-lo per cada altaveu i torna a comprovar la sincronització quan es desvien. El so es processa només en aquest ordinador: mai no s'emmagatzema ni s'envia enlloc."
+msgstr "Reprodueix cada pocs minuts un to curt massa agut per a sentir-lo per cada altaveu i torna a comprovar la sincronització quan es desvien. El so es processa només en aquest ordinador: no s'emmagatzema ni s'envia enlloc."
 
 #: package/contents/ui/FullRepresentation.qml:5775
 msgid "Tuned automatically — %1"
@@ -1525,7 +1525,7 @@ msgstr "Mesura amb un to massa agut per a sentir-lo"
 
 #: package/contents/ui/FullRepresentation.qml:5822
 msgid "Measures with an 18–19 kHz sweep, which most adults cannot hear and music does not reach, so the room can stay noisy. Younger ears often can hear it, and dogs and cats certainly do — turn it off and measurement uses a short audible click instead, which needs a quiet room."
-msgstr "Mesura amb un escombrat de freqüències entre 18 i 19 kHz, que la majoria d'adults no poden sentir i que la música no sol fer servir, de manera que es pot fer la sincronització encara que hi hagi molt de soroll a l'entorn. Les oïdes dels més joves sovint les poden sentir i gossos i gats les senten segur. Si es desactiva, les mesures fan servir un clic audible, que requereix que l'entorn estigui en silenci."
+msgstr "Mesura amb un escombrat de freqüències entre 18 i 19 kHz, que la majoria d'adults no poden sentir i que la música no sol fer servir, de manera que es pot fer la sincronització encara que hi hagi molt de soroll a l'entorn. Les oïdes dels més joves sovint les poden sentir i els gossos i els gats les senten segur. Si es desactiva, les mesures fan servir un clic audible, que requereix que l'entorn estigui en silenci."
 
 #: package/contents/ui/FullRepresentation.qml:5851
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
@@ -1549,7 +1549,7 @@ msgstr "%1 sona al grup"
 
 #: package/contents/ui/FullRepresentation.qml:5941
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
-msgstr "Si aquest altaveu sona al grup, desmarqueu-lo per a deixar-lo a fora sense desconnectar-lo. L'opció es recorda per al dispositiu."
+msgstr "Si aquest altaveu sona al grup, desmarqueu-lo per a deixar-lo a fora sense desconnectar-lo. L'opció es recorda per a cada dispositiu."
 
 #: package/contents/ui/FullRepresentation.qml:5950
 msgid "%1 (nothing plugged in)"
@@ -1561,7 +1561,7 @@ msgstr "Balanç de %1"
 
 #: package/contents/ui/FullRepresentation.qml:5973
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
-msgstr "La part d'aquest altaveu al volum. El balanç segueix les modificacions del control mestre i es recorda per a cada dispositiu. Només afecta al que reprodueix aquest giny. El volum per dispositiu de les opcions de so del sistema va en una capa separada i sense modificar. Per això els nombres en ambdós controls lliscants corresponents poden ser diferents."
+msgstr "La part d'aquest altaveu al volum. El balanç segueix les modificacions del control mestre i es recorda per a cada dispositiu. Només afecta al que reprodueix aquest giny. El volum per dispositiu de les opcions de so del sistema va en una capa separada i aquest giny no la modifica. Per això els nombres en ambdós controls lliscants corresponents poden ser diferents."
 
 #: package/contents/ui/FullRepresentation.qml:5990
 msgctxt "compact: speaker plays the left channel"
@@ -1677,7 +1677,7 @@ msgstr "L'emissora no ha respost. Potser no emet ara mateix o bé no està dispo
 
 #: package/contents/ui/main.qml:830
 msgid "Download gave no answer"
-msgstr "La descàrrega no ha donat cap resposta"
+msgstr "La petició de descàrrega no ha respost."
 
 #: package/contents/ui/main.qml:831
 msgid "Nothing came back from the downloader — try again."
@@ -1752,7 +1752,7 @@ msgstr "S'ha saltat una gravació programada."
 
 #: package/contents/ui/main.qml:3242
 msgid "%1 — another recording is already running."
-msgstr "%1 — es realitzava una altra gravació."
+msgstr "%1 — Es realitzava una altra gravació."
 
 #: package/contents/ui/main.qml:3416
 msgid "Wake-up alarm missed"
@@ -1760,7 +1760,7 @@ msgstr "Alarma despertador perduda"
 
 #: package/contents/ui/main.qml:3417
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
-msgstr "%1 estava posada a les %2, però l'ordinador estava apagat, suspès o bé la sessió no estava en execució en aquell moment."
+msgstr "%1 estava posada a les %2, però l'ordinador estava apagat, suspès o bé la sessió no estava oberta en aquell moment."
 
 #: package/contents/ui/main.qml:3451 package/contents/ui/main.qml:3551
 #: package/contents/ui/main.qml:3618 package/contents/ui/main.qml:3625
@@ -1842,11 +1842,11 @@ msgstr "L'exportació ha fallat."
 
 #: package/contents/ui/main.qml:7180
 msgid "Could not write the subscriptions file."
-msgstr "No s'ha pogut escriure les subscripcions al fitxer."
+msgstr "Les subscripcions no s'han pogut escriure al fitxer."
 
 #: package/contents/ui/main.qml:7284
 msgid "Casting needs pychromecast"
-msgstr "La retransmissió necessita pychromecast"
+msgstr "La retransmissió necessita pychromecast."
 
 #: package/contents/ui/main.qml:7285
 msgid "Install the pychromecast library to cast to your devices."
@@ -1886,7 +1886,7 @@ msgstr "el dispositiu Bluetooth"
 
 #: package/contents/ui/main.qml:7451
 msgid "Could not connect to %1"
-msgstr "No s'ha pogut connectar amb %1"
+msgstr "No s'ha pogut connectar amb %1."
 
 #: package/contents/ui/main.qml:7453
 msgid "Make sure the speaker is switched on and in range."
@@ -1894,7 +1894,7 @@ msgstr "Assegureu-vos que l'altaveu està engegat i dins de l'abast."
 
 #: package/contents/ui/main.qml:7569
 msgid "Could not pair with %1"
-msgstr "No s'ha pogut emparellar amb %1"
+msgstr "No s'ha pogut emparellar amb %1."
 
 #: package/contents/ui/main.qml:7571
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
@@ -1910,7 +1910,7 @@ msgstr "Instal·leu l'ffmpeg per a gravar emissions de ràdio."
 
 #: package/contents/ui/main.qml:7685
 msgid "curl is not installed"
-msgstr "El curl no està instal·lat"
+msgstr "El curl no està instal·lat."
 
 #: package/contents/ui/main.qml:7686
 msgid "Install curl to record radio."
@@ -1934,7 +1934,7 @@ msgstr "Gravació interrompuda (gravat: %1)"
 
 #: package/contents/ui/main.qml:7699
 msgid "%1 — the file is much smaller than expected."
-msgstr "%1 — el fitxer és molt més petit del que s'esperava."
+msgstr "%1 — El fitxer és molt més petit del que s'esperava."
 
 #: package/contents/ui/main.qml:7704
 msgid "The stream could not be captured."
@@ -1962,7 +1962,7 @@ msgstr "Només s'ha trobat un programa diferent. S'omet."
 
 #: package/contents/ui/main.qml:7821
 msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
-msgstr "La millor coincidència per a «%1» ha estat «%2». No es descarrega l'equivocada."
+msgstr "La millor coincidència per a «%1» ha estat «%2». L'equivocada no es descarrega."
 
 #: package/contents/ui/main.qml:7843
 msgid "Downloading again without the cover"
@@ -1978,7 +1978,7 @@ msgstr "Peça descarregada ✓"
 
 #: package/contents/ui/main.qml:7873
 msgid "Saved as \"%1\" — newest first in My Music"
-msgstr "Desat com a «%1». El més nou, primer, a La Meva Música."
+msgstr "Desat com a «%1». El més nou, primer, a «La meva música»."
 
 #: package/contents/ui/main.qml:7881
 msgid "Download failed"
@@ -2022,7 +2022,7 @@ msgstr "L'altaveu Bluetooth va %1 ms endarrerit i s'ha igualat el volum de tots 
 
 #: package/contents/ui/SyncEngine.qml:794
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
-msgstr "L'altaveu Bluetooth va %1 ms endarrerit. L'endarreriment d'aquest dispositiu s'ha establert i s'ha desat."
+msgstr "L'altaveu Bluetooth va %1 ms endarrerit. S'ha establert l'endarreriment d'aquest dispositiu i s'ha desat."
 
 #: package/contents/ui/SyncEngine.qml:796
 msgid "Balance levels set earlier were replaced by the measured ones."
@@ -2034,7 +2034,7 @@ msgstr "Els altaveus s'han igualat amb el més fluix i el volum del grup s'ha au
 
 #: package/contents/ui/SyncEngine.qml:803
 msgid "The speakers were matched to the quietest one, so the room is quieter than before — turn the volume up if you want it back."
-msgstr "Els altaveus s'han igualat al que reprodueix més fluix i l'entorn ara estarà més tranquil que abans. Augmenteu el volum si voleu recuperar la intensitat anterior."
+msgstr "Els altaveus s'han igualat al que reprodueix més fluix i l'entorn ara estarà més tranquil que abans. Apugeu el volum si voleu recuperar la intensitat anterior."
 
 #: package/contents/ui/SyncEngine.qml:812
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
@@ -2063,7 +2063,7 @@ msgstr "El to inaudible no ha arribat al micròfon des dels altaveus. Moveu el m
 #: package/contents/ui/SyncEngine.qml:848
 #: package/contents/ui/SyncEngine.qml:1221
 msgid "Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."
-msgstr "Cada micròfon ha detectat silenci pur. El botó de silenci del propi micròfon és invisible per al sistema. Comproveu el llum del micròfon o establiu com a predeterminat un micròfon que funcioni."
+msgstr "Cada micròfon ha detectat silenci absolut. El botó de silenci del propi micròfon és invisible per al sistema. Comproveu el llum del micròfon o establiu com a predeterminat un micròfon que funcioni."
 
 #: package/contents/ui/SyncEngine.qml:880
 msgid "Calibration"
@@ -2111,7 +2111,7 @@ msgstr "%1 està silenciat i per això se'l salta a la prova. Caldrà activar-lo
 
 #: package/contents/ui/SyncEngine.qml:1004
 msgid "The speakers were %1 ms apart — measuring once more to confirm."
-msgstr "Els altaveus estaven a %1 ms de diferència; es torna a mesurar per a confirmar-ho."
+msgstr "Els altaveus estaven a %1 ms de diferència. Es torna a mesurar per a confirmar-ho."
 
 #: package/contents/ui/SyncEngine.qml:1039
 msgid "Two measurements disagreed about the room, so nothing was changed. If the speakers sound apart, press Calibrate."
@@ -2167,11 +2167,11 @@ msgstr "No s'ha sentit a %1 durant la prova. L'altaveu potser està en silenci o
 
 #: package/contents/ui/SyncEngine.qml:1302
 msgid "Sync verified"
-msgstr "Sincronització verificada"
+msgstr "Sincronia verificada"
 
 #: package/contents/ui/SyncEngine.qml:1303
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
-msgstr "Cada altaveu arriba al micròfon en un marge de %1 ms. Per a l'oïda humana, estan sincronitzats."
+msgstr "Els altaveus arriben al micròfon dins d'un marge de %1 ms. Per a l'oïda humana, estan sincronitzats."
 
 #: package/contents/ui/SyncEngine.qml:1307
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
@@ -2184,35 +2184,35 @@ msgstr "Autocomprovació %1: Se salta, ja que una altra entitat fa servir els al
 #: package/contents/ui/SyncEngine.qml:1369
 #: package/contents/ui/SyncEngine.qml:1423
 msgid "Auto-check %1: settling after the adjustment"
-msgstr "Autocomprovació %1: s'està estabilitzant després de l'ajust"
+msgstr "Autocomprovació %1: S'estabilitza després de l'ajust"
 
 #: package/contents/ui/SyncEngine.qml:1396
 msgid "Auto-check %1: reading would not settle — the microphone may be too far from the speakers"
-msgstr "Autocomprovació %1: les lectures no s'estabilitzen. Potser el micròfon està massa lluny dels altaveus."
+msgstr "Autocomprovació %1: Les lectures no s'estabilitzen. Potser el micròfon està massa lluny dels altaveus."
 
 #: package/contents/ui/SyncEngine.qml:1400
 msgid "Auto-check %1: too quiet to tell"
-msgstr "Autocomprovació %1: massa silenci per a dir res"
+msgstr "Autocomprovació %1: Massa silenci per a dir res"
 
 #: package/contents/ui/SyncEngine.qml:1474
 msgid "Auto-check %1: in sync — measured %2 ms"
-msgstr "Autocomprovació %1: en sincronia; s'han mesurat %2 ms"
+msgstr "Autocomprovació %1: En sincronia. S'ha mesurat %2 ms."
 
 #: package/contents/ui/SyncEngine.qml:1475
 msgid "Auto-check %1: in sync"
-msgstr "Autocomprovació %1: en sincronia"
+msgstr "Autocomprovació %1: En sincronia"
 
 #: package/contents/ui/SyncEngine.qml:1485
 msgid "Auto-check %1: %2 ms apart — measured %3 ms"
-msgstr "Autocomprovació %1: %2 ms de desfasament; s'han mesurat %3 ms"
+msgstr "Autocomprovació %1: %2 ms de desfasament. S'ha mesurat %3 ms."
 
 #: package/contents/ui/SyncEngine.qml:1486
 msgid "Auto-check %1: still %2 ms apart (0 = in step)"
-msgstr "Autocomprovació %1: encara %2 ms de desfasament (0 = sincronitzat)"
+msgstr "Autocomprovació %1: Encara hi ha %2 ms de desfasament (0 = sincronitzat)."
 
 #: package/contents/ui/SyncEngine.qml:1523
 msgid "Sync has drifted"
-msgstr "La sincronització s'ha desviat"
+msgstr "La sincronia s'ha desviat"
 
 #: package/contents/ui/SyncEngine.qml:1524
 msgid "The speakers are audibly apart again — run Calibrate when convenient."
@@ -2229,7 +2229,7 @@ msgstr "Un altaveu Bluetooth s'ha descalibrat. La sincronització ho ha compensa
 #: package/contents/ui/SyncEngine.qml:2232
 #: package/contents/ui/SyncEngine.qml:2331
 msgid "Auto-check: listening…"
-msgstr "Autocomprovació: s'està escoltant…"
+msgstr "Autocomprovació: S'escolta…"
 
 #: package/contents/ui/SyncEngine.qml:2302
 msgid "Auto-check %1: only one speaker can hear the inaudible tone — nothing to compare"
@@ -2237,7 +2237,7 @@ msgstr "Autocomprovació %1: Només es pot sentir el to inaudible des d'un altav
 
 #: package/contents/ui/SyncEngine.qml:2349
 msgid "Auto-check %1: no answer came back"
-msgstr "Autocomprovació %1: no s'ha rebut cap resposta"
+msgstr "Autocomprovació %1: No s'ha rebut cap resposta."
 
 #: package/contents/ui/SyncEngine.qml:2391
 msgid "%1: %2 ms"
@@ -2255,11 +2255,11 @@ msgstr "Hi ha una gravació en curs. Les mesures reprodueixen tons de prova i po
 
 #: package/contents/ui/SyncEngine.qml:3050
 msgid "Measuring with a tone too high to hear — about two minutes in total. The music stays silent until the check finishes."
-msgstr "S'està mesurant amb un to massa agut per a sentir-lo; uns dos minuts en total. La música es manté en silenci fins que acaba la comprovació."
+msgstr "Es mesura amb un to massa agut per a sentir-lo. Es trigarà uns dos minuts en total. La música es manté en silenci fins que acabi la prova."
 
 #: package/contents/ui/SyncEngine.qml:3051
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
-msgstr "Dues rondes de clics amb una prova de silenci entre rondes. Uns dos minuts en total. La música no es reproduirà fins que acabi la prova."
+msgstr "Dues rondes de clics amb una prova de silenci entre rondes. Uns dos minuts en total. La música es manté en silenci fins que acabi la prova."
 
 #: package/contents/ui/SyncEngine.qml:3053
 msgid "Skipped (empty jack): %1."
