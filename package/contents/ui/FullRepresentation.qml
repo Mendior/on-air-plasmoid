@@ -106,7 +106,11 @@ PlasmaExtras.Representation {
     readonly property int _nowBitrate: {
         if (!_streamActive) return 0
         var br = playMusic.metaData.value(MediaMetaData.AudioBitRate)
-        return br && br > 0 ? Math.round(br / 1000) : 0
+        if (br && br > 0) return Math.round(br / 1000)
+        // Qt reports no bitrate at all for FLAC-family streams (measured
+        // through the relay) — the directory's number, the same one the
+        // search row showed, is better than a footer stuck on "Playing".
+        return root._playingStationBitrate > 0 ? root._playingStationBitrate : 0
     }
 
     // ── Global search: radio-browser.info catalog (~50,000 stations) ────
@@ -1552,7 +1556,7 @@ PlasmaExtras.Representation {
                                 Accessible.name: webItem.isPreviewing
                                                  ? i18n("Stop preview: %1", model.name)
                                                  : i18n("Preview: %1", model.name)
-                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
+                                Accessible.onPressAction: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl, webItem.model.codec, webItem.model.bitrate)
                                 Keys.onPressed: (event) => {
                                     // Ctrl+Return = the star, from the keyboard: the hover-only
                                     // button was the single way to KEEP a found station, and it
@@ -1562,7 +1566,7 @@ PlasmaExtras.Representation {
                                         webItem.starThisRow()
                                         event.accepted = true
                                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
+                                        root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl, webItem.model.codec, webItem.model.bitrate)
                                         event.accepted = true
                                     } else if (event.key === Qt.Key_Down) {
                                         var next = webRepeater.itemAt(webItem.index + 1)
@@ -1588,7 +1592,7 @@ PlasmaExtras.Representation {
                                 // over a page the directory still has more of.
                                 function starThisRow() {
                                     var wasIndex = webItem.index
-                                    root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid)
+                                    root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid, webItem.model.codec, webItem.model.bitrate)
                                     webResultsModel.remove(wasIndex)
                                     fullRepresentation.webResultCap =
                                         Math.max(webResultsModel.count, fullRepresentation.webResultCap - 1)
@@ -1744,7 +1748,7 @@ PlasmaExtras.Representation {
 
                                 HoverHandler { id: webHover }
                                 TapHandler {
-                                    onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl)
+                                    onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl, webItem.model.codec, webItem.model.bitrate)
                                 }
 
                                 PlasmaCore.ToolTipArea {

@@ -44,8 +44,10 @@ Item {
             function nextSeq() { return ++seqN; }
             function notify(t, x, i) {}
             function tsBufferDir() { return "/home/egon/.cache/onair/timeshift"; }
+            function tsServeScriptPath() { return "/opt/onair/relayserve.py"; }
             function tsPlayBuffer(url, pos) { played.push({ kind: "buffer", url: url, pos: pos }); }
             function tsPlayLive(url) { played.push({ kind: "live", url: url, pos: -1 }); }
+            function tsPlayRelay(url) { played.push({ kind: "relay", url: url, pos: -1 }); }
         }
     }
 
@@ -257,33 +259,59 @@ Item {
             compare(r.e.stationName, "Rock FM");
         }
 
-        function test_a_relay_arms_and_plays_with_the_feature_off() {
-            // Issue #3: live Ogg-family streams wedge the backend on the
-            // socket. The relay is playability, not a feature — it must
-            // arm with the timeshift checkbox unticked and start playing
-            // from the file on its own.
-            var r = rig({ timeshiftEnabled: false });
+        // Walk a relay rig to "tap answering, player drinking from it".
+        function relayed(r) {
             verify(r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000));
             verify(r.e.relay);
             r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
             verify(r.e.writerUp);
-            compare(r.mock.played.length, 0);        // not yet — file too young
-            wait(3300);
-            compare(r.mock.played.length, 1);
-            compare(r.mock.played[0].kind, "buffer");
-            compare(r.mock.played[0].pos, 0);
-            verify(r.e.shifted);
+            // The writer and the tap launch side by side...
+            compare(r.mock.execLog.length, 3);
+            verify(r.mock.execLog[1].indexOf(": TS_RUN;") === 0);
+            verify(r.mock.execLog[2].indexOf(": TS_SRV;") === 0);
+            // ...and the player waits for the port, not for a guessed timer.
+            compare(r.mock.played.length, 0);
+            r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__", 1002000);
         }
 
-        function test_a_relay_catch_up_rearms_instead_of_going_live() {
+        function test_a_relay_arms_and_serves_with_the_feature_off() {
+            // Issue #3: live Ogg-family streams wedge the backend on the
+            // socket. The relay is playability, not a feature — it must
+            // arm with the timeshift checkbox unticked, and the player is
+            // pointed at the loopback tap the moment its port answers.
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            verify(r.e.serveUp);
+            compare(r.mock.played.length, 1);
+            compare(r.mock.played[0].kind, "relay");
+            compare(r.mock.played[0].url, r.e.relayUrl);
+            // Through the tap this IS live radio — nothing is shifted, so
+            // the horizon machinery (the thing that stopped the file road
+            // dead every few seconds) never enters.
+            verify(!r.e.shifted);
+        }
+
+        function test_a_tap_that_never_answers_leaves_the_player_alone() {
             var r = rig({ timeshiftEnabled: false });
             r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000);
             r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
-            wait(3300);
+            r.e.handleExec(r.mock.execLog[2], "__TS_SRV_DOWN__", 1010000);
+            verify(!r.e.serveUp);
+            compare(r.mock.played.length, 0);    // worst case = status quo
+            verify(r.e.active);                  // the buffer still grows
+        }
+
+        function test_a_parked_relay_returns_through_a_fresh_capture() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            // Pause parks in the buffer file, resume drinks from it...
+            verify(r.e.pauseGesture(1100000) > 0);
+            verify(r.e.resumeGesture());
+            verify(r.e.shifted);
             var n = r.mock.execLog.length;
+            // ...and "back to live" cannot hand over to the socket that
+            // wedges — a fresh capture takes its place.
             r.e.backToLive();
-            // No live handover — the direct stream is the thing that
-            // wedges. A fresh capture takes its place.
             for (var i = 0; i < r.mock.played.length; i++)
                 verify(r.mock.played[i].kind !== "live");
             verify(r.mock.execLog.length > n);
@@ -293,17 +321,53 @@ Item {
 
         function test_a_drained_relay_buffer_starts_over() {
             var r = rig({ timeshiftEnabled: false });
-            r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000);
-            r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
-            wait(3300);
+            relayed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
             var n = r.mock.execLog.length;
-            // The reader caught the writer for real (stall): re-arm, not live.
-            verify(r.e.playerEndOfMedia(2500, 1003000));
+            // The shifted reader caught the writer for real: re-arm, not live.
+            verify(r.e.playerEndOfMedia(99500, 1103000));
             verify(r.mock.execLog.length > n);
             for (var i = 0; i < r.mock.played.length; i++)
                 verify(r.mock.played[i].kind !== "live");
             verify(r.e.relay);
             verify(r.e.active);
+        }
+
+        function test_a_fallen_tap_rearms_a_bounded_number_of_times() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            // Three quiet restarts, then the caller's heal road owns it —
+            // an endlessly re-armed dead stream would spin forever.
+            verify(r.e.relayPlaybackFell(1010000));
+            verify(r.e.relayPlaybackFell(1020000));
+            verify(r.e.relayPlaybackFell(1030000));
+            verify(!r.e.relayPlaybackFell(1040000));
+            verify(!r.e.active);                 // the fourth fall disarmed
+        }
+
+        function test_a_capped_relay_writer_rearms_quietly() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var n = r.mock.execLog.length;
+            // The window cap ends the writer an hour in; a live listener
+            // must not be left coasting into silence.
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=0 bytes=99999999", 4600000);
+            verify(r.mock.execLog.length > n);
+            verify(r.mock.execLog[n].indexOf(": TS_STOP;") === 0);
+            verify(r.e.relay);
+            verify(r.e.active);
+        }
+
+        function test_a_relay_writer_dying_at_birth_does_not_spin() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var n = r.mock.execLog.length;
+            // Dead upstream: the writer lived seconds, not minutes — a
+            // quiet re-arm would just die the same death in a loop.
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1005000);
+            compare(r.mock.execLog.length, n);
+            verify(!r.e.active);
         }
 
         function test_back_to_live_keeps_a_running_writer() {

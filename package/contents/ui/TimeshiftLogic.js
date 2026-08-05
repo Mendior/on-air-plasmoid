@@ -126,15 +126,50 @@ function buildBufferCommands(o) {
     return { writeUrl: writeUrl, run: run };
 }
 
+// The loopback tap for streams the backend cannot drink from the socket:
+// live Ogg-family wedges the ffmpeg backend within the first frames, but
+// the SAME bytes served clean over loopback HTTP play indefinitely
+// (measured 2026-08-05: direct socket froze at 278 ms; through the tap
+// Lapfox ran eight minutes without a stall, duration pinned at 0 so the
+// player treats it as the live stream it is). The tap is a raw-byte
+// python server on purpose — an ffmpeg remuxer in this seat died at
+// every Ogg chain boundary a reconnecting upstream wrote, a few seconds
+// of silence apiece. The port check answers when the player may actually
+// connect; a player sent to a refused port never retries (measured).
+function buildServeCommands(o) {
+    var q = PodcastLogic.shQuote;
+    var run = ": TS_SRV; "
+        + "if ! command -v python3 >/dev/null 2>&1; then echo __TS_SRV_DOWN__; exit 0; fi; "
+        + "python3 " + q(o.scriptPath) + " " + q(o.bufPath) + " " + o.port
+        + " >/dev/null 2>&1 & echo $! > " + q(o.srvPidPath) + "; "
+        + "i=0; while [ $i -lt 40 ]; do "
+        + "if ss -ltnH 2>/dev/null | grep -q ':" + o.port + " '; then echo __TS_SRV_UP__; exit 0; fi; "
+        + "if ! command -v ss >/dev/null 2>&1; then sleep 1; echo __TS_SRV_UP__; exit 0; fi; "
+        + "i=$((i+1)); sleep 0.25; done; "
+        // The port never opened (taken, python crashed): a stuck tap would
+        // hold its seat forever — reap it and let the player stand pat.
+        + "kill \"$(cat " + q(o.srvPidPath) + " 2>/dev/null)\" 2>/dev/null; "
+        + "rm -f " + q(o.srvPidPath) + "; "
+        + "echo __TS_SRV_DOWN__; true # " + o.seq;
+    return { run: run };
+}
+
 // SIGINT lands on ffmpeg (the pid file holds the pipeline's last member),
 // which finalizes the container; curl leaves with the broken pipe. The
 // buffer file goes too — a stopped shift has nothing to come back to —
 // and so does the url config: a disarm can land in the window between
 // the config write and the writer launch, where no cln exists yet to
-// take the address off the disk.
-function buildStopCommand(pidPath, outPath, cfgPath, seq) {
+// take the address off the disk. A relay arm's tap pid rides along; the
+// buffer deletion doubles as its failsafe — the tap notices the file
+// vanish and leaves on its own even when the pid file never got written.
+function buildStopCommand(pidPath, outPath, cfgPath, seq, srvPidPath) {
     var q = PodcastLogic.shQuote;
-    return ": TS_STOP; [ -f " + q(pidPath) + " ] && kill -INT \"$(cat "
+    var srv = "";
+    if (srvPidPath) {
+        srv = "kill \"$(cat " + q(srvPidPath) + " 2>/dev/null)\" 2>/dev/null; "
+            + "rm -f " + q(srvPidPath) + "; ";
+    }
+    return ": TS_STOP; " + srv + "[ -f " + q(pidPath) + " ] && kill -INT \"$(cat "
         + q(pidPath) + ")\" 2>/dev/null; sleep 1; rm -f " + q(outPath)
         + " " + q(pidPath) + " " + q(cfgPath) + "; true # " + seq;
 }

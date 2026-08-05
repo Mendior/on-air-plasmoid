@@ -20,6 +20,8 @@ Item {
 
     // exec(cmd) / nextSeq() / notify(t, x, i) / tsBufferDir()
     // tsPlayBuffer(fileUrl, posMs) / tsPlayLive(streamUrl)
+    // tsPlayRelay(relayUrl) — point the player at the loopback tap
+    // tsServeScriptPath() — where the tap's python lives on disk
     required property var app
     // timeshiftEnabled (bool), timeshiftWindowMin (int)
     required property var cfg
@@ -33,13 +35,33 @@ Item {
     // Relay mode: the stream is one the ffmpeg backend cannot play off the
     // socket at all (live Ogg-family — FLAC/Vorbis/Opus — wedges within
     // the first frames; measured on Qt 6.11 with the frequence3 stream
-    // from issue #3, position frozen at 256 ms). The same buffer pipeline
-    // makes them playable: curl fetches WITHOUT the ICY interleaving that
-    // breaks the Ogg framing, and the file plays clean. Relay arms no
-    // matter what the timeshift checkbox says — this is playability, not
-    // a feature — and "back to live" re-arms a fresh buffer instead of
-    // handing the player back to a stream it cannot drink.
+    // from issue #3, position frozen at 256 ms). The same curl that feeds
+    // the buffer fetches WITHOUT whatever the socket road trips on, and a
+    // small loopback HTTP tap re-serves those clean bytes to the player —
+    // which then treats them as the live stream they are (duration stays
+    // 0, so the horizon machinery never enters; measured 90 s without a
+    // stall where the file road stopped dead at its frozen duration every
+    // few seconds). Relay arms no matter what the timeshift checkbox says
+    // — this is playability, not a feature — and "back to live" re-arms a
+    // fresh capture instead of handing the player back to a stream it
+    // cannot drink.
     property bool relay: false
+    // The loopback tap answered on its port — the player may connect.
+    property bool serveUp: false
+    property int relayPort: 0
+    readonly property string relayUrl: relayPort > 0 ? "http://127.0.0.1:" + relayPort + "/" : ""
+    property string srvPidPath: ""
+    property string _srvPendingRun: ""
+    // The tap died mid-listen (client hiccup, port stolen, writer capped):
+    // a bounded number of quiet re-arms keeps the music going; past the
+    // cap the stream itself is the problem and the heal road owns it.
+    property int _relayRestarts: 0
+    Timer {
+        id: relayRestartDecay
+        interval: 60000
+        repeat: false
+        onTriggered: engine._relayRestarts = 0
+    }
     // The writer has exited (window cap, stream end): the file is frozen
     // but intact — a shifted listener keeps every second already caught.
     property bool windowFull: false
@@ -100,7 +122,12 @@ Item {
         // arm's delayed stop (sleep 1; rm) delete the incoming arm's
         // fresh buffer out from under its writer.
         var seq = app.nextSeq();
-        bufPath = dir + "/buffer-" + seq + "." + TimeshiftLogic.bufferExtension(url);
+        // A relay buffer is always an Ogg shell: every codec this road
+        // exists for (FLAC, Vorbis, Opus) has an Ogg mapping, and the tap
+        // needs ONE input format it can trust — the address often cannot
+        // say (radiomast serves FLAC from a path with no extension).
+        var ext = isRelay ? "ogg" : TimeshiftLogic.bufferExtension(url);
+        bufPath = dir + "/buffer-" + seq + "." + ext;
         cfgFilePath = dir + "/url-" + seq + ".cfg";
         pidPath = dir + "/writer-" + seq + ".pid";
         var windowMin = Math.max(5, Math.min(240, cfg.timeshiftWindowMin || 60));
@@ -111,6 +138,17 @@ Item {
         });
         active = true;
         relay = isRelay === true;
+        if (relay) {
+            // The port rides the seq so a fast re-arm never fights its own
+            // predecessor over the bind; the range is unregistered space.
+            relayPort = 17800 + (seq % 180);
+            srvPidPath = dir + "/serve-" + seq + ".pid";
+            _srvPendingRun = TimeshiftLogic.buildServeCommands({
+                bufPath: bufPath, srvPidPath: srvPidPath,
+                scriptPath: app.tsServeScriptPath(),
+                port: relayPort, seq: seq
+            }).run;
+        }
         _pendingRun = cmds.run;
         _armSeq = seq;
         app.exec(cmds.writeUrl);
@@ -118,10 +156,25 @@ Item {
     }
 
     // A stream the backend cannot play directly: same arm, three
-    // differences — no config gate, the relay flag, and playback starts
-    // from the file by itself once a few seconds are on disk.
+    // differences — no config gate, the relay flag, and the player is
+    // pointed at the loopback tap the moment its port answers.
     function armRelay(url, name, nowMs) {
         if (!armCommon(url, name, nowMs, true)) return false;
+        return true;
+    }
+
+    // Playback of the tap fell over (serve died, port stolen, the player
+    // erred out). Returns whether the engine took the recovery: a bounded
+    // burst of quiet re-arms, then the caller's heal road owns it.
+    function relayPlaybackFell(nowMs) {
+        if (!relay || !active) return false;
+        if (_relayRestarts >= 3) {
+            disarm();
+            return false;
+        }
+        _relayRestarts++;
+        relayRestartDecay.restart();
+        armRelay(streamUrl, stationName, nowMs);
         return true;
     }
 
@@ -132,28 +185,14 @@ Item {
         return armCommon(url, name, nowMs, false);
     }
 
-    Timer {
-        id: relayStart
-        // Enough file for the reader to sit a steady ~3 s behind the
-        // writer — the gap stays constant at 1x, so the horizon reopen
-        // almost never fires in relay play.
-        interval: 3000
-        repeat: false
-        onTriggered: {
-            if (!engine.relay || !engine.active || !engine.writerUp || engine.shifted) return;
-            engine.shifted = true;
-            engine._lastReopenPosMs = -1;
-            engine.app.tsPlayBuffer("file://" + engine.bufPath, 0);
-        }
-    }
-
     // Playback of this station is over (stop, station switch, cast): the
     // buffer's reason to exist is gone with it. The stop command goes out
     // whenever a buffer was ever built this arm — a writer that already
     // exited leaves a file worth removing all the same.
     function disarm() {
         if (bufPath !== "" && (active || writerUp || windowFull))
-            app.exec(TimeshiftLogic.buildStopCommand(pidPath, bufPath, cfgFilePath, app.nextSeq()));
+            app.exec(TimeshiftLogic.buildStopCommand(pidPath, bufPath, cfgFilePath, app.nextSeq(),
+                                                     srvPidPath));
         reset(false);
     }
 
@@ -162,7 +201,10 @@ Item {
         writerUp = false;
         shifted = false;
         relay = false;
-        relayStart.stop();
+        serveUp = false;
+        relayPort = 0;
+        srvPidPath = "";
+        _srvPendingRun = "";
         windowFull = false;
         bufStartMs = 0;
         frozenCapturedMs = -1;
@@ -254,9 +296,30 @@ Item {
                 bufStartMs = nowMs;
                 writerUp = true;
                 app.exec(run);
-                if (relay) relayStart.restart();
+                if (relay && _srvPendingRun !== "") {
+                    // The tap launches beside the writer; its UP ack — not a
+                    // guessed timer — is what points the player at the port.
+                    var srv = _srvPendingRun;
+                    _srvPendingRun = "";
+                    app.exec(srv);
+                }
             } else {
                 reset(false);
+            }
+            return true;
+        }
+        if (cmd.indexOf(": TS_SRV;") === 0) {
+            if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;
+            if (stdout.indexOf("__TS_SRV_UP__") !== -1) {
+                if (relay && active && !shifted) {
+                    serveUp = true;
+                    app.tsPlayRelay(relayUrl);
+                }
+            } else {
+                // The tap never answered (no port, stuck pipeline — the
+                // command reaped its own children). The player stays where
+                // it is: worst case is exactly the pre-relay status quo.
+                serveUp = false;
             }
             return true;
         }
@@ -267,6 +330,19 @@ Item {
             if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;
             writerUp = false;
             if (stdout.indexOf("__TS_EXIT__") !== -1) {
+                // A relayed LIVE listener loses their audio source when the
+                // writer stops (window cap after an hour, upstream restart):
+                // re-arm quietly — the player coasts on the server burst it
+                // holds while the fresh tap comes up. Only a writer that
+                // lived a while earns this; one that died at birth is a dead
+                // stream, and re-arming it forever would spin.
+                if (relay && !shifted && bufStartMs > 0 && nowMs - bufStartMs >= 60000
+                    && _relayRestarts < 3) {
+                    _relayRestarts++;
+                    relayRestartDecay.restart();
+                    armRelay(streamUrl, stationName, nowMs);
+                    return true;
+                }
                 // The window cap or the stream's end — the caught audio
                 // stays servable. Live-side listeners just lose the arm.
                 windowFull = true;

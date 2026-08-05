@@ -76,12 +76,16 @@ KCM.SimpleKCM {
             opacity: 0.75
             font: Kirigami.Theme.smallFont
 
+            // Kept at zero opacity rather than visible:false. Measured on
+            // this stack, both forms load and report Error for a missing
+            // name — the icon loader does not care about visibility — but
+            // a probe that stays in the scene never invites that doubt.
             Kirigami.Icon {
                 id: iconProbe
                 source: root.cfg_icon
-                visible: false
-                width: 1
-                height: 1
+                opacity: 0
+                width: Kirigami.Units.iconSizes.small
+                height: width
             }
         }
 

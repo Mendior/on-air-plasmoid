@@ -352,6 +352,11 @@ PlasmoidItem {
             for (const server of servers) {
                 allNames.push(server.name || "");
                 nameByHost[(server.hostname || "").toString()] = server.name || "";
+                // The model's role set locks on the FIRST append: a list
+                // whose first station predates saved codecs would silently
+                // drop the codec of every station after it.
+                if (server.codec === undefined) server.codec = "";
+                if (server.bitrate === undefined) server.bitrate = 0;
                 if (server.active)
                     stationsModel.append(server);
             }
@@ -471,9 +476,13 @@ PlasmoidItem {
                          : ((timeshift.shifted || root._tsPaused)
                             ? (lastPlay === index && _currentOrigUrl === origHost)
                             : (isPlaying()
-                               && (playMusic.source == origHost || playMusic.source == resolved
+                               // Through the relay the source is the loopback
+                               // tap — translate before comparing, or the
+                               // stop click on a playing FLAC row restarts it.
+                               && (_icyStreamTarget(playMusic.source) === origHost
+                                   || _icyStreamTarget(playMusic.source) === resolved
                                    || (_currentOrigUrl === origHost
-                                       && playMusic.source.toString() === _currentResolvedUrl))
+                                       && _icyStreamTarget(playMusic.source) === _currentResolvedUrl))
                                && lastPlay === index));
         if (stopping) {
             stopWithFade();
@@ -486,6 +495,7 @@ PlasmoidItem {
             // roads answer for the order again.
             root._orphanOrder = null;
             root._previewUrl = "";
+            root._previewCodec = "";
             root._previewUuid = "";
             // The standing order: play, and keep playing until I say stop.
             root._wantsPlaying = true;
@@ -505,6 +515,15 @@ PlasmoidItem {
     // The URL being played as a PREVIEW (an internet-search result that the
     // user has not added to their list). Empty = normal playback.
     property string _previewUrl: ""
+    // What the directory said this audition is encoded as. The URL is
+    // not always enough to tell — see previewStation.
+    property string _previewCodec: ""
+    property int _previewBitrate: 0
+    // The directory's bitrate for whatever station is playing now. Qt
+    // reports no bitrate for FLAC-family streams (measured: AudioBitRate
+    // stays empty through the relay), so the footer borrows the number
+    // the search row already showed.
+    property int _playingStationBitrate: 0
     // The directory identity of the preview — one error-time retry asks the
     // directory for the station's CURRENT address by uuid instead of giving
     // up on a rotted one.
@@ -579,8 +598,14 @@ PlasmoidItem {
 
     // LISTEN to an internet-search result (preview) — does NOT add it to the list.
     // A second click on the same result stops playback.
-    function previewStation(name, url, favicon, rbUuid, rawUrl) {
+    function previewStation(name, url, favicon, rbUuid, rawUrl, codec, bitrate) {
         if (!url) return;
+        // The directory knows the codec even when the address says nothing:
+        // radiomast serves FLAC from a bare path with no extension at all.
+        // Without this the relay decision is blind and an Ogg audition
+        // wedges after a second — measured live, issue #3's second report.
+        root._previewCodec = String(codec || "").toLowerCase();
+        root._previewBitrate = parseInt(bitrate) || 0;
         // A preview routed to cast devices leaves the LOCAL player idle
         // (isPlaying() false) — so the second tap must also recognize
         // "casting this preview" as playing, or the row offers no way to
@@ -614,7 +639,9 @@ PlasmoidItem {
         healRetryTimer.stop();
         root.currentStationFavicon = favicon || "";
         // noUpgrade: the row is directory-fresh — play it as-is, instantly.
-        _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "", "active": true }, true);
+        _playStation({ "name": name || url, "hostname": url, "favicon": favicon || "",
+                       "codec": root._previewCodec, "bitrate": root._previewBitrate,
+                       "active": true }, true);
     }
 
     // A dying preview's retry ladder: the directory's CURRENT address by
@@ -1443,7 +1470,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1470,7 +1497,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1508,7 +1535,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1549,7 +1576,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1623,7 +1650,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1679,7 +1706,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1821,7 +1848,7 @@ PlasmoidItem {
         // The config file is spent the moment curl exits, either way.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.28' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.29' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -2019,7 +2046,7 @@ PlasmoidItem {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -3500,6 +3527,7 @@ PlasmoidItem {
         // would retry LAST NIGHT's candidate under this alarm's station
         // name. The alarm starts clean.
         _previewUrl = "";
+        _previewCodec = "";
         _previewUuid = "";
         // startWithFade is called directly (no _playStation), so the
         // origin/resolved pair would still describe LAST NIGHT's stream —
@@ -3659,6 +3687,7 @@ PlasmoidItem {
             // just the same. Same bump, same reason.
             _previewSeq++;
             _previewUrl = "";
+            _previewCodec = "";
             _previewUuid = "";
             healTimer.stop();
             healRetryTimer.stop();
@@ -3775,6 +3804,7 @@ PlasmoidItem {
         _healSeq++;
         healTimer.stop();
         root._previewUrl = "";
+        root._previewCodec = "";
         root._previewUuid = "";
         root.lastPlay = -1;
         root.currentStationFavicon = "";
@@ -3844,7 +3874,7 @@ PlasmoidItem {
             // played right now — a stale _currentOrigUrl (e.g. a local file is
             // playing) must not restart an old radio stream.
             const wasPlayingUrl = isPlaying() && root._previewUrl === ""
-                                  && playMusic.source.toString() === root._currentResolvedUrl
+                                  && _icyStreamTarget(playMusic.source) === root._currentResolvedUrl
                                   ? root._currentOrigUrl : "";
             Plasmoid.configuration.servers = JSON.stringify(servers); // → reload (stops playback)
             Qt.callLater(function() {
@@ -4043,7 +4073,7 @@ PlasmoidItem {
     // ⭐ on an internet result: add the station PERMANENTLY to the list + favorites.
     // Playback is NOT started; if the same station is already previewing, it
     // continues uninterrupted (now as an "own" station).
-    function addStationToList(name, url, favicon, makeFavorite, rbUuid) {
+    function addStationToList(name, url, favicon, makeFavorite, rbUuid, codec, bitrate) {
         if (!url) return;
         // A cast preview counts: the local player idles while the speaker
         // sounds, and isPlaying() alone left the handoff branch unreached —
@@ -4063,7 +4093,7 @@ PlasmoidItem {
         // same guard as removeStation: only a real list-station stream, never a
         // stale _currentOrigUrl (e.g. while a local file is playing).
         const wasPlayingUrl = isPlaying() && root._previewUrl === ""
-                              && playMusic.source.toString() === root._currentResolvedUrl
+                              && _icyStreamTarget(playMusic.source) === root._currentResolvedUrl
                               ? root._currentOrigUrl : "";
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
@@ -4093,6 +4123,14 @@ PlasmoidItem {
                 // and scheme-less strings become "" (the backfill then fills).
                 servers.push({ "active": true, "hostname": url, "name": stName,
                                "favicon": FaviconLogic.webUrlOrEmpty(favicon),
+                               // Kept because the address often cannot say:
+                               // an Ogg-family stream has to reach the relay
+                               // or it wedges after a second, and radiomast
+                               // serves FLAC from a path with no extension.
+                               // The bitrate fills the footer where Qt
+                               // reports none (FLAC-family streams).
+                               "codec": String(codec || "").toLowerCase().substring(0, 16),
+                               "bitrate": parseInt(bitrate) || 0,
                                "uuid": rbUuid || "" });
                 // This triggers onServersChanged → reloadStationsModel (stop + reload),
                 // so we continue only after an event-loop cycle.
@@ -4111,6 +4149,7 @@ PlasmoidItem {
                     const h = stationsModel.get(k).hostname;
                     if (keepPlaying && h === url) {
                         root._previewUrl = "";
+                        root._previewCodec = "";
                         root._previewUuid = "";
                         lastPlay = k;
                         refreshServer(k);
@@ -4268,7 +4307,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.28");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4572,6 +4611,10 @@ PlasmoidItem {
         return loc === "" ? "" : loc + "/onair-timeshift";
     }
 
+    function tsServeScriptPath() {
+        return Qt.resolvedUrl("relayserve.py").toString().substring(7);
+    }
+
     // How far behind the broadcast the listener is, as m:ss. Reads the
     // wall clock, so the caller re-binds on a tick (or on position moves).
     function tsBehindText(posMs) {
@@ -4610,6 +4653,41 @@ PlasmoidItem {
         root._tsPendingSeekUrl = fileUrl;
         root._tsPendingSeekMs = posMs;
         playMusic.play();
+    }
+
+    // The loopback tap for a stream the backend cannot drink directly.
+    // Unlike the buffer road this IS live radio: titles keep polling (the
+    // STATION's address, never the tap — see _icyStreamTarget) and the
+    // recovery machinery stays off, because a tap that dies reports through
+    // the engine's own re-arm road, not the heal ladder.
+    function tsPlayRelay(relayUrl) {
+        fadeOutAnimation.stop();
+        _abortSleepFade();
+        bitrateFallbackTimer.stop();
+        bitrateFallbackTimer.fallbackUrl = "";
+        connectWatchdog.stop();
+        stallTimer.stop();
+        relayRescue.stop();
+        root._tsPaused = false;
+        root._tsPendingSeekUrl = "";
+        playMusic.stop();
+        playMusic.source = "";
+        playMusic.loops = 1;
+        playMusicOutput.volume = targetVolume();
+        playMusic.source = relayUrl;
+        playMusic.play();
+        if (!infoTimer.running) infoTimer.restart();
+    }
+
+    // Where a metadata poll should really go: the tap serves bytes for the
+    // player alone — its ffmpeg accepts a single client, so a second
+    // connection from the title reader would bounce off (or worse, steal
+    // the seat). Polls aimed at the tap are redirected to the station.
+    function _icyStreamTarget(src) {
+        var s = (src || "").toString();
+        if (timeshift.relay && timeshift.relayUrl !== "" && s === timeshift.relayUrl)
+            return timeshift.streamUrl;
+        return s;
     }
 
     function tsPlayLive(streamUrl) {
@@ -5748,6 +5826,9 @@ PlasmoidItem {
     }
 
     function _playStation(station, noUpgrade, automated) {
+        // Whatever the directory knew about this station's bitrate rides to
+        // the footer; a station without the fact simply clears it.
+        root._playingStationBitrate = parseInt(station.bitrate) || 0;
         // A user-initiated play means the listener is awake: the wake tone
         // stands down and the alarm's volume override hands control back. An
         // AUTOMATED resume (network came back, heal retry) replaying a
@@ -5848,6 +5929,7 @@ PlasmoidItem {
         alarmFallbackTimer.stop();
         _volumeOverridePct = -1;
         root._previewUrl = "";
+        root._previewCodec = "";
         root._previewUuid = "";
         root._previewRawUrl = "";
         root._previewSeq++;
@@ -6026,27 +6108,58 @@ PlasmoidItem {
         // No ICY polling for an episode: reader.py would re-download the
         // enclosure's head over and over hunting titles a FILE cannot have.
         if (!root._podStarting) infoTimer.restart();
-        // Timeshift catches the station from its first note. Never for a
-        // preview audition, an episode or a cast group — those roads take
-        // the writer down instead, or an orphan ffmpeg would keep copying
-        // a stream nobody can shift. A re-play of the SAME stream (back to
-        // live, stall recovery) keeps the buffer it already has, but the
-        // shifted state ends: what plays now is the broadcast.
-        if (root._previewUrl === "" && !root._podStarting && _castTargets.length === 0) {
-            var tsUrl = (station.hostname || "").toString();
-            var tsFam = StreamLogic.streamFormat(tsUrl);
-            if (tsFam === "flac" || tsFam === "ogg" || tsFam === "opus") {
-                // Live Ogg-family streams wedge the ffmpeg backend on the
-                // socket (issue #3, reproduced here at a frozen 256 ms) —
-                // they play through the relay buffer instead, always.
+        // Timeshift catches the station from its first note; the relay road
+        // additionally catches every stream the backend cannot drink off
+        // the socket — auditions included, because playability is not a
+        // feature. Episodes and cast groups still take the writer down
+        // instead: those roads cannot shift and cannot be relayed. A
+        // re-play of the SAME stream (back to live, stall recovery) keeps
+        // what it already has, but the shifted state ends: what plays now
+        // is the broadcast.
+        var tsUrl = (station.hostname || "").toString();
+        var tsLocal = !root._podStarting && _castTargets.length === 0;
+        // Which streams are the wedging kind cannot be read off the address
+        // alone: radiomast serves FLAC from a path with no extension at
+        // all, so the codec the directory reported rides along and counts
+        // equally (issue #3, second report — every FLAC radio without an
+        // extension sailed straight past the old extension-only test).
+        var tsSaid = ((station.codec || root._previewCodec) || "").toString().toLowerCase();
+        var tsFam = StreamLogic.streamFormat(tsUrl);
+        var tsOgg = tsFam === "flac" || tsFam === "ogg" || tsFam === "opus"
+                 || tsSaid.indexOf("ogg") !== -1 || tsSaid.indexOf("flac") !== -1
+                 || tsSaid.indexOf("opus") !== -1 || tsSaid.indexOf("vorbis") !== -1;
+        if (tsLocal && tsOgg) {
+            if (timeshift.relay && timeshift.active && timeshift.streamUrl === tsUrl
+                && (playMusic.source.toString() === timeshift.relayUrl || !timeshift.serveUp)) {
+                // This very stream is already relayed, or its tap is still
+                // warming up. Tearing that down to rebuild the same thing —
+                // on every retry-ladder knock — was the churn behind "plays
+                // five seconds, goes quiet, plays again": keep drinking.
+            } else {
                 timeshift.armRelay(tsUrl, station.name || "", Date.now());
-            } else if (timeshift.active && timeshift.streamUrl === tsUrl) {
+            }
+        } else if (tsLocal && root._previewUrl === "") {
+            if (timeshift.active && timeshift.streamUrl === tsUrl) {
                 timeshift.noteLivePlayback();
             } else {
                 timeshift.armForStation(tsUrl, station.name || "", Date.now());
             }
         } else {
+            // A non-Ogg audition, an episode or a cast group: whatever arm
+            // a previous station left running dies with its playback.
             timeshift.disarm();
+        }
+        // The last net under all of the above: a stream that claims
+        // neither an Ogg extension nor an Ogg codec can still be one
+        // (a hand-typed URL, a list saved before codecs were kept). If
+        // the position is still frozen near zero seconds from now while
+        // the buffer reads full — the exact face of the wedge — the
+        // relay gets one quiet try.
+        if (tsLocal && !tsOgg && tsUrl.indexOf("http") === 0
+            && TimeshiftLogic.canTimeshift(tsUrl)) {
+            relayRescue.restart();
+        } else {
+            relayRescue.stop();
         }
     }
 
@@ -6054,6 +6167,9 @@ PlasmoidItem {
         if (!streamUrl || streamUrl.toString() === "") {
             return;
         }
+        // A poll aimed at the loopback tap goes to the station instead —
+        // the tap seats one client and that seat is the player's.
+        streamUrl = _icyStreamTarget(streamUrl);
         // A STREAMED podcast episode is NOT a radio station: never poll its
         // enclosure for ICY metadata. Otherwise a hostile feed host could
         // answer the Icy-MetaData probe with a crafted StreamTitle and inject
@@ -6705,7 +6821,7 @@ PlasmoidItem {
             // Track log sidecar for an INSTANT recording of this same stream —
             // no per-track splitting, but the times + titles are all there.
             if (root.recording && !root._recScheduled && root._recTracksPath !== ""
-                && playMusic.source.toString() === root._recUrl && parsed.title) {
+                && _icyStreamTarget(playMusic.source) === root._recUrl && parsed.title) {
                 var recLine = "[" + root.recElapsedText() + "] "
                               + (parsed.artist ? parsed.artist + " - " : "") + parsed.title;
                 executable.exec(": REC_TRACK; printf '%s\\n' '" + recLine.replace(/'/g, "'\\''")
@@ -7048,7 +7164,7 @@ PlasmoidItem {
                 // three runs against a live stream), and that is now the
                 // whole wait.
                 if (isPlaying() && !isError && !root._qtMetaWorks
-                    && playMusic.source.toString() === root._icyUrlFileFor)
+                    && _icyStreamTarget(playMusic.source) === root._icyUrlFileFor)
                     getStreamInfo(playMusic.source, root.metadata);
                 return;
             }
@@ -7968,6 +8084,12 @@ PlasmoidItem {
             // the fallback or heal timers here used to restart playback
             // seconds after the user explicitly pressed Stop.
             if (fadeOutAnimation.running) return;
+            // An erring loopback tap is the engine's to restart, not the
+            // heal ladder's — healing 127.0.0.1 would be a dead end.
+            if (timeshift.relay && timeshift.relayUrl !== ""
+                && playMusic.source.toString() === timeshift.relayUrl) {
+                if (timeshift.relayPlaybackFell(Date.now())) return;
+            }
             // A podcast FILE that errors is almost always gone — cleaned by
             // hand outside the app while its ledger row stayed. Prune the
             // row and continue the show with the next real file; only a
@@ -8162,6 +8284,15 @@ PlasmoidItem {
                 if (timeshift.shifted && endedSrc === "file://" + timeshift.bufPath) {
                     timeshift.playerEndOfMedia(playMusic.position, Date.now());
                     return;
+                }
+                // The loopback tap closed under the player (serve died, port
+                // stolen, writer capped): it coasted through the burst it
+                // held and honestly ran out. The engine re-arms itself a
+                // bounded number of times; past the cap the stream itself is
+                // the problem and the ordinary heal road below takes over.
+                if (timeshift.relay && timeshift.relayUrl !== ""
+                    && endedSrc === timeshift.relayUrl) {
+                    if (timeshift.relayPlaybackFell(Date.now())) return;
                 }
                 // The PODCAST identity wins over the scheme: a streamed
                 // episode (played straight off its enclosure URL, no
@@ -8523,6 +8654,34 @@ PlasmoidItem {
         }
     }
 
+    // The wedge has a face no watchdog above ever sees: mediaStatus says
+    // Buffered, bufferProgress reads 1.00 — and the position sits frozen a
+    // few hundred milliseconds in (measured 278 ms on a live Ogg-FLAC
+    // socket). The connect watchdog trusts Buffered, the stall timer waits
+    // for StalledMedia; neither fires, and the listener gets silence with
+    // a playing icon. This timer looks at the one witness that cannot lie
+    // — the position — and hands the stream to the relay once.
+    Timer {
+        id: relayRescue
+        running: false
+        repeat: false
+        interval: 6000
+        onTriggered: {
+            if (!isPlaying() || isError) return;
+            var src = playMusic.source.toString();
+            if (src === "" || src.indexOf("http") !== 0) return;
+            if (timeshift.relay || (timeshift.relayUrl !== "" && src === timeshift.relayUrl)) return;
+            if (root._podPlayingKey !== "" || root._podStarting || _castTargets.length !== 0) return;
+            if (playMusic.position >= 1500) return;
+            if (playMusic.mediaStatus !== MediaPlayer.BufferedMedia
+                && playMusic.mediaStatus !== MediaPlayer.BufferingMedia) return;
+            if (!TimeshiftLogic.canTimeshift(src)) return;
+            console.log("[ARP] position frozen at " + playMusic.position
+                        + " ms with a full buffer — relaying");
+            timeshift.armRelay(src, root.currentStation, Date.now());
+        }
+    }
+
     Timer {
         id: stallTimer
         running: false
@@ -8727,7 +8886,7 @@ PlasmoidItem {
                 infoTimer.stop();
                 return;
             }
-            if (root._noIcySource && root._noIcySource === playMusic.source.toString()) {
+            if (root._noIcySource && root._noIcySource === _icyStreamTarget(playMusic.source)) {
                 infoTimer.stop();
                 return;
             }

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026.29
+
+- **FLAC and Ogg stations play properly now.** The 2026.27 fix helped one
+  station and stumbled on the rest: playback ran a few seconds, went
+  quiet, and started again. These streams now pour through a small local
+  relay the player can actually drink from, and they keep playing — also
+  in search previews, which never reached the relay at all before.
+- Most FLAC radios don't reveal the format in their address. The station
+  directory knows it, and that knowledge now rides along with search
+  results and saved stations, so those stations are recognized too. A
+  stream that still slips through and freezes in the first seconds gets
+  caught and routed onto the relay by itself.
+- Stations whose servers drop the connection every now and then (radio
+  hosters do this) recover on their own instead of leaving silence.
+- The footer shows the bitrate for FLAC stations — the player itself
+  reports none for them, so the directory's number steps in.
+
 ## 2026.28
 
 - The panel icon no longer depends on your icon theme. Both names it asked

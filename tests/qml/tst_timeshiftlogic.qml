@@ -122,4 +122,29 @@ TestCase {
         verify(s.indexOf("kill -INT") !== -1)
         verify(s.indexOf("rm -f '/d/buffer.mp3' '/d/writer.pid' '/d/url.cfg'") !== -1)
     }
+
+    function test_the_tap_serves_raw_bytes_and_acks_by_the_port() {
+        var c = TS.buildServeCommands({ bufPath: "/d/buffer-7.ogg",
+                                        srvPidPath: "/d/serve-7.pid",
+                                        scriptPath: "/opt/onair/relayserve.py",
+                                        port: 17807, seq: 7 })
+        verify(c.run.indexOf(": TS_SRV;") === 0)
+        // Raw bytes on purpose: a remuxer in this seat died at every Ogg
+        // chain boundary a reconnecting upstream wrote (measured, Lapfox).
+        verify(c.run.indexOf("python3 '/opt/onair/relayserve.py' '/d/buffer-7.ogg' 17807") !== -1)
+        verify(c.run.indexOf("echo $! > '/d/serve-7.pid'") !== -1)
+        // The ack rides the port answering, not a guessed timer — a player
+        // sent to a refused port never retries (measured).
+        verify(c.run.indexOf("__TS_SRV_UP__") !== -1)
+        verify(c.run.indexOf("__TS_SRV_DOWN__") !== -1)
+        verify(/#\s*7\s*$/.test(c.run))
+    }
+
+    function test_a_relay_stop_reaps_the_tap_too() {
+        var s = TS.buildStopCommand("/d/writer.pid", "/d/buffer-7.ogg", "/d/url.cfg", 9,
+                                    "/d/serve-7.pid")
+        verify(s.indexOf("kill -INT") !== -1)
+        verify(s.indexOf("'/d/serve-7.pid'") !== -1)
+        verify(s.indexOf("rm -f '/d/buffer-7.ogg' '/d/writer.pid' '/d/url.cfg'") !== -1)
+    }
 }
