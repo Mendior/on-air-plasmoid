@@ -48,10 +48,19 @@ Item {
     property bool relay: false
     // The loopback tap answered on its port — the player may connect.
     property bool serveUp: false
+    // Known only from the tap's UP ack: the kernel assigns the port at
+    // bind. (An early scheme derived one from the global exec counter,
+    // which every metadata poll advances — the 180-slot range recycled
+    // within minutes and a collision was a silently dead tap.)
     property int relayPort: 0
     readonly property string relayUrl: relayPort > 0 ? "http://127.0.0.1:" + relayPort + "/" : ""
     property string srvPidPath: ""
+    property string srvPortPath: ""
     property string _srvPendingRun: ""
+    // The tap gets ONE quiet relaunch per arm — a crash at bind can be
+    // transient, but a python that is missing or broken outright would
+    // answer every retry with the same DOWN forever.
+    property bool _srvRetried: false
     // The tap died mid-listen (client hiccup, port stolen, writer capped):
     // a bounded number of quiet re-arms keeps the music going; past the
     // cap the stream itself is the problem and the heal road owns it.
@@ -134,25 +143,29 @@ Item {
         var cmds = TimeshiftLogic.buildBufferCommands({
             url: url, cfgPath: cfgFilePath, outPath: bufPath, pidPath: pidPath,
             dirPath: dir, windowSec: windowMin * 60,
-            needKiB: windowMin * 2048, seq: seq
+            needKiB: TimeshiftLogic.bufferNeedKiB(windowMin, isRelay === true), seq: seq
         });
         active = true;
         relay = isRelay === true;
         if (relay) {
-            // The port rides the seq so a fast re-arm never fights its own
-            // predecessor over the bind; the range is unregistered space.
-            relayPort = 17800 + (seq % 180);
             srvPidPath = dir + "/serve-" + seq + ".pid";
-            _srvPendingRun = TimeshiftLogic.buildServeCommands({
-                bufPath: bufPath, srvPidPath: srvPidPath,
-                scriptPath: app.tsServeScriptPath(),
-                port: relayPort, seq: seq
-            }).run;
+            srvPortPath = dir + "/serve-" + seq + ".port";
+            _srvPendingRun = _serveRun(seq);
         }
         _pendingRun = cmds.run;
         _armSeq = seq;
         app.exec(cmds.writeUrl);
         return true;
+    }
+
+    // The tap's launch command for THIS arm — built from the arm's own
+    // paths so the DOWN retry re-runs the same identity, not a new one
+    // (a fresh seq would fail the ack's identity check and go ignored).
+    function _serveRun(seq) {
+        return TimeshiftLogic.buildServeCommands({
+            bufPath: bufPath, srvPidPath: srvPidPath, portPath: srvPortPath,
+            scriptPath: app.tsServeScriptPath(), seq: seq
+        }).run;
     }
 
     // A stream the backend cannot play directly: same arm, three
@@ -192,7 +205,7 @@ Item {
     function disarm() {
         if (bufPath !== "" && (active || writerUp || windowFull))
             app.exec(TimeshiftLogic.buildStopCommand(pidPath, bufPath, cfgFilePath, app.nextSeq(),
-                                                     srvPidPath));
+                                                     srvPidPath, srvPortPath));
         reset(false);
     }
 
@@ -204,7 +217,9 @@ Item {
         serveUp = false;
         relayPort = 0;
         srvPidPath = "";
+        srvPortPath = "";
         _srvPendingRun = "";
+        _srvRetried = false;
         windowFull = false;
         bufStartMs = 0;
         frozenCapturedMs = -1;
@@ -310,17 +325,31 @@ Item {
         }
         if (cmd.indexOf(": TS_SRV;") === 0) {
             if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;
-            if (stdout.indexOf("__TS_SRV_UP__") !== -1) {
+            // The port arrives IN the ack — the kernel picked it at bind,
+            // nobody here ever guessed it. An UP that lost its number is
+            // treated as a fall: pointing the player at a guess is exactly
+            // the silent-death road this handshake replaced.
+            var pm = /__TS_SRV_UP__ port=(\d+)/.exec(stdout);
+            var port = pm ? parseInt(pm[1], 10) : 0;
+            if (port > 0 && port < 65536) {
                 if (relay && active && !shifted) {
+                    relayPort = port;
                     serveUp = true;
                     app.tsPlayRelay(relayUrl);
                 }
-            } else {
-                // The tap never answered (no port, stuck pipeline — the
-                // command reaped its own children). The player stays where
-                // it is: worst case is exactly the pre-relay status quo.
-                serveUp = false;
+                return true;
             }
+            if (relay && active && !shifted && !_srvRetried) {
+                // One quiet relaunch: a crash at bind can be transient,
+                // and the writer beside the tap is perfectly healthy.
+                _srvRetried = true;
+                app.exec(_serveRun(_armSeq));
+                return true;
+            }
+            // The tap never answered twice (the command reaped its own
+            // children). The player stays where it is: worst case is
+            // exactly the pre-relay status quo.
+            serveUp = false;
             return true;
         }
         if (cmd.indexOf(": TS_RUN;") === 0) {
@@ -349,8 +378,14 @@ Item {
                 frozenCapturedMs = bufStartMs > 0 ? nowMs - bufStartMs : 0;
                 if (!shifted && shiftPosMs < 0) active = false;
             } else {
-                // No tool, no space, no dir: timeshift is a bonus, not a
-                // broken promise — fold quietly, playback is untouched.
+                // No tool, no space, no dir: for a plain arm timeshift is
+                // a bonus, not a broken promise — fold quietly. A relay
+                // arm IS the playback road, and a full disk there means
+                // the station cannot play at all: say why, or the silence
+                // reads as a dead stream.
+                if (relay && stdout.indexOf("__TS_NOSPACE__") !== -1)
+                    app.notify(i18n("Not enough free disk space"),
+                               stationName, "dialog-error");
                 if (!shifted) reset(false);
             }
             return true;

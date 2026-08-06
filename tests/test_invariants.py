@@ -174,20 +174,26 @@ def test_the_url_file_ack_asks_for_the_title_at_once():
 
 
 def test_the_popup_volume_poll_is_not_slowed_on_battery():
-    """This poll runs ONLY while the popup is open (`running: root.expanded`).
+    """This poll runs ONLY while the face is watched: with a popup that
+    means `running: root.expanded`; on a desktop containment, where
+    expanded is pinned true for the applet's life, the pointer stands in
+    and the unattended face coasts at thirty seconds instead.
 
-    Stretching it on battery bought nothing worth having: the seconds saved
+    Stretching it on BATTERY bought nothing worth having: the seconds saved
     are seconds the user spends looking straight at the slider it feeds, and
     an external volume or mute change then sat wrong on screen for all of
-    them. Pinned because it was tried and reverted.
+    them. Pinned because it was tried and reverted: no battery term in the
+    interval, and the attended rate stays at two seconds.
     """
     src = (UI / "main.qml").read_text(encoding="utf-8")
     i = src.index("id: sinkMasterPoll")
-    block = src[i:i + 700]
+    block = src[i:i + 1600]
     m = re.search(r"^\s*interval:\s*(.+)$", block, re.M)
     assert m, "sinkMasterPoll lost its interval"
-    assert "thrifty" not in m.group(1), (
+    assert "thrifty" not in m.group(1) and "onBattery" not in m.group(1), (
         "sinkMasterPoll is being slowed on battery again: %r" % m.group(1))
+    assert re.search(r"\b2000\b", m.group(1)), (
+        "the attended poll rate drifted off two seconds: %r" % m.group(1))
 
 
 def test_no_reserved_word_is_used_as_an_identifier():

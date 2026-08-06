@@ -54,11 +54,15 @@ TestCase {
         compare(TS.clampSeekMs(1000, 2000, 3000), 0)
     }
 
-    function test_the_disk_budget_keeps_headroom() {
-        // 1 GiB free, 200 MiB headroom: (1024-200) MiB at ~2 MiB/min.
-        compare(TS.maxBufferMinutes(1024 * 1024 * 1024, 200 * 1024 * 1024), 412)
-        compare(TS.maxBufferMinutes(100 * 1024 * 1024, 200 * 1024 * 1024), 0)
-        compare(TS.maxBufferMinutes(0, 0), 0)
+    function test_the_disk_preflight_charges_honest_rates() {
+        // Plain compressed radio ≈2 MiB/min (the recorder's measured
+        // estimate). A relay shell can hold FLAC — measured live at
+        // ~8 MiB/min — and for an hour's window the flat rate used to
+        // demand a quarter of what the arm was actually going to eat.
+        compare(TS.bufferNeedKiB(60, false), 122880)
+        compare(TS.bufferNeedKiB(60, true), 491520)
+        compare(TS.bufferNeedKiB(240, true), 1966080)
+        compare(TS.bufferNeedKiB(0, true), 8192)
     }
 
     function test_resume_lands_where_the_listener_stopped() {
@@ -88,10 +92,10 @@ TestCase {
         verify(c.writeUrl.indexOf("umask 077") !== -1)
         // The config write is the FIRST touch on the directory — without
         // its own mkdir the very first arm on a machine failed before the
-        // writer ever existed. The sweep may only take day-old leftovers:
-        // a fresh pid file can belong to a still-live writer.
+        // writer ever existed. The sweep takes six-hour leftovers: past
+        // the four-hour window cap no living session comes back for them.
         verify(c.writeUrl.indexOf("mkdir -p '/home/egon/.cache/onair/ts'") !== -1)
-        verify(c.writeUrl.indexOf("-mmin +1440 -delete") !== -1)
+        verify(c.writeUrl.indexOf("-mmin +360 -delete") !== -1)
     }
 
     function test_the_writer_copies_flushes_and_caps() {
@@ -123,28 +127,37 @@ TestCase {
         verify(s.indexOf("rm -f '/d/buffer.mp3' '/d/writer.pid' '/d/url.cfg'") !== -1)
     }
 
-    function test_the_tap_serves_raw_bytes_and_acks_by_the_port() {
+    function test_the_tap_serves_raw_bytes_and_reports_the_kernels_port() {
         var c = TS.buildServeCommands({ bufPath: "/d/buffer-7.ogg",
                                         srvPidPath: "/d/serve-7.pid",
+                                        portPath: "/d/serve-7.port",
                                         scriptPath: "/opt/onair/relayserve.py",
-                                        port: 17807, seq: 7 })
+                                        seq: 7 })
         verify(c.run.indexOf(": TS_SRV;") === 0)
         // Raw bytes on purpose: a remuxer in this seat died at every Ogg
         // chain boundary a reconnecting upstream wrote (measured, Lapfox).
-        verify(c.run.indexOf("python3 '/opt/onair/relayserve.py' '/d/buffer-7.ogg' 17807") !== -1)
+        // The tap gets the PORT FILE, never a port number — the kernel
+        // picks at bind, so no fixed choice is left to collide.
+        verify(c.run.indexOf("python3 '/opt/onair/relayserve.py' '/d/buffer-7.ogg' '/d/serve-7.port'") !== -1)
         verify(c.run.indexOf("echo $! > '/d/serve-7.pid'") !== -1)
-        // The ack rides the port answering, not a guessed timer — a player
-        // sent to a refused port never retries (measured).
-        verify(c.run.indexOf("__TS_SRV_UP__") !== -1)
+        // A stale port file (this arm's own failed first launch) must not
+        // fake an instant UP with a dead number in it.
+        verify(c.run.indexOf("rm -f '/d/serve-7.port'; python3") !== -1)
+        // The UP ack carries the number back; the old ss scan — which
+        // matched ANY listener and answered UP with no ss at all — is gone.
+        verify(c.run.indexOf("__TS_SRV_UP__ port=$p") !== -1)
+        verify(c.run.indexOf("ss -ltnH") === -1)
+        // The give-up road reaps the tap AND the port file it never wrote.
+        verify(c.run.indexOf("rm -f '/d/serve-7.pid' '/d/serve-7.port'") !== -1)
         verify(c.run.indexOf("__TS_SRV_DOWN__") !== -1)
         verify(/#\s*7\s*$/.test(c.run))
     }
 
     function test_a_relay_stop_reaps_the_tap_too() {
         var s = TS.buildStopCommand("/d/writer.pid", "/d/buffer-7.ogg", "/d/url.cfg", 9,
-                                    "/d/serve-7.pid")
+                                    "/d/serve-7.pid", "/d/serve-7.port")
         verify(s.indexOf("kill -INT") !== -1)
-        verify(s.indexOf("'/d/serve-7.pid'") !== -1)
+        verify(s.indexOf("rm -f '/d/serve-7.pid' '/d/serve-7.port'") !== -1)
         verify(s.indexOf("rm -f '/d/buffer-7.ogg' '/d/writer.pid' '/d/url.cfg'") !== -1)
     }
 }

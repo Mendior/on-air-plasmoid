@@ -42,7 +42,8 @@ Item {
                                : "export LC_ALL=C LANGUAGE=C; " + s);
             }
             function nextSeq() { return ++seqN; }
-            function notify(t, x, i) {}
+            property var notes: []
+            function notify(t, x, i) { notes.push({ title: t, text: x }); }
             function tsBufferDir() { return "/home/egon/.cache/onair/timeshift"; }
             function tsServeScriptPath() { return "/opt/onair/relayserve.py"; }
             function tsPlayBuffer(url, pos) { played.push({ kind: "buffer", url: url, pos: pos }); }
@@ -194,6 +195,7 @@ Item {
             verify(!r.e.active);
             verify(!r.e.writerUp);
             compare(r.mock.played.length, 0);    // playback never touched
+            compare(r.mock.notes.length, 0);     // and nobody was told
         }
 
         function test_disarm_stops_the_writer_and_removes_the_buffer() {
@@ -269,9 +271,10 @@ Item {
             compare(r.mock.execLog.length, 3);
             verify(r.mock.execLog[1].indexOf(": TS_RUN;") === 0);
             verify(r.mock.execLog[2].indexOf(": TS_SRV;") === 0);
-            // ...and the player waits for the port, not for a guessed timer.
+            // ...and the player waits for the tap to REPORT its port — the
+            // kernel picks it at bind, the engine never guesses one.
             compare(r.mock.played.length, 0);
-            r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__", 1002000);
+            r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__ port=34567", 1002000);
         }
 
         function test_a_relay_arms_and_serves_with_the_feature_off() {
@@ -284,6 +287,8 @@ Item {
             verify(r.e.serveUp);
             compare(r.mock.played.length, 1);
             compare(r.mock.played[0].kind, "relay");
+            // The address is built from the ack's number, nothing else.
+            compare(r.mock.played[0].url, "http://127.0.0.1:34567/");
             compare(r.mock.played[0].url, r.e.relayUrl);
             // Through the tap this IS live radio — nothing is shifted, so
             // the horizon machinery (the thing that stopped the file road
@@ -291,14 +296,48 @@ Item {
             verify(!r.e.shifted);
         }
 
-        function test_a_tap_that_never_answers_leaves_the_player_alone() {
+        function test_a_fallen_tap_gets_one_relaunch_then_stands_pat() {
             var r = rig({ timeshiftEnabled: false });
             r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000);
             r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
+            // A crash at bind can be transient and the writer is healthy:
+            // the first DOWN buys exactly one quiet relaunch...
             r.e.handleExec(r.mock.execLog[2], "__TS_SRV_DOWN__", 1010000);
+            compare(r.mock.execLog.length, 4);
+            verify(r.mock.execLog[3].indexOf(": TS_SRV;") === 0);
+            // ...whose UP still lands on this arm's identity...
+            compare(r.e._seqOf(r.mock.execLog[3]), r.e._seqOf(r.mock.execLog[2]));
+            // ...but a python that is broken outright answers the retry
+            // with the same DOWN, and that is the end of it.
+            r.e.handleExec(r.mock.execLog[3], "__TS_SRV_DOWN__", 1020000);
+            compare(r.mock.execLog.length, 4);
             verify(!r.e.serveUp);
             compare(r.mock.played.length, 0);    // worst case = status quo
             verify(r.e.active);                  // the buffer still grows
+        }
+
+        function test_an_up_without_a_port_is_not_trusted() {
+            // The ack format IS the contract: an UP that lost its number
+            // must ride the retry road, never point the player at a guess.
+            var r = rig({ timeshiftEnabled: false });
+            r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000);
+            r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
+            r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__", 1010000);
+            compare(r.mock.played.length, 0);
+            compare(r.mock.execLog.length, 4);   // the one quiet relaunch
+            verify(r.mock.execLog[3].indexOf(": TS_SRV;") === 0);
+        }
+
+        function test_a_relay_without_disk_says_why_the_station_is_silent() {
+            // For a plain arm a full disk folds quietly — timeshift is a
+            // bonus. A relay arm IS the playback road: the same silence
+            // there would read as a dead stream.
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            r.e.handleExec(r.mock.execLog[1], "__TS_NOSPACE__", 1005000);
+            compare(r.mock.notes.length, 1);
+            compare(r.mock.notes[0].text, "Gold");
+            verify(!r.e.active);
         }
 
         function test_a_parked_relay_returns_through_a_fresh_capture() {

@@ -33,6 +33,34 @@ import "TrackLogic.js" as TrackLogic
 PlasmoidItem {
     id: root
 
+    // On a desktop containment libplasma shows the full face inline and
+    // pins expanded true for the applet's whole life (verified against
+    // Plasma 6.7 appletquickitem.cpp: the full branch forces it). These
+    // switch sizes are what stands between a desktop user and a face
+    // crushed below its own minimum: squeezed to 16x20 gu or less, the
+    // widget folds back into the icon-plus-popup form instead. Panels
+    // are unaffected — a panel slot is far below either threshold.
+    switchWidth: Kirigami.Units.gridUnit * 16
+    switchHeight: Kirigami.Units.gridUnit * 20
+
+    // The header's pin: a pinned popup survives clicks elsewhere — the
+    // closest sanctioned thing to a floating player window (the popup
+    // cannot leave its anchor, so pinning is what Plasma offers instead).
+    // A config key rather than a session flag: the pin survives restarts.
+    hideOnWindowDeactivate: !Plasmoid.configuration.pin
+
+    readonly property bool planar: Plasmoid.formFactor === PlasmaCore.Types.Planar
+    // The desktop form's attention signal. With a popup, expanded meant
+    // "someone is looking"; inline on a desktop it is pinned true and says
+    // nothing about attention, so the pointer is the closest honest read.
+    // Set by the face's own HoverHandler; false while no face exists.
+    property bool faceHovered: false
+    onFaceHoveredChanged: {
+        // Approaching the desktop face re-arms the fast poll at once — a
+        // volume slider that catches up half a minute later reads as broken.
+        if (planar && faceHovered && sinkMasterPoll.running) sinkMasterPoll.restart();
+    }
+
     property string title: Plasmoid.title
     property string imageurl: ""
     property string metadata: ""
@@ -1052,13 +1080,19 @@ PlasmoidItem {
         id: sinkMasterPoll
         // Every tick is a shell pipeline — pactl twice, grep, head, tr — so
         // this is the most expensive repeating thing in the widget by process
-        // count, not by CPU. It runs ONLY with the popup open, which is the
-        // reason it is not slowed on battery: the seconds it costs are
+        // count, not by CPU. With a popup it runs ONLY while open, which is
+        // the reason it is not slowed on battery: the seconds it costs are
         // seconds the user is looking straight at the slider it feeds, and
         // stretching it to ten made an external volume or mute change sit
         // wrong on screen for that long. Power saved while someone stares at
         // a stale number is not power well saved.
-        interval: 2000
+        //
+        // A desktop face never closes — expanded is pinned true there — so
+        // attention is read from the pointer instead: hovered polls at the
+        // full rate, unattended coasts at thirty seconds. Left at two, this
+        // alone would spawn 43k shells a day on an idle desktop, the exact
+        // shape of the 10% CPU report issue #2 was about.
+        interval: root.planar && !root.faceHovered ? 30000 : 2000
         repeat: true
         running: root.expanded
         triggeredOnStart: true
@@ -1085,9 +1119,9 @@ PlasmoidItem {
         // pactl decides, not our cached belief. This used to flip
         // _sinkMasterMuted and send the ABSOLUTE 0 or 1 that followed from
         // it — which is the opposite of what the user asked whenever the
-        // mute moved from somewhere else since the last poll. The poll is
-        // two seconds behind on mains and ten on battery, and the keyboard
-        // mute key is exactly the "somewhere else" people use: mute from
+        // mute moved from somewhere else since the last poll. The poll runs
+        // seconds behind (up to thirty on an idle desktop face), and the
+        // keyboard mute key is exactly the "somewhere else" people use: mute from
         // the keyboard, then press the widget's speaker to get sound back,
         // and it sent set-sink-mute 1 and stayed silent.
         //
@@ -1143,8 +1177,11 @@ PlasmoidItem {
 
     ListModel { id: podcastSubsModel }      // {title, author, art, feedUrl}
     ListModel { id: podcastSearchModel }    // merged directory results, same roles
-    ListModel { id: podcastTrendingModel }  // fyyd hot list, same roles
+    ListModel { id: podcastTrendingModel }  // the charts: Apple top list, fyyd standing in
     ListModel { id: podcastEpisodesModel }  // open feed: {title,url,guid,pubMs,durationSec,sizeBytes}
+    // Episode-level hits across ALL shows — the search's second answer:
+    // {title, show, art, url, guid, feed, dateMs, durationMs}
+    ListModel { id: podcastEpSearchModel }
 
     property bool podcastSearchBusy: false
     property int _podSearchSeq: 0
@@ -1218,6 +1255,9 @@ PlasmoidItem {
     // listener left off, which is the whole promise of the position map.
     property var _podRmByTok: ({})
     property int _podRmTok: 0
+    // Files whose playback erred, awaiting shell proof of absence before
+    // the ledger row falls (shares the token counter with POD_RM).
+    property var _podGoneByTok: ({})
 
     function deletePodcastDownload(fileName) {
         var name = (fileName || "").toString();
@@ -1387,21 +1427,33 @@ PlasmoidItem {
         // The early returns bump the sequence too: an older query's XHR still
         // in flight must find itself stale, or its late response repopulates
         // the list the clear below just emptied.
-        if (q === "") { _podSearchSeq++; podcastSearchModel.clear(); podcastSearchBusy = false; return; }
+        // A single character buys four API calls and burns the shared
+        // per-IP budget the cover search also lives on — no directory
+        // answers anything useful to it anyway.
+        if (q.length < 2) {
+            _podSearchSeq++; podcastSearchModel.clear(); podcastEpSearchModel.clear();
+            podcastSearchBusy = false; return;
+        }
         // A pasted feed URL is not a directory query — the shows view offers a
         // direct "open this feed" action for it, so no iTunes round-trip here.
-        if (/^https?:\/\//i.test(q)) { _podSearchSeq++; podcastSearchModel.clear(); podcastSearchBusy = false; return; }
-        // TWO directories at once — iTunes (primary, biggest index) and
-        // fyyd.de (keyless, hands back the feed URL + artwork + author in one
-        // call). Results merge as they land, deduped by exact feed URL; a
-        // source failing or timing out just means the other one answers.
+        if (/^https?:\/\//i.test(q)) {
+            _podSearchSeq++; podcastSearchModel.clear(); podcastEpSearchModel.clear();
+            podcastSearchBusy = false; return;
+        }
+        // THREE directories at once — iTunes (primary, biggest index),
+        // fyyd.de and gpodder.net — plus iTunes again at the EPISODE level,
+        // which finds the needle no show-title search can (a topic, a guest,
+        // one famous interview). Show results merge as they land, deduped by
+        // canonical feed key; a source failing just means the others answer.
         podcastSearchBusy = true;
         var seq = ++_podSearchSeq;
         podcastSearchModel.clear();
-        _podSearchPending = 3;
+        podcastEpSearchModel.clear();
+        _podSearchPending = 4;
         _podSearchITunes(q, seq);
         _podSearchFyyd(q, seq);
         _podSearchGpodder(q, seq);
+        _podSearchEpisodes(q, seq);
     }
 
     // One merged row, whatever directory it came from: gated, capped, deduped.
@@ -1409,7 +1461,7 @@ PlasmoidItem {
     // so its art is a dead cover walking — any twin's working art beats it.
     readonly property var _podFyydArt: /^https?:\/\/img-\d+\.fyyd\.de\//i
 
-    function _podAppendSearchRow(title, author, art, feed) {
+    function _podAppendSearchRow(title, author, art, feed, rank) {
         feed = String(feed || "").trim();
         if (!PodcastLogic.urlAllowed(feed)) return;
         // Cross-directory twins wear different coats for one address —
@@ -1431,11 +1483,22 @@ PlasmoidItem {
             return;
         }
         if (podcastSearchModel.count >= 50) return;
-        podcastSearchModel.append({
+        // Sources land in whatever order the network felt like — the same
+        // query used to open with a different first row every time, the
+        // fastest directory claiming the top. Each source carries a rank
+        // (iTunes 0, fyyd 1, gpodder 2) and a row files in behind its own
+        // block, so the order is the directories' judgment, not the race's.
+        var r = rank === undefined ? 9 : rank;
+        var at = podcastSearchModel.count;
+        for (var p = 0; p < podcastSearchModel.count; p++) {
+            if (podcastSearchModel.get(p).rank > r) { at = p; break; }
+        }
+        podcastSearchModel.insert(at, {
             "title": String(title || "").substring(0, 200),
             "author": String(author || "").substring(0, 200),
             "art": PodcastLogic.urlAllowed(art) ? String(art).substring(0, 2048) : "",
-            "feedUrl": feed
+            "feedUrl": feed,
+            "rank": r
         });
     }
 
@@ -1451,7 +1514,17 @@ PlasmoidItem {
     function _podSearchITunes(q, seq) {
         var xhr = new XMLHttpRequest();
         var guard = null;
+        var aborted = false;
         xhr.onreadystatechange = function() {
+            // The same 512 KB leash the gpodder handler carries: a search
+            // answer is a few dozen KB, anything bigger is broken or hostile.
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podSearchSeq) return;   // a newer search took over
@@ -1461,7 +1534,7 @@ PlasmoidItem {
                     var r = res[i] || {};
                     root._podAppendSearchRow(r.collectionName, r.artistName,
                         String(r.artworkUrl600 || r.artworkUrl100 || "").trim(),
-                        r.feedUrl);
+                        r.feedUrl, 0);
                 }
             } catch (e) {
                 console.log("[ARP] podcastSearch(iTunes): " + e);
@@ -1470,7 +1543,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1478,7 +1551,15 @@ PlasmoidItem {
     function _podSearchFyyd(q, seq) {
         var xhr = new XMLHttpRequest();
         var guard = null;
+        var aborted = false;
         xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podSearchSeq) return;
@@ -1488,7 +1569,7 @@ PlasmoidItem {
                     var r = res[i] || {};
                     root._podAppendSearchRow(r.title, r.author,
                         String(r.smallImageURL || r.imgURL || "").trim(),
-                        r.xmlURL);
+                        r.xmlURL, 1);
                 }
             } catch (e) {
                 console.log("[ARP] podcastSearch(fyyd): " + e);
@@ -1497,7 +1578,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1527,7 +1608,7 @@ PlasmoidItem {
                     var hm = /^https?:\/\/([^\/?#:]+)/i.exec(String(r.website || ""));
                     var host = hm ? hm[1] : "";
                     root._podAppendSearchRow(r.title, host,
-                        String(r.logo_url || "").trim(), r.url);
+                        String(r.logo_url || "").trim(), r.url, 2);
                 }
             } catch (e) {
                 console.log("[ARP] podcastSearch(gpodder): " + e);
@@ -1535,23 +1616,196 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
 
-    // The worldwide charts — fyyd's hot list, the one keyless directory whose
-    // trending entries carry the feed URL directly (Apple's toplist would
-    // need a second lookup call per show). Cached for the session; `force`
-    // re-fetches.
+    // Episode-level search across every show — iTunes carries it keyless
+    // under the same endpoint (entity=podcastEpisode), and it answers the
+    // queries a show-title search cannot: a topic, a guest's name, that
+    // one famous interview. The row plays directly (the enclosure URL is
+    // in the answer) and carries its show's feed for the "open the show"
+    // road. Verified live 2026-08-06: episodeUrl + feedUrl + duration in
+    // every row.
+    function _podSearchEpisodes(q, seq) {
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        var aborted = false;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            _clearXhrTimeout(guard); guard = null;
+            if (seq !== root._podSearchSeq) return;
+            try {
+                var res = JSON.parse(xhr.responseText || "{}").results || [];
+                for (var i = 0; i < res.length && podcastEpSearchModel.count < 30; i++) {
+                    var r = res[i] || {};
+                    var eurl = String(r.episodeUrl || "").trim();
+                    if (!PodcastLogic.urlAllowed(eurl)) continue;
+                    var seen = false;
+                    for (var d = 0; d < podcastEpSearchModel.count; d++)
+                        if (podcastEpSearchModel.get(d).url === eurl) { seen = true; break; }
+                    if (seen) continue;
+                    var eart = String(r.artworkUrl600 || r.artworkUrl160 || r.artworkUrl100 || "").trim();
+                    var efeed = String(r.feedUrl || "").trim();
+                    var dm = Date.parse(String(r.releaseDate || ""));
+                    podcastEpSearchModel.append({
+                        "title": String(r.trackName || "").substring(0, 200),
+                        "show": String(r.collectionName || "").substring(0, 200),
+                        "art": PodcastLogic.urlAllowed(eart) ? eart.substring(0, 2048) : "",
+                        "url": eurl,
+                        "guid": String(r.episodeGuid || "").substring(0, 512),
+                        "feed": PodcastLogic.urlAllowed(efeed) ? efeed.substring(0, 2048) : "",
+                        "dateMs": isFinite(dm) ? dm : 0,
+                        "durationMs": Number(r.trackTimeMillis) > 0 ? Number(r.trackTimeMillis) : 0
+                    });
+                }
+            } catch (e) {
+                console.log("[ARP] podcastSearch(episodes): " + e);
+            }
+            root._podSearchSettle(seq);
+        };
+        xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
+                        + encodeURIComponent(q));
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        guard = _armXhrTimeout(xhr, 10000);
+        xhr.send();
+    }
+
+    // The charts. Apple's per-country top list is keyless and fresh, and
+    // ONE batch lookup turns its ids into feed URLs — two requests for a
+    // local Top 25. fyyd's worldwide hot list stands in when Apple
+    // refuses: for a small country it is no replacement (measured
+    // 2026-08-06: fyyd has zero Estonian shows — 'et' is not even in its
+    // language list), but it is better than an empty pane. Cached for the
+    // session; `force` re-fetches.
     function podcastLoadTrending(force) {
         if (podcastTrendingBusy) return;
         if (!force && podcastTrendingModel.count > 0) return;
         var seq = ++_podTrendSeq;
         podcastTrendingBusy = true;
+        _podTrendApple(seq);
+    }
+
+    function _podTrendRow(title, author, art, feed) {
+        if (podcastTrendingModel.count >= 30) return;
+        feed = String(feed || "").trim();
+        if (!PodcastLogic.urlAllowed(feed)) return;
+        podcastTrendingModel.append({
+            "title": String(title || "").substring(0, 200),
+            "author": String(author || "").substring(0, 200),
+            "art": PodcastLogic.urlAllowed(art) ? String(art).substring(0, 2048) : "",
+            "feedUrl": feed
+        });
+    }
+
+    function _podTrendApple(seq) {
+        var cc = /^[A-Za-z]{2}$/.test(homeCountryCode) ? homeCountryCode.toLowerCase() : "us";
         var xhr = new XMLHttpRequest();
         var guard = null;
+        var aborted = false;
         xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            _clearXhrTimeout(guard); guard = null;
+            if (seq !== root._podTrendSeq) return;
+            var ids = [];
+            var meta = {};
+            try {
+                var res = (JSON.parse(xhr.responseText || "{}").feed || {}).results || [];
+                for (var i = 0; i < res.length && ids.length < 25; i++) {
+                    var r = res[i] || {};
+                    var id = String(r.id || "").trim();
+                    if (!/^\d{1,12}$/.test(id)) continue;
+                    ids.push(id);
+                    meta[id] = { "name": String(r.name || ""), "artist": String(r.artistName || ""),
+                                 "art": String(r.artworkUrl100 || "").trim() };
+                }
+            } catch (e) {
+                console.log("[ARP] podcastTrending(apple): " + e);
+            }
+            if (ids.length === 0) { root._podTrendFyyd(seq); return; }
+            root._podTrendAppleResolve(seq, ids, meta);
+        };
+        xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
+                        + "/podcasts/top/25/podcasts.json");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        guard = _armXhrTimeout(xhr, 10000);
+        xhr.send();
+    }
+
+    // The chart names shows; subscribing needs their FEEDS. One lookup
+    // call resolves the whole list, and the walk keeps the CHART's order —
+    // the lookup answers in whatever order it pleases.
+    function _podTrendAppleResolve(seq, ids, meta) {
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        var aborted = false;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            _clearXhrTimeout(guard); guard = null;
+            if (seq !== root._podTrendSeq) return;
+            var byId = {};
+            try {
+                var res = JSON.parse(xhr.responseText || "{}").results || [];
+                for (var i = 0; i < res.length; i++) {
+                    var r = res[i] || {};
+                    byId[String(r.collectionId || "")] = {
+                        "feed": String(r.feedUrl || "").trim(),
+                        "art": String(r.artworkUrl600 || "").trim()
+                    };
+                }
+            } catch (e) {
+                console.log("[ARP] podcastTrending(lookup): " + e);
+            }
+            podcastTrendingModel.clear();
+            for (var k = 0; k < ids.length; k++) {
+                var m = meta[ids[k]] || {};
+                var hit = byId[ids[k]];
+                if (!hit || hit.feed === "") continue;
+                root._podTrendRow(m.name, m.artist, hit.art || m.art, hit.feed);
+            }
+            if (podcastTrendingModel.count === 0) { root._podTrendFyyd(seq); return; }
+            root.podcastTrendingBusy = false;
+        };
+        xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        guard = _armXhrTimeout(xhr, 10000);
+        xhr.send();
+    }
+
+    function _podTrendFyyd(seq) {
+        var xhr = new XMLHttpRequest();
+        var guard = null;
+        var aborted = false;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
+                    aborted = true;
+                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
+                }
+                return;
+            }
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podTrendSeq) return;
@@ -1561,22 +1815,16 @@ PlasmoidItem {
                 var res = JSON.parse(xhr.responseText || "{}").data || [];
                 for (var i = 0; i < res.length && podcastTrendingModel.count < 30; i++) {
                     var r = res[i] || {};
-                    var feed = String(r.xmlURL || "").trim();
-                    if (!PodcastLogic.urlAllowed(feed)) continue;
-                    var art = String(r.smallImageURL || r.imgURL || "").trim();
-                    podcastTrendingModel.append({
-                        "title": String(r.title || "").substring(0, 200),
-                        "author": String(r.author || "").substring(0, 200),
-                        "art": PodcastLogic.urlAllowed(art) ? String(art).substring(0, 2048) : "",
-                        "feedUrl": feed
-                    });
+                    root._podTrendRow(r.title, r.author,
+                                      String(r.smallImageURL || r.imgURL || "").trim(),
+                                      String(r.xmlURL || "").trim());
                 }
             } catch (e) {
                 console.log("[ARP] podcastLoadTrending: " + e);
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1620,22 +1868,42 @@ PlasmoidItem {
             _clearXhrTimeout(guard); guard = null;
             if (seq !== root._podFeedSeq) return;
             root.podcastFeedLoading = false;
+            // urlAllowed vetted the FIRST address only — Qt follows the
+            // redirects internally. A feed answering from the LAN must not
+            // have its body parsed into enclosures: the same last-hop gate
+            // the playlist unwrapper carries.
+            if (!HostGuard.answerFromPublicHost(xhr)) {
+                root.podcastFeedError = i18n("This feed address is not allowed.");
+                return;
+            }
             // A capped body still parses — RSS carries the newest items first.
             var feed = PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50);
             if (!feed.ok) {
+                // Transport failure is not directory rot: a timeout, a DNS
+                // blip or a 5xx must neither blame the address nor call the
+                // rescue — one 15 s hiccup used to rewrite a living feed's
+                // subscription to whatever iTunes matched the title to,
+                // permanently.
+                // "hiccup", not "transient": the latter is an ECMAScript
+                // future-reserved word, and Qt 6.10's parser rejects those
+                // as identifiers outright — the `var final` lesson.
+                var hiccup = xhr.status === 0 || xhr.status === 408
+                             || xhr.status === 429 || xhr.status >= 500;
                 // Directory rot is ordinary: fyyd and gpodder carry
                 // addresses their crawlers last saw months ago. Before the
                 // honest error, one rescue — the same cure the stations
                 // have: ask iTunes for the show BY TITLE and follow where
                 // it lives today. A subscribed show heals PERMANENTLY.
-                if (!root._podFeedNoRescue && (showTitle || "") !== "") {
+                if (!hiccup && !root._podFeedNoRescue && (showTitle || "") !== "") {
                     root._podFeedRescue(seq, feedUrl, showTitle, showArt || "",
                                         xhr.status);
                     return;
                 }
-                root.podcastFeedError = xhr.status >= 400
-                    ? i18n("The feed did not answer (error %1).", xhr.status)
-                    : i18n("This address is not a podcast feed.");
+                root.podcastFeedError = xhr.status === 0
+                    ? i18n("The feed could not be reached — check the connection and try again.")
+                    : xhr.status >= 400
+                      ? i18n("The feed did not answer (error %1).", xhr.status)
+                      : i18n("This address is not a podcast feed.");
                 return;
             }
             if (root.podcastEpisodesTitle === "" && feed.title !== "")
@@ -1650,7 +1918,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1682,9 +1950,11 @@ PlasmoidItem {
             } catch (e) {}
             if (fresh === "") {
                 root.podcastFeedLoading = false;
-                root.podcastFeedError = deadStatus >= 400
-                    ? i18n("The feed did not answer (error %1).", deadStatus)
-                    : i18n("This address is not a podcast feed.");
+                root.podcastFeedError = deadStatus === 0
+                    ? i18n("The feed could not be reached — check the connection and try again.")
+                    : deadStatus >= 400
+                      ? i18n("The feed did not answer (error %1).", deadStatus)
+                      : i18n("This address is not a podcast feed.");
                 return;
             }
             console.log("[ARP] podcast feed heal: " + _hostOf(deadFeed) + " -> " + _hostOf(fresh));
@@ -1706,7 +1976,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1846,9 +2116,14 @@ PlasmoidItem {
         // folder model never lists a half-written file as playable. The
         // size cap guards the disk; -f keeps HTTP errors out of the file.
         // The config file is spent the moment curl exits, either way.
+        // Redirects stay on http(s) and stop at ten hops: urlAllowed vets
+        // only the FIRST address, and a hostile enclosure answering with
+        // a Location elsewhere must not widen what -L will follow — the
+        // same leash the favicon fetcher already wears.
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
-            + "curl -fSL --max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.29' -o " + part + " -K " + cfg + "; "
+            + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
+            + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
+            + "-A 'OnAir/2026.30' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1944,32 +2219,50 @@ PlasmoidItem {
                 // The LEGACY (title-only) name is the right stable identity
                 // here: the tagged name folds the guid back in, and for a
                 // guid-less feed that is exactly what this branch cannot use.
-                var nk = newest.guid !== "" ? PodcastLogic.episodeKey(newest.guid, newest.url)
-                                            : "t:" + podcastFileNameLegacy(newest.title, newest.url);
+                var seenKeyOf = function(ep) {
+                    return ep.guid !== "" ? PodcastLogic.episodeKey(ep.guid, ep.url)
+                                          : "t:" + podcastFileNameLegacy(ep.title, ep.url);
+                };
+                var nk = seenKeyOf(newest);
                 var known = _podSeen[job.feed];
                 if (known === undefined) {
                     _podSeen[job.feed] = nk;      // first acquaintance: quiet
                 } else if (known !== nk) {
+                    // Everything ABOVE the remembered key is news. Only the
+                    // newest used to count: a show dropping two episodes
+                    // between cycles announced one, and the other never got
+                    // a word or a byte. The walk stops at ten — a feed that
+                    // rewrote every key wholesale (token rotation) is not a
+                    // ten-episode news day, so it falls back to the newest.
+                    var fresh = [];
+                    for (var fi = 0; fi < feed.episodes.length && fi < 10; fi++) {
+                        if (seenKeyOf(feed.episodes[fi]) === known) break;
+                        fresh.push(feed.episodes[fi]);
+                    }
+                    if (fresh.length === 0 || fresh.length >= 10) fresh = [newest];
                     _podSeen[job.feed] = nk;
                     _podRefreshNews.push(_sanitizeDeviceName(job.title || feed.title || ""));
-                    var epKey = PodcastLogic.episodeKey(newest.guid, newest.url);
-                    // Either name counts as "already here": episodes fetched
-                    // before the tag existed sit under the legacy one.
-                    var legacyName = podcastFileNameLegacy(newest.title, newest.url);
-                    var already = _podDownloads[podcastFileName(newest.title, newest.url,
-                                                                job.feed, newest.guid)] !== undefined
-                                  || (_podDownloads[legacyName] !== undefined
-                                      && podcastLegacyIsOurs(legacyName, job.feed,
-                                                             newest.guid, newest.url));
-                    if (Plasmoid.configuration.podcastAutoDownload === true
-                        && !already && !isEpisodePlayed(epKey)) {
-                        // Counted only when the queue actually TOOK it — a
-                        // full line must not inflate the aggregate's claim.
-                        if (_podEnqueueDownload({ "title": newest.title, "url": newest.url,
-                                "guid": newest.guid, "show": job.title || feed.title || "",
-                                "art": job.art || feed.image || "", "feed": job.feed,
-                                "auto": true }))
-                            _podRefreshDls++;
+                    for (var ni = 0; ni < fresh.length && ni < 3; ni++) {
+                        var ep = fresh[ni];
+                        var epKey = PodcastLogic.episodeKey(ep.guid, ep.url);
+                        // Either name counts as "already here": episodes fetched
+                        // before the tag existed sit under the legacy one.
+                        var legacyName = podcastFileNameLegacy(ep.title, ep.url);
+                        var already = _podDownloads[podcastFileName(ep.title, ep.url,
+                                                                    job.feed, ep.guid)] !== undefined
+                                      || (_podDownloads[legacyName] !== undefined
+                                          && podcastLegacyIsOurs(legacyName, job.feed,
+                                                                 ep.guid, ep.url));
+                        if (Plasmoid.configuration.podcastAutoDownload === true
+                            && !already && !isEpisodePlayed(epKey)) {
+                            // Counted only when the queue actually TOOK it — a
+                            // full line must not inflate the aggregate's claim.
+                            if (_podEnqueueDownload({ "title": ep.title, "url": ep.url,
+                                    "guid": ep.guid, "show": job.title || feed.title || "",
+                                    "art": job.art || feed.image || "", "feed": job.feed,
+                                    "auto": true }))
+                                _podRefreshDls++;
+                        }
                     }
                 }
             }
@@ -2043,10 +2336,13 @@ PlasmoidItem {
             if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
             done = true;
             _clearXhrTimeout(guard); guard = null;
+            // Same last-hop gate as the visible loader: a feed that
+            // redirected into the LAN answers nothing to the refresh.
+            if (!HostGuard.answerFromPublicHost(xhr)) { cb(null); return; }
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -2384,6 +2680,8 @@ PlasmoidItem {
         // global "" and the just-set feed are always kept.
         _podSpeeds = PodcastLogic.prunePodSpeeds(_podSpeeds, 300);
         Plasmoid.configuration.podcastSpeeds = JSON.stringify(_podSpeeds);
+        // The desk's media controls show Rate — tell them it moved.
+        _mprisQueueWrite();
     }
     function cyclePodcastRate() {
         setPodcastRate(PodcastLogic.nextRate(podcastRate));
@@ -4307,7 +4605,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.29");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4520,6 +4818,12 @@ PlasmoidItem {
     // suffix — those belong to the caller's own round-trip — and the caller
     // must be in the C locale, because the awk reads pactl's English labels.
     function btProfileBounceShell(mac) {
+        // Both callers validate upstream today, but this value lands in an
+        // awk pattern AND an unquoted shell word — a root-of-trust seat.
+        // The gate lives here too, so the third caller someone adds in a
+        // year is covered the day they add it. "true" keeps the returned
+        // fragment harmless in any command position a caller splices it.
+        if (!_btValidMac(mac)) return "true";
         const macU = String(mac).replace(/:/g, "_");
         return "c=bluez_card." + macU
              + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + macU + "/{f=1}"
@@ -4601,8 +4905,13 @@ PlasmoidItem {
     // re-checks and falls back to a plain stop when the buffer is not
     // ready after all — an optimistic icon for the first seconds is
     // cheaper than a flickering one).
+    // A preview normally cannot pause — an audition has no buffer to hold
+    // it. Through the relay it HAS one (the relay arms for auditions too,
+    // that is how they play at all), and a FLAC listener lives in search
+    // previews — so where the buffer exists, the pause is honest.
     readonly property bool tsPauseAvailable: timeshift.active && timeshift.writerUp
-                                             && !_casting && _previewUrl === ""
+                                             && !_casting
+                                             && (_previewUrl === "" || timeshift.relay)
                                              && _podPlayingKey === "" && !timeshift.shifted
 
     function tsBufferDir() {
@@ -4711,7 +5020,13 @@ PlasmoidItem {
             playMusic.pause();
             return true;
         }
-        if (_casting || _previewUrl !== "" || _podPlayingKey !== "") return false;
+        if (_casting || _podPlayingKey !== "") return false;
+        // An audition through the relay has a real buffer growing behind
+        // it, so its pause can honestly promise a resume. Every other
+        // preview keeps the old meaning: stop. This is the difference a
+        // FLAC listener actually feels — their stations live in search
+        // results, and the pause used to throw the audition away.
+        if (_previewUrl !== "" && !(timeshift.relay && timeshift.active)) return false;
         var pos = timeshift.pauseGesture(Date.now());
         if (pos < 0) return false;
         infoTimer.stop();
@@ -4720,8 +5035,12 @@ PlasmoidItem {
         root._wantsPlaying = false;
         fadeOutAnimation.stop();
         _abortSleepFade();
-        playMusic.stop();
+        // The flag goes up BEFORE the stop: stop() delivers its state
+        // signals synchronously, and the not-playing road clears the track
+        // title and cover — a park must keep showing the sentence it parked
+        // on, not fall back to the station logo.
         root._tsPaused = true;
+        playMusic.stop();
         return true;
     }
 
@@ -5733,8 +6052,29 @@ PlasmoidItem {
 
     // The 👍 — one vote per station per 10 minutes (the API's own limit).
     function voteCurrentStation() {
+        if (_voteStatus !== "") return;
+        // An audition carries its directory identity from the search row —
+        // no config entry to resolve through, and no reason a listener who
+        // found a station they like should have to save it before thanking
+        // it. The FLAC crowd lives in previews; this is where they vote.
+        if (root._previewUrl !== "" && root._previewUuid !== "") {
+            _voteStatus = "busy";
+            var pvUrl = root._previewUrl;
+            _rbFetch("/json/vote/" + encodeURIComponent(root._previewUuid), 5000, function(xhr) {
+                var pok = false;
+                try { pok = xhr && JSON.parse(xhr.responseText).ok === true; } catch (e) {}
+                if (pok) {
+                    root._voteLockMap[pvUrl] = Date.now();
+                    if (root._previewUrl === pvUrl) root._voteStatus = "voted";
+                } else if (root._previewUrl === pvUrl && root._voteStatus === "busy") {
+                    root._voteStatus = "";
+                }
+            }, true);
+            voteResetTimer.restart();
+            return;
+        }
         var entry = _stationEntry();
-        if (!entry || _voteStatus !== "") return;
+        if (!entry) return;
         _voteStatus = "busy";
         var votedUrl = entry.hostname;
         _rbResolveUuid(function(uuid) {
@@ -6188,6 +6528,19 @@ PlasmoidItem {
         root._icyQueryUrl = u;
         var scriptPath = Qt.resolvedUrl("reader.py").toString().substring(7);
         var safeScript = scriptPath.replace(/'/g, "'\\''");
+        // A relayed Ogg station's titles live in its own buffer file — the
+        // stream has no ICY interleave to poll, the player surfaces none of
+        // its comment tags (measured), and the bytes are already on disk.
+        // Reading them there opens no second connection anywhere.
+        if (timeshift.relay && timeshift.active && timeshift.bufPath !== ""
+            && u === timeshift.streamUrl) {
+            if (root._icyInFlight) return;
+            var safeBuf = timeshift.bufPath.replace(/'/g, "'\\''");
+            root._icyInFlight = true;
+            executable.exec("python3 '" + safeScript + "' --oggbuf '" + safeBuf
+                            + "' # ICYGEN " + root._icyUrlGen + " " + nextSeq());
+            return;
+        }
         var safeFile = _icyUrlFile.replace(/'/g, "'\\''");
         // The URL changed (a station switch, the first poll of a play): rewrite
         // the owner-only file and SKIP this one poll, so the write lands before
@@ -6721,10 +7074,22 @@ PlasmoidItem {
             art: root.albumArtUrl || root.imageurl
                  || root.faviconSrc(root.currentStationFavicon) || "",
             volume: playMusicOutput.volume,
-            canGoNext: stationsModel.count > 1,
-            canGoPrevious: stationsModel.count > 1,
+            // With an episode on, the headset's Next/Previous skip INSIDE
+            // it — so the arrows stay lit even with a one-station list.
+            canGoNext: _podPlayingKey !== "" || stationsModel.count > 1,
+            canGoPrevious: _podPlayingKey !== "" || stationsModel.count > 1,
             canPlay: stationsModel.count > 0,
-            canPause: isPlaying() || _casting || _tsPaused || timeshift.shifted
+            canPause: isPlaying() || _casting || _tsPaused || timeshift.shifted,
+            // The podcast half of the bridge. Position is an ANCHOR, not a
+            // stream: the daemon extrapolates from it while Playing, and a
+            // jump (skip, chapter tap, an MPRIS seek) re-anchors it through
+            // the discontinuity watch beside the command reader.
+            episode: _podPlayingKey !== "",
+            positionMs: Math.max(0, Math.round(playMusic.position)),
+            durationMs: _podPlayingKey !== "" && playMusic.duration > 0
+                        ? Math.round(playMusic.duration) : 0,
+            rate: _podPlayingKey !== "" ? playMusic.playbackRate : 1.0,
+            canSeek: _podPlayingKey !== "" && playMusic.seekable
         };
         var json = JSON.stringify(state).replace(/'/g, "'\\''");
         var safe = _mprisStateFile.replace(/'/g, "'\\''");
@@ -6774,16 +7139,39 @@ PlasmoidItem {
                 refreshServer(idx);
             }
         } else if (cmd === "Next") {
+            // Mid-episode the headset's Next means "onward INSIDE it" —
+            // jumping to a radio station over a half-heard episode was the
+            // bridge's single worst podcast habit. Mirrors the on-screen
+            // skip buttons: +30 forward, -15 back.
+            if (_podPlayingKey !== "" && isPlaying()) { podcastSkip(30); return; }
             if (stationsModel.count < 1) return;
             var next = (lastPlay + 1) % stationsModel.count;
             lastPlay = next;
             refreshServer(next);
         } else if (cmd === "Previous") {
+            if (_podPlayingKey !== "" && isPlaying()) { podcastSkip(-15); return; }
             if (stationsModel.count < 1) return;
             var prev = lastPlay - 1;
             if (prev < 0) prev = stationsModel.count - 1;
             lastPlay = prev;
             refreshServer(prev);
+        } else if (cmd.indexOf("Seek ") === 0) {
+            // MPRIS offsets ride in microseconds.
+            var us = parseFloat(cmd.substring(5));
+            if (isFinite(us) && _podPlayingKey !== "" && isPlaying())
+                podcastSkip(us / 1000000);
+        } else if (cmd.indexOf("SetPos ") === 0) {
+            var pus = parseFloat(cmd.substring(7));
+            if (isFinite(pus) && pus >= 0 && _podPlayingKey !== "" && isPlaying()
+                && playMusic.seekable) {
+                var tgt = pus / 1000;
+                if (playMusic.duration > 0) tgt = Math.min(tgt, playMusic.duration);
+                playMusic.position = tgt;
+                _mprisQueueWrite();
+            }
+        } else if (cmd.indexOf("Rate ") === 0) {
+            var rr = parseFloat(cmd.substring(5));
+            if (isFinite(rr) && _podPlayingKey !== "") setPodcastRate(rr);
         } else if (cmd.indexOf("Volume ") === 0) {
             var v = parseFloat(cmd.substring(7));
             if (!isNaN(v)) {
@@ -7284,6 +7672,21 @@ PlasmoidItem {
                 } else if (rmName !== undefined
                            && (stdout || "").indexOf("__POD_RM_OK__") === -1) {
                     console.warn("[ARP] podcast delete: file still present — ledger kept for " + rmName);
+                }
+                return;
+            }
+            // A playback error blamed a file; the row falls only if the
+            // file is PROVABLY missing — a healthy download whose decode
+            // hiccuped keeps its cover and resume point.
+            if (cmd.indexOf(": POD_GONE") === 0) {
+                var goneM = cmd.match(/^: POD_GONE (\d+);/);
+                var goneName = goneM ? root._podGoneByTok[goneM[1]] : undefined;
+                if (goneM) delete root._podGoneByTok[goneM[1]];
+                if (goneName !== undefined
+                    && (stdout || "").indexOf("__POD_GONE__") !== -1
+                    && root._podDownloads[goneName] !== undefined) {
+                    delete root._podDownloads[goneName];
+                    root._savePodDownloads();
                 }
                 return;
             }
@@ -8023,8 +8426,12 @@ PlasmoidItem {
             // when the StreamUrl part is empty ("Title\t\n") and break '::' titles.
             var formattedText = (stdout || "").replace(/[\r\n]+$/, "");
             if (!isPlaying()) {
-                root.metadata = "";
-                root.title = Plasmoid.title;
+                // An in-flight reader landing on a timeshift park must not
+                // wipe the parked sentence off the header.
+                if (!root._tsPaused && !timeshift.shifted) {
+                    root.metadata = "";
+                    root.title = Plasmoid.title;
+                }
                 return;
             }
             if (formattedText === "__NO_ICY__") {
@@ -8090,10 +8497,12 @@ PlasmoidItem {
                 && playMusic.source.toString() === timeshift.relayUrl) {
                 if (timeshift.relayPlaybackFell(Date.now())) return;
             }
-            // A podcast FILE that errors is almost always gone — cleaned by
-            // hand outside the app while its ledger row stayed. Prune the
-            // row and continue the show with the next real file; only a
-            // show with nothing left surfaces the error.
+            // A podcast FILE that errors is USUALLY gone — cleaned by hand
+            // outside the app while its ledger row stayed. Usually is not
+            // always: a codec or audio-stack hiccup lands here too, and the
+            // row must not lose its cover and resume point over one of
+            // those — so the prune waits for shell proof that the file is
+            // really missing (the POD_GONE round-trip below).
             var pfSrc = playMusic.source.toString();
             if (root._podPlayingKey !== "" && pfSrc === root._podPlayingUrl) {
                 var deadKey = root._podPlayingKey;
@@ -8110,8 +8519,11 @@ PlasmoidItem {
                 root._podSilCur = [];
                 root._podChaptersCur = [];
                 if (deadFile !== "") {
-                    delete root._podDownloads[deadFile];
-                    root._savePodDownloads();
+                    var goneTok = ++root._podRmTok;
+                    root._podGoneByTok[goneTok] = deadFile;
+                    executable.exec(": POD_GONE " + goneTok + "; [ ! -e "
+                        + PodcastLogic.shQuote(root.downloadDirPath + "/Podcasts/" + deadFile)
+                        + " ] && echo __POD_GONE__; true # " + nextSeq());
                 }
                 if (root._podPlayUpNextHead()) return;
                 if (Plasmoid.configuration.podcastContinuous !== false && deadFeed) {
@@ -8181,7 +8593,10 @@ PlasmoidItem {
         }
         onPlayingChanged: {
             if (!isPlaying()) {
-                root.metadata = "";
+                // A timeshift park (or a shifted reader mid-reopen) is not a
+                // stop: the listener comes back to this exact sentence, and
+                // the title, artist and cover stay put waiting for them.
+                if (!root._tsPaused && !timeshift.shifted) root.metadata = "";
                 infoTimer.stop();
             }
             _mprisQueueWrite();
@@ -8954,6 +9369,30 @@ PlasmoidItem {
         repeat: false
         running: false
         onTriggered: _mprisWriteState()
+    }
+
+    // The bridge extrapolates Position between state writes; only a JUMP
+    // (skip button, chapter tap, silence skip, an MPRIS seek) needs to
+    // re-anchor it. Ordinary playback flows smoothly and writes nothing —
+    // stamping the file four times a second was never on the table.
+    property double _mprisPosLast: -1
+    property double _mprisPosWall: 0
+    Connections {
+        target: playMusic
+        enabled: _mprisStarted && root._podPlayingKey !== ""
+        function onPositionChanged() {
+            var noww = Date.now();
+            if (root._mprisPosLast >= 0 && root._mprisPosWall > 0) {
+                var expected = root._mprisPosLast
+                               + (noww - root._mprisPosWall) * playMusic.playbackRate;
+                if (Math.abs(playMusic.position - expected) > 2500) _mprisQueueWrite();
+            }
+            root._mprisPosLast = playMusic.position;
+            root._mprisPosWall = noww;
+        }
+        function onSourceChanged() { root._mprisPosLast = -1; }
+        // The duration lands once the media loads — mpris:length waits on it.
+        function onDurationChanged() { _mprisQueueWrite(); }
     }
 
     P5Support.DataSource {

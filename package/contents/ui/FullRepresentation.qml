@@ -41,6 +41,17 @@ PlasmaExtras.Representation {
     Layout.preferredHeight: Kirigami.Units.gridUnit * 32
     collapseMarginsHint: true
 
+    // The desktop form's attention signal. With a popup, expanded meant
+    // "someone is looking"; inline on a desktop it is pinned true, so the
+    // pointer is the closest honest read. Feeds the pollers that price
+    // themselves by attention (master-volume, BT heartbeat).
+    HoverHandler {
+        onHoveredChanged: root.faceHovered = hovered
+        // A face torn down mid-hover (squeezed below the switch sizes)
+        // must not leave the fast poll rate latched on.
+        Component.onDestruction: root.faceHovered = false
+    }
+
     // Urls whose image failed to LOAD (404, broken file) — _bestArtUrl skips
     // them so the chain falls through to the next candidate instead of
     // showing the placeholder forever. Keyed by exact url, so a new track's
@@ -494,12 +505,43 @@ PlasmaExtras.Representation {
         return m
     }
 
+    // The directory's own country list, folded name → code, fetched once
+    // per session the first time a search runs. The hand map above stays
+    // the first word (it carries the Estonian names the directory has
+    // never heard of); this map is the other 200-odd countries — before
+    // it, "salsa in mexico" scoped nothing because mexico was simply not
+    // in the hand-written thirty.
+    property var _countryMapApiFolded: ({})
+    property bool _countryListAsked: false
+
+    function _ensureCountryList() {
+        if (fullRepresentation._countryListAsked) return
+        fullRepresentation._countryListAsked = true
+        root._rbFetch("/json/countries", 5000, function(xhr) {
+            if (!xhr || xhr.status !== 200) {
+                // One honest retry on the NEXT search — a mirror hiccup at
+                // the first keystroke must not cost the whole session its
+                // country vocabulary.
+                fullRepresentation._countryListAsked = false
+                return
+            }
+            try {
+                fullRepresentation._countryMapApiFolded =
+                    SearchLogic.countryMapFromApi(JSON.parse(xhr.responseText))
+            } catch (e) {
+                console.log("[ARP] country list parse: " + e)
+            }
+        })
+    }
+
     // A prototype-safe country-map lookup: a plain `in` also matched
     // Object.prototype keys, so searching "constructor" went to the
     // country branch with an undefined code (the null-prototype folded
     // map keeps that guarantee without the hasOwnProperty dance).
     function _countryCodeOf(q) {
-        var code = _countryMapFolded[SearchLogic.fold(q)]
+        var f = SearchLogic.fold(q)
+        var code = _countryMapFolded[f]
+        if (code === undefined) code = fullRepresentation._countryMapApiFolded[f]
         return code === undefined ? "" : code
     }
 
@@ -524,6 +566,9 @@ PlasmaExtras.Representation {
 
     function runWebSearch(q, releaseScope) {
         q = (q || "").trim()
+        // The country vocabulary rides in lazily with the first search of
+        // the session — a listener who never searches never fetches it.
+        _ensureCountryList()
         // A chip click runs the search NOW — a debounce still pending from
         // typing would fire the same query a beat later as a duplicate.
         webSearchDebounce.stop()
@@ -602,8 +647,12 @@ PlasmaExtras.Representation {
         else if (mode === "language")
             qs = "/json/stations/search?language=" + encodeURIComponent(q.toLowerCase())
         else if (mode === "country" || cc !== "")
+            // The name fallback goes out capitalized: the directory's
+            // country filter is a case-sensitive substring (measured —
+            // country=mexico answers nothing, country=Mexico plenty).
             qs = cc !== "" ? "/json/stations/search?countrycode=" + cc
-                           : "/json/stations/search?country=" + encodeURIComponent(q)
+                           : "/json/stations/search?country="
+                             + encodeURIComponent(SearchLogic.countryQueryForm(q))
         else
             qs = "/json/stations/search?name=" + encodeURIComponent(q)
         fullRepresentation._webLastQs = qs + tail
@@ -617,15 +666,18 @@ PlasmaExtras.Representation {
             if (gotAnswer && mode === "all" && cc === "")
                 _webBoostRelevance(q)
             _probeKick(seq)
-            // Genre pass: a one-word query is as likely a genre as a name —
-            // the search field literally suggests "jazz", yet the query only
+            // Genre pass: a short query is as likely a genre as a name — the
+            // search field literally suggests "jazz", yet the query only
             // ever ran against station names. Tag matches fill in after the
-            // name matches, deduped, same 30-row cap. A scoped query ("70s in
-            // UK") ALWAYS takes this pass, any word count — inside a country
-            // the genre reading is the whole point, and tags can be multiword.
+            // name matches, deduped, same 30-row cap. Up to three words,
+            // because tags themselves are multiword ("smooth jazz" is a real
+            // tag with real stations — measured — and the one-word gate sent
+            // it past this pass to the name roads alone). A scoped query
+            // ("70s in UK") takes the pass at any length — inside a country
+            // the genre reading is the whole point.
             if (gotAnswer && mode === "all" && cc === ""
                 && webResultsModel.count < fullRepresentation.webResultCap
-                && (/^\S+$/.test(q) || scoped !== null || scopeCc !== "")) {
+                && (SearchLogic.words(q).length <= 3 || scoped !== null || scopeCc !== "")) {
                 var tagQs = "/json/stations/search?tag="
                             + encodeURIComponent(q.toLowerCase())
                 var beforeTag = webResultsModel.count
@@ -994,8 +1046,13 @@ PlasmaExtras.Representation {
     }
 
     // ── 2026 aurora background: two slowly drifting light blobs ──────────
-    // NB: all animations are paused when the popup is closed (root.expanded) —
-    // otherwise plasmashell would burn CPU 24/7 (a standard KDE reviewer requirement).
+    // NB: every infinite animation in this file prices itself by visibility:
+    // paused with the popup closed (root.expanded — a hidden popup must not
+    // burn CPU 24/7, a standard KDE reviewer requirement) and held by
+    // thrifty on battery. On a desktop containment expanded is pinned true
+    // for the applet's whole life, so the blobs take one brake more: an
+    // idle desktop face keeps a still gradient and only drifts while a
+    // stream actually plays (idle drift alone measured 3.4% CPU).
     Item {
         id: aurora
         anchors.fill: parent
@@ -1024,13 +1081,21 @@ PlasmaExtras.Representation {
 
             SequentialAnimation on x {
                 loops: Animation.Infinite
-                paused: running && (!root.expanded || root.thrifty)
+                // running, not paused: a paused SequentialAnimation keeps its
+                // current child ticking (measured: the blob drifted ten seconds
+                // past paused=true) — only running=false stops the frames.
+                running: root.expanded && !root.thrifty
+                         && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.width * 0.35; duration: 26000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: -blobA.width * 0.3; duration: 26000; easing.type: Easing.InOutSine }
             }
             SequentialAnimation on y {
                 loops: Animation.Infinite
-                paused: running && (!root.expanded || root.thrifty)
+                // running, not paused: a paused SequentialAnimation keeps its
+                // current child ticking (measured: the blob drifted ten seconds
+                // past paused=true) — only running=false stops the frames.
+                running: root.expanded && !root.thrifty
+                         && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.height * 0.2; duration: 19000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: -blobA.height * 0.25; duration: 19000; easing.type: Easing.InOutSine }
             }
@@ -1057,13 +1122,21 @@ PlasmaExtras.Representation {
 
             SequentialAnimation on x {
                 loops: Animation.Infinite
-                paused: running && (!root.expanded || root.thrifty)
+                // running, not paused: a paused SequentialAnimation keeps its
+                // current child ticking (measured: the blob drifted ten seconds
+                // past paused=true) — only running=false stops the frames.
+                running: root.expanded && !root.thrifty
+                         && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.width * 0.1; duration: 31000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: fullRepresentation.width - blobB.width * 0.4; duration: 31000; easing.type: Easing.InOutSine }
             }
             SequentialAnimation on y {
                 loops: Animation.Infinite
-                paused: running && (!root.expanded || root.thrifty)
+                // running, not paused: a paused SequentialAnimation keeps its
+                // current child ticking (measured: the blob drifted ten seconds
+                // past paused=true) — only running=false stops the frames.
+                running: root.expanded && !root.thrifty
+                         && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.height * 0.35; duration: 23000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: fullRepresentation.height - blobB.height * 0.35; duration: 23000; easing.type: Easing.InOutSine }
             }
@@ -1920,10 +1993,12 @@ PlasmaExtras.Representation {
                         border.width: 1
                         border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
                         clip: true
-                        // Breathing effect while playing (only with the popup open)
+                        // Breathing while playing. Already behind
+                        // _streamActive, so an idle desktop face holds
+                        // still on its own; thrifty stills it on battery.
                         SequentialAnimation on scale {
                             loops: Animation.Infinite
-                            running: fullRepresentation._streamActive && root.view === 1 && root.expanded
+                            running: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
                             NumberAnimation { from: 1.0; to: 1.011; duration: 2600; easing.type: Easing.InOutSine }
                             NumberAnimation { from: 1.011; to: 1.0; duration: 2600; easing.type: Easing.InOutSine }
                         }
@@ -2171,7 +2246,7 @@ PlasmaExtras.Representation {
                                 color: Kirigami.Theme.negativeTextColor
                                 SequentialAnimation on opacity {
                                     loops: Animation.Infinite
-                                    running: fullRepresentation._streamActive && root.view === 1 && root.expanded
+                                    running: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
                                     NumberAnimation { from: 1.0; to: 0.25; duration: 800; easing.type: Easing.InOutSine }
                                     NumberAnimation { from: 0.25; to: 1.0; duration: 800; easing.type: Easing.InOutSine }
                                 }
@@ -2384,7 +2459,7 @@ PlasmaExtras.Representation {
                                   : "media-playback-start"
                         iconScale: 0.45
                         primary: true
-                        glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded
+                        glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
                         enabledState: stationsModel.count > 0 || isPlaying() || root._casting
                                       || root._tsPaused || root.tsShifted
                         tooltipText: (isPlaying() || root._casting)
@@ -2657,8 +2732,12 @@ PlasmaExtras.Representation {
                         // Not checkable: one-shot action button (same rule as
                         // download); checked only drives the "voted" visual.
                         checked: voted
-                        enabledState: root._voteStatus === "" && root._previewUrl === ""
-                                      && root._currentOrigUrl !== ""
+                        // An audition votes through the identity its search
+                        // row carried; a saved station through its entry.
+                        enabledState: root._voteStatus === ""
+                                      && (root._previewUrl !== ""
+                                          ? root._previewUuid !== ""
+                                          : root._currentOrigUrl !== "")
                         tooltipText: {
                             if (voted) return i18n("Vote sent — thank you for supporting the station!")
                             if (root._voteStatus === "busy") return i18n("Sending the vote…")
@@ -2678,7 +2757,7 @@ PlasmaExtras.Representation {
                         // "downloading" visual, it is not a user-togglable state.
                         checked: root.downloading
                         // && expanded: the infinite pulse ring must not tick in a hidden popup
-                        glowPulse: root.downloading && root.expanded
+                        glowPulse: root.downloading && root.expanded && !root.thrifty
                         enabledState: !root.downloading && (root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== ""))
                         tooltipText: root.downloading
                                      ? i18n("Downloading…")
@@ -2703,7 +2782,7 @@ PlasmaExtras.Representation {
                         checkedIconColor: "#FFFFFF"
                         // && expanded: recordings run for hours — the pulse ring must
                         // not keep plasmashell's animation timer alive popup-closed
-                        glowPulse: root.recording && root.expanded
+                        glowPulse: root.recording && root.expanded && !root.thrifty
                         enabledState: root.recording ? !root._recScheduled : canRec
                         tooltipText: {
                             if (root.recording && root._recScheduled)
@@ -3444,6 +3523,9 @@ PlasmaExtras.Representation {
             // file on disk — the answer to "where did my download go".
             // Exclusive with the charts; typing a search overrides both.
             property bool downloadsMode: false
+            // While a query is live the search has TWO answers — shows,
+            // and single episodes across every show. This picks the pane.
+            property bool epSearchMode: false
             // Episode filter: 0 = all, 1 = unplayed (fresh + in-progress).
             // Applied at feed-load and on an explicit filter change, NOT on
             // every played-mark, so a row never vanishes under a mid-scroll.
@@ -3581,7 +3663,7 @@ PlasmaExtras.Representation {
                     opacity: checked ? 1.0 : 0.7
                     tooltipText: podcastPage.trendingMode
                                  ? i18n("Back to my shows")
-                                 : i18n("Popular now — worldwide charts")
+                                 : i18n("Popular now — the top charts")
                     onClicked: {
                         podcastPage.trendingMode = !podcastPage.trendingMode
                         podcastPage.downloadsMode = false
@@ -3865,6 +3947,28 @@ PlasmaExtras.Representation {
                 onTriggered: root.podcastSearch(podSearchField.text)
             }
 
+            // Shows or episodes — the query's two answers. Episodes is
+            // where a topic or a guest's name finds what no show title
+            // can; the tab pattern is navTabs', imperative both ways.
+            PlasmaComponents3.TabBar {
+                id: podSearchScope
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                visible: !podcastPage.showingEpisodes && podcastPage.searching
+                         && !podcastPage.searchIsUrl
+                Component.onCompleted: currentIndex = podcastPage.epSearchMode ? 1 : 0
+                onCurrentIndexChanged: podcastPage.epSearchMode = currentIndex === 1
+                PlasmaComponents3.TabButton {
+                    text: i18n("Shows")
+                    focusPolicy: Qt.TabFocus
+                }
+                PlasmaComponents3.TabButton {
+                    text: i18n("Episodes")
+                    focusPolicy: Qt.TabFocus
+                }
+            }
+
             // One honest status line: searching, loading, or the error.
             RowLayout {
                 Layout.fillWidth: true
@@ -4079,6 +4183,8 @@ PlasmaExtras.Representation {
                 Layout.fillHeight: true
                 visible: !podcastPage.showingEpisodes
                          && !(podcastPage.downloadsMode && !podcastPage.searching)
+                         && !(podcastPage.searching && !podcastPage.searchIsUrl
+                              && podcastPage.epSearchMode)
                 PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
                 contentItem: ListView {
@@ -4278,6 +4384,192 @@ PlasmaExtras.Representation {
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             opacity: 0.55
                             text: i18n("Search for a show above, star it, and its episodes download here for offline listening")
+                        }
+                    }
+                }
+            }
+
+            // ── Episode hits across every show — the search's second answer
+            PlasmaComponents3.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: !podcastPage.showingEpisodes && podcastPage.searching
+                         && !podcastPage.searchIsUrl && podcastPage.epSearchMode
+                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
+
+                contentItem: ListView {
+                    id: epSearchView
+                    leftMargin: Kirigami.Units.smallSpacing
+                    rightMargin: Kirigami.Units.smallSpacing
+                    model: podcastEpSearchModel
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+                    spacing: 2
+
+                    delegate: PlasmaComponents3.ItemDelegate {
+                        id: epsRow
+
+                        required property int index
+                        required property string title
+                        required property string show
+                        required property string art
+                        required property string url
+                        required property string guid
+                        required property string feed
+                        required property double dateMs
+                        required property double durationMs
+
+                        readonly property bool isThisPlaying: isPlaying()
+                                    && (playMusic.source.toString() === url
+                                        || (root._podPlayingRawUrl !== "" && root._podPlayingRawUrl === url))
+                        readonly property string sub: {
+                            var parts = [];
+                            if (show !== "") parts.push(show);
+                            if (dateMs > 0)
+                                parts.push(Qt.formatDate(new Date(dateMs), Qt.locale(), Locale.ShortFormat));
+                            if (durationMs > 0)
+                                parts.push(i18n("%1 min", Math.max(1, Math.round(durationMs / 60000))));
+                            return parts.join(" · ");
+                        }
+
+                        width: epSearchView.width - epSearchView.leftMargin - epSearchView.rightMargin
+                        height: Kirigami.Units.gridUnit * 3
+                        padding: 0
+                        hoverEnabled: true
+                        Accessible.name: title
+                        Accessible.role: Accessible.Button
+
+                        background: Item {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing / 2
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: Kirigami.Units.smallSpacing * 1.5
+                                color: epsRow.hovered ? Qt.alpha(root.accent, 0.07)
+                                                      : Qt.alpha(Kirigami.Theme.textColor, 0.045)
+                                border.width: 1
+                                border.color: epsRow.hovered ? Qt.alpha(root.accent, 0.25)
+                                                             : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                            }
+                        }
+
+                        contentItem: RowLayout {
+                            spacing: Kirigami.Units.smallSpacing * 1.5
+                            anchors.fill: parent
+                            anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
+                            anchors.rightMargin: Kirigami.Units.smallSpacing
+
+                            Rectangle {
+                                id: epsAvatar
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: width * 0.2
+                                readonly property bool darkTheme: Kirigami.Theme.backgroundColor.hslLightness < 0.5
+                                readonly property string mono: root.monogramText(epsRow.show || epsRow.title)
+                                readonly property bool monogrammed: mono !== ""
+                                                                    && epsArtImg.status !== Image.Ready
+                                color: monogrammed
+                                       ? Qt.hsla(root.monogramHue(epsRow.show || epsRow.title) / 360, 0.45,
+                                                 darkTheme ? 0.28 : 0.85, 1)
+                                       : Qt.alpha(Kirigami.Theme.textColor, 0.1)
+                                clip: true
+
+                                Image {
+                                    id: epsArtImg
+                                    anchors.fill: parent
+                                    source: epsRow.art
+                                    sourceSize.width: 96
+                                    sourceSize.height: 96
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                    visible: status === Image.Ready
+                                }
+                                PlasmaComponents3.Label {
+                                    anchors.centerIn: parent
+                                    visible: epsAvatar.monogrammed
+                                    text: epsAvatar.mono
+                                    font.weight: Font.DemiBold
+                                    font.pixelSize: parent.height * 0.38
+                                    color: epsAvatar.darkTheme ? Qt.alpha("#ffffff", 0.85)
+                                                               : Qt.alpha("#000000", 0.7)
+                                }
+                                EqBars {
+                                    anchors.centerIn: parent
+                                    visible: epsRow.isThisPlaying
+                                    animating: visible && root.expanded && !root.thrifty
+                                    bars: 3
+                                    barWidth: 3
+                                    minHeight: 4
+                                    maxHeight: parent.height * 0.45
+                                    barColor: root.accentBright
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    text: epsRow.title
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    font.weight: Font.DemiBold
+                                }
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    text: epsRow.sub
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    opacity: 0.7
+                                    visible: text !== ""
+                                }
+                            }
+
+                            // The row plays; this one door leads to the SHOW —
+                            // its full archive, and the star to subscribe.
+                            CircleButton {
+                                visible: epsRow.feed !== ""
+                                Layout.alignment: Qt.AlignVCenter
+                                implicitWidth: Kirigami.Units.gridUnit * 2
+                                implicitHeight: implicitWidth
+                                iconName: "application-rss+xml"
+                                iconScale: 0.5
+                                opacity: 0.7
+                                tooltipText: i18n("Open the show")
+                                onClicked: root.loadPodcastFeed(epsRow.feed, epsRow.show, epsRow.art)
+                            }
+                        }
+
+                        TapHandler {
+                            onTapped: root.playPodcastEpisode(epsRow.url, epsRow.title,
+                                          PodcastLogic.episodeKey(epsRow.guid, epsRow.url),
+                                          epsRow.show, epsRow.art, epsRow.feed)
+                        }
+                    }
+
+                    Column {
+                        anchors.centerIn: parent
+                        width: parent.width - Kirigami.Units.largeSpacing * 2
+                        visible: epSearchView.count === 0 && !root.podcastSearchBusy
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            source: "view-media-lyrics"
+                            width: Kirigami.Units.iconSizes.huge
+                            height: width
+                            opacity: 0.4
+                        }
+                        PlasmaComponents3.Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            text: i18n("No episodes found")
+                            font.weight: Font.DemiBold
+                            opacity: 0.7
                         }
                     }
                 }
@@ -4982,7 +5274,28 @@ PlasmaExtras.Representation {
             anchors.right: parent.right
             height: Kirigami.Units.gridUnit * 4.5
             anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
+            // The heading text stays clear of the pin's corner seat.
             anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5
+                                 + (pinButton.visible ? pinButton.width : 0)
+        }
+
+        // Pinned, the popup survives clicks elsewhere (the same pattern the
+        // folder-view popup uses); the state lives in a config key, so a
+        // pinned player is still pinned after a restart. Hidden on a desktop
+        // containment — an inline face has no popup to hold open.
+        PlasmaComponents3.ToolButton {
+            id: pinButton
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: Kirigami.Units.smallSpacing
+            anchors.rightMargin: Kirigami.Units.smallSpacing
+            icon.name: "window-pin"
+            checkable: true
+            checked: Plasmoid.configuration.pin
+            onToggled: Plasmoid.configuration.pin = checked
+            visible: !root.planar
+            focusPolicy: Qt.TabFocus
+            PlasmaComponents3.ToolTip { text: i18n("Keep open") }
         }
 
         // The popup's map, finally on the surface: four labeled tabs.
@@ -5128,6 +5441,11 @@ PlasmaExtras.Representation {
                     if (root._casting) {
                         return i18n("Casting to %1", root._castName)
                     }
+                    if (root._tsPaused)
+                        // Without this the paused footer read "Connecting…" —
+                        // the loading-state branch below catches a stopped
+                        // player — which looks like a hang, not a pause.
+                        return i18n("Paused — the station keeps recording")
                     if (!isConnected)
                         return i18n("Check internet connection…")
                     else if (root.isError)
@@ -5213,9 +5531,11 @@ PlasmaExtras.Representation {
                     // the desktop hides the applet without closing the menu),
                     // and an unguarded heartbeat then spawned a bluetoothctl
                     // pipeline every 5 s forever — the same !expanded pause
-                    // every other timer here honours.
+                    // every other timer here honours. A desktop face never
+                    // closes, so a menu left open there slows the beat to
+                    // 15 s until the pointer comes back.
                     running: castMenu.opened && root.expanded
-                    interval: 5000
+                    interval: root.planar && !root.faceHovered ? 15000 : 5000
                     repeat: true
                     onTriggered: root.btList()
                 }

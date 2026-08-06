@@ -41,7 +41,7 @@ source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # The tag tarball is immutable, so this is pinned to the real digest. On every
 # version bump: raise pkgver, run `updpkgsums` here, and let check() below
 # catch a metadata.json that disagrees before anything ships.
-sha256sums=('8cc84c3862afd2547e44900000add0f5a333a61afc888040dd197d8ebc451efb')
+sha256sums=('c06ab33f9330a344b521ea4ce3532368f362d91532118d35820268bfee6828a8')
 
 # The applet id is the one the published package was registered under and it
 # also names the translation domain. It comes out of metadata.json rather than

@@ -320,6 +320,39 @@ function artPick(wantArtist, wantTitle, cands) {
     return best;
 }
 
+// The form a typed country name must take on the wire. The directory's
+// country filter is a CASE-SENSITIVE substring match (measured live:
+// country=mexico answers nothing, country=Mexico and even country=Mexi
+// answer plenty) — so every word gets its capital, hyphenated names
+// included, and the substring match forgives the rest ("united arab
+// emirates" finds "The United Arab Emirates").
+function countryQueryForm(q) {
+    return String(q || "").trim().replace(/(^|[\s-])(\S)/g, function(m, sep, ch) {
+        return sep + ch.toUpperCase();
+    });
+}
+
+// The directory's own country list ({name, iso_3166_1} rows) as a folded
+// name → code map, the same shape the hand-written map feeds the scope
+// parser. Only clean rows enter: a code that is not two ASCII letters or
+// a name past any honest length is catalogue slush, not a country. Names
+// with a leading article are keyed both ways — a searcher types "united
+// arab emirates", the directory files "The United Arab Emirates".
+function countryMapFromApi(rows) {
+    var m = Object.create(null);
+    if (!rows || !rows.length) return m;
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i] || {};
+        var cc = String(r.iso_3166_1 || "").toUpperCase();
+        if (!/^[A-Z]{2}$/.test(cc)) continue;
+        var name = fold(String(r.name || "").substring(0, 80));
+        if (name === "") continue;
+        m[name] = cc;
+        if (name.indexOf("the ") === 0) m[name.substring(4)] = cc;
+    }
+    return m;
+}
+
 // ISO code → a name a human can read on the chip. Qt's CLDR data has the
 // answer offline, but Qt.locale() FALLS BACK SILENTLY on a pair it does not
 // carry (measured: "et_FI" answers as et_EE with "Eesti", "en_ZZ" as en_US

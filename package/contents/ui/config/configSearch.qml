@@ -146,7 +146,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.29")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.30")
     }
 
     function getStations(by, val) {

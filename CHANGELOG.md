@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026.30
+
+- **Podcast search finds episodes now, not just shows.** A Shows/Episodes
+  switch appears while you type: the Episodes side searches across every
+  show out there — a topic, a guest's name, that one interview — and the
+  hit plays directly. The feed button on a row opens the whole show.
+- **The podcast charts are your country's.** "Popular now" lists the top
+  podcasts for your own country; the old worldwide list had nothing local
+  on it for smaller countries, and it remains only as the fallback.
+- **Headset buttons understand episodes.** Next and Previous skip forward
+  and back inside a playing episode instead of yanking you to a radio
+  station. Desktop media controls can seek in an episode and show its real
+  position, length and playback speed.
+- A show that posts several episodes between checks gets them all
+  announced and auto-downloaded — only the newest used to count.
+- Track titles update on FLAC and Ogg stations while they play, and the
+  track download button works there too.
+- Search previews can pause (FLAC included) and vote — pausing a preview
+  used to plain stop it, and the vote button demanded a saved station.
+- Pausing keeps the cover and track title on screen; the footer notes the
+  station keeps recording while paused.
+- Country search understands every country's name in any spelling —
+  "mexico" finds Mexican stations now — and two-word music styles like
+  "smooth jazz" work as genre searches.
+- FLAC and Ogg playback stands steadier: the local relay picks its port
+  collision-free, gets a second chance when it stumbles, and says so
+  honestly when the disk is too full for a FLAC buffer.
+- **The widget is at home on the desktop now.** Placed there, an idle face
+  costs next to nothing; squeezed below its minimum it folds into the
+  icon-and-popup form instead of crushing its layout. A pin in the popup's
+  header keeps the popup open while you work elsewhere, and its size is
+  remembered when you drag its edges.
+- Podcast feed errors tell the truth on a flaky network — a timeout is not
+  "not a podcast feed", and it can no longer quietly rewrite where a
+  subscription points. Episode downloads keep to http(s) and a bounded
+  redirect chain.
+- The Catalan translation was reviewed and corrected by a native speaker —
+  thank you, Joan Josep.
+
 ## 2026.29
 
 - **FLAC and Ogg stations play properly now.** The 2026.27 fix helped one

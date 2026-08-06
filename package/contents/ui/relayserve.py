@@ -14,12 +14,24 @@ import socket
 import sys
 import time
 
-buf_path, port = sys.argv[1], int(sys.argv[2])
+buf_path, port_file = sys.argv[1], sys.argv[2]
 
+# The kernel picks the port. The first tap took a number derived from the
+# widget's global exec counter — which every metadata poll advances, so the
+# 180-slot range recycled within minutes and a collision meant this bind
+# died silently while the shell reported the OTHER listener as ours. An
+# ephemeral bind cannot collide, and writing the number down only after
+# listen() makes the file's existence the real "you may connect now".
 srv = socket.socket()
-srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-srv.bind(("127.0.0.1", port))
-srv.listen(1)
+try:
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+except OSError:
+    sys.exit(1)
+tmp_file = port_file + ".tmp"
+with open(tmp_file, "w") as f:
+    f.write(str(srv.getsockname()[1]))
+os.replace(tmp_file, port_file)
 # The one seat is the player's. If nobody sits down (the arm was torn
 # down before its ack landed), leave instead of holding the port forever.
 srv.settimeout(60.0)

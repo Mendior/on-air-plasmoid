@@ -61,14 +61,14 @@ function clampSeekMs(targetPosMs, capturedMs, edgeGuardMs) {
     return targetPosMs;
 }
 
-// The compressed-stream estimate the recorder's disk pre-flight measured:
-// ≈2 MiB per minute. The buffer refuses to be configured larger than the
-// free space would survive, with headroom so it is never the thing that
-// fills the disk to the brim.
-function maxBufferMinutes(freeBytes, headroomBytes) {
-    var usable = freeBytes - headroomBytes;
-    if (usable <= 0) return 0;
-    return Math.floor(usable / (2 * 1024 * 1024));
+// What the writer's disk pre-flight demands, in KiB. Two honest rates:
+// plain compressed radio runs ≈2 MiB per minute (the recorder's measured
+// estimate), but a relay shell exists precisely for the Ogg family and
+// can hold FLAC — measured live 2026-08-05 at ~135 KB/s, near 8 MiB per
+// minute. The old flat 2 MiB figure let a four-hour FLAC arm start with
+// a quarter of the disk it was actually going to eat.
+function bufferNeedKiB(windowMin, isRelay) {
+    return Math.max(1, Math.floor(windowMin)) * (isRelay ? 8192 : 2048);
 }
 
 // What the pause button means while a buffer runs: remember where the
@@ -95,11 +95,12 @@ function buildBufferCommands(o) {
     // mkdir lives HERE, not only in the run command — the config write is
     // the first thing to touch the directory, and without it the very
     // first arm on a machine failed before the writer ever existed. The
-    // find sweep clears leftovers of crashed sessions; it keeps anything
-    // younger than a day because a FRESH pid file may belong to the
-    // previous arm's still-live writer, whose stop command needs it.
+    // find sweep clears leftovers of crashed sessions. Six hours keeps
+    // every buffer a living session could still come back for (the window
+    // cap ends a shift at four) — a day of panel restarts used to stack
+    // nine dead generations of buffers before the old sweep woke up.
     var writeUrl = ": TS_URL; umask 077; mkdir -p " + q(o.dirPath) + " 2>/dev/null; "
-        + "find " + q(o.dirPath) + " -maxdepth 1 -type f -mmin +1440 -delete 2>/dev/null; "
+        + "find " + q(o.dirPath) + " -maxdepth 1 -type f -mmin +360 -delete 2>/dev/null; "
         + "printf '%s' " + q(cfgLine)
         + " > " + q(o.cfgPath)
         + " && echo __TS_URL_OK__ || echo __TS_URL_FAIL__; true # " + o.seq;
@@ -134,22 +135,29 @@ function buildBufferCommands(o) {
 // player treats it as the live stream it is). The tap is a raw-byte
 // python server on purpose — an ffmpeg remuxer in this seat died at
 // every Ogg chain boundary a reconnecting upstream wrote, a few seconds
-// of silence apiece. The port check answers when the player may actually
-// connect; a player sent to a refused port never retries (measured).
+// of silence apiece. The tap binds an ephemeral port and reports it in a
+// file it writes only after listen() — so the file appearing IS the "you
+// may connect" (a player sent to a refused port never retries, measured).
+// The first version guessed a port up front and scanned ss for it, which
+// matched ANY listener on that number and answered UP with no ss at all.
 function buildServeCommands(o) {
     var q = PodcastLogic.shQuote;
     var run = ": TS_SRV; "
         + "if ! command -v python3 >/dev/null 2>&1; then echo __TS_SRV_DOWN__; exit 0; fi; "
-        + "python3 " + q(o.scriptPath) + " " + q(o.bufPath) + " " + o.port
+        // A leftover port file (this arm's own failed first launch, on the
+        // retry road) would fake an instant UP with a dead port in it.
+        + "rm -f " + q(o.portPath) + "; "
+        + "python3 " + q(o.scriptPath) + " " + q(o.bufPath) + " " + q(o.portPath)
         + " >/dev/null 2>&1 & echo $! > " + q(o.srvPidPath) + "; "
         + "i=0; while [ $i -lt 40 ]; do "
-        + "if ss -ltnH 2>/dev/null | grep -q ':" + o.port + " '; then echo __TS_SRV_UP__; exit 0; fi; "
-        + "if ! command -v ss >/dev/null 2>&1; then sleep 1; echo __TS_SRV_UP__; exit 0; fi; "
+        + "if [ -s " + q(o.portPath) + " ]; then "
+        + "p=$(cat " + q(o.portPath) + "); echo \"__TS_SRV_UP__ port=$p\"; exit 0; fi; "
         + "i=$((i+1)); sleep 0.25; done; "
-        // The port never opened (taken, python crashed): a stuck tap would
-        // hold its seat forever — reap it and let the player stand pat.
+        // No port file within ten seconds (python crashed at bind, disk
+        // refused the write): a stuck tap would hold its seat forever —
+        // reap it and let the player stand pat.
         + "kill \"$(cat " + q(o.srvPidPath) + " 2>/dev/null)\" 2>/dev/null; "
-        + "rm -f " + q(o.srvPidPath) + "; "
+        + "rm -f " + q(o.srvPidPath) + " " + q(o.portPath) + "; "
         + "echo __TS_SRV_DOWN__; true # " + o.seq;
     return { run: run };
 }
@@ -162,12 +170,13 @@ function buildServeCommands(o) {
 // take the address off the disk. A relay arm's tap pid rides along; the
 // buffer deletion doubles as its failsafe — the tap notices the file
 // vanish and leaves on its own even when the pid file never got written.
-function buildStopCommand(pidPath, outPath, cfgPath, seq, srvPidPath) {
+function buildStopCommand(pidPath, outPath, cfgPath, seq, srvPidPath, srvPortPath) {
     var q = PodcastLogic.shQuote;
     var srv = "";
     if (srvPidPath) {
         srv = "kill \"$(cat " + q(srvPidPath) + " 2>/dev/null)\" 2>/dev/null; "
-            + "rm -f " + q(srvPidPath) + "; ";
+            + "rm -f " + q(srvPidPath)
+            + (srvPortPath ? " " + q(srvPortPath) : "") + "; ";
     }
     return ": TS_STOP; " + srv + "[ -f " + q(pidPath) + " ] && kill -INT \"$(cat "
         + q(pidPath) + ")\" 2>/dev/null; sleep 1; rm -f " + q(outPath)

@@ -204,7 +204,7 @@ PlasmaComponents3.ItemDelegate {
             EqBars {
                 anchors.centerIn: parent
                 visible: epItem.isThisPlaying
-                animating: visible && root.expanded
+                animating: visible && root.expanded && !root.thrifty
                 bars: 3
                 barWidth: 3
                 minHeight: 4

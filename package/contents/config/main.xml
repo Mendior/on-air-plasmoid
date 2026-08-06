@@ -245,6 +245,10 @@
             <label>Use the system accent color instead of the built-in emerald theme</label>
             <default>false</default>
         </entry>
+        <entry name="pin" type="bool">
+            <label>Keep the popup open when focus moves to another window (the header's pin button)</label>
+            <default>false</default>
+        </entry>
         <entry name="saveOnBattery" type="bool">
             <label>Go easy on the battery when the laptop is unplugged</label>
             <default>true</default>

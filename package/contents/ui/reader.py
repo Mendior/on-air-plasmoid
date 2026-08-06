@@ -7,10 +7,60 @@ Prints "<title>\t<stream_url>" when the stream's ICY title differs from the
 previous metadata (argv[2]). Prints "__NO_ICY__" when the stream can't or
 won't deliver usable metadata, so the plasmoid stops respawning us.
 """
+import os
 import signal
 import sys
 import time
 import urllib.parse
+
+
+def _ogg_buffer_title(path: str) -> str:
+    """Current track of a relayed Ogg station, read from its buffer file.
+
+    Ogg-family streams carry no ICY interleave at all — the track name
+    lives in vorbis-comment fields (the same layout for FLAC, Vorbis and
+    Opus), and a reconnecting upstream writes a fresh comment block into
+    the buffer at every chain start. The LAST block is the current track.
+    The relay already has the bytes on disk, so this opens no second
+    connection anywhere; the player itself surfaces none of it (measured:
+    three minutes of a tagged stream, Qt's metaData stayed empty).
+    """
+    try:
+        size = os.path.getsize(path)
+        with open(path, "rb") as fh:
+            fh.seek(max(0, size - 4 * 1024 * 1024))
+            blob = fh.read()
+    except OSError:
+        return ""
+
+    def last_field(key: bytes) -> str:
+        pos = blob.rfind(key)
+        if pos < 4:
+            return ""
+        # Each field rides as <u32le length><KEY=value>; a match whose
+        # length disagrees is stream data that happened to spell the key.
+        ln = int.from_bytes(blob[pos - 4:pos], "little")
+        if ln < len(key) + 1 or ln > 1000 or pos + ln > len(blob):
+            return ""
+        raw = blob[pos + len(key):pos + ln]
+        try:
+            return raw.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            return ""
+
+    title = last_field(b"TITLE=") or last_field(b"title=")
+    artist = last_field(b"ARTIST=") or last_field(b"artist=")
+    if title and artist:
+        return f"{artist} - {title}"
+    return title
+
+
+if len(sys.argv) >= 3 and sys.argv[1] == "--oggbuf":
+    text = _ogg_buffer_title(sys.argv[2])
+    if text:
+        # Same shape the ICY road prints: title, TAB, (empty) stream url.
+        print(f"{text}\t")
+    sys.exit(0)
 
 try:
     import requests

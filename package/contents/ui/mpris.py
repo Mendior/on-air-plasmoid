@@ -18,6 +18,7 @@ import re
 import signal
 import sys
 import threading
+import time
 from pathlib import Path
 
 import dbus
@@ -56,9 +57,20 @@ class MPRISBridge(dbus.service.Object):
             "canGoPrevious": False,
             "canPlay": False,
             "canPause": False,
+            # The podcast half: real position/seek/rate for an episode,
+            # all honestly absent for a live radio stream.
+            "episode": False,
+            "positionMs": 0,
+            "durationMs": 0,
+            "rate": 1.0,
+            "canSeek": False,
         }
         self._track_seq = 0
         self._tracker_path = f"{OBJ_PATH}/Track/0"
+        # Position is extrapolated from the last anchor the plasmoid wrote —
+        # the state file cannot chase a moving needle four times a second.
+        self._pos_anchor_ms = 0.0
+        self._pos_anchor_mono = time.monotonic()
 
     def update_from_state_file(self):
         # mtime gate: this runs every 300 ms for the whole session — reading
@@ -79,7 +91,21 @@ class MPRISBridge(dbus.service.Object):
         self._last_mtime_ns = mtime_ns
 
         changed_player = {}
+        seeked_us = None
         with self._lock:
+            # A position jump beyond what playback itself explains means a
+            # seek happened — the spec's word for that is the Seeked signal,
+            # never a PropertiesChanged on Position.
+            if "positionMs" in new_state:
+                expected = self._pos_anchor_ms
+                if self._state.get("status") == "Playing":
+                    expected += ((time.monotonic() - self._pos_anchor_mono)
+                                 * 1000.0 * float(self._state.get("rate") or 1.0))
+                new_pos = float(new_state.get("positionMs") or 0)
+                if self._state.get("episode") and abs(new_pos - expected) > 1500:
+                    seeked_us = int(new_pos * 1000)
+                self._pos_anchor_ms = new_pos
+                self._pos_anchor_mono = time.monotonic()
             for key, value in new_state.items():
                 if self._state.get(key) != value:
                     self._state[key] = value
@@ -91,6 +117,8 @@ class MPRISBridge(dbus.service.Object):
                 self._track_seq += 1
                 self._tracker_path = f"{OBJ_PATH}/Track/{self._track_seq}"
 
+        if seeked_us is not None:
+            self.Seeked(dbus.Int64(seeked_us))
         if not changed_player:
             return
 
@@ -106,6 +134,14 @@ class MPRISBridge(dbus.service.Object):
             prop_changes["CanGoPrevious"] = dbus.Boolean(bool(self._state["canGoPrevious"]), variant_level=1)
             prop_changes["CanPlay"] = dbus.Boolean(bool(self._state["canPlay"]), variant_level=1)
             prop_changes["CanPause"] = dbus.Boolean(bool(self._state["canPause"]), variant_level=1)
+        if "canSeek" in changed_player:
+            prop_changes["CanSeek"] = dbus.Boolean(bool(self._state["canSeek"]), variant_level=1)
+        if "rate" in changed_player:
+            prop_changes["Rate"] = dbus.Double(float(self._state["rate"] or 1.0), variant_level=1)
+        if "durationMs" in changed_player and "Metadata" not in prop_changes:
+            # The duration lands a beat after the episode's title did —
+            # without this the length never reaches an already-sent Metadata.
+            prop_changes["Metadata"] = dbus.Dictionary(self._build_metadata(), signature="sv", variant_level=1)
 
         if prop_changes:
             self.PropertiesChanged(PLAYER_IF, prop_changes, dbus.Array([], signature="s"))
@@ -123,7 +159,24 @@ class MPRISBridge(dbus.service.Object):
         art = self._state.get("art") or ""
         if art:
             meta["mpris:artUrl"] = dbus.String(art, variant_level=1)
+        # Only an episode has an honest length; a live stream's would be a lie.
+        duration_ms = float(self._state.get("durationMs") or 0)
+        if self._state.get("episode") and duration_ms > 0:
+            meta["mpris:length"] = dbus.Int64(int(duration_ms * 1000), variant_level=1)
         return meta
+
+    def _position_us(self):
+        # Extrapolated from the last anchor: the plasmoid stamps position on
+        # every state write and on every jump, and between those playback
+        # advances at the declared rate — nothing else moves the needle.
+        pos = float(self._state.get("positionMs") or self._pos_anchor_ms or 0)
+        if self._state.get("status") == "Playing" and self._state.get("episode"):
+            pos = self._pos_anchor_ms + ((time.monotonic() - self._pos_anchor_mono)
+                                         * 1000.0 * float(self._state.get("rate") or 1.0))
+        duration_ms = float(self._state.get("durationMs") or 0)
+        if duration_ms > 0:
+            pos = min(pos, duration_ms)
+        return int(max(0.0, pos) * 1000)
 
     def _emit_command(self, cmd: str):
         with self._lock:
@@ -185,11 +238,14 @@ class MPRISBridge(dbus.service.Object):
 
     @dbus.service.method(PLAYER_IF, in_signature="x")
     def Seek(self, offset):
-        return None
+        # Honest only for an episode — a live stream has nowhere to seek.
+        if self._state.get("canSeek"):
+            self._emit_command(f"Seek {int(offset)}")
 
     @dbus.service.method(PLAYER_IF, in_signature="ox")
     def SetPosition(self, track_id, position):
-        return None
+        if self._state.get("canSeek") and int(position) >= 0:
+            self._emit_command(f"SetPos {int(position)}")
 
     @dbus.service.method(PLAYER_IF, in_signature="s")
     def OpenUri(self, uri):
@@ -218,9 +274,22 @@ class MPRISBridge(dbus.service.Object):
             except (TypeError, ValueError):
                 return
             self._emit_command(f"Volume {vol:.3f}")
+        elif property_name == "Rate":
+            # Applied through the plasmoid's own clamp and per-show memory —
+            # and only to an episode: rate-shifting live radio is refused.
+            try:
+                rate = float(value)
+            except (TypeError, ValueError):
+                return
+            if self._state.get("episode") and 0.5 <= rate <= 3.0:
+                self._emit_command(f"Rate {rate:.2f}")
 
     @dbus.service.signal(PROP_IF, signature="sa{sv}as")
     def PropertiesChanged(self, interface_name, changed_props, invalidated_props):
+        pass
+
+    @dbus.service.signal(PLAYER_IF, signature="x")
+    def Seeked(self, position):
         pass
 
     def _root_props(self):
@@ -241,18 +310,19 @@ class MPRISBridge(dbus.service.Object):
         return dbus.Dictionary({
             "PlaybackStatus": dbus.String(self._state.get("status", "Stopped"), variant_level=1),
             "LoopStatus": dbus.String("None", variant_level=1),
-            "Rate": dbus.Double(1.0, variant_level=1),
+            "Rate": dbus.Double(float(self._state.get("rate") or 1.0), variant_level=1),
             "Shuffle": dbus.Boolean(False, variant_level=1),
             "Metadata": dbus.Dictionary(self._build_metadata(), signature="sv", variant_level=1),
             "Volume": dbus.Double(float(self._state.get("volume", 0.75)), variant_level=1),
-            "Position": dbus.Int64(0, variant_level=1),
-            "MinimumRate": dbus.Double(1.0, variant_level=1),
-            "MaximumRate": dbus.Double(1.0, variant_level=1),
+            "Position": dbus.Int64(self._position_us(), variant_level=1),
+            # The plasmoid's own clamp: 0.5x to 3x, episodes only.
+            "MinimumRate": dbus.Double(0.5, variant_level=1),
+            "MaximumRate": dbus.Double(3.0, variant_level=1),
             "CanGoNext": dbus.Boolean(bool(self._state.get("canGoNext", False)), variant_level=1),
             "CanGoPrevious": dbus.Boolean(bool(self._state.get("canGoPrevious", False)), variant_level=1),
             "CanPlay": dbus.Boolean(bool(self._state.get("canPlay", False)), variant_level=1),
             "CanPause": dbus.Boolean(bool(self._state.get("canPause", False)), variant_level=1),
-            "CanSeek": dbus.Boolean(False, variant_level=1),
+            "CanSeek": dbus.Boolean(bool(self._state.get("canSeek", False)), variant_level=1),
             "CanControl": dbus.Boolean(True, variant_level=1),
         }, signature="sv")
 

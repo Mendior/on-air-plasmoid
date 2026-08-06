@@ -461,10 +461,27 @@ def _http_get(url, timeout=3.0, max_bytes=512 * 1024):
         return data
 
 
+def _parse_device_xml(data):
+    """Parse a device description, refusing any DTD outright."""
+    # The body comes from an unauthenticated LAN box. No UPnP description
+    # carries a DOCTYPE, and the only thing one could add here is entity
+    # expansion (the classic billion-laughs) — newer expat caps that on
+    # its own, but the cap is a build-time property this code should not
+    # have to bet on. XML keywords are case-sensitive, so the exact-byte
+    # scan misses nothing expat would accept; a UTF-16 body (which no
+    # real device sends, descriptions are UTF-8) is refused wholesale
+    # rather than scanned wrong.
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        raise ValueError("UTF-16 device description refused")
+    if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
+        raise ValueError("DTD in device description refused")
+    return ET.fromstring(data)
+
+
 def _describe_renderer(location):
     """Fetch+parse a device description; None unless it is a MediaRenderer."""
     try:
-        root = ET.fromstring(_http_get(location))
+        root = _parse_device_xml(_http_get(location))
     except Exception as exc:
         # The direct-probe fallback hits many dead ports by design — most of
         # these lines are the expected mass, but they are exactly what shows

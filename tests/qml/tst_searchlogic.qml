@@ -360,4 +360,40 @@ TestCase {
         compare(SL.artPick("Anaconda", "Veel veel veel",
                            [{ artist: "Veeramanidaasan", title: "Veel veel veel" }]), -1)
     }
+
+    function test_country_queries_go_out_capitalized() {
+        // The directory's country filter is a case-sensitive substring —
+        // measured live, country=mexico answers nothing, country=Mexico
+        // plenty. Every word gets its capital, hyphens included.
+        compare(SL.countryQueryForm("mexico"), "Mexico")
+        compare(SL.countryQueryForm("south korea"), "South Korea")
+        compare(SL.countryQueryForm("guinea-bissau"), "Guinea-Bissau")
+        compare(SL.countryQueryForm("  new zealand "), "New Zealand")
+        compare(SL.countryQueryForm("Mexico"), "Mexico")
+        compare(SL.countryQueryForm(""), "")
+    }
+
+    function test_the_directorys_country_list_becomes_a_folded_map() {
+        var m = SL.countryMapFromApi([
+            { name: "Mexico", iso_3166_1: "MX" },
+            { name: "The United Arab Emirates", iso_3166_1: "AE" },
+            { name: "Curaçao", iso_3166_1: "CW" },
+            // Catalogue slush must not enter: a three-letter "code", an
+            // empty name, a row with nothing at all.
+            { name: "Nowhere", iso_3166_1: "XXX" },
+            { name: "", iso_3166_1: "DE" },
+            {}
+        ])
+        compare(m["mexico"], "MX")
+        // Keyed both with and without the leading article — the searcher
+        // types "united arab emirates", the directory files "The ...".
+        compare(m["the united arab emirates"], "AE")
+        compare(m["united arab emirates"], "AE")
+        // Folded like every other name comparison: accents are optional.
+        compare(m["curacao"], "CW")
+        compare(m["nowhere"], undefined)
+        // Null-prototype: a country named "constructor" must answer as a
+        // country or not at all, never as Object.prototype furniture.
+        compare(m["toString"], undefined)
+    }
 }

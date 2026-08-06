@@ -224,7 +224,7 @@ PlasmaComponents3.ItemDelegate {
                 EqBars {
                     anchors.centerIn: parent
                     visible: listItem.isCurrent && listItem.isBuffered && !listItem.hovered
-                    animating: visible && root.expanded
+                    animating: visible && root.expanded && !root.thrifty
                     bars: 3
                     barWidth: 3
                     minHeight: 4
