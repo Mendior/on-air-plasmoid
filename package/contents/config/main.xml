@@ -249,6 +249,18 @@
             <label>Keep the popup open when focus moves to another window (the header's pin button)</label>
             <default>false</default>
         </entry>
+        <entry name="showMusicTab" type="bool">
+            <label>Show the My Music tab</label>
+            <default>true</default>
+        </entry>
+        <entry name="showPodcastsTab" type="bool">
+            <label>Show the Podcasts tab</label>
+            <default>true</default>
+        </entry>
+        <entry name="showTimersTab" type="bool">
+            <label>Show the Timers tab</label>
+            <default>true</default>
+        </entry>
         <entry name="saveOnBattery" type="bool">
             <label>Go easy on the battery when the laptop is unplugged</label>
             <default>true</default>

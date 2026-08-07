@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026.31
+
+- **High-bitrate FLAC stations start clean now.** The first seconds used
+  to stutter on streams around 1.5 Mbps: the local relay began serving
+  the moment it had anything, leaving the player on the live edge with
+  no cushion. It now hands the player a head start before the first
+  byte — the same trick Icecast plays on its own listeners — capped by
+  a short clock so ordinary stations don't wait for a cushion they
+  never needed. Reported on GitHub with measurements exact enough to
+  find it, thank you.
+- **Tabs you don't use can step aside.** Settings → Appearance now has
+  switches for the My Music, Podcasts and Timers tabs; the remaining
+  tabs take the freed space. Hiding a page puts nothing away — alarms
+  still ring, downloads still land, and everything returns the moment
+  the switch comes back. Asked for on GitHub, thank you.
+- A note on moving between machines joined the README: stations travel
+  as .arp files, podcast subscriptions as OPML.
+
 ## 2026.30
 
 - **Podcast search finds episodes now, not just shows.** A Shows/Episodes

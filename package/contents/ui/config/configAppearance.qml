@@ -31,11 +31,37 @@ KCM.SimpleKCM {
     property alias cfg_saveOnBattery: batteryCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
+    property alias cfg_showMusicTab: musicTabCheck.checked
+    property alias cfg_showPodcastsTab: podcastsTabCheck.checked
+    property alias cfg_showTimersTab: timersTabCheck.checked
     property string cfg_downloadFormat
     property string cfg_icon
 
 
     Kirigami.FormLayout {
+        Item {
+            Kirigami.FormData.label: i18n("Tabs")
+            Kirigami.FormData.isSection: true
+        }
+
+        // Asked for on GitHub: someone who only listens to their own
+        // stations wants that space back. Stations and Playing stay —
+        // they are the widget. Switching a tab off hides the page, never
+        // its contents: alarms still ring, downloads still arrive.
+        QQC2.CheckBox {
+            id: musicTabCheck
+            Kirigami.FormData.label: i18n("Show:")
+            text: i18n("My Music")
+        }
+        QQC2.CheckBox {
+            id: podcastsTabCheck
+            text: i18n("Podcasts")
+        }
+        QQC2.CheckBox {
+            id: timersTabCheck
+            text: i18n("Timers")
+        }
+
         Item {
             Kirigami.FormData.label: i18n("Panel")
             Kirigami.FormData.isSection: true

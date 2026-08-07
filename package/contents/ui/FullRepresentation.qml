@@ -2830,6 +2830,11 @@ PlasmaExtras.Representation {
                         iconScale: 0.55
                         enabledState: root._currentEpisodeFeed !== ""
                         tooltipText: i18n("Go to this show")
+                        // With the Podcasts tab switched off this jump has
+                        // nowhere to land — the hidden-page guard would walk
+                        // the click on to Timers, a page nobody asked for,
+                        // with the feed fetch already fired for nothing.
+                        visible: root.viewVisible(3)
                         onClicked: {
                             // Open the Podcasts tab; load the show if it is not
                             // already the one on screen. The playing episode
@@ -2882,7 +2887,11 @@ PlasmaExtras.Representation {
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 Layout.topMargin: Kirigami.Units.smallSpacing
-                visible: podcastFolder.count > 0
+                // ...and only while the Podcasts tab is on: with it hidden
+                // the guard would walk this tap on to Timers, and the
+                // downloadsMode flag it sets would linger for a later
+                // re-enable to trip over.
+                visible: podcastFolder.count > 0 && root.viewVisible(3)
                 implicitHeight: Kirigami.Units.gridUnit * 2.2
                 hoverEnabled: true
                 Accessible.name: i18n("Podcast downloads (%1)", podcastFolder.count)
@@ -5351,6 +5360,11 @@ PlasmaExtras.Representation {
                 focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
+                visible: root.viewVisible(2)
+                // An invisible button keeps its equal-share slot on this
+                // Qt (measured: a hidden tab held its 100px in a 500px
+                // bar, leaving a hole) — undefined resets to auto-share.
+                width: visible ? undefined : 0
                 icon.name: "folder-music"
                 text: i18n("My Music")
                 display: QQC2.AbstractButton.TextUnderIcon
@@ -5364,6 +5378,11 @@ PlasmaExtras.Representation {
                 focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
+                visible: root.viewVisible(3)
+                // An invisible button keeps its equal-share slot on this
+                // Qt (measured: a hidden tab held its 100px in a 500px
+                // bar, leaving a hole) — undefined resets to auto-share.
+                width: visible ? undefined : 0
                 icon.name: "application-rss+xml"
                 text: i18n("Podcasts")
                 display: QQC2.AbstractButton.TextUnderIcon
@@ -5377,6 +5396,11 @@ PlasmaExtras.Representation {
                 focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
+                visible: root.viewVisible(4)
+                // An invisible button keeps its equal-share slot on this
+                // Qt (measured: a hidden tab held its 100px in a 500px
+                // bar, leaving a hole) — undefined resets to auto-share.
+                width: visible ? undefined : 0
                 icon.name: "clock"
                 text: i18n("Timers")
                 display: QQC2.AbstractButton.TextUnderIcon

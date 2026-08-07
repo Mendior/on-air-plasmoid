@@ -72,6 +72,37 @@ PlasmoidItem {
     property bool isError: false
     property int lastPlay: 0
     property int view: 0
+    // Which pages this listener wants. Stations and Playing are the widget
+    // — the other three are answers to "I don't use those, give the room to
+    // my stations" (asked for on GitHub). Hiding a page never deletes what
+    // it holds: alarms still fire, downloads still land.
+    function viewVisible(i) {
+        if (i === 2) return Plasmoid.configuration.showMusicTab !== false;
+        if (i === 3) return Plasmoid.configuration.showPodcastsTab !== false;
+        if (i === 4) return Plasmoid.configuration.showTimersTab !== false;
+        return true;
+    }
+    // A hidden page can still be arrived at — a swipe, a restored index, a
+    // tab switched off while standing on it. Walk on rather than stare at
+    // a page whose tab is gone; Stations is always there to land on.
+    function _ensureViewVisible() {
+        if (viewVisible(view)) return;
+        for (var f = view + 1; f <= 4; f++)
+            if (viewVisible(f)) { view = f; return; }
+        for (var b = view - 1; b >= 0; b--)
+            if (viewVisible(b)) { view = b; return; }
+        view = 0;
+    }
+    onViewChanged: _ensureViewVisible()
+    // Switching a tab off while STANDING on it moves no view, so the guard
+    // above never hears about it — the listener would be left looking at a
+    // page whose tab just disappeared (measured on the bench).
+    Connections {
+        target: Plasmoid.configuration
+        function onShowMusicTabChanged() { root._ensureViewVisible() }
+        function onShowPodcastsTabChanged() { root._ensureViewVisible() }
+        function onShowTimersTabChanged() { root._ensureViewVisible() }
+    }
     // Only a definite Disconnected counts as offline. A machine without a
     // QNetworkInformation backend sits at Unknown forever, and Local/Site
     // (LAN-only, captive portal) can still reach a LAN stream server — the
@@ -1543,7 +1574,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1578,7 +1609,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1616,7 +1647,7 @@ PlasmoidItem {
             root._podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1674,7 +1705,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1742,7 +1773,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
                         + "/podcasts/top/25/podcasts.json");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1789,7 +1820,7 @@ PlasmoidItem {
             root.podcastTrendingBusy = false;
         };
         xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1824,7 +1855,7 @@ PlasmoidItem {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -1918,7 +1949,7 @@ PlasmoidItem {
                 root.podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1976,7 +2007,7 @@ PlasmoidItem {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -2123,7 +2154,7 @@ PlasmoidItem {
         executable.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
             + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.30' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.31' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -2342,7 +2373,7 @@ PlasmoidItem {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -4605,7 +4636,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.30");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or

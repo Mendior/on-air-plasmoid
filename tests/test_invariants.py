@@ -307,3 +307,77 @@ def test_every_icon_name_the_widget_asks_for_exists_in_breeze():
     assert not missing, (
         "icon names that exist in no theme, Breeze included — these render as "
         "a placeholder wherever they are used: " + ", ".join(missing))
+
+
+def test_the_relay_tap_hands_the_player_a_head_start():
+    """The tap used to start serving the moment the buffer file appeared.
+
+    That handed the player the live edge with no cushion: every time it
+    caught up it waited on the network for the next packet, and a listener
+    reported the result — a 1.5 Mbps FLAC station stuttering through its
+    first ten seconds while low-bitrate streams never did. (The player's
+    own buffer is counted in bytes, so the same 64 KiB is 0.35 s of FLAC
+    and 4 s of a 128 kbps stream.) Measured on a 1 Mbps FLAC station: a
+    modelled player starved once with no lead and never with one.
+
+    The clock cap stays short on purpose — a thin stream never starved,
+    so making its listener wait for a cushion it does not need would be a
+    fresh bug of its own.
+    """
+    src = (UI / "relayserve.py").read_text(encoding="utf-8")
+    m = re.search(r"^LEAD_BYTES\s*=\s*(\d+)\s*\*\s*1024", src, re.MULTILINE)
+    assert m and int(m.group(1)) >= 256, (
+        "the relay tap no longer waits for a byte head start before the "
+        "first byte reaches the player")
+    sec = re.search(r"^LEAD_SEC\s*=\s*([\d.]+)", src, re.MULTILINE)
+    assert sec and 0 < float(sec.group(1)) <= 2.0, (
+        "the lead's clock cap is missing or long enough to make a "
+        "low-bitrate station wait for nothing: %r" % (sec and sec.group(1)))
+    assert "os.path.getsize(buf_path) >= LEAD_BYTES" in src, (
+        "the lead constant is no longer what actually gates the first byte")
+    idle = re.search(r"^IDLE_SLEEP\s*=\s*([\d.]+)", src, re.MULTILINE)
+    assert idle and float(idle.group(1)) <= 0.1, (
+        "the tap's idle wait grew back: at 200 ms it was itself a gap the "
+        "player could run dry in (measured cost of 50 ms: 0.1% CPU)")
+
+
+def test_a_hidden_tab_never_leaves_the_listener_on_its_page():
+    """Tabs can be switched off (asked for on GitHub: give the space back).
+
+    Two roads reach a hidden page and both must bounce: arriving at one
+    (a swipe, a restored index) and switching off the tab you are already
+    standing on. The second was missed the first time — no view changes,
+    so a guard hanging off onViewChanged alone never hears about it, and
+    the page stays on screen with its tab gone (caught on the bench).
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "onViewChanged: _ensureViewVisible()" in src, (
+        "arriving at a hidden page is no longer guarded")
+    for key in ("onShowMusicTabChanged", "onShowPodcastsTabChanged",
+                "onShowTimersTabChanged"):
+        assert "%s() { root._ensureViewVisible() }" % key in src, (
+            "%s does not re-check the current page: switching that tab off "
+            "while standing on it strands the listener there" % key)
+    body = _function_body(src, "_ensureViewVisible")
+    assert "view = 0" in body, (
+        "the walk lost its floor — Stations is the page that is always "
+        "there to land on")
+    # The UI half lives in FullRepresentation.qml and the first version of
+    # this test never opened it — a refactor could have dropped every
+    # visible: binding while the test stayed green.
+    rep = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    for i in (2, 3, 4):
+        assert "visible: root.viewVisible(%d)" % i in rep, (
+            "tab %d lost its visibility binding — the switch in Settings "
+            "no longer hides anything" % i)
+    # An invisible TabButton keeps its equal-share slot on this Qt
+    # (measured: a hidden tab held its 100px of a 500px bar, a dead hole
+    # in the middle) — the width has to fall with the visibility.
+    assert rep.count("width: visible ? undefined : 0") >= 3, (
+        "a hidden tab's width no longer collapses — the bar keeps a "
+        "dead gap where the tab was and nobody gets the space back")
+    # In-app jumps to the Podcasts page must close with its tab: both
+    # doors used to stay live and the guard walked the click on to
+    # Timers, a page nobody asked for.
+    assert "visible: podcastFolder.count > 0 && root.viewVisible(3)" in rep, (
+        "the My Music bridge row no longer honours a hidden Podcasts tab")

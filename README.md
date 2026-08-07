@@ -81,7 +81,7 @@ cd packaging/aur && makepkg -si
 
 **From the release file:**
 ```bash
-kpackagetool6 --type Plasma/Applet --install on-air-2026.30.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.31.plasmoid
 ```
 
 **From a clone:** build first, or you get an English-only widget — the
@@ -90,7 +90,7 @@ into the catalogs the package loads.
 
 ```bash
 scripts/dev.sh build
-kpackagetool6 --type Plasma/Applet --install on-air-2026.30.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.31.plasmoid
 ```
 
 ## Usage tips
@@ -101,6 +101,7 @@ kpackagetool6 --type Plasma/Applet --install on-air-2026.30.plasmoid
 - **Scroll** on the panel icon to change volume — in the popup, the master volume slider lives in the output hub next to routing, sync and per-speaker balance
 - The **⬇ button** on the **Playing** tab downloads the current track to `~/Music/OnAir` (folder changeable in Settings)
 - The **My Music** tab is your offline library and play history; the **Timers** tab holds the sleep timer, wake-up alarms and scheduled recordings; the **Podcasts** tab searches, subscribes and downloads episodes for offline listening
+- **Moving to another machine or distro?** Station lists import and export as `.arp` files (Settings → Stations), the same format Advanced Radio Player uses; podcast subscriptions travel as OPML (Podcasts tab), which AntennaPod and gPodder read too. Tabs you don't use can be switched off in Settings → Appearance
 
 ## Multi-room playback and sync
 
