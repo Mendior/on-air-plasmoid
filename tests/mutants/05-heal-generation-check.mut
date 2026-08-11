@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heal run forgets its generation number, so a slow reply overwrites a newer one.
+
+history:
+  Heal rewrites the user's SAVED station address. Without the generation guard a
+  late callback from an abandoned attempt can land after the user already moved
+  on and write the wrong URL into their station list. This is the most damaging
+  class of bug in the widget: it corrupts saved user data, not just the display.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+    var mySeq = ++_healSeq;
+
+replace:
+    var mySeq = _healSeq;
+
+expect:
+  tests/test_invariants.py::test_a_heal_generation_is_claimed_fresh_and_abandoned_whole
+  — it pins the ++ pre-increment this mutant removes. A behavioural version
+  (two heal runs, the first one's late reply must be dropped) does not exist
+  yet; it wants the run bookkeeping out of main.qml first.

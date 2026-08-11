@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Unmute-on-volume-change becomes a toggle instead of an absolute 0.
+
+history:
+  Raising the volume must unmute; it must never mute a sink that was already
+  playing. `toggle` does exactly that every second time. The invariant about
+  asking the sink instead of trusting a cached value exists because this area
+  has been wrong before.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+    + (p > 0 ? " pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null;" : "")
+
+replace:
+    + (p > 0 ? " pactl set-sink-mute @DEFAULT_SINK@ toggle 2>/dev/null;" : "")
+
+expect:
+  Nothing today, and that is the finding. The existing mute invariant guards
+  toggleSinkMasterMute, where `toggle` is the CORRECT command. This mutant hits
+  the VOLUME path, where an absolute 0 is correct and `toggle` mutes every
+  second time. Two neighbouring call sites want opposite commands and only one
+  of them is guarded.

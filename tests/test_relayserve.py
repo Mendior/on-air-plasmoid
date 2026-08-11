@@ -86,15 +86,17 @@ def test_a_thin_stream_pays_the_clock_and_no_more(tmp_path):
     buf.write_bytes(b"")
     tap = Tap(tmp_path)
     try:
-        # A slow writer: never reaches LEAD_BYTES inside the clock, the
-        # way a 128 kbps stream never would.
+        # A genuinely THIN writer — roughly a 128 kbps stream's 16 KB/s.
+        # The rate is what decides now, not the clock alone: a stream
+        # this slow never starved, so it must still leave on the short
+        # clock, while a fat one waits for its byte target (2026-08-11).
         t0 = time.monotonic()
         deadline = t0 + LEAD_SEC + 3.0
         first = None
 
         def feed():
             with open(buf, "ab") as f:
-                f.write(b"y" * 8192)
+                f.write(b"y" * 1600)
                 f.flush()
 
         tap.sock.settimeout(0.1)

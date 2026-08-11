@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The declared notification is set to autoDelete, which kills every later caller.
+
+history:
+  Released and unnoticed for a long time: with autoDelete true, KNotification
+  frees the object after the first notification of a session. Everything that
+  tried to notify afterwards — stream errors, the recording finished message,
+  the alarm fallback tone — silently did nothing. notify() is the only door,
+  so one wrong flag muted the whole widget.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+    autoDelete: false
+
+replace:
+    autoDelete: true
+
+expect:
+  The dev.sh lint rule that greps declared notifications for autoDelete: true
+  (scripts/dev.sh, written for this very incident) — that is what kills this
+  mutant today. A behavioural test that fires two notifications in one session
+  and asserts the second still lands does NOT exist yet; if the lint rule is
+  ever dropped, this mutant survives and this line is the diagnosis.

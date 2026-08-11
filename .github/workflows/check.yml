@@ -27,12 +27,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install gettext and pytest
+      - name: Install gettext, pytest and ruff
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gettext python3-pytest
+          # Pinned deliberately. ruff.toml selects rule FAMILIES, so a new ruff
+          # release can add a rule that fires on code nobody touched — and a
+          # release is held until CI is green, so a red that has nothing to do
+          # with the commit is expensive. Bump this on purpose: run
+          # `ruff check $(git ls-files '*.py')` locally with the newer version
+          # first, triage whatever it finds, then raise the number here.
+          # This is the only job that checks Python; the Arch job below says
+          # out loud that it did not.
+          python3 -m pip install --break-system-packages --user ruff==0.16.2
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Lint without QML
-        run: QMLLINT=none scripts/dev.sh lint
+        # LINT_PYTEST_MARK='' clears lint's local 'not slow' filter: the
+        # under-30-s promise is for a developer's inner loop, CI pays full
+        # price so the slow calibrate.py subprocess tests always run somewhere.
+        run: QMLLINT=none LINT_PYTEST_MARK='' scripts/dev.sh lint
 
   # The gate's blind spot until 2026.28: every other job here runs on a
   # rolling Arch container with the newest Qt. Qt 6.10 rejected `final` as a

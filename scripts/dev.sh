@@ -53,6 +53,8 @@ Usage: scripts/dev.sh <command>
   i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
   locale-install  compile po/ catalogs into the LOCAL install (old plugin id domain)
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
+  mutants   break the widget on purpose, one shipped bug at a time, and demand
+            the gate goes red (scripts/mutants.py; slow — one full check per mutant)
   view      plasmoidviewer on package/ (quick preview without restarting plasmashell)
   restart   systemctl --user restart plasma-plasmashell (reloads the QML)
   doctor    is this machine running the code you think it is? (git vs repo vs
@@ -112,6 +114,20 @@ PYEOF
 for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/reader.py" "$PKG/contents/ui/mpris.py" "$PKG/contents/ui/cast.py" "$PKG/contents/ui/calibrate.py"
     python3 -c "import json; json.load(open('$PKG/metadata.json'))"
     bash -n "$PKG/contents/ui/start-mpris.sh"
+    # Python rules, pinned in ruff.toml. That file is the record: every rule
+    # switched off there carries the reason it was triaged out on 2026-08-09,
+    # one finding at a time, so nobody has to rediscover a decision somebody
+    # already made. This line is the enforcement, and the ceiling is zero.
+    #
+    # The else branch is not politeness. A check that skips quietly reads as
+    # green from the outside, which is how two of this project's guards spent
+    # weeks dead while looking alive — if ruff is missing, the gate says so.
+    if command -v ruff >/dev/null 2>&1; then
+      ruff check --quiet "$PKG/contents" "$REPO_DIR/tests" "$REPO_DIR/scripts" \
+        || { echo "lint FAILED: ruff (ruff.toml says what is deliberately off)"; fail=1; }
+    else
+      echo "lint: ruff NOT INSTALLED — the Python rules did not run"
+    fi
     # Translations: every .po must compile cleanly (a bad one would silently
     # ship a broken catalog).
     for po in "$REPO_DIR"/po/*.po; do
@@ -178,11 +194,18 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     # Unit tests (cast.py dispatch/DLNA parsing, reader.py field extraction).
     # pytest comes from the system or via uv; with neither present this only
     # warns locally — CI always runs them.
+    #
+    # lint skips the tests marked slow (test_calibrate_main runs calibrate.py
+    # as a subprocess a dozen times — measured 2026-08-09, it alone carried
+    # ~110 s of the 151 s suite). check and CI clear the mark and run it all;
+    # the skip is announced so a green lint never reads as the full suite.
     if [ -d "$REPO_DIR/tests" ]; then
+      mark="${LINT_PYTEST_MARK-not slow}"
+      [ -n "$mark" ] && echo "unit tests: -m '$mark' (dev.sh check runs everything)"
       if python3 -c 'import pytest' 2>/dev/null; then
-        (cd "$REPO_DIR" && python3 -m pytest tests/ -q) || { echo "lint FAILED: unit tests"; exit 1; }
+        (cd "$REPO_DIR" && python3 -m pytest tests/ -q ${mark:+-m "$mark"}) || { echo "lint FAILED: unit tests"; exit 1; }
       elif command -v uv >/dev/null 2>&1; then
-        (cd "$REPO_DIR" && uv run --with pytest python -m pytest tests/ -q) || { echo "lint FAILED: unit tests"; exit 1; }
+        (cd "$REPO_DIR" && uv run --with pytest python -m pytest tests/ -q ${mark:+-m "$mark"}) || { echo "lint FAILED: unit tests"; exit 1; }
       else
         echo "NB: pytest unavailable (no system pytest, no uv) — unit tests skipped here, CI runs them"
       fi
@@ -203,7 +226,9 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     exit "$fail"
     ;;
   check)
-    "$0" lint
+    # The full suite, slow marks included — lint's skip is a speed loan and
+    # check is where it gets paid back.
+    LINT_PYTEST_MARK='' "$0" lint
     # Runtime smoke test. qmllint does not see engine-level load errors (e.g.
     # nesting a child into a type with no default property — the exact bug
     # that shipped broken in 2026.7.2), only the QML engine reports those.
@@ -396,10 +421,35 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       msgfmt --statistics -o /dev/null "$po" 2>&1
     done
     ;;
+  mutants)
+    shift
+    exec python3 "$REPO_DIR/scripts/mutants.py" "$@"
+    ;;
   view)
     exec plasmoidviewer -a "$PKG"
     ;;
   restart)
+    # Ask the widget to stop playback BEFORE the shell dies: killing a
+    # playing stream mid-waveform is a step function, and the wired pair
+    # answered one restart with a crack loud enough to scare the listener
+    # (2026-08-11, third crack of that class that day). MPRIS Stop drains
+    # the pipeline the polite way; a dead or absent player is fine.
+    # Stop drains through the user's smooth FADE, so a fixed nap is a
+    # race: 0.6 s lost it and the shell died mid-fade — the crack came
+    # back (2026-08-12 morning, the listener's ears again). Wait for the
+    # player to actually say Stopped, up to three seconds.
+    for mp in $(busctl --user list 2>/dev/null \
+                | grep -oE 'org\.mpris\.MediaPlayer2\.onair[^ ]*'); do
+      busctl --user call "$mp" /org/mpris/MediaPlayer2 \
+        org.mpris.MediaPlayer2.Player Stop >/dev/null 2>&1 || true
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        st=$(busctl --user get-property "$mp" /org/mpris/MediaPlayer2 \
+             org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null || true)
+        case "$st" in *Stopped*|"") break ;; esac
+        sleep 0.2
+      done
+    done
+    sleep 0.4
     systemctl --user restart plasma-plasmashell
     ;;
   doctor)

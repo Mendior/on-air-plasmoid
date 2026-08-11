@@ -30,7 +30,51 @@ PlasmaExtras.Representation {
 
     readonly property var appletInterface: Plasmoid.self
 
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 16
+    // The floor the content actually needs, not a constant. A hard 16 gu
+    // was narrower than the tabs in plenty of font environments, and the
+    // first correction (the bar's implicit width — the SUM of the tabs)
+    // still broke, because the bar hands every tab an EQUAL slice: the
+    // room it needs is count times its WIDEST tab. Measured on the 5K
+    // desk, 2026-08-10: buttons 61/56/71/67/53, sum 308, equal slice 62
+    // — and exactly "My Music" (71) and "Podcasts" (67) starved and
+    // wrapped mid-word, photographed both times. Widest-times-count
+    // tracks fonts, scale and every catalog language; the extra pixel a
+    // tab covers fractional-scale glyph rounding.
+    //
+    // Measured ONCE, imperatively, after the bar has built: a live
+    // binding here reads the very widths the minimum it sets can move,
+    // and QML rightly called it a binding loop — CI caught what the eye
+    // could not, because the loop happens to settle on the right answer.
+    // How many tabs are actually on screen. Everything that shares the
+    // bar's width — the buttons themselves and the popup's floor — counts
+    // from this, never from the five that exist in the source.
+    readonly property int _visibleTabCount: {
+        var n = 0
+        for (var i = 0; i <= 4; i++) if (root.viewVisible(i)) n++
+        return Math.max(1, n)
+    }
+    // Re-measured whenever the set of tabs changes, or the floor keeps
+    // describing the widget the listener had before they switched. (A
+    // property declared in the same object cannot carry its own
+    // on<Name>Changed handler here — Connections is the door.)
+    Connections {
+        target: fullRepresentation
+        function on_VisibleTabCountChanged() { Qt.callLater(fullRepresentation._measureNavTabs) }
+    }
+    property real _navTabsNeed: 0
+    function _measureNavTabs() {
+        var widest = 0;
+        for (var i = 0; i < navTabs.count; i++) {
+            var b = navTabs.itemAt(i);
+            // A switched-off tab needs no room and must not raise the
+            // floor: a listener down to two tabs should be able to make
+            // the window narrower than one showing all five.
+            if (b && b.visible && b.implicitWidth > widest) widest = b.implicitWidth;
+        }
+        _navTabsNeed = _visibleTabCount * (widest + 1);
+    }
+
+    Layout.minimumWidth: Math.max(Kirigami.Units.gridUnit * 16, _navTabsNeed)
     Layout.minimumHeight: Kirigami.Units.gridUnit * 20
     // No Layout.maximum*: a hard cap makes user resizing snap back (issue #1) —
     // AppletPopup already clamps popups to 95% of the screen on its own.
@@ -59,7 +103,13 @@ PlasmaExtras.Representation {
     // as a whole object — QML var bindings don't see in-place mutation.
     property var _brokenArtUrls: ({})
 
+    // Switched off in Appearance, the Playing page keeps its words and
+    // loses its picture — the room some listeners asked for, and the one
+    // thing on that page that is pure decoration. Everything else about
+    // the art keeps working: MPRIS still hands the cover to the lock
+    // screen, and a cast device still gets it.
     readonly property string _bestArtUrl: {
+        if (Plasmoid.configuration.showCoverArt === false) return ""
         var broken = _brokenArtUrls
         // A playing podcast episode: its show cover comes first (the file
         // carries no embedded art). Gated on the SOURCE-EXACT _podcastPlaying,
@@ -1057,6 +1107,11 @@ PlasmaExtras.Representation {
         id: aurora
         anchors.fill: parent
         clip: true
+        // Plain colours mean plain: the drifting light is the most
+        // decorative thing on the page, and a listener who asked the
+        // widget to stop having a colour of its own did not ask for grey
+        // blobs instead. Off costs nothing and saves the canvas repaints.
+        visible: root._accentMode !== 2
         opacity: fullRepresentation._streamActive ? 0.7 : 0.42
         Behavior on opacity { NumberAnimation { duration: 1200; easing.type: Easing.InOutQuad } }
 
@@ -1208,6 +1263,13 @@ PlasmaExtras.Representation {
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
+                // Switched off in Appearance by a listener who keeps their
+                // own stations and wants the height back. The field keeps
+                // existing (the search machinery, the shortcut and the
+                // favourites toggle all hang off it) — it simply stops
+                // taking the room.
+                visible: Plasmoid.configuration.showSearchRow !== false
+                Layout.preferredHeight: visible ? implicitHeight : 0
 
                 Kirigami.SearchField {
                     id: filterField
@@ -1223,8 +1285,8 @@ PlasmaExtras.Representation {
                         if (stationView.count > 0) {
                             stationView.currentIndex = 0
                             stationView.forceActiveFocus()
-                        } else if (webRepeater.count > 0) {
-                            webRepeater.itemAt(0).forceActiveFocus()
+                        } else if (stationView.webRows && stationView.webRows.count > 0) {
+                            stationView.webRows.itemAt(0).forceActiveFocus()
                         }
                     }
                     // Shell-style recall: Up in an empty field brings the last
@@ -1280,8 +1342,13 @@ PlasmaExtras.Representation {
                 // Always present: the discovery row (Trending, Popular-in-…,
                 // the genres) is the first-run door to the world catalog —
                 // gating it on history hid it from exactly the people who
-                // hadn't searched yet.
-                visible: true
+                // hadn't searched yet. The one thing that may take it away
+                // is the listener saying so in Appearance, on its OWN
+                // switch: pairing it with the search field was my idea of
+                // tidiness and the listener's answer was immediate — they
+                // are two rows to the person looking at them, and someone
+                // who searches by typing still wants the chips gone.
+                visible: Plasmoid.configuration.showDiscoveryRow !== false
 
                 // The pinned country scope — a flag chip every query runs
                 // inside; the ✕ releases it back to the whole world.
@@ -1446,6 +1513,12 @@ PlasmaExtras.Representation {
 
                 contentItem: ListView {
                     id: stationView
+                    // The web-results Repeater lives inside the footer
+                    // component, whose ids are invisible out here — both
+                    // readers below threw ReferenceError from the day they
+                    // shipped (journal 2026-08-09 21:41). The instance
+                    // registers itself through this property instead.
+                    property Item webRows: null
                     // A live drag is in progress (a row handle owns the
                     // pointer and moves the row through the model as it
                     // travels) — the keyboard reorder stands aside for it.
@@ -1488,8 +1561,8 @@ PlasmaExtras.Representation {
                         // results — one column of arrows over what reads as
                         // one list on screen.
                         if (event.key === Qt.Key_Down && !(event.modifiers & Qt.ControlModifier)
-                            && currentIndex === count - 1 && webRepeater.count > 0) {
-                            webRepeater.itemAt(0).forceActiveFocus()
+                            && currentIndex === count - 1 && webRows && webRows.count > 0) {
+                            webRows.itemAt(0).forceActiveFocus()
                             event.accepted = true
                             return
                         }
@@ -1611,6 +1684,8 @@ PlasmaExtras.Representation {
                         Repeater {
                             id: webRepeater
                             model: webResultsModel
+                            Component.onCompleted: stationView.webRows = webRepeater
+                            Component.onDestruction: if (stationView.webRows === webRepeater) stationView.webRows = null
 
                             delegate: Item {
                                 id: webItem
@@ -2310,6 +2385,7 @@ PlasmaExtras.Representation {
 
                     Rectangle {
                         visible: fullRepresentation._nowBitrate > 0
+                                 && Plasmoid.configuration.showBitrateBadge !== false
                         implicitHeight: brLabel.implicitHeight + Kirigami.Units.smallSpacing
                         implicitWidth: brLabel.implicitWidth + Kirigami.Units.largeSpacing
                         radius: height / 2
@@ -4168,8 +4244,8 @@ PlasmaExtras.Representation {
                                 iconName: armed ? "dialog-warning" : "edit-delete"
                                 iconScale: 0.55
                                 baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
-                                opacity: (podDlRow.hovered || armed) ? 0.85 : 0.0
-                                visible: opacity > 0.0
+                                // Always faintly there — hover-only read as "no way to delete" (2026-08-09).
+                                opacity: (podDlRow.hovered || armed) ? 0.85 : 0.35
                                 tooltipText: armed ? i18n("Tap again to delete the file")
                                                    : i18n("Delete the downloaded file")
                                 onClicked: {
@@ -4813,7 +4889,19 @@ PlasmaExtras.Representation {
                             Layout.fillWidth: true
                             model: stationsModel
                             textRole: "name"
+                            enabled: !alarmToneOnly.checked
                             Accessible.name: i18n("Station")
+                        }
+
+                        // The chime as a CHOICE, not only a failure net: the
+                        // listener asked for a plain ringer on 2026-08-10 —
+                        // some mornings want a tone, not a talk show.
+                        Item { width: 1; height: 1 }
+                        QQC2.CheckBox {
+                            id: alarmToneOnly
+                            Layout.fillWidth: true
+                            text: i18n("Wake with the built-in tone (no station)")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
                         }
 
                         PlasmaComponents3.Label {
@@ -4895,12 +4983,21 @@ PlasmaExtras.Representation {
                         QQC2.Button {
                             icon.name: "list-add"
                             text: i18n("Add")
-                            enabled: alarmStation.currentIndex >= 0
-                                     && alarmStation.currentIndex < stationsModel.count
+                            enabled: alarmToneOnly.checked
+                                     || (alarmStation.currentIndex >= 0
+                                         && alarmStation.currentIndex < stationsModel.count)
                             onClicked: {
+                                var repeats = ["once", "daily", "weekly"]
+                                if (alarmToneOnly.checked) {
+                                    root.addAlarm(i18n("Wake-up tone"), "chime:", "",
+                                                  alarmHH.value, alarmMM.value,
+                                                  repeats[alarmRepeat.currentIndex],
+                                                  alarmWeekday.currentIndex,
+                                                  alarmVolume.value, alarmAwake.checked, "")
+                                    return
+                                }
                                 var st = stationsModel.get(alarmStation.currentIndex)
                                 if (!st || !st.hostname) return
-                                var repeats = ["once", "daily", "weekly"]
                                 root.addAlarm(st.name, st.hostname, st.favicon || "",
                                               alarmHH.value, alarmMM.value,
                                               repeats[alarmRepeat.currentIndex],
@@ -5318,8 +5415,12 @@ PlasmaExtras.Representation {
             anchors.right: parent.right
 
             // Two-way sync with root.view, imperative like the SwipeView's:
-            // a declarative binding would break on the first click.
-            Component.onCompleted: currentIndex = root.view
+            // a declarative binding would break on the first click. The
+            // width measurement waits a beat for the labels to settle.
+            Component.onCompleted: {
+                currentIndex = root.view
+                Qt.callLater(fullRepresentation._measureNavTabs)
+            }
             onCurrentIndexChanged: {
                 if (root.view !== currentIndex) root.view = currentIndex
             }
@@ -5334,6 +5435,16 @@ PlasmaExtras.Representation {
             // hyphen soup at popup width; stacked they stay whole in
             // every language the catalog carries.
             PlasmaComponents3.TabButton {
+                visible: root.viewVisible(0)
+                // Same equal-share workaround the other tabs carry.
+                // The bar hands every tab an equal slice of ITSELF, so a
+                // hidden one keeping its slice left the remaining tabs
+                // huddled at the left with a hole beside them (seen on the
+                // 5K desk the day the switches shipped). Share between what
+                // is actually on screen instead.
+                width: visible
+                       ? navTabs.availableWidth / fullRepresentation._visibleTabCount
+                       : 0
                 icon.name: "radio"
                 text: i18n("Stations")
                 display: QQC2.AbstractButton.TextUnderIcon
@@ -5347,6 +5458,15 @@ PlasmaExtras.Representation {
                 focusPolicy: Qt.TabFocus
             }
             PlasmaComponents3.TabButton {
+                visible: root.viewVisible(1)
+                // The bar hands every tab an equal slice of ITSELF, so a
+                // hidden one keeping its slice left the remaining tabs
+                // huddled at the left with a hole beside them (seen on the
+                // 5K desk the day the switches shipped). Share between what
+                // is actually on screen instead.
+                width: visible
+                       ? navTabs.availableWidth / fullRepresentation._visibleTabCount
+                       : 0
                 icon.name: "view-media-lyrics"
                 text: i18n("Playing")
                 display: QQC2.AbstractButton.TextUnderIcon
@@ -5364,7 +5484,14 @@ PlasmaExtras.Representation {
                 // An invisible button keeps its equal-share slot on this
                 // Qt (measured: a hidden tab held its 100px in a 500px
                 // bar, leaving a hole) — undefined resets to auto-share.
-                width: visible ? undefined : 0
+                // The bar hands every tab an equal slice of ITSELF, so a
+                // hidden one keeping its slice left the remaining tabs
+                // huddled at the left with a hole beside them (seen on the
+                // 5K desk the day the switches shipped). Share between what
+                // is actually on screen instead.
+                width: visible
+                       ? navTabs.availableWidth / fullRepresentation._visibleTabCount
+                       : 0
                 icon.name: "folder-music"
                 text: i18n("My Music")
                 display: QQC2.AbstractButton.TextUnderIcon
@@ -5382,7 +5509,14 @@ PlasmaExtras.Representation {
                 // An invisible button keeps its equal-share slot on this
                 // Qt (measured: a hidden tab held its 100px in a 500px
                 // bar, leaving a hole) — undefined resets to auto-share.
-                width: visible ? undefined : 0
+                // The bar hands every tab an equal slice of ITSELF, so a
+                // hidden one keeping its slice left the remaining tabs
+                // huddled at the left with a hole beside them (seen on the
+                // 5K desk the day the switches shipped). Share between what
+                // is actually on screen instead.
+                width: visible
+                       ? navTabs.availableWidth / fullRepresentation._visibleTabCount
+                       : 0
                 icon.name: "application-rss+xml"
                 text: i18n("Podcasts")
                 display: QQC2.AbstractButton.TextUnderIcon
@@ -5400,7 +5534,14 @@ PlasmaExtras.Representation {
                 // An invisible button keeps its equal-share slot on this
                 // Qt (measured: a hidden tab held its 100px in a 500px
                 // bar, leaving a hole) — undefined resets to auto-share.
-                width: visible ? undefined : 0
+                // The bar hands every tab an equal slice of ITSELF, so a
+                // hidden one keeping its slice left the remaining tabs
+                // huddled at the left with a hole beside them (seen on the
+                // 5K desk the day the switches shipped). Share between what
+                // is actually on screen instead.
+                width: visible
+                       ? navTabs.availableWidth / fullRepresentation._visibleTabCount
+                       : 0
                 icon.name: "clock"
                 text: i18n("Timers")
                 display: QQC2.AbstractButton.TextUnderIcon

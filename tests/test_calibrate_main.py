@@ -19,6 +19,11 @@ import sys
 
 import pytest
 
+# Real subprocess runs of the shipped main() — measured 2026-08-09, this file
+# alone carried ~110 s of the 151 s suite. dev.sh lint skips the mark for its
+# under-30-s promise; dev.sh check and CI run everything.
+pytestmark = pytest.mark.slow
+
 UI_DIR = pathlib.Path(__file__).resolve().parent.parent / "package" / "contents" / "ui"
 
 # A physically faithful microphone: it ALWAYS carries a small noise floor

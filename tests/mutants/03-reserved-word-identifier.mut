@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A variable named `final` — a reserved word on Qt 6.10.
+
+history:
+  2026-08-03, released as 2026.24: `var final` parsed fine on the rolling Qt we
+  develop against and killed the widget outright on Kubuntu 26.04 LTS, which
+  ships Qt 6.10. Fixed in 2026.25 and locked down by an invariant plus the
+  lts-parse CI job — this mutant is what proves both still work.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+    function _pad2(n) {
+
+replace:
+    function _pad2(final) {
+
+expect:
+  tests/test_invariants.py::test_no_reserved_word_is_used_as_an_identifier, and
+  the LTS Qt parse job in CI.

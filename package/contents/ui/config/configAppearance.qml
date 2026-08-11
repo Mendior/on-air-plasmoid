@@ -28,17 +28,49 @@ KCM.SimpleKCM {
     property alias cfg_autoHeal: autoHealCheck.checked
     property alias cfg_reportClicks: reportClicksCheck.checked
     property alias cfg_followSystemAccent: accentCheck.checked
+    property int cfg_accentMode: 0
     property alias cfg_saveOnBattery: batteryCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
     property alias cfg_showMusicTab: musicTabCheck.checked
     property alias cfg_showPodcastsTab: podcastsTabCheck.checked
     property alias cfg_showTimersTab: timersTabCheck.checked
+    property alias cfg_showSearchRow: searchRowCheck.checked
+    property alias cfg_showDiscoveryRow: discoveryRowCheck.checked
+    property alias cfg_showReorderHandles: reorderCheck.checked
+    property alias cfg_showStationsTab: stationsTabCheck.checked
+    property alias cfg_showPlayingTab: playingTabCheck.checked
+    property alias cfg_rememberLastTab: rememberTabCheck.checked
+    property alias cfg_autoSwitchToPlaying: autoPlayingCheck.checked
+    property alias cfg_showBitrateBadge: bitrateCheck.checked
+    property alias cfg_showCoverArt: coverCheck.checked
     property string cfg_downloadFormat
     property string cfg_icon
 
 
     Kirigami.FormLayout {
+        Item {
+            Kirigami.FormData.label: i18n("Colours")
+            Kirigami.FormData.isSection: true
+        }
+
+        // Three answers rather than a colour picker: every shade has to
+        // stay readable on both light and dark Plasma schemes, and one
+        // that nobody measured is a promise the widget cannot keep.
+        QQC2.ComboBox {
+            id: accentModeBox
+            Kirigami.FormData.label: i18n("Accent:")
+            model: [i18n("On Air green"), i18n("System accent colour"), i18n("Plain — no colour of its own")]
+            currentIndex: root.cfg_accentMode
+            onActivated: {
+                root.cfg_accentMode = currentIndex;
+                // The old boolean stays in the file for configs written
+                // before this list existed; the moment someone chooses
+                // here, their choice is the only thing that speaks.
+                accentCheck.checked = (currentIndex === 1);
+            }
+        }
+
         Item {
             Kirigami.FormData.label: i18n("Tabs")
             Kirigami.FormData.isSection: true
@@ -48,9 +80,23 @@ KCM.SimpleKCM {
         // stations wants that space back. Stations and Playing stay —
         // they are the widget. Switching a tab off hides the page, never
         // its contents: alarms still ring, downloads still arrive.
+        // Every tab can go now, including these two — a listener who only
+        // wants podcasts should not have to look at a stations page, and
+        // one who lives in the list does not need a Playing page. The one
+        // rule the switches cannot break lives in main.qml: the LAST
+        // remaining tab stays on screen whatever the config says, because
+        // a widget with nothing on it has no way back.
+        QQC2.CheckBox {
+            id: stationsTabCheck
+            Kirigami.FormData.label: i18n("Show:")
+            text: i18n("Stations")
+        }
+        QQC2.CheckBox {
+            id: playingTabCheck
+            text: i18n("Playing")
+        }
         QQC2.CheckBox {
             id: musicTabCheck
-            Kirigami.FormData.label: i18n("Show:")
             text: i18n("My Music")
         }
         QQC2.CheckBox {
@@ -60,6 +106,76 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: timersTabCheck
             text: i18n("Timers")
+        }
+
+        Item {
+            Kirigami.FormData.label: i18n("Stations page")
+            Kirigami.FormData.isSection: true
+        }
+
+        // Both asked for in Discussions by someone who listens to their own
+        // handful of stations: the search field and the discovery row are
+        // the door to the world catalogue, and the reorder controls earn
+        // their width on a long list — but neither is worth its space to a
+        // listener who set their stations up once. On by default: nobody's
+        // widget changes unless they ask.
+        QQC2.CheckBox {
+            id: searchRowCheck
+            Kirigami.FormData.label: i18n("Show:")
+            text: i18n("Search field")
+        }
+        QQC2.CheckBox {
+            id: discoveryRowCheck
+            text: i18n("Discovery row (Trending, country, genres)")
+        }
+        QQC2.CheckBox {
+            id: reorderCheck
+            text: i18n("Reorder and remove controls on each row")
+        }
+
+        Item {
+            Kirigami.FormData.label: i18n("Playing page")
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: coverCheck
+            Kirigami.FormData.label: i18n("Show:")
+            text: i18n("Cover picture")
+        }
+        QQC2.CheckBox {
+            id: bitrateCheck
+            text: i18n("Bitrate badge")
+        }
+        QQC2.CheckBox {
+            id: rememberTabCheck
+            Kirigami.FormData.label: i18n("On opening:")
+            text: i18n("Return to the tab I was last on")
+        }
+        QQC2.CheckBox {
+            id: autoPlayingCheck
+            Kirigami.FormData.label: i18n("While playing:")
+            text: i18n("Jump to Playing soon after a station starts")
+        }
+
+        QQC2.Button {
+            Kirigami.FormData.label: i18n("Everything back:")
+            icon.name: "edit-undo"
+            text: i18n("Show all of it again")
+            // The way out of a widget somebody switched down to nothing —
+            // one button, no memory required of which switch did what.
+            onClicked: {
+                stationsTabCheck.checked = true;
+                playingTabCheck.checked = true;
+                musicTabCheck.checked = true;
+                podcastsTabCheck.checked = true;
+                timersTabCheck.checked = true;
+                searchRowCheck.checked = true;
+                discoveryRowCheck.checked = true;
+                reorderCheck.checked = true;
+                coverCheck.checked = true;
+                bitrateCheck.checked = true;
+            }
         }
 
         Item {

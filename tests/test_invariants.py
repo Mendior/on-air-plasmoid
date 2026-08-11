@@ -59,25 +59,54 @@ def test_every_byuuid_concatenation_encodes_its_uuid():
                 % (qml.name, tail.split("\n")[0]))
 
 
-def test_device_supplied_names_are_stripped_at_the_model_door():
+def test_every_device_supplied_name_still_goes_through_the_stripper():
+    """The stripper itself is tested by CALLING it (tests/qml/tst_nameguard.qml).
+
+    What that behavioural test cannot see is whether main.qml still HANDS
+    it anything. Those are two different failures and they need two
+    different guards: drop the character class and the QML test goes red;
+    drop one call site and only this one does.
+
+    Measured 2026-08-09: eight call sites, plus the wrapper's definition.
+    The count is pinned rather than given a floor because the floor is what
+    let the old version of this test through — it asked for `>= 4` while
+    there were nine, so losing five would have been silent.
+    """
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    # The cast device dict, the paired list and the scan list each sanitize
-    # LAN/BT-supplied display text through _sanitizeDeviceName. Three
-    # sites; losing one reopens the rich-text beacon door.
-    assert "function _sanitizeDeviceName" in src, (
-        "_sanitizeDeviceName helper missing from main.qml")
-    helper = re.search(
-        r"function _sanitizeDeviceName[\s\S]{0,200}?replace\(/\[([^\]]+)\]/g",
-        src)
-    assert helper, "_sanitizeDeviceName no longer strips a character class"
-    for needed in ("<>&", "\\u0000-\\u001f", "\\u202a-\\u202e"):
-        assert needed in helper.group(1), (
-            "_sanitizeDeviceName class lost %r (markup / control / bidi)"
-            % needed)
-    strips = src.count("_sanitizeDeviceName(")
-    assert strips >= 4, (  # 3 model-door call sites + the definition itself
-        "expected >=4 _sanitizeDeviceName mentions (3 call sites + def), "
-        "found %d" % strips)
+
+    # The body lives in the library now; main.qml must still route to it.
+    assert 'import "NameGuard.js" as NameGuard' in src, (
+        "main.qml no longer imports NameGuard")
+    body = _function_body(src, "_sanitizeDeviceName")
+    assert "NameGuard.sanitize(s)" in body, (
+        "_sanitizeDeviceName stopped delegating to NameGuard — the wrapper "
+        "is the only thing keeping eight callers pointed at the tested code")
+
+    mentions = src.count("_sanitizeDeviceName(")
+    calls = mentions - src.count("function _sanitizeDeviceName(")
+    eng = (UI / "PodcastEngine.qml").read_text(encoding="utf-8")
+    calls += eng.count("app._sanitizeDeviceName(")
+    assert calls == 8, (
+        "expected 8 _sanitizeDeviceName call sites across main.qml and "
+        "PodcastEngine.qml (the download title moved with slice 3a), found "
+        "%d. A name that skips it reaches the model, a filename and a shell "
+        "command line unstripped; a NEW one that legitimately needs "
+        "stripping means this number goes UP, in the commit that adds it."
+        % calls)
+
+    # The library must still be the one door, not a second copy. The class
+    # is read out of the regex LINE, not the whole file: every group also
+    # appears in the explanatory comment above it, so a whole-file grep
+    # stayed green with a group deleted from the code — measured, and the
+    # exact text-not-behaviour trap this extraction was meant to end.
+    lib = (UI / "NameGuard.js").read_text(encoding="utf-8")
+    assert ".pragma library" in lib, "NameGuard.js stopped being a library"
+    cls = re.search(r"\.replace\(/\[([^\]]+)\]/g", lib)
+    assert cls, "NameGuard.sanitize no longer strips a character class"
+    for needed in ("<>&", "\\u0000-\\u001f", "\\u202a-\\u202e", "\\u2066-\\u2069"):
+        assert needed in cls.group(1), (
+            "NameGuard's regex lost %r (markup / control / bidi / isolate) — "
+            "tst_nameguard.qml says what each group is for" % needed)
 
 
 def test_the_readme_never_claims_more_checks_than_exist():
@@ -110,6 +139,16 @@ def test_the_raw_episode_url_retires_with_its_siblings():
     # starting the episode. The field set is cleared as a unit or the bug
     # comes straight back — this pins every clearing block together.
     src = (UI / "main.qml").read_text(encoding="utf-8")
+    # The four identical player-death sites folded into the engine's
+    # clearPlaying() (A2); the sites main still spells by hand keep the
+    # pairing rule, and the fold itself must keep the pair together.
+    eng = (UI / "PodcastEngine.qml").read_text(encoding="utf-8")
+    clear = _function_body(eng, "clearPlaying")
+    assert '_podPlayingUrl = "";' in clear and '_podPlayingRawUrl = "";' in clear, (
+        "clearPlaying no longer retires the raw URL with its siblings")
+    assert src.count("podcastEngine.clearPlaying();") >= 4, (
+        "the player-death sites stopped using the unified clear — "
+        "hand-spelled copies are how the fields drift apart again")
     blocks = list(re.finditer(r'_podPlayingUrl = "";', src))
     assert len(blocks) >= 3, "expected the handoff + both stop paths"
     for m in blocks:
@@ -126,7 +165,9 @@ def test_the_podcast_download_keeps_its_url_off_the_transfer_argv():
     # /proc for the life of the process. The transfer command may name
     # paths only; the URL travels through the owner-only -K config that a
     # separate, microsecond-lived printf staged.
-    src = (UI / "main.qml").read_text(encoding="utf-8")
+    # The pipeline lives in PodcastEngine since the slice-3a move; the
+    # guard follows the code, asserting the same shape it always did.
+    src = (UI / "PodcastEngine.qml").read_text(encoding="utf-8")
     stage = _function_body(src, "_podStartDownload")
     assert ": POD_URL;" in stage and "umask 077" in stage, (
         "the staging step no longer writes the URL file owner-only")
@@ -223,14 +264,30 @@ def test_no_reserved_word_is_used_as_an_identifier():
     # Every shipped QML and JS file, not just ui/: the widget's own
     # contents/config/config.qml parses with the same Qt 6.10 parser, and a
     # glob that stopped at ui/ left it unguarded.
+    #
+    # tests/qml is in the list for the same reason one level up, and it was
+    # added the day it bit: a new test file here declared `var long` and
+    # every check in the gate stayed green. Not because a broken test file
+    # fails quietly — measured on 6.11, qmltestrunner reports an unparseable
+    # file as compile() FAIL and exits 1 — but because NOTHING runs these
+    # files on an old parser at all: the LTS-parse CI job only qmllints
+    # `find package`, and the machines that do run qmltestrunner carry a
+    # rolling Qt where `long` is an ordinary name. The break would have
+    # surfaced on the first LTS machine that ran the suite — months away
+    # from the commit that caused it, with this green tree looking innocent.
+    # Both extensions guard .js too: the libraries these tests import ride
+    # through the same old parser.
     for p in sorted((ROOT / "package").rglob("*.qml")) \
-            + sorted((ROOT / "package").rglob("*.js")):
+            + sorted((ROOT / "package").rglob("*.js")) \
+            + sorted((TESTS / "qml").rglob("*.qml")) \
+            + sorted((TESTS / "qml").rglob("*.js")):
         for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             stripped = line.strip()
             if stripped.startswith("//") or stripped.startswith("*"):
                 continue
             if decl.search(line):
-                hits.append("%s:%d: %s" % (p.name, i, stripped[:70]))
+                hits.append("%s:%d: %s"
+                            % (p.relative_to(ROOT), i, stripped[:70]))
     assert not hits, (
         "Reserved words declared as identifiers — Qt 6.10 refuses to parse "
         "these files at all:\n" + "\n".join(hits))
@@ -292,7 +349,7 @@ def test_every_icon_name_the_widget_asks_for_exists_in_breeze():
     sys.path.insert(0, str(TESTS))
     import icon_theme_lookup as lookup
 
-    if lookup._theme_dir("breeze") is None:          # noqa: SLF001
+    if lookup._theme_dir("breeze") is None:
         import pytest
         pytest.skip("breeze icons are not installed on this machine")
 
@@ -333,8 +390,22 @@ def test_the_relay_tap_hands_the_player_a_head_start():
     assert sec and 0 < float(sec.group(1)) <= 2.0, (
         "the lead's clock cap is missing or long enough to make a "
         "low-bitrate station wait for nothing: %r" % (sec and sec.group(1)))
-    assert "os.path.getsize(buf_path) >= LEAD_BYTES" in src, (
+    # ...and the short clock must apply to THIN streams only. It used to
+    # release everyone, which is how the two lossless stations a reporter
+    # named started on a fifth of the cushion the byte target intends
+    # (measured 2026-08-11: they arrive at 1181 and 749 kbps, needing 3.6
+    # and 5.6 s to reach it). A fat stream waits for bytes, capped.
+    fat = re.search(r"^FAT_RATE\s*=\s*(\d+)", src, re.MULTILINE)
+    assert fat, "the thin/fat discriminator is gone — the clock releases everyone again"
+    cap = re.search(r"^MAX_LEAD_SEC\s*=\s*([\d.]+)", src, re.MULTILINE)
+    assert cap and 2.0 < float(cap.group(1)) <= 8.0, (
+        "the fat stream's cap is missing, too short to hold a real "
+        "cushion, or long enough to feel like a hang")
+    assert "have >= LEAD_BYTES" in src, (
         "the lead constant is no longer what actually gates the first byte")
+    assert "< FAT_RATE" in src, (
+        "the wait no longer measures the rate from what has arrived — a "
+        "stream must not have to be recognised in advance")
     idle = re.search(r"^IDLE_SLEEP\s*=\s*([\d.]+)", src, re.MULTILINE)
     assert idle and float(idle.group(1)) <= 0.1, (
         "the tap's idle wait grew back: at 200 ms it was itself a gap the "
@@ -351,7 +422,8 @@ def test_a_hidden_tab_never_leaves_the_listener_on_its_page():
     the page stays on screen with its tab gone (caught on the bench).
     """
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    assert "onViewChanged: _ensureViewVisible()" in src, (
+    m = re.search(r"onViewChanged: \{?[^}]*_ensureViewVisible\(\);", src)
+    assert m, (
         "arriving at a hidden page is no longer guarded")
     for key in ("onShowMusicTabChanged", "onShowPodcastsTabChanged",
                 "onShowTimersTabChanged"):
@@ -366,18 +438,556 @@ def test_a_hidden_tab_never_leaves_the_listener_on_its_page():
     # this test never opened it — a refactor could have dropped every
     # visible: binding while the test stayed green.
     rep = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
-    for i in (2, 3, 4):
+    for i in range(5):
         assert "visible: root.viewVisible(%d)" % i in rep, (
             "tab %d lost its visibility binding — the switch in Settings "
             "no longer hides anything" % i)
     # An invisible TabButton keeps its equal-share slot on this Qt
     # (measured: a hidden tab held its 100px of a 500px bar, a dead hole
-    # in the middle) — the width has to fall with the visibility.
-    assert rep.count("width: visible ? undefined : 0") >= 3, (
-        "a hidden tab's width no longer collapses — the bar keeps a "
-        "dead gap where the tab was and nobody gets the space back")
+    # in the middle), and simply zeroing it is not enough either: the
+    # survivors then keep their old fifth each and huddle at the left,
+    # which is what the listener photographed the day the switches
+    # shipped. Every tab sizes itself from the VISIBLE count.
+    assert rep.count("navTabs.availableWidth / fullRepresentation._visibleTabCount") == 5, (
+        "a tab stopped sharing the bar by visible count — either a hidden "
+        "one keeps its slice, or the survivors keep their old width and "
+        "leave a hole beside them")
+    assert "_visibleTabCount" in rep and "on_VisibleTabCountChanged" in rep, (
+        "the visible-tab count is gone or no longer re-measures the "
+        "popup's floor — a widget down to two tabs would still demand "
+        "the width of five")
     # In-app jumps to the Podcasts page must close with its tab: both
     # doors used to stay live and the guard walked the click on to
     # Timers, a page nobody asked for.
     assert "visible: podcastFolder.count > 0 && root.viewVisible(3)" in rep, (
         "the My Music bridge row no longer honours a hidden Podcasts tab")
+
+
+def test_a_heal_generation_is_claimed_fresh_and_abandoned_whole():
+    """Healing is the only road that rewrites the user's SAVED address.
+
+    The whole safety of that road is one integer. A heal run takes a
+    generation number, every network reply it started compares its own
+    number against the current one before it writes anything, and any
+    road that abandons the run bumps the number so the strays die. Two
+    halves, and the road is only safe while BOTH hold:
+
+      * the run must claim a FRESH number (pre-increment). Reading the
+        number without bumping it leaves every earlier run in flight
+        still matching, and a slow reply from an attempt the user has
+        already walked away from can land afterwards and write the wrong
+        URL into their station list.
+      * abandoning a generation must also drop the pending audition. The
+        commit path (onMediaStatusChanged's BufferedMedia branch →
+        _healCommit) does NOT look at the generation at all — its only
+        gate is that _healPendingUrl is still set and still equals the
+        player's source. Bump without clearing and an abandoned audition
+        can still commit.
+
+    Measured 2026-08-09 on e4d9eb1: both halves hold on all five sites,
+    and mutation 05-heal-generation-check (which turns the pre-increment
+    into a plain read) walked past the entire gate before this test
+    existed.
+
+    This reads the source as text, so say what that cannot see: it proves
+    the bookkeeping is SHAPED right, not that a late reply is dropped at
+    runtime. The behavioural version wants the run bookkeeping out of
+    main.qml and under qmltestrunner.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    lines = src.splitlines()
+
+    # Both spellings count everywhere below: main.qml already writes the
+    # sibling counter as `root._previewSeq++;` in half its sites, so a
+    # pattern that only knows the bare form goes quietly blind the day a
+    # heal site is written house-style.
+    body = _function_body(src, "_tryHealStation")
+    assert re.search(r"\+\+(root\.)?_healSeq", body), (
+        "the heal run no longer claims a fresh generation — every reply "
+        "from an abandoned earlier run still matches, and one of them can "
+        "overwrite the user's saved station address")
+    creators = len(re.findall(r"\+\+(?:root\.)?_healSeq", src))
+    assert creators == 1, (
+        "a second place creates heal generations (%d found); one creator "
+        "is what makes the number mean 'the run that is current'" % creators)
+
+    # Bare `_healSeq++;` statements are the abandon sites. The creator uses
+    # the pre-increment form above, so the two never get confused here.
+    # The alarm tone's site moved into the engine with the fire half and
+    # speaks facade (`app._healSeq++;`) — counted from there, same rules.
+    eng_lines = (UI / "AlarmEngine.qml").read_text(encoding="utf-8").splitlines()
+    bumps = [i for i, ln in enumerate(lines)
+             if re.match(r"^\s*(root\.)?_healSeq\+\+;\s*$", ln)]
+    eng_bumps = [i for i, ln in enumerate(eng_lines)
+                 if re.match(r"^\s*app\._healSeq\+\+;\s*$", ln)]
+    assert len(eng_bumps) >= 1, (
+        "the wake tone no longer abandons the heal generation — a heal "
+        "audition in flight can replace the looping chime")
+    assert len(bumps) + len(eng_bumps) >= 4, (
+        "only %d road(s) abandon a heal generation — the stop, the local "
+        "file, the alarm tone and the station switch each owe one"
+        % (len(bumps) + len(eng_bumps)))
+    for i in eng_bumps:
+        near = "\n".join(eng_lines[max(0, i - 2):i + 3])
+        assert "_healClearPending()" in near, (
+            "AlarmEngine.qml:%d bumps the heal generation without dropping "
+            "the pending audition" % (i + 1))
+    for i in bumps:
+        near = "\n".join(lines[max(0, i - 2):i + 3])
+        assert "_healClearPending()" in near, (
+            "main.qml:%d bumps the heal generation without dropping the "
+            "pending audition — _healCommit does not check generations, so "
+            "the stray can still be written to the saved address" % (i + 1))
+
+    # Every rung that comes back from the network compares before it
+    # writes — and the COUNT is pinned per function, because the entry
+    # guard alone satisfied a mere `in`: delete the reply-side check in
+    # _healNameSearch or the async playlist-callback check in _healAdvance
+    # and `'!== _healSeq' in body` stayed green while the exact stray this
+    # docstring warns about was free to land (measured 2026-08-09).
+    guards = {"_tryHealStation": 1, "_healNameSearch": 2, "_healAdvance": 2}
+    for fn, want in guards.items():
+        got = len(re.findall(r"!== (?:root\.)?_healSeq", _function_body(src, fn)))
+        assert got == want, (
+            "%s carries %d generation checks, expected %d — the missing one "
+            "is the reply-side guard, the only thing between an abandoned "
+            "run's late network callback and the generation-blind commit "
+            "path. A NEW legitimate check moves this number UP in the same "
+            "commit." % (fn, got, want))
+
+
+def test_every_qml_file_imports_the_js_library_it_calls():
+    """A missing .js import is a silent ReferenceError, not a load error.
+
+    Measured 2026-08-10, and it had already shipped: ArtworkEngine.qml called
+    SearchLogic five times without importing it. Every call sat inside the
+    lookup's own `try { … } catch(e) {}`, so the ReferenceError was swallowed
+    and reported as a transient network failure — album art was 100% dead from
+    the moment the engine landed, and because "transient" is deliberately not
+    cached, it retried on every single track and never once succeeded.
+
+    Nothing in the gate could see it. qmllint does report the five unqualified
+    accesses, but dev.sh lint filters [unqualified] out on purpose (Qt6 warns
+    on plenty of healthy code), the offscreen smoke test never plays a track,
+    and the engine's own tests avoid the network path by design. So the class
+    gets its own check: for every shipped QML file, a NamespaceLike. usage in
+    real code must have a matching `import "X.js" as X`.
+    """
+    libs = {p.stem for p in UI.glob("*.js")}
+    missing = []
+    for qml in sorted((ROOT / "package").rglob("*.qml")):
+        src = qml.read_text(encoding="utf-8")
+        # Comments name libraries in prose ("gated by HostGuard") without
+        # calling them — strip them before deciding anything.
+        code = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+        code = "\n".join(re.sub(r"//.*$", "", ln) for ln in code.split("\n"))
+        for lib in libs:
+            if re.search(r"\b%s\s*\." % re.escape(lib), code) \
+                    and ('as %s' % lib) not in code:
+                missing.append("%s calls %s without importing it"
+                               % (qml.name, lib))
+    assert not missing, (
+        "QML file(s) calling a JS library they never import — every call site "
+        "throws ReferenceError at runtime:\n" + "\n".join(missing))
+
+
+def test_the_tz_change_road_retimes_both_schedule_lists():
+    """The zone-change handler must keep reaching BOTH lists it promises.
+
+    tst_recordingengine.qml proves applyTzRetime works when called; what it
+    cannot see is whether main.qml still calls it. Those are different
+    failures (same split as the name-stripper guard above): drop the engine
+    logic and the QML test goes red, drop the one call in
+    _schedApplyTzChange and nothing does — until the next DST flip quietly
+    leaves every recording schedule an hour off while alarms retime fine.
+    The call sits at the very end of a function a future alarm extraction
+    will rewrite, which is exactly when a trailing line gets lost.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "_schedApplyTzChange")
+    # A commented-out call still contains the string — the first version of
+    # this test stayed green with the line commented away, which is half of
+    # how refactors actually lose a line. Strip comments before looking.
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+    body = "\n".join(re.sub(r"//.*$", "", ln) for ln in body.split("\n"))
+    assert "recordingEngine.applyTzRetime(" in body, (
+        "_schedApplyTzChange no longer forwards the zone change to the "
+        "recording engine — recording schedules drift an hour at every "
+        "DST flip while alarms keep retiming")
+    assert "alarmEngine.applyTzRetime(" in body, (
+        "_schedApplyTzChange no longer forwards the zone change to the "
+        "alarm engine — alarms drift an hour at every DST flip, and a "
+        "wrong-hour wake-up is the worst bug this feature can have")
+    for eng_name in ("RecordingEngine.qml", "AlarmEngine.qml"):
+        eng = (UI / eng_name).read_text(encoding="utf-8")
+        assert re.search(r"function applyTzRetime\s*\(", eng), (
+            "%s lost applyTzRetime while main.qml still calls it — every "
+            "zone change now throws inside the schedule tick" % eng_name)
+    assert "AlarmLogic.retimeForZone(" in (UI / "AlarmEngine.qml").read_text(encoding="utf-8"), (
+        "the alarm engine's retime no longer uses the zone math itself")
+
+
+def test_the_popup_minimum_width_tracks_the_tab_bar():
+    """A hard minimum narrower than the tabs breaks labels mid-word.
+
+    Photographed on the 5K home display (1.75 fractional scale),
+    2026-08-10: tab captions clipped mid-word on the 5K desk ("Station",
+    half of "Playing", "Podcas"). Measured on the
+    bench the same day: the five tabs' implicit width beats a 16 gu
+    floor even at scale 1.0 (308 px against 288) — the constant was
+    wrong everywhere and fractional scaling only made it visible. The
+    minimum must therefore derive from the bar itself; the gridunit
+    term may stay as a floor for the tabless first paint.
+    """
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    m = re.search(r"Layout\.minimumWidth:([^\n]*)", src)
+    assert m, "the popup lost its minimumWidth line"
+    assert "_navTabsNeed" in m.group(1), (
+        "Layout.minimumWidth no longer tracks the tabs' real need — "
+        "the smallest window breaks tab labels mid-word again on any "
+        "display whose fonts outgrow the gridunit constant")
+    helper = _function_body(src, "_measureNavTabs")
+    assert "itemAt" in helper and "implicitWidth" in helper, (
+        "_navTabsNeed stopped measuring the widest tab — the bar hands "
+        "every tab an equal slice, so widest-times-count is the need; "
+        "the sum (bar implicitWidth) was measured too small on the 5K "
+        "desk (308 against the 355 the equal split required)")
+    assert "Qt.callLater(fullRepresentation._measureNavTabs)" in src, (
+        "nothing calls _measureNavTabs any more — the floor stays 0 and "
+        "the constant rules again; it must run once, imperatively, after "
+        "the bar builds (a live binding here is a binding loop, CI-caught)")
+
+
+def test_the_wake_tone_accepts_flowed_audio_as_life():
+    """The tone must never replace a station the sleeper can hear.
+
+    Measured live 2026-08-10 23:08:46 on the home machine, from the
+    fallback's own evidence line: playing=true, position=24917,
+    mediaStatus=4 (BufferingMedia) — a live stream plays for minutes
+    without ever reaching BufferedMedia, and the status-only gate
+    replaced an audible station with the chime. Audio having FLOWED
+    (position past the floor) is the evidence that counts; a stream
+    that dies after starting belongs to the heal road, whose standing
+    order the fire path arms.
+    """
+    src = (UI / "AlarmEngine.qml").read_text(encoding="utf-8")
+    i = src.index("_alarmFallbackArmed = false;")
+    window = src[i:i + 2500]
+    assert "playMusicRef.position" in window and "BufferedMedia" in window, (
+        "the wake-tone stand-down lost its flowed-audio evidence — a "
+        "status-only gate calls a playing live stream dead (measured: "
+        "25 s of audio at BufferingMedia) and the chime replaces it")
+
+
+def test_the_chime_stays_a_deliberate_choice():
+    """The tone as a CHOICE, asked for by the listener 2026-08-10.
+
+    An alarm whose url is the "chime:" sentinel must take its own road:
+    no station, no heal orders, straight to the bundled tone. Losing the
+    branch would silently turn a chosen ringer into a dead station URL.
+    """
+    src = (UI / "AlarmEngine.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "_alarmFire")
+    assert '=== "chime:"' in body, (
+        "_alarmFire lost its chime: branch — a chosen ringer would be "
+        "played as a station URL and wake nobody")
+    chime = _function_body(src, "_alarmFireChime")
+    assert "_alarmToneUrl" in chime and "startWithFade" in chime, (
+        "_alarmFireChime no longer starts the bundled tone")
+
+
+def test_the_station_backup_can_be_found_again():
+    """Export and import must agree on what a backup file looks like.
+
+    The save dialog's name field is free text, so a listener who types
+    "minu jaamad" gets a file with no extension — and the open dialog
+    filtered on *.arp only, which made their own backup invisible. Both
+    ends are pinned: the save side supplies the suffix, the open side
+    also offers an unfiltered view for files that predate it.
+    """
+    src = (UI / "config" / "configGeneral.qml").read_text(encoding="utf-8")
+    save = src[src.index("id: saveFileDialog"):]
+    save = save[:save.index("P5Support.DataSource")]
+    assert 'defaultSuffix: "arp"' in save, (
+        "the save dialog stopped supplying the .arp suffix — a backup "
+        "saved under a bare name disappears from the import dialog")
+    opendlg = src[src.index("id: openFileDialog"):]
+    opendlg = opendlg[:opendlg.index("Labs.FileDialog {", 1)] if "Labs.FileDialog {" in opendlg[1:] else opendlg
+    assert "All files (*)" in opendlg, (
+        "the open dialog filters to *.arp alone again — older backups "
+        "and hand-renamed files become unopenable")
+
+
+def test_the_two_new_appearance_switches_reach_the_widget():
+    """A switch that exists in Settings and changes nothing is worse than
+    no switch: it reads as a broken promise.
+
+    Both were asked for in Discussions (2026-08) by a listener who keeps
+    a handful of their own stations: the search and discovery row, and
+    the row's editing furniture. Each key must be declared, offered in
+    Appearance, and actually read where it takes effect.
+    """
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    appear = (UI / "config" / "configAppearance.qml").read_text(encoding="utf-8")
+    full = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    item = (UI / "MediaListItem.qml").read_text(encoding="utf-8")
+
+    for key in ("showSearchRow", "showDiscoveryRow", "showReorderHandles"):
+        assert 'name="%s"' % key in xml, "%s is not declared in main.xml" % key
+        assert "cfg_%s" % key in appear, "%s has no switch in Appearance" % key
+
+    assert "Plasmoid.configuration.showSearchRow !== false" in full, (
+        "the search field no longer follows its switch")
+    assert "Plasmoid.configuration.showDiscoveryRow !== false" in full, (
+        "the discovery chips no longer follow their own switch — they "
+        "were bundled with the search field once and the listener asked "
+        "for them apart the same day")
+    assert "Plasmoid.configuration.showReorderHandles !== false" in item, (
+        "the row's editing furniture no longer reads its switch")
+    assert "listItem.rowEditing" in item, (
+        "the remove button stopped travelling with the drag handle — the "
+        "ask was the row's whole editing furniture, or none of it")
+
+
+def test_an_alarm_cannot_veto_the_speaker_check_forever():
+    """The wake-up window, not the volume override, is the question.
+
+    alarmEngaged is what SyncEngine asks before it measures anything, and
+    it used to read the override alone — which survives until the
+    listener picks a station, stops, or touches the volume. Someone who
+    simply let the wake-up play had their drift check blocked all day
+    (measured in the home journal 2026-08-11). The override's answer
+    expires with the wake-up window; the loudness itself does not.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    m = re.search(r"readonly property bool alarmEngaged:(.{0,220})", src, re.S)
+    assert m, "alarmEngaged is gone"
+    body = m.group(1)
+    assert "_volumeOverrideAtMs" in body, (
+        "alarmEngaged stopped bounding the override in time — a wake-up "
+        "nobody dismissed vetoes every speaker measurement from then on")
+    eng = (UI / "AlarmEngine.qml").read_text(encoding="utf-8")
+    assert eng.count("app._volumeOverrideAtMs = Date.now();") == 3, (
+        "a fire road stopped stamping when it raised the volume — an "
+        "unstamped override is an expired one, and the alarm's own level "
+        "would stop counting as engaged immediately")
+
+
+def test_the_park_stands_the_wake_up_down():
+    """Parking IS "I'm up" — every other silencing road says so.
+
+    Without it the 25 s wake-tone net stayed armed over a parked
+    station: press pause to quiet the alarm, and half a minute later the
+    built-in chime starts over the park.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "timeshiftPause")
+    assert "alarmEngine.standDown()" in body, (
+        "the timeshift park no longer stands the wake-up down — the chime "
+        "plays over the parked station 25 seconds later")
+    assert "_volumeOverridePct = -1" in body, (
+        "the park no longer releases the alarm's volume override")
+
+
+def test_the_frozen_horizon_has_a_watchdog():
+    """Qt never delivers EndOfMedia on a growing buffer (measured live on
+    the home machine, twice, 2026-08-11): the position pins while the
+    player still claims to be playing. playerEndOfMedia() sits behind
+    EndOfMedia alone, so without this watchdog the engine's whole
+    reopen-or-return machinery is dead code and a resumed pause goes
+    silent forever with the widget still showing "playing".
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "id: tsHorizonWatch" in src, "the horizon watchdog is gone"
+    i = src.index("id: tsHorizonWatch")
+    body = src[i:i + 2000]
+    assert "timeshift.playerEndOfMedia(" in body, (
+        "the watchdog no longer hands the frozen horizon to the engine")
+    assert "timeshift.shifted" in body, (
+        "the watchdog stopped gating on the shifted state — it would fire "
+        "over ordinary live playback")
+
+
+def test_the_colour_choice_stays_a_measured_set():
+    """Three answers, not a colour picker.
+
+    Every shade has to stay readable on both light and dark Plasma
+    schemes — the emerald only does because it was measured (8.8:1 on
+    dark, and the text variant darkened to 5.4:1 on light). A free
+    picker would be a promise nobody measures, so the choice is a list:
+    the built-in green, the listener's own system accent, or plain,
+    where the widget borrows the theme's text colour and stops having a
+    colour of its own.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "_accentMode" in src and "_plainAccent" in src, (
+        "the colour modes are gone")
+    # Migration: a config written before the list existed still speaks.
+    m = re.search(r"readonly property int _accentMode:(.{0,260})", src, re.S)
+    assert m and "followSystemAccent" in m.group(1), (
+        "the old followSystemAccent boolean no longer migrates — every "
+        "listener who had the system accent would snap back to green")
+    # Plain mode must reach the theme, not a hard-coded grey.
+    for prop in ("accent:", "accentBright:", "accentTeal:", "accentText:"):
+        i = src.index("property color " + prop)
+        window = src[i:i + 320]
+        assert "_plainAccent" in window and "Kirigami.Theme" in window, (
+            "%s does not answer plain mode from the theme — a hard-coded "
+            "shade there is exactly the unmeasured promise the list "
+            "exists to avoid" % prop)
+    # The two purely decorative pieces retire in plain mode.
+    rep = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    head = (UI / "Heading.qml").read_text(encoding="utf-8")
+    assert "root._accentMode !== 2" in rep, (
+        "the aurora keeps drifting in plain mode")
+    assert "root._accentMode !== 2" in head, (
+        "the emerald strip under the title survives plain mode")
+
+
+def test_the_sync_gates_hold_their_shape():
+    """Both walking roads got their gates on 2026-08-11, reconstructed
+    exactly from the journal: the settle road read +36/+15/+36 as "flat"
+    because only the ends were compared (the map walked 154->190 off a
+    room the ear had just called perfect), and the fold road walked
+    154->169 on a correction smaller than its own scatter. The settle
+    window must bound the WHOLE spread, and the fold must drop one flyer
+    and then demand the step stand taller than what remains.
+    """
+    src = (UI / "SyncEngine.qml").read_text(encoding="utf-8")
+    assert "if (hi - lo > _settleFlatMs)" in src, (
+        "the settle flatness gate no longer bounds the whole window — "
+        "alternating readings pass an ends-only comparison and the median "
+        "then returns the outlier pair")
+    assert "byDist.pop();" in src and "kept[kept.length - 1] - kept[0]" in src, (
+        "the fold road lost its scatter gate — a correction the same size "
+        "as the disagreement between its own witnesses is noise voting")
+
+
+def test_the_volume_road_never_touches_the_sync_maps():
+    """Snapcast's most famous regression (#476): a volume change zeroed the
+    latency settings. Volume does not change delay physically, so the
+    volume road here must never write a lag map, a loopback delay or a
+    learned bias — and must never trigger a re-calibration. The research
+    round (2026-08-11) named this the one regression class worth a
+    standing guard, because the code that makes it possible sits close:
+    setUserVolume's persist timer already writes config keys.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "setUserVolume")
+    for key in ("syncOffsetMap", "syncOffsetMs", "syncSweepBiasMap",
+                "latency_msec", "syncRefLatMap"):
+        assert key not in body, (
+            "setUserVolume touches %s — volume must never move sync" % key)
+    i = src.index("id: volumePersistTimer")
+    timer = src[i:i + 900]
+    for key in ("syncOffsetMap", "syncOffsetMs", "syncSweepBiasMap",
+                "latency_msec"):
+        assert key not in timer, (
+            "the volume persist timer touches %s — a volume change would "
+            "quietly rewrite the sync the listener tuned" % key)
+    # The REVERSE direction is deliberately allowed: the engine restores
+    # the user's own level after a calibration mutes and parks the room
+    # (their slider move mid-measurement wins). What it must never do is
+    # restore anything but the listener's own number.
+    eng = (UI / "SyncEngine.qml").read_text(encoding="utf-8")
+    calls = [ln for ln in eng.splitlines() if "app.setUserVolume(" in ln]
+    assert len(calls) == 1, (
+        "the engine grew another volume write — each one is a chance to "
+        "overwrite the level the listener chose")
+
+
+def test_the_two_discussion_asks_ship_with_their_own_guards():
+    """#6: the hover glyph rides a scrim OVER the station logo — the logo
+    must stay visible under the pointer, not swap out for a bare glyph.
+    #7: the auto-jump to Playing exists, ships OFF, and every disarm the
+    discussion reply promised (view change, active search) is real.
+    """
+    item = (UI / "MediaListItem.qml").read_text(encoding="utf-8")
+    assert "status === Image.Ready && !listItem.isCurrent" in item, (
+        "the station logo hides on hover again — the row loses its face "
+        "right as the pointer reaches it")
+    assert "hoverGlyph.visible && faviconImage.visible" in item, (
+        "the scrim no longer pairs with the glyph over the logo")
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    i = xml.index('name="autoSwitchToPlaying"')
+    assert "<default>false</default>" in xml[i:i + 400], (
+        "the auto-jump must ship OFF — it takes the screen away from "
+        "someone mid-browse, the discussion said so itself")
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i2 = src.index("id: autoPlayingTimer")
+    body = src[i2:i2 + 800]
+    assert 'searchFilter !== ""' in body, (
+        "the auto-jump no longer yields to an active search")
+    assert "autoPlayingTimer.stop();" in src[src.index("onViewChanged:"):
+                                             src.index("onViewChanged:") + 300], (
+        "a manual tab change no longer disarms the pending auto-jump")
+
+
+def test_the_stuck_titles_holes_stay_closed():
+    """Issue #10's confirmed availability holes, all four. No single one
+    explained every report, so all of them closed (2026-08-11): the Qt
+    latch waits for a SECOND, different title before retiring the polling
+    fallback; a non-fatal error's timer restarts the poll it stopped;
+    landing on the Playing page fires one bounded poll (the reporters'
+    tab-dance ritual, made real); and reader.py treats 403 as transient -
+    a WAF that starts refusing the repeat visitor must not become a
+    permanent no-titles verdict.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("onMetaDataChanged:")
+    meta = src[i:i + 2200]
+    assert "cleaned !== root._qtMetaFirstTitle" in meta, (
+        "the Qt latch fires on the first title again - a backend that "
+        "delivers one tag and goes quiet leaves both title sources dead")
+    i2 = src.index("id: errorTimer")
+    et = src[i2:i2 + 900]
+    assert "infoTimer.restart()" in et, (
+        "the error timer no longer revives the poll it stopped")
+    i3 = src.index("onViewChanged: {")
+    vc = src[i3:i3 + 1200]
+    assert "getStreamInfo()" in vc, (
+        "arriving on the Playing page no longer refreshes a stopped poll")
+    rd = (ROOT / "package" / "contents" / "ui" / "reader.py").read_text(encoding="utf-8")
+    assert "(403, 408, 429)" in rd, (
+        "403 became a permanent verdict again - a rate-limiting WAF "
+        "would permanently silence a station that carries titles")
+
+
+def test_a_dying_speakers_pause_never_silences_the_room():
+    """A Bluetooth speaker powering off sends an AVRCP Pause as its last
+    breath (JBL, measured live 2026-08-11). With the combine active and
+    other speakers still playing, that pause is not the listener's word.
+    Both arrival orders are guarded: a pause inside the departure window
+    is ignored, and a park landed just before the departure is resumed.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "_deathbedPause" in src and "_btMemberLostAt < 4000" in src, (
+        "the MPRIS handler honours a departing speaker's pause again")
+    body = _function_body(src, "noteBtMemberLost")
+    assert "timeshiftResume()" in body, (
+        "a park that was the speaker's farewell no longer resumes")
+    assert "_tsParkFromMpris" in body and "120000" in body, (
+        "the resume lost its origin check or its wide window - Bluetooth "
+        "admits a loss 5-20 s late, and only an MPRIS-born park may be "
+        "resumed over (the widget's own pause button is the listener)")
+    eng = (UI / "SyncEngine.qml").read_text(encoding="utf-8")
+    assert "app.noteBtMemberLost()" in eng, (
+        "the engine no longer reports a member lost without being asked")
+
+
+def test_a_park_that_cannot_resume_always_finds_a_way_back_to_sound():
+    """A speaker powering off rebuilds the group, the rebuild disarms the
+    timeshift, and its stream address empties - so the single-address
+    fallback refused and the room stayed silent with the widget still
+    showing a station (live, 2026-08-11). The resume walks three roads
+    now: the timeshift address, the station's own resolved address, and
+    failing both, the row it came from.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "timeshiftResume")
+    assert "tsPlayLive(timeshift.streamUrl)" in body, "the first road is gone"
+    assert "_currentResolvedUrl" in body, (
+        "the resume lost its second road - a disarmed timeshift leaves "
+        "the room silent again")
+    assert "refreshServer(lastPlay)" in body, (
+        "the resume lost its last resort, the station's own row")

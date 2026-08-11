@@ -26,7 +26,7 @@ body:
     attributes:
       label: On Air version
       description: Shown on the widget's About page in its settings.
-      placeholder: "2026.22"
+      placeholder: "2026.31"
     validations:
       required: true
   - type: input
@@ -37,8 +37,21 @@ body:
     validations:
       required: true
   - type: textarea
+    id: backend
+    attributes:
+      label: Audio backend
+      description: >
+        Which multimedia backend Qt uses decides how the widget reads track
+        titles, so it matters for anything about Now Playing. Paste the output
+        of this one command (works on any distribution):
+        ls /usr/lib*/qt6/plugins/multimedia/*.so /usr/lib/*/qt6/plugins/multimedia/*.so 2>/dev/null || true
+      render: shell
+      placeholder: /usr/lib/qt6/plugins/multimedia/libffmpegmediaplugin.so
+  - type: textarea
     id: logs
     attributes:
       label: Journal output (if relevant)
-      description: "Paste the output of: journalctl --user -b | grep -iE 'onair|plasmashell' | tail -50"
+      description: >
+        The widget tags its own lines with [ARP]. Paste the output of:
+        journalctl --user -b --no-pager | grep -iE 'on ?air|\[ARP\]|qt\.multimedia|plasmashell' | tail -80
       render: shell

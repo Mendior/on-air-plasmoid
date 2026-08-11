@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The raw episode URL outlives the episode it belongs to.
+
+history:
+  The raw URL is deliberately retired together with its siblings when playback
+  stops. Leaving it behind means a later action can act on the previous
+  episode's address — the exact shape of bug the "retires with its siblings"
+  invariant was written for.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+    _podPlayingKey = "";
+          _podPlayingUrl = "";
+          _podPlayingRawUrl = "";
+
+replace:
+    _podPlayingKey = "";
+          _podPlayingUrl = "";
+
+expect:
+  tests/test_invariants.py::test_the_raw_episode_url_retires_with_its_siblings

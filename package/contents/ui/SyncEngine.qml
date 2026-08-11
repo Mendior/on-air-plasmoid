@@ -23,7 +23,10 @@ Item {
     // exec(cmd), nextSeq(), notify(title, text, icon), isPlaying(),
     // setAudioOutputDevice(id), mediaDevs, playerOutput, instanceId,
     // btList(), _btValidMac(mac), _btConnectingMac, _btPairingMac,
-    // _btPendingSinkName, castTrimActive(id), applyCastTrim(uuid).
+    // _btPendingSinkName, castTrimActive(id), applyCastTrim(uuid),
+    // recording, anythingPlaying, alarmEngaged, thrifty,
+    // setUserVolume(v, step), _pendingUserVolumePct,
+    // _pendingUserVolumeStep, btProfileBounceShell(mac).
     required property var app
     // Plasmoid's configuration object in production; a plain object in tests.
     required property var cfg
@@ -90,9 +93,25 @@ Item {
         // default was still ours — a default the user holds elsewhere is not
         // touched at startup.
         var restoreDefCmd = "";
-        if (prevDefCfg !== "")
+        if (prevDefCfg !== "") {
+            var prevEsc = prevDefCfg.replace(/'/g, "'\\''");
+            // The member sinks run their MASTERS at 100 % while the combine
+            // is up — the user's level lives on the combined sink. So the
+            // restart gap had a trap: the default falls back to the bare
+            // wired sink, the stream resumes onto it BEFORE the combine is
+            // rebuilt, and the room gets full-blast radio for the seconds
+            // in between (the listener's words, 2026-08-11: scared them
+            // properly). Clamp the restored sink's master to the stored
+            // slider level in the same shell — if the combine then re-arms
+            // it re-asserts its own structure, and if it does not, a sink
+            // at the listener's level is right anyway.
+            var prevPct = Math.max(0, Math.min(100,
+                              Math.round((cfg.defaultVolume !== undefined
+                                          ? cfg.defaultVolume : 75))));
             restoreDefCmd = " case \"$d\" in onair_combined*) pactl set-default-sink '"
-                            + prevDefCfg.replace(/'/g, "'\\''") + "' 2>/dev/null;; esac;";
+                            + prevEsc + "' 2>/dev/null;"
+                            + " pactl set-sink-volume '" + prevEsc + "' " + prevPct + "% 2>/dev/null;; esac;";
+        }
         app.exec(": PW_COMBINE_CLEAN; d=$(pactl get-default-sink 2>/dev/null);"
                         + " for m in $(pactl list short modules 2>/dev/null"
                         + " | awk '/" + _combineSinkName + "([^0-9]|$)|onair_combined([^_0-9]|$)/ {print $1}'); do"
@@ -226,7 +245,9 @@ Item {
 
     // Every engine-owned shell round-trip lands here from main.qml's exec
     // handler; true = the command was ours and is fully handled.
-    function handleExec(cmd, stdout, stderr) {
+    // exitCode is additive (2026-08-09): the dispatcher passes it, the mocks
+    // may not — undefined classifies as nothing. Branches adopt it one by one.
+    function handleExec(cmd, stdout, stderr, exitCode) {
         if (cmd.indexOf(": PW_RAMP;") === 0) {
             // The ramp's own end is the only honest "the master is where the
             // room wants it" moment — see _combineRamping.
@@ -523,6 +544,98 @@ Item {
             // the rebuild flight resolved against module ids that were
             // being unloaded — the fresh modules now get the stored value.
             _trimReconcile(rlPairs);
+            return true;
+        }
+        // The settle road's landing: named wired loopbacks re-delayed in
+        // place, everything else — the Bluetooth stream above all — left
+        // exactly as it was playing.
+        if (cmd.indexOf(": PW_LBSWAP") === 0) {
+            var swNew = [], swRe = /^LBSWAP (\d+) (\S+) ?(\S*)$/gm, swM;
+            while ((swM = swRe.exec(stdout || "")) !== null)
+                swNew.push({ id: swM[1], sink: swM[2], old: swM[3] || "" });
+            var swFail = /^LBSWAPFAIL /m.test(stdout || "");
+            // Generation discipline, word for word from the reloop ack: a
+            // stale swap's modules are strays, and the live generation's
+            // busy flag is not a stale ack's to clear.
+            var swSeqM = cmd.match(/^: PW_LBSWAP (\d+);/);
+            if (!swSeqM || parseInt(swSeqM[1], 10) !== _combineLoadSeq) {
+                var swUn = "";
+                for (var su = 0; su < swNew.length; su++)
+                    swUn += "pactl unload-module " + swNew[su].id + " 2>/dev/null; ";
+                if (swUn !== "") app.exec(": PW_UNCOMBINE; " + swUn + "true");
+                return true;
+            }
+            _combineReloopBusy = false;
+            // The frame the swap was computed from, captured before the
+            // slate is wiped — the adoption below still needs it.
+            var swLags = _settleSwapLags;
+            _settleSwapLags = ({});
+            if (!_combineActive) {
+                _combineReloopPending = false;
+                var swUnd = "";
+                for (var sd = 0; sd < swNew.length; sd++)
+                    swUnd += "pactl unload-module " + swNew[sd].id + " 2>/dev/null; ";
+                if (swUnd !== "") app.exec(": PW_UNCOMBINE; " + swUnd + "true");
+                return true;
+            }
+            // Adopt the fresh ids FIRST, so any rebuild below unloads them
+            // instead of stranding a double-fed speaker.
+            var swIds = _combineLoopbackIds.slice();
+            var swPairs = {};
+            for (var sp in _combineLoopbackSinkByModule)
+                swPairs[sp] = _combineLoopbackSinkByModule[sp];
+            for (var sa = 0; sa < swNew.length; sa++) {
+                var swOi = swIds.indexOf(swNew[sa].old);
+                if (swOi !== -1) swIds.splice(swOi, 1);
+                swIds.push(swNew[sa].id);
+                delete swPairs[swNew[sa].old];
+                swPairs[swNew[sa].id] = swNew[sa].sink;
+            }
+            _combineLoopbackIds = swIds;
+            _combineLoopbackSinkByModule = swPairs;
+            if (_combineReloopPending) {
+                _combineReloopPending = false;
+                _combineRebuildLoopbacks();
+                return true;
+            }
+            if (swFail || !swNew.length) {
+                // A speaker whose old loopback died and whose new one never
+                // came is a silent speaker — and an EMPTY answer means the
+                // shell died mid-swap, which must not be adopted as a
+                // success: rebuild the group whole. That
+                // costs the re-roll this road exists to avoid — once, as a
+                // rescue, not as the plan.
+                console.log("[ARP] sync: settle swap failed — rebuilding the group");
+                _combineRebuildLoopbacks();
+                return true;
+            }
+            // The swap moved the room into the frame it was computed from:
+            // adopt that frame as-built, wholesale. Members whose modules
+            // were not touched kept their delay BECAUSE the frame says so —
+            // a partial adoption would hand the next fold two frames at once.
+            var swBl = {};
+            for (var sb in _builtLags) swBl[sb] = _builtLags[sb];
+            var swSinks = _combineRealSinks();
+            for (var sl = 0; sl < swSinks.length; sl++)
+                if (swLags[swSinks[sl]] !== undefined)
+                    swBl[swSinks[sl]] = swLags[swSinks[sl]];
+            _builtLags = swBl;
+            var swSh = {};
+            for (var so in _builtShiftByMac) swSh[so] = _builtShiftByMac[so];
+            for (var sm = 0; sm < swSinks.length; sm++) {
+                var swMac = _btMacOfSink(swSinks[sm]);
+                if (swMac !== "") swSh[swMac] = _refLatShiftByMac[swMac] || 0;
+            }
+            _builtShiftByMac = swSh;
+            // Readings taken before the swap describe the room it replaced.
+            _driftHistory = [];
+            _driftHistoryAt = [];
+            _driftEstHistory = [];
+            _trimReconcile(_combineLoopbackSinkByModule);
+            console.log("[ARP] sync: settle correction landed — wired"
+                        + " loopback(s) re-delayed, Bluetooth stream untouched");
+            driftLastText = i18n("Auto-check %1: room put back in step",
+                                 Qt.formatTime(new Date(), "hh:mm"));
             return true;
         }
         // Disable's teardown ran to completion — only now is the persisted
@@ -1053,9 +1166,46 @@ Item {
                     try {
                         var vMap = JSON.parse(cfg.syncOffsetMap || "{}");
                         var vBefore = cfg.syncOffsetMap || "{}";
+                        // The reference shift, promised by the refusal
+                        // below since the day it was written: only
+                        // DIFFERENCES ever mattered, so a residual sitting
+                        // on the wired member is the same sentence as every
+                        // Bluetooth member being early by that much — and
+                        // subtracting it from everyone moves the room
+                        // identically (checked byte-for-byte against
+                        // _combineLoopbackCmds: {bt:195, wired:43} and
+                        // {bt:152} build the same command). Without this the
+                        // verify could only ever RAISE the map: a late
+                        // Bluetooth member carries its own residual, but a
+                        // late WIRED member — which is what a too-high map
+                        // looks like — parked all the information on the one
+                        // row the loop refuses to write, and the map's only
+                        // road down was the listener's hand. Measured live
+                        // 2026-08-11: verify read wired 43 ms late twice
+                        // and wrote nothing while the ear called 152 right.
+                        // The 60 ms fence keeps the artifact class the
+                        // refusal was built for (a member woken
+                        // mid-measurement reads 419-508 ms) firmly out.
+                        var vTaught = [];
+                        var rWired = 0, rWiredN = 0;
+                        for (var rw in vKeys) {
+                            if (_btMacOfSink(rw) !== "") continue;
+                            rWired += Math.round(((vProp.residuals[rw] || 0)
+                                                  + (residuals[rw] || 0)) / 2);
+                            rWiredN++;
+                        }
+                        rWired = rWiredN > 0 ? Math.round(rWired / rWiredN) : 0;
+                        if (Math.abs(rWired) > 60) {
+                            console.log("[ARP] sync: wired residual " + rWired
+                                        + " ms is artifact-class — reference kept");
+                            rWired = 0;
+                        } else if (rWired !== 0) {
+                            console.log("[ARP] sync: reference shifted by wired residual "
+                                        + rWired + " ms — the map can come down");
+                        }
                         for (var vs in vKeys) {
                             var vMean = Math.round(((vProp.residuals[vs] || 0)
-                                                    + (residuals[vs] || 0)) / 2);
+                                                    + (residuals[vs] || 0)) / 2) - rWired;
                             if (vMean === 0) continue;
                             // The closed loop exists because a BLUETOOTH
                             // path's buffering re-rolls per stream — that is
@@ -1112,7 +1262,29 @@ Item {
                             }
                             var vStep = Math.max(-600, Math.min(600, vMean));
                             vMap[vKey] = Math.max(-100, Math.min(2000, vOld + vStep));
+                            vTaught.push(vKey);
                             vFolded++;
+                        }
+                        if (vFolded > 0 && rWired !== 0) {
+                            // The wired residual is the sweep's own error,
+                            // measured: the sweeps called this very room in
+                            // step minutes ago, the music path says it was
+                            // rWired out. Teach the sweep, half a step at a
+                            // time — one verify seeds it, the next confirms
+                            // or corrects it, and a fluke never owns the
+                            // whole number.
+                            try {
+                                var vbMap = JSON.parse(cfg.syncSweepBiasMap || "{}");
+                                for (var vti = 0; vti < vTaught.length; vti++) {
+                                    var vbOld = parseInt(vbMap[vTaught[vti]], 10);
+                                    var vbNew = isFinite(vbOld)
+                                              ? Math.round((vbOld + rWired) / 2) : rWired;
+                                    vbMap[vTaught[vti]] = Math.max(-60, Math.min(60, vbNew));
+                                }
+                                cfg.syncSweepBiasMap = JSON.stringify(vbMap);
+                                console.log("[ARP] sync: sweep bias learned — "
+                                            + cfg.syncSweepBiasMap);
+                            } catch (vbE) {}
                         }
                         if (vFolded > 0) {
                             _anchorLags(vMap, _combineRealSinks());
@@ -1320,6 +1492,11 @@ Item {
             // survive to eat the next one's answer.
             var deStale = _driftProbeStale;
             _driftProbeStale = false;
+            // Consumed with the probe, exactly like the stale mark: whether
+            // this answer feeds the settle road or the periodic one is the
+            // probe's own property, not the next probe's.
+            var deSettle = _settleProbeOut;
+            _settleProbeOut = false;
             // Liveness gate, kin of the seq gates on PW_CALIB/PW_VERIFY: the
             // probe is out for up to 20 s, and a stale ack must not arm the
             // audible verify after the user toggled auto-care off or the
@@ -1343,6 +1520,7 @@ Item {
                 driftGuardTimer.stop();
                 driftLastText = i18n("Auto-check %1: skipped, something else was using the speakers",
                                      Qt.formatTime(new Date(), "hh:mm"));
+                if (deSettle) _settleRearm();
                 return true;
             }
             driftGuardTimer.stop();
@@ -1394,12 +1572,18 @@ Item {
             // 130 ms between rounds is not a room that changed.
             if (/^DRIFT_UNSTEADY /m.test(stdout || "")) {
                 driftLastText = i18n("Auto-check %1: reading would not settle — the microphone may be too far from the speakers", deWhen);
+                _quietRoomNote(true);
+                if (deSettle) _settleRearm();
                 return true;
             }
             if (!deM) {   // quiet / no signal — nothing to remember
                 driftLastText = i18n("Auto-check %1: too quiet to tell", deWhen);
+                _quietRoomNote(false);
+                if (deSettle) _settleRearm();
                 return true;
             }
+            _quietRoomHalf = false;
+            _quietRoomStreak = 0;
             var deMs = parseInt(deM[1], 10);
             // Where each speaker actually landed, which the spread throws
             // away. This is the road that measures in the state the listener
@@ -1410,6 +1594,25 @@ Item {
             var deEars = {}, deEarRe = /^DRIFT_EAR (\S+) (-?\d+)/gm, deEarM;
             while ((deEarM = deEarRe.exec(stdout || "")) !== null)
                 deEars[deEarM[1]] = parseInt(deEarM[2], 10);
+            // The learned sweep bias comes off at the door, so EVERY
+            // consumer — the settle verdict, the periodic history, the
+            // advertised fine-tune — reads arrivals in the frame the
+            // listener hears. Subtracting it downstream in each road was
+            // how one of them would inevitably be forgotten.
+            for (var dbk in deEars) {
+                var dbMac = _btMacOfSink(dbk);
+                if (dbMac === "") continue;
+                var dbB = _sweepBiasOf(dbMac);
+                if (dbB !== 0) deEars[dbk] -= dbB;
+            }
+            // A settle reading measures the freshly rebuilt room ON PURPOSE
+            // — the re-roll IS what it came for — so it routes before the
+            // spent-probe rule below and never enters the periodic history.
+            if (deSettle) {
+                _earLessonFeed(deEars);
+                _settleHandleReading(deEars, deWhen);
+                return true;
+            }
             // The probe right after a fold measures the fold's own re-roll.
             // Spend it: it may report, but it may not become half of the
             // next correction.
@@ -1423,6 +1626,7 @@ Item {
                 driftLastText = i18n("Auto-check %1: settling after the adjustment", deWhen);
                 return true;
             }
+            if (_earLessonFeed(deEars)) return true;
             // Every reading joins the history, in step or not: the median is
             // taken over what the room has been doing, and throwing away the
             // small readings would bias it away from zero.
@@ -1843,10 +2047,17 @@ Item {
         var queued = false;
         for (var mod in pairs) {
             var pct = Math.round(trimOf(_trimKeyForSink(pairs[mod])) * 100);
-            if (pct < 100) {
-                _trimPendingLocal[mod] = pct;
-                queued = true;
-            }
+            // EVERY member, not only the trimmed ones. Full level used to
+            // be left as the loopback's own default — true until the
+            // handover started muzzling a newborn and fading it up, which
+            // means a shell that dies mid-fade (a plasmashell restart, a
+            // logout, a kill) can leave a member sitting at 0 % with the
+            // widget insisting it is playing. Found exactly that way,
+            // live: the Bluetooth loopback's input at -inf dB and no
+            // sound. Asserting the intended level on every adopted module
+            // costs one pactl call each and closes the whole class.
+            _trimPendingLocal[mod] = (pct >= 5 && pct <= 100) ? pct : 100;
+            queued = true;
         }
         if (queued) trimApplyTimer.restart();
     }
@@ -2245,6 +2456,137 @@ Item {
         return false;
     }
 
+    // One mouth for every reading kind: collects while a lesson is armed,
+    // teaches at three, and tells the PERIODIC caller whether the reading
+    // was calibration data (true = keep it out of the fold history). The
+    // settle caller ignores the verdict — its readings continue into the
+    // settle machinery either way.
+    function _earLessonFeed(deEars) {
+        if (_earLessonLeft > 0) {
+            // Any other road rewriting the map retires the lesson: the
+            // deployment it was armed on no longer exists.
+            if ((cfg.syncOffsetMap || "") !== _earLessonMapAt) {
+                _earLessonLeft = 0;
+                _earLessonRuns = [];
+        } else {
+                _earLessonRuns.push(deEars);
+                _earLessonLeft--;
+                // These readings are the ear's calibration data, not
+                // drift evidence — fed to the fold history too, the
+                // fold would walk the map off the very deployment the
+                // listener just approved, lesson or no lesson.
+                if (_earLessonLeft > 0) return true;
+                if (_earLessonLeft === 0) {
+                    var elPer = _driftOffsetsFromHistory(_earLessonRuns);
+                    var elMap = null;
+                    for (var elM in elPer) {
+                        var elV = elPer[elM];
+                        if (elV.length < 5) continue;
+                        // Five readings, trimmed. Demanding three
+                        // consecutive readings inside twelve milliseconds
+                        // — the settle's standard, right for a CORRECTION
+                        // — meant this lesson never once landed in a real
+                        // room: measured live, ten consecutive spreads ran
+                        // 124, 3, 2, 7, 126, 1, 4, 9, 35, 6, and any
+                        // window of three catches a flyer. Learning can
+                        // afford what correcting cannot: drop the two
+                        // extremes, and if the middle three then agree
+                        // within twenty, their median is the lesson. The
+                        // half-step averaging and the sixty-millisecond
+                        // clamp keep a bad lesson small.
+                        var elS = elV.slice().sort(function(a, b) { return a - b; });
+                        var elMid = elS.slice(1, elS.length - 1);
+                        if (elMid[elMid.length - 1] - elMid[0] > 20) continue;
+                        var elMed = elMid[Math.floor(elMid.length / 2)];
+                        if (Math.abs(elMed) < 5) continue;
+                        if (elMap === null) {
+                            try { elMap = JSON.parse(cfg.syncSweepBiasMap || "{}"); }
+                            catch (elE) { elMap = {}; }
+                        }
+                        // Readings arrive with the current bias already
+                        // subtracted, so the median is the part still
+                        // unlearned — half of it per lesson, like the
+                        // verify's, so one sitting never owns the number.
+                        var elOld = parseInt(elMap[elM], 10);
+                        if (!isFinite(elOld)) elOld = 0;
+                        elMap[elM] = Math.max(-60, Math.min(60,
+                                         elOld + Math.round(elMed / 2)));
+                    }
+                    if (elMap !== null) {
+                        cfg.syncSweepBiasMap = JSON.stringify(elMap);
+                        console.log("[ARP] sync: sweep bias learned from"
+                                    + " the listener's hand — "
+                                    + cfg.syncSweepBiasMap);
+                    }
+                    _earLessonRuns = [];
+                    // History gathered before the lesson speaks the
+                    // pre-lesson frame — the fold must not average two
+                    // frames into one step.
+                    _driftHistory = [];
+                    _driftHistoryAt = [];
+                    _driftEstHistory = [];
+                    return true;
+                }
+        }
+        }
+        return false;
+    }
+
+    // The dead-room detector, born from a live incident (2026-08-11): a
+    // Bluetooth speaker powered OFF whose bluez node lingered wedged the
+    // whole combined graph — the WIRED pair went silent too, a station
+    // restart could not help, and the widget played on into the void.
+    // The auto-care HEARD it ("too quiet to tell") and shrugged. No event
+    // ever announces this state: the device never leaves, so the rebuild
+    // road never fires. But two sweeps in a row that the microphone
+    // cannot hear, while the player claims music is flowing, is not a
+    // quiet afternoon — it is a room to resuscitate. Rung one is the
+    // same suspend-cycle the birth flush uses (a power-cycle of the
+    // speaker is what revived it live, and this is that, in software).
+    // The guards keep a muted mic or a moved mic from kicking a healthy
+    // room forever: consecutive sweeps only, one attempt per cooldown,
+    // and any readable sweep resets the streak.
+    property int _quietRoomStreak: 0
+    property bool _quietRoomHalf: false
+    property double _quietRoomKickAt: 0
+
+    function _quietRoomNote(halfQuiet) {
+        // An UNSTEADY verdict still heard SOMETHING — it only failed to
+        // settle. It breaks a streak of true silence but starts none.
+        if (halfQuiet) { _quietRoomHalf = true; return; }
+        if (!app.isPlaying() || !_combineActive) { _quietRoomStreak = 0; return; }
+        _quietRoomStreak++;
+        if (_quietRoomStreak < 2) return;
+        var now = Date.now();
+        if (now - _quietRoomKickAt < 10 * 60 * 1000) return;
+        _quietRoomKickAt = now;
+        _quietRoomStreak = 0;
+        var kick = "";
+        var sinks = _combineRealSinks();
+        for (var i = 0; i < sinks.length; i++) {
+            if (sinks[i].indexOf("bluez_") !== 0) continue;
+            var qs = sinks[i].replace(/'/g, "'\\''");
+            kick += "pactl suspend-sink '" + qs + "' 1; sleep 0.4;"
+                  + " pactl suspend-sink '" + qs + "' 0; ";
+        }
+        if (kick === "") return;
+        console.log("[ARP] sync: the room went silent twice while music"
+                    + " claims to be flowing — suspend-cycling the Bluetooth"
+                    + " member(s) to unwedge a lingering node");
+        app.exec(": PW_ROOMKICK; " + kick + "true # " + app.nextSeq());
+    }
+
+    // The acoustic deathbed arbitration was REMOVED after one live
+    // verdict (2026-08-12): with the speaker powered off, the sweep
+    // reported the Bluetooth member ALIVE — the detector locked onto
+    // something that was not there, called a dead speaker healthy, and
+    // burned up to 45 s of microphone to do it. A judge that cannot see
+    // is worse than no judge: the honest chain is the one the same
+    // evening proved three times running — the departure itself is the
+    // evidence. If it is noticed first, the dying pause is ignored; if
+    // the pause lands first, the park resumes the moment the member is
+    // reported gone (a two-minute window covers Bluetooth's leisurely
+    // 5-20 s admission that a device is missing).
     function _driftProbe() {
         // Never over a measurement, a recovery cure, a recording or an
         // alarm — the check must be invisible, in every sense. And never
@@ -2255,6 +2597,11 @@ Item {
             || app.alarmEngaged === true) return;
         if (!_combineHasBtMember()) return;
         if (cfg.syncManualOnly === true) return;
+        // One probe in the air at a time, whichever road asked. Both roads
+        // route their answers through per-probe marks that assume exactly
+        // one flight, and a second sweep over the first breaks up the audio
+        // regardless — every probe opens a stream on each member.
+        if (driftGuardTimer.running) return;
         _lastDriftProbeMs = Date.now();
         console.log("[ARP] sync: auto-care listening (periodic drift check)");
         // What each member is credited with, spelled out. A check that
@@ -2333,6 +2680,9 @@ Item {
         // probe was marked stale and its answer never came back (guard
         // timeout), the mark must not carry over and eat this one's.
         _driftProbeStale = false;
+        // A launch the settle road asked for wears its badge out and back:
+        // the ack routes on it, and the periodic road must never inherit it.
+        _settleProbeOut = _settleWant;
         driftGuardTimer.interval = (dBudget + 15) * 1000;
         driftGuardTimer.restart();
         app.exec(": PW_DRIFT;" + _ultraEnv()
@@ -2345,9 +2695,24 @@ Item {
     Timer {
         id: driftGuardTimer
         repeat: false
-        onTriggered: {
-            driftLastText = i18n("Auto-check %1: no answer came back",
-                                 Qt.formatTime(new Date(), "hh:mm"));
+        onTriggered: _driftGuardExpired()
+    }
+
+    // The probe's shell died with its leash, or the ack was lost across a
+    // restart. Named a function so the tests can walk this road too.
+    function _driftGuardExpired() {
+        // The timer stops itself when it fires; stopping again costs
+        // nothing and keeps the leash-is-over meaning when the tests
+        // walk this road by hand.
+        driftGuardTimer.stop();
+        driftLastText = i18n("Auto-check %1: no answer came back",
+                             Qt.formatTime(new Date(), "hh:mm"));
+        // A settle probe that died with its shell must not eat the round:
+        // the badge dies with the probe and the round gets its retry —
+        // every other way a settle reading fails already does.
+        if (_settleProbeOut) {
+            _settleProbeOut = false;
+            _settleRearm();
         }
     }
 
@@ -2502,6 +2867,13 @@ Item {
             // was launched at the room this rebuild just replaced.
             if (driftGuardTimer.running) _driftProbeStale = true;
         }
+        // Which sink each LIVE loopback serves — the ones this build is
+        // about to replace, so it can make before it breaks.
+        var liveBySink = {};
+        for (var lm in _combineLoopbackSinkByModule)
+            liveBySink[_combineLoopbackSinkByModule[lm]] = lm;
+        var awkSi = " '/^Sink Input #/{si=substr($3,2)}"
+                  + " $1==\"Owner\" && $2==\"Module:\" && $3==m {print si; exit}'";
         var cmds = "";
         for (var i = 0; i < sinks.length; i++) {
             var s = sinks[i].replace(/'/g, "'\\''");
@@ -2524,10 +2896,41 @@ Item {
                        : chMode === "R" ? "channels=1 channel_map=front-right"
                        : chMode === "M" ? "channels=1 channel_map=mono"
                        : "channels=2";
-            cmds += "if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
+            var oldId = liveBySink[sinks[i]] || "";
+            cmds += "if pactl list short sinks 2>/dev/null | cut -f2"
+                 + " | grep -Fxq '" + _combineSinkName + "'"
+                 + " && pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
                  + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
                  + " sink='" + s + "' latency_msec=" + d + " " + chSpec + ") && echo \"LB $id " + s + "\"";
             var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
+            // A member that was ALREADY playing crossfades out of its old
+            // loopback instead of being cut out of it. This is the road a
+            // speaker joining mid-song takes, and cutting the wired pair
+            // there cracked hard enough to startle the listener
+            // (2026-08-11) — the same discontinuity the settle swap was
+            // taught to avoid, in the other place it happens.
+            if (oldId !== "") {
+                var pctT = (pct < 5 || pct > 100) ? 100 : pct;
+                cmds += "; nsi=; n=0;"
+                     + " while [ \"$n\" -lt 40 ]; do"
+                     + " nsi=$(pactl list sink-inputs 2>/dev/null | awk -v m=\"$id\"" + awkSi + ");"
+                     + " [ -n \"$nsi\" ] && break; sleep 0.05; n=$((n+1)); done;"
+                     + " [ -n \"$nsi\" ] && pactl set-sink-input-volume \"$nsi\" 0% 2>/dev/null;"
+                     + " sleep 0.8;"
+                     + " osi=$(pactl list sink-inputs 2>/dev/null | awk -v m=" + oldId + awkSi + ");";
+                for (var fs = 1; fs <= 8; fs++) {
+                    cmds += " [ -n \"$osi\" ] && pactl set-sink-input-volume \"$osi\" "
+                         + Math.round(pctT * (100 - fs * 12.5) / 100) + "% 2>/dev/null;"
+                         + " [ -n \"$nsi\" ] && pactl set-sink-input-volume \"$nsi\" "
+                         + Math.round(pctT * fs / 8) + "% 2>/dev/null;"
+                         + " sleep 0.04;";
+                }
+                // No trailing semicolon: the line that follows opens with
+                // one, and ";;" is a shell syntax error that would have
+                // killed the whole rebuild (caught by the stub dry-run,
+                // not by any test — which is why the dry-run exists).
+                cmds += " pactl unload-module " + oldId + " 2>/dev/null";
+            }
             // Semicolons, not &&: the trim group returns nonzero when the
             // sink-input has not registered yet (async), and an && chain
             // then SKIPPED the birth flush on exactly the trimmed Bluetooth
@@ -2539,11 +2942,51 @@ Item {
             // drain — measured live at 2.3 seconds of permanent echo. The
             // beat of sleep lets the attach actually land first; flushing
             // in the same breath as load-module raced the stream's birth.
-            if (sinks[i].indexOf("bluez_") === 0)
+            // The birth flush is for a loopback attached to a sink that is
+            // still settling — a speaker that just connected. A member
+            // being HANDED OVER has been playing all along, and flushing
+            // it would re-roll the very transport whose delay we just
+            // measured: the crossfade would land on a moved target.
+            if (sinks[i].indexOf("bluez_") === 0 && oldId === "")
                 cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
                      + " pactl suspend-sink '" + s + "' 1;"
                      + " pactl suspend-sink '" + s + "' 0; }";
             cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
+        }
+        // Every build re-rolls the Bluetooth transport (the birth flush
+        // above is part of why), so the room the map was measured in is
+        // gone the moment these commands land. Arm the settle road: one
+        // inaudible measurement of the room AS REBUILT, once the link has
+        // had a moment to warm — measured 2026-08-10, the reading taken
+        // 45 s after a wake was 47 ms hot against the ones that followed.
+        var sHasBt = false, sHasWired = false;
+        for (var sb = 0; sb < sinks.length; sb++) {
+            if (sinks[sb].indexOf("bluez_") === 0) sHasBt = true;
+            else sHasWired = true;
+        }
+        // A build always lands whatever the map holds — a correction the
+        // settle road had to defer included. The fence around the fold
+        // comes down with it.
+        _settleDeferredMacs = ({});
+        // The round needs a Bluetooth member to have anything to fix AND a
+        // wired one to measure against (offsets are bt-minus-wired), and
+        // the sweep road to exist at all: with the ultrasonic tone off the
+        // probe only ever answers DRIFT_EST, no landings — five doomed
+        // microphone captures per rebuild, found on review 2026-08-10.
+        if (sHasBt && sHasWired && cfg.syncAutoCare === true
+            && cfg.syncManualOnly !== true && cfg.syncUltrasonic !== false) {
+            // A probe still in the air was aimed at the room this build is
+            // replacing; its answer must not seed the fresh round.
+            if (driftGuardTimer.running) _driftProbeStale = true;
+            _settleEarsRuns = [];
+            // Five reads for a three-reading verdict: a ramp burns the
+            // extras replacing its oldest reading until the window sits flat.
+            _settleReadsLeft = 5;
+            _settleGateRetries = 10;
+            // The first reading waits out the steep end of the ramp — at
+            // 90 s it landed mid-climb every time it was watched.
+            settleFixTimer.interval = 150 * 1000;
+            settleFixTimer.restart();
         }
         return cmds;
     }
@@ -3320,9 +3763,26 @@ Item {
         _combineReloopBusy = true;
         var sinks = _combineRealSinks();
         _combineSinksSnapshot = _combineGroupSignature();
+        // The unload-everything-first line is gone: each member that is
+        // being REPLACED now hands over inside _combineLoopbackCmds, born
+        // muted and crossfaded, and unloads its own old module at zero.
+        // What remains here are the strays — a loopback whose sink left
+        // the group has nobody to hand over to.
+        var staying = {};
+        for (var sk = 0; sk < sinks.length; sk++) staying[sinks[sk]] = true;
         var un = "";
-        for (var i = 0; i < _combineLoopbackIds.length; i++)
+        for (var i = 0; i < _combineLoopbackIds.length; i++) {
+            var lbSink = _combineLoopbackSinkByModule[_combineLoopbackIds[i]];
+            // No known sink means no way to tell whether it hands over —
+            // the old blanket unload is the safe answer for those.
+            if (lbSink !== undefined && staying[lbSink]) continue;
             un += "pactl unload-module " + _combineLoopbackIds[i] + " 2>/dev/null; ";
+        }
+        // The loads are BUILT here, while the module map still says which
+        // loopback serves which sink — the handover below reads it, and
+        // clearing it first left every member being cut instead of faded
+        // (caught by the test the crack earned).
+        var loadCmds = _combineLoopbackCmds(sinks);
         _combineLoopbackIds = [];
         // The module→sink map dies with the modules: a slider moved during
         // the flight used to resolve against these very ids and volume a
@@ -3347,7 +3807,7 @@ Item {
         // ack lands after a disable→re-enable would otherwise be adopted
         // into the NEW generation next to its own fresh build — every
         // speaker with two differently-delayed loopbacks, audible phasing.
-        app.exec(": PW_RELOOP " + _combineLoadSeq + "; " + un + _combineLoopbackCmds(sinks)
+        app.exec(": PW_RELOOP " + _combineLoadSeq + "; " + un + loadCmds
                         + reclaim + " true"
                         + " # " + app.nextSeq());
         // Fresh loopbacks mean a fresh A2DP operating point — read every
@@ -3438,14 +3898,65 @@ Item {
             }
             if (touched) cfg.syncOffsetMap = JSON.stringify(map);
         } catch (e) {}
+        // The hand on this slider is the ear speaking: the listener just
+        // declared THIS deployment right. The sweeps' next few readings on
+        // it are therefore not drift to correct but the sweeps' own error,
+        // measured against the only authority the room has — armed here,
+        // collected on the periodic road, and taught to the bias map the
+        // same half-step way the microphone verify teaches it.
+        _earLessonLeft = 5;
+        _earSetAt = Date.now();
+        _earLessonRuns = [];
+        _earLessonMapAt = cfg.syncOffsetMap || "";
         syncOffsetDebounce.restart();
     }
+
+    // The ear's window of authority. A hand on the fine-tune slider is
+    // the room's highest court, and for ten minutes afterwards the sweep
+    // roads defer to it: their readings still flow — and TEACH the
+    // lesson, settle-badged ones included — but neither the settle nor
+    // the fold may rewrite a map the listener just declared right. This
+    // is the piece whose absence let the settle win every race all day:
+    // its post-rebuild readings routed AROUND the lesson block and wrote
+    // the map first, which killed the armed lesson — so the bias was
+    // never learned, so the walking never stopped (152 -> 172 -> 176,
+    // each one re-set by an increasingly patient listener).
+    property double _earSetAt: 0
+    function _earWindowOpen() { return Date.now() - _earSetAt < 10 * 60 * 1000; }
+    property int _earLessonLeft: 0
+    property var _earLessonRuns: []
+    property string _earLessonMapAt: ""
 
     Timer {
         id: syncOffsetDebounce
         interval: 300
         repeat: false
-        onTriggered: _combineRebuildLoopbacks()
+        // Two callers share this debounce and they need DIFFERENT
+        // landings. An ear-tune only moves wired delays, so it takes the
+        // quiet swap (the full rebuild's handover re-rolled the Bluetooth
+        // transport under the listener's hand). But a MEMBERSHIP change —
+        // a speaker joining or leaving — must take the full rebuild: the
+        // quiet swap can re-delay what exists, it can neither retire a
+        // departed member's loopback nor seat a new one. Routing both
+        // through the quiet road silenced a live room (2026-08-11 13:0x):
+        // the speaker left, its orphaned loopback stayed loaded,
+        // WirePlumber moved that stream onto the WIRED sink, and the
+        // journal said "nothing to re-delay" over a wedged room.
+        onTriggered: {
+            var fed = {};
+            for (var mod in _combineLoopbackSinkByModule)
+                fed[_combineLoopbackSinkByModule[mod]] = true;
+            var members = _combineRealSinks();
+            var have = {};
+            for (var i = 0; i < members.length; i++) have[members[i]] = true;
+            var orphan = false;
+            for (var fs in fed) if (!have[fs]) { orphan = true; break; }
+            if (orphan || _combineMemberMissingLoopback()) {
+                _combineRebuildLoopbacks();
+                return;
+            }
+            _settleQuietSwap("slider", {}, true);
+        }
     }
 
     // Restore the stream volume muted for the calibration clicks. Skipped if
@@ -3745,6 +4256,19 @@ Item {
     // arithmetic: a room that cannot agree which way it is out is not out, it
     // is unsettled, and nudging it walks it somewhere on its own. All but one
     // reading must point the same way.
+    // What the sweep has LEARNED about its own systematic error on this
+    // member — taught by the verify below, which measures through the
+    // music path the listener actually hears. The two roads disagreed by
+    // a steady ~24 ms on this desk (sweep plays straight into the sink,
+    // music arrives through the loopback) and the sweep kept "correcting"
+    // an ear-perfect room by exactly that much. Zero until taught.
+    function _sweepBiasOf(mac) {
+        try {
+            var b = parseInt(JSON.parse(cfg.syncSweepBiasMap || "{}")[mac], 10);
+            return isFinite(b) ? Math.max(-60, Math.min(60, b)) : 0;
+        } catch (e) { return 0; }
+    }
+
     function _driftStepsFromOffsets(per) {
         var steps = {};
         for (var m in per) {
@@ -3766,6 +4290,21 @@ Item {
             var med = s.length % 2 ? s[(s.length - 1) / 2]
                                    : 0.5 * (s[s.length / 2 - 1] + s[s.length / 2]);
             if (Math.abs(med) < _driftDeadbandMs) continue;
+            // The correction has to stand taller than the scatter it came
+            // from — after the measured 1-in-12 flyer allowance. Drop the
+            // single reading farthest from the median (the flyer the
+            // median already ignores), then what remains must agree more
+            // tightly than the correction is big: a "correction" the same
+            // size as the disagreement between its own witnesses is the
+            // noise voting. This road walked the map 154 -> 169 under the
+            // listener within the hour; a genuine outage drift (a codec
+            // re-roll is 60 ms or more) towers over its spread and passes.
+            var byDist = v.slice().sort(function(a, b) {
+                return Math.abs(a - med) - Math.abs(b - med);
+            });
+            byDist.pop();
+            var kept = byDist.sort(function(a, b) { return a - b; });
+            if (Math.abs(med) <= kept[kept.length - 1] - kept[0]) continue;
             steps[m] = Math.round(med);
         }
         return steps;
@@ -3786,10 +4325,11 @@ Item {
     // Only MAC-keyed members move, for the same reason the verify fold has
     // that rule: a Bluetooth path re-rolls its buffering per stream and a
     // wired one does not.
-    function _driftFoldEars() {
-        var steps = _driftStepsFromOffsets(_driftOffsetsFromHistory(_driftHistory));
-        var foldedEars = _driftHistory.length
-                       ? _driftHistory[_driftHistory.length - 1] : null;
+    // The map-write both correction roads share: the periodic fold hands it
+    // a ±60 ms leash, the settle road (one measurement of a freshly rebuilt
+    // room) a ±600 one — same base arithmetic, because every bug in here
+    // was paid for once already and must not be re-earned by a second copy.
+    function _foldStepsIntoMap(steps, clampMs) {
         var moved = false, before = cfg.syncOffsetMap || "{}";
         try {
             var map = JSON.parse(before);
@@ -3822,10 +4362,7 @@ Item {
                     cur = parseInt(map[mk], 10);
                 }
                 if (!isFinite(cur)) cur = Math.max(0, Math.min(2000, cfg.syncOffsetMs || 0));
-                // Bounded, because this runs every few minutes: a correction
-                // that cannot leap cannot run away either, and anything
-                // larger is a room the microphone should look at properly.
-                var step = Math.max(-60, Math.min(60, steps[mk]));
+                var step = Math.max(-clampMs, Math.min(clampMs, steps[mk]));
                 target[mk] = cur + step;
                 moved = true;
             }
@@ -3877,6 +4414,29 @@ Item {
             cfg.syncOffsetMap = JSON.stringify(map);
             _mirrorTunedToSlider();
         } catch (e) { return false; }
+        return true;
+    }
+
+    function _driftFoldEars() {
+        var steps = _driftStepsFromOffsets(_driftOffsetsFromHistory(_driftHistory));
+        // A member with a full-size correction waiting for its rebuild is
+        // off limits: folding from the deployed base would overwrite the
+        // waiting repair with a 60 ms step.
+        for (var dm in _settleDeferredMacs)
+            if (steps[dm] !== undefined) delete steps[dm];
+        var foldedEars = _driftHistory.length
+                       ? _driftHistory[_driftHistory.length - 1] : null;
+        // The ear spoke minutes ago: its window outranks this verdict.
+        if (_earWindowOpen()) {
+            console.log("[ARP] sync: fold verdict inside the ear's window"
+                        + " — deferring to the listener's own setting");
+            return false;
+        }
+        var before = cfg.syncOffsetMap || "{}";
+        // Bounded, because this runs every few minutes: a correction
+        // that cannot leap cannot run away either, and anything
+        // larger is a room the microphone should look at properly.
+        if (!_foldStepsIntoMap(steps, 60)) return false;
         // No probe is spent here: the room has not changed yet. The rebuild
         // that lands this correction arms the skip, in _combineLoopbackCmds.
         var foldedFrom = _driftHistory.length;
@@ -3916,6 +4476,308 @@ Item {
             ? i18n("Auto-check: measured %1 ms — takes effect the next time the music pauses", dfSug)
             : i18n("Auto-check: adjusted — takes effect the next time the music pauses");
         return true;
+    }
+
+    // ── The settle road ──────────────────────────────────────────────────
+    //
+    // Every rebuild re-rolls the A2DP buffering into a new operating point
+    // (measured live: +35 ms before a restart, -68 after, same map), and
+    // until 2026-08-01 an automatic verify existed to mop that up. Its
+    // deletion was right — it parked the music at its own convenience — but
+    // it left the periodic fold as the only self-repair, and that one is
+    // clamped to 60 ms per step AND lands only at the next rebuild: under
+    // continuous listening a restart-sized error simply never healed, and
+    // the next restart re-rolled the room again before the map caught up.
+    //
+    // This road repairs exactly that window, without the old cost: after a
+    // build lands it takes TWO inaudible sweep readings on the warmed link,
+    // demands they agree, writes the full-size correction in one move, and
+    // lands it by re-delaying only the WIRED loopbacks. The Bluetooth
+    // stream is never touched — the startling clatter that got the fold's
+    // instant deploy removed was a Bluetooth codec fed a discontinuity, and
+    // leaving that stream alone also means the deploy cannot re-roll the
+    // very operating point the reading just measured.
+    property bool _settleWant: false        // the next probe launch is ours
+    property bool _settleProbeOut: false    // the probe in flight is ours
+    property var _settleEarsRuns: []        // this round's readings, oldest first
+    property int _settleReadsLeft: 0
+    property int _settleGateRetries: 0
+    // A warming link RAMPS — measured 2026-08-10, two post-rebuild runs
+    // rose -36→-28→-8 and +7→+19, about ten ms a minute for minutes on
+    // end — and adjacent readings on a ramp agree while every one of them
+    // is wrong together: the +13 "correction" that pair produced put an
+    // in-step room audibly out. Flatness across the whole round, first
+    // against last, is the proof the transient is actually over.
+    readonly property int _settleFlatMs: 12
+    // Corrections written to the map but NOT yet landed (the geometry
+    // would have moved a Bluetooth loopback). The periodic fold must not
+    // rewrite these entries from the deployed base before a rebuild lands
+    // them — that quietly clamped a waiting 150 ms repair back to 60.
+    property var _settleDeferredMacs: ({})
+    // The lags the swap's delays were computed from — adopted as the new
+    // as-built frame when the ack lands, discarded if it never does.
+    property var _settleSwapLags: ({})
+    // Below this the room is already inside the ear's don't-care band and
+    // the periodic fold owns the residue — a swap would spend a stream
+    // restart to fix what nobody can hear. 10, not the 25 it launched
+    // with: the first live round (2026-08-10) left a 17 ms residual
+    // standing and the listener heard it, faint but there. Under 10 the
+    // agreed mean is inside the readings' own scatter.
+    readonly property int _settleMinFixMs: 10
+    // The verify fold's old leash. Anything past it is not a re-roll, it is
+    // a room the microphone should look at properly.
+    readonly property int _settleMaxFixMs: 600
+
+    Timer {
+        id: settleFixTimer
+        interval: 90 * 1000
+        repeat: false
+        onTriggered: _settleTick()
+    }
+
+    // Tests only, same reason as _driftTimerRunningForTest.
+    function _settleTimerRunningForTest() { return settleFixTimer.running; }
+
+    function _settleRearm() {
+        if (_settleReadsLeft <= 0) return;
+        settleFixTimer.interval = 90 * 1000;
+        settleFixTimer.restart();
+    }
+
+    function _settleTick() {
+        if (cfg.syncAutoCare !== true || cfg.syncManualOnly === true) return;
+        if (!_combineActive || _settleReadsLeft <= 0) return;
+        // The same busy states that gate every other measurement — plus a
+        // probe already in flight, which counts as busy here rather than
+        // spending a read on a launch _driftProbe would refuse. A busy
+        // room retries on a shorter beat instead of giving the window up.
+        if (_calibrating || _verifyPending || _combineReloopBusy
+            || _btKickInFlight || app.recording === true
+            || app.alarmEngaged === true || app.anythingPlaying !== true
+            || driftGuardTimer.running || !_combineHasBtMember()) {
+            if (--_settleGateRetries > 0) {
+                settleFixTimer.interval = 60 * 1000;
+                settleFixTimer.restart();
+            } else if (driftLastText.indexOf("…") !== -1) {
+                // A round that dies must not leave "confirming…" standing —
+                // an unfinished word reads as a check that hung.
+                driftLastText = "";
+            }
+            return;
+        }
+        _settleReadsLeft--;
+        _settleWant = true;
+        _driftProbe();
+        _settleWant = false;
+        // The probe can refuse past our gates (a deaf shelf, a shrunken
+        // group). Refusal leaves the guard timer cold — the read was not
+        // spent, so it goes back on the shelf for the retry.
+        if (!driftGuardTimer.running && --_settleGateRetries > 0) {
+            _settleReadsLeft++;
+            settleFixTimer.interval = 60 * 1000;
+            settleFixTimer.restart();
+        }
+    }
+
+    function _settleHandleReading(ears, when) {
+        var runs = _settleEarsRuns.slice();
+        runs.push(ears);
+        // A sliding window of three: on a ramp the oldest reading is the
+        // stalest and gets replaced until the window finally sits flat.
+        while (runs.length > 3) runs.shift();
+        _settleEarsRuns = runs;
+        if (runs.length < 3) {
+            _settleRearm();
+            driftLastText = i18n("Auto-check %1: confirming the room after the rebuild…", when);
+            return;
+        }
+        var per = _driftOffsetsFromHistory(runs);
+        var steps = {}, acted = false, unsettled = false, any = false;
+        for (var m in per) {
+            var v = per[m];
+            if (v.length < 3) continue;        // absent from one reading
+            any = true;
+            // The whole spread, not first-against-last. Endpoints alone
+            // catch a ramp but wave alternation straight through: +36, +15,
+            // +36 read as "flat" because the ends matched, the median then
+            // returned the very outlier, and the map walked 154 -> 190 off
+            // a room the listener had just called perfect (and 164 -> 195
+            // the same morning, +31/+10/+31 — both reconstructed exactly
+            // from the journal). Max minus min bounds ramp AND alternation
+            // at once: three readings either agree with each other, or the
+            // room has not settled and gets no verdict.
+            var lo = Math.min(v[0], v[1], v[2]), hi = Math.max(v[0], v[1], v[2]);
+            if (hi - lo > _settleFlatMs) { unsettled = true; continue; }
+            var sameSign = (v[0] > 0 && v[1] > 0 && v[2] > 0)
+                        || (v[0] < 0 && v[1] < 0 && v[2] < 0);
+            var sm = v.slice().sort(function(a, b) { return a - b; });
+            var med = sm[1];
+            if (Math.abs(med) < _settleMinFixMs || !sameSign) continue;
+            steps[m] = Math.max(-_settleMaxFixMs, Math.min(_settleMaxFixMs, med));
+            acted = true;
+        }
+        if (!any || (unsettled && !acted)) {
+            if (_settleReadsLeft > 0) { _settleRearm(); return; }
+            console.log("[ARP] sync: settle readings kept moving — leaving"
+                        + " the room to the periodic check");
+            // Retire the "confirming…" word, or the give-up reads as a hang.
+            if (driftLastText.indexOf("…") !== -1) driftLastText = "";
+            return;
+        }
+        _settleEarsRuns = [];
+        _settleReadsLeft = 0;
+        // The ear spoke minutes ago: its window outranks this verdict. The
+        // readings above already taught the lesson — acting on them too
+        // would rewrite the very map the listener just approved, which is
+        // the walk that ate three ear-sets in one afternoon (152 -> 172,
+        // 152 -> 176, each re-set by an increasingly patient listener).
+        if (_earWindowOpen()) {
+            console.log("[ARP] sync: settle verdict inside the ear's window"
+                        + " — deferring to the listener's own setting");
+            return;
+        }
+        if (!acted) {
+            console.log("[ARP] sync: settle check — the rebuilt room is"
+                        + " within " + _settleMinFixMs + " ms, nothing to fix");
+            driftLastText = i18n("Auto-check %1: in step after the rebuild", when);
+            return;
+        }
+        var before = cfg.syncOffsetMap || "{}";
+        if (!_foldStepsIntoMap(steps, _settleMaxFixMs)) return;
+        console.log("[ARP] sync: settle correction from three flat readings"
+                    + " — map " + before + " -> " + cfg.syncOffsetMap);
+        _settleQuietSwap(when, steps);
+    }
+
+    // The waiting map entries get a fence the fold respects until the
+    // next build lands them.
+    function _settleGuardDeferral(steps) {
+        var fence = {};
+        for (var m in (steps || {})) fence[m] = true;
+        _settleDeferredMacs = fence;
+    }
+
+    // immediate=true is the SLIDER's voice: the listener is tuning by ear
+    // right now, so a road that would defer ("lands at the next pause")
+    // falls back to the full rebuild instead — hearing the change is the
+    // whole point. The quiet wired-only landing stays first choice for
+    // both: every full rebuild re-rolls the Bluetooth transport, which
+    // moves the very target the hand just hit. Measured live 2026-08-11:
+    // the listener set 154 by ear, the rebuild it triggered re-rolled the
+    // room, and 154 was wrong before their hand left the slider.
+    function _settleQuietSwap(when, steps, immediate) {
+        // The map is already written; the question is only whether it can
+        // land NOW without touching a Bluetooth stream. A busy room keeps
+        // the old behaviour — the next natural rebuild reads the map.
+        if (_combineReloopBusy || _calibrating || _verifyPending
+            || !_combineActive) {
+            if (immediate) { _combineRebuildLoopbacks(); return; }
+            _settleGuardDeferral(steps);
+            driftLastText = i18n("Auto-check %1: adjusted — takes effect the next time the music pauses", when);
+            return;
+        }
+        var sinks = _combineRealSinks();
+        var maxLag = 0, lags = {};
+        for (var i = 0; i < sinks.length; i++) {
+            lags[sinks[i]] = _lagForSink(sinks[i]);
+            if (lags[sinks[i]] > maxLag) maxLag = lags[sinks[i]];
+        }
+        var toSwap = [], btMoves = false;
+        for (var j = 0; j < sinks.length; j++) {
+            var want = Math.round(_loopbackFloorMs + (maxLag - lags[sinks[j]]));
+            var have = Math.round(_deployedDelayMs(sinks[j], sinks));
+            if (Math.abs(want - have) < 2) continue;
+            if (sinks[j].indexOf("bluez_") === 0) { btMoves = true; continue; }
+            toSwap.push({ sink: sinks[j], d: want });
+        }
+        // With the slowest member Bluetooth — the ordinary desk — its own
+        // delay is the constant floor and the whole correction lives in the
+        // wired loopbacks. When the geometry says otherwise, moving the BT
+        // loopback is the measured clatter AND a fresh re-roll: decline,
+        // and let the next natural rebuild land it as before.
+        if (btMoves || !toSwap.length) {
+            if (immediate) {
+                // Nothing to re-delay means the hand's number is already
+                // playing — a full rebuild here would be a pointless
+                // re-roll of the very room the listener just approved.
+                if (btMoves) _combineRebuildLoopbacks();
+                else console.log("[ARP] sync: slider landed in the frame —"
+                                 + " nothing to re-delay, nothing re-rolled");
+                return;
+            }
+            if (btMoves) _settleGuardDeferral(steps);
+            console.log(btMoves
+                ? "[ARP] sync: landing the settle correction would move a"
+                  + " Bluetooth loopback — waiting for the next natural rebuild"
+                : "[ARP] sync: settle correction absorbed by the frame —"
+                  + " nothing to re-delay");
+            driftLastText = i18n("Auto-check %1: adjusted — takes effect the next time the music pauses", when);
+            return;
+        }
+        // Make before break, and cut only what is already silent. The first
+        // live swap (2026-08-10 08:55) unloaded the playing wired loopback
+        // ahead of its replacement, and the listener got a loud crack out
+        // of the speaker — a stream cut mid-waveform is a step function.
+        // Now the newborn is muzzled before its first word, given a moment
+        // to fill at the new delay, and the two are crossfaded over 200 ms;
+        // the old one is unloaded at zero, where a cut has nothing to snap.
+        // Music never stops: the other members play on and the wired sum
+        // stays roughly level through the fade.
+        var awkSi = " '/^Sink Input #/{si=substr($3,2)}"
+                  + " $1==\"Owner\" && $2==\"Module:\" && $3==m {print si; exit}'";
+        var cmds = "";
+        for (var k = 0; k < toSwap.length; k++) {
+            var s = toSwap[k].sink.replace(/'/g, "'\\''");
+            var oldId = "";
+            for (var mod in _combineLoopbackSinkByModule)
+                if (_combineLoopbackSinkByModule[mod] === toSwap[k].sink) oldId = mod;
+            var chMode = channelOf(_trimKeyForSink(toSwap[k].sink));
+            var chSpec = chMode === "L" ? "channels=1 channel_map=front-left"
+                       : chMode === "R" ? "channels=1 channel_map=front-right"
+                       : chMode === "M" ? "channels=1 channel_map=mono"
+                       : "channels=2";
+            // The newborn fades up to the stored balance, not to full.
+            var pct = Math.round(trimOf(_trimKeyForSink(toSwap[k].sink)) * 100);
+            if (pct < 5 || pct > 100) pct = 100;
+            // Eight steps of an eighth, not four of a quarter: the listener
+            // still caught a faint hitch on the coarser fade (2026-08-10,
+            // "üli õrn katkestus"). 12.5 % per 40 ms is below where a level
+            // step reads as an event; the remaining artefact is the timing
+            // move itself, which no fade can hide and 10-20 ms barely shows.
+            var fade = "";
+            for (var fs = 1; fs <= 8; fs++) {
+                fade += " [ -n \"$osi\" ] && pactl set-sink-input-volume \"$osi\" "
+                      + Math.round(pct * (100 - fs * 12.5) / 100) + "% 2>/dev/null;"
+                      + " [ -n \"$nsi\" ] && pactl set-sink-input-volume \"$nsi\" "
+                      + Math.round(pct * fs / 8) + "% 2>/dev/null;"
+                      + " sleep 0.04;";
+            }
+            cmds += "if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
+                 + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
+                 + " sink='" + s + "' latency_msec=" + toSwap[k].d + " " + chSpec + ");"
+                 + " if [ -n \"$id\" ]; then"
+                 // The sink-input registers a beat after load-module returns;
+                 // wait it out, or the muzzle lands on nothing and the
+                 // newborn speaks doubled audio for the whole settle sleep.
+                 + " n=0; nsi=;"
+                 + " while [ \"$n\" -lt 40 ]; do"
+                 + " nsi=$(pactl list sink-inputs 2>/dev/null | awk -v m=\"$id\"" + awkSi + ");"
+                 + " [ -n \"$nsi\" ] && break; sleep 0.05; n=$((n+1)); done;"
+                 + " [ -n \"$nsi\" ] && pactl set-sink-input-volume \"$nsi\" 0% 2>/dev/null;"
+                 + " sleep 0.8;"
+                 + (oldId !== ""
+                    ? " osi=$(pactl list sink-inputs 2>/dev/null | awk -v m=" + oldId + awkSi + ");"
+                    : " osi=;")
+                 + fade
+                 + (oldId !== "" ? " pactl unload-module " + oldId + " 2>/dev/null;" : "")
+                 + " echo \"LBSWAP $id " + s + " " + oldId + "\";"
+                 + " else echo \"LBSWAPFAIL " + s + "\"; fi"
+                 + "; else echo \"LBSWAPFAIL " + s + "\"; fi; ";
+        }
+        _settleSwapLags = lags;
+        _combineReloopBusy = true;
+        app.exec(": PW_LBSWAP " + _combineLoadSeq + "; " + cmds + "true"
+                 + " # " + app.nextSeq());
     }
 
     // Pass 1's proposed correction, waiting for pass 2 to agree. The fold
@@ -4279,6 +5141,7 @@ Item {
             if (!syncDeviceIncluded(String(known).toUpperCase())) continue;
             console.log("[ARP] sync: " + lastName + " left the group without being"
                         + " asked — walking it back in");
+            if (app.noteBtMemberLost) app.noteBtMemberLost();
             _btJoinWatchArm(known, lastName);
         }
     }

@@ -245,17 +245,60 @@ Item {
     // The pause button while live. Returns the parked file position, or
     // -1 when this pause is not timeshift's to own (feature off, buffer
     // too young, writer never started) — the caller then stops plainly.
+    // Whether a park is possible right now — the pause BUTTON asks this,
+    // so the icon stops promising what the gesture refuses. A PROPERTY,
+    // not a function of the clock: a binding that reads Date.now() is
+    // evaluated once and never again, so the first version of this froze
+    // the button on "stop" for the whole session while the gesture
+    // underneath happily parked (caught by the listener within the hour,
+    // 2026-08-11). The timer below is what makes time move for it.
+    property bool parkable: false
+
+    Timer {
+        id: parkableTimer
+        interval: minShiftMs
+        repeat: false
+        onTriggered: engine.parkable = engine.active && engine.writerUp
+                                       && engine.bufStartMs > 0
+    }
+
+    // Called wherever the buffer's life changes: the writer coming up
+    // starts the countdown, everything else takes the promise away.
+    function _reviseParkable(armedNow) {
+        if (armedNow) {
+            parkableTimer.restart();
+            return;
+        }
+        parkableTimer.stop();
+        parkable = false;
+    }
+
+    onWriterUpChanged: _reviseParkable(writerUp)
+    onActiveChanged: if (!active) _reviseParkable(false)
+
     function pauseGesture(nowMs) {
+        // writerUp stays required, and the frozen-capture branch below
+        // stays unreachable for a live listener ON PURPOSE — checked
+        // 2026-08-11 rather than assumed: the writer's exit ack retires
+        // `active` for anyone not already shifted, so an hour-capped
+        // station loses its pause icon honestly instead of offering a
+        // park it cannot serve.
         if (!active || !writerUp || bufStartMs <= 0) return -1;
         var captured = windowFull ? frozenCapturedMs : (nowMs - bufStartMs);
         if (captured < minShiftMs) return -1;
         shiftPosMs = TimeshiftLogic.clampSeekMs(captured, captured, edgeGuardMs);
+        console.log("[ARP] timeshift: parked at " + shiftPosMs + " ms of "
+                    + captured + " captured" + (windowFull ? " (window full)" : ""));
         return shiftPosMs;
     }
 
     // Play resumes: hand the player the buffer at the parked sentence.
     function resumeGesture() {
-        if (!active || shiftPosMs < 0) return false;
+        if (!active || shiftPosMs < 0) {
+            console.log("[ARP] timeshift: resume refused — active=" + active
+                        + " shiftPos=" + shiftPosMs);
+            return false;
+        }
         shifted = true;
         _lastReopenPosMs = -1;
         app.tsPlayBuffer("file://" + bufPath, shiftPosMs);
@@ -282,6 +325,8 @@ Item {
     function playerEndOfMedia(posMs, nowMs) {
         if (!shifted) return false;
         var captured = windowFull ? frozenCapturedMs : (nowMs - bufStartMs);
+        console.log("[ARP] timeshift: horizon at " + posMs + " ms, captured "
+                    + captured + " — " + (captured - posMs) + " ms behind");
         var stalled = _lastReopenPosMs >= 0 && posMs - _lastReopenPosMs < 500;
         if (!stalled && captured - posMs > edgeGuardMs + 1000) {
             shiftPosMs = Math.max(0, posMs - reopenOverlapMs);
@@ -301,7 +346,8 @@ Item {
 
     // Acks from the two shell roads. nowMs rides in as a parameter so the
     // tests own the clock, the same convention AlarmLogic settled on.
-    function handleExec(cmd, stdout, nowMs) {
+    // exitCode is additive (2026-08-09) — see SyncEngine.handleExec.
+    function handleExec(cmd, stdout, nowMs, exitCode) {
         if (cmd.indexOf(": TS_URL;") === 0) {
             // Another arm's leftover ack changes nothing here.
             if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;

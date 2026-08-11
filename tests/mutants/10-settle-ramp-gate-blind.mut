@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The settle round's flatness gate goes blind — a warming ramp becomes a
+  full-size correction again.
+
+history:
+  Watched live 2026-08-10, twice in one morning: after a rebuild the
+  Bluetooth offset readings RISE about ten milliseconds a minute for
+  minutes on end (-36 -28 -8, then +7 +19). Adjacent readings on a ramp
+  agree with each other while both are wrong together, and the +13 the
+  first pair-based version produced put a room the listener had just
+  called good audibly out of step. First-against-last flatness is the one
+  comparison a steady ramp cannot pass — this mutant raises that gate out
+  of reach, which is exactly the bug shipping a "small cleanup" to the
+  threshold would reintroduce.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+              if (hi - lo > _settleFlatMs) { unsettled = true; continue; }
+
+replace:
+              if (hi - lo > 9999999) { unsettled = true; continue; }
+
+expect:
+  Killed by tst_syncengine.qml
+  test_a_warming_ramp_cannot_become_a_correction: the ramp 7/19/31 then
+  passes as flat, the median acts, the map moves off 145 and the test
+  goes red. Line-neutral on purpose — SyncEngine.qml is not ratcheted,
+  but a kill must come from the behavioural test, not a size lock.

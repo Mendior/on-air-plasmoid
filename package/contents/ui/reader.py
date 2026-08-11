@@ -176,9 +176,13 @@ def main():
             # whole listening session; exiting silently lets the poll retry.
             # 429/408 are transient BY DEFINITION: connection-capped Icecast
             # answers 429 to the metadata poll's second connection, and one
+            # 403 rides with them since 2026-08-11: a WAF that tolerated the
+            # first polls starts refusing the REPEAT visitor mid-session,
+            # and a refusal born from polling too visibly must not become
+            # a permanent verdict that the station carries no titles.
             # busy moment must not erase titles for the whole session.
             if 400 <= response.status_code < 500 \
-                    and response.status_code not in (408, 429):
+                    and response.status_code not in (403, 408, 429):
                 print("__NO_ICY__")
             return
 

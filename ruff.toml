@@ -1,0 +1,126 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+#
+# The Python half of the gate, pinned.
+#
+# Why this file exists: under ruff's OWN defaults this tree reports a couple
+# hundred findings (226 on 2026-08-09, ruff 0.16.2) — and those defaults move
+# between ruff releases. A count that changes when a tool updates is not a
+# measurement, and a check whose meaning drifts is the same trap as a check
+# that has quietly died.
+#
+# Every rule below was triaged against the code on 2026-08-09, one finding at
+# a time. Almost all of them turned out to be decisions somebody had already
+# made and written a comment about; those are switched off HERE, with the
+# reason, so the next person does not have to rediscover them. Seven were real
+# and are fixed. What is left is zero — the only ceiling worth having.
+#
+# Re-measure the gate:      ruff check $(git ls-files '*.py')        → must be 0
+# Re-measure the defaults:  ruff check --isolated --no-cache $(git ls-files '*.py')
+#
+# Line length stays at ruff's 88, and that is measured rather than inherited:
+# median line 44, 99th percentile 85 over every tracked .py (9643 lines on
+# 2026-08-09; git ls-files '*.py' | xargs wc -l), so the code was already
+# written to about that width.
+#
+# target-version is a FLOOR, not a measurement: the shipped scripts run on the
+# listener's machine and the oldest distro carrying Plasma 6 is on Python 3.11.
+# Nothing here needs newer syntax. Raise it only when a distro floor moves.
+target-version = "py311"
+
+[lint]
+# Everything selected can point at a defect. Style-only families stay out.
+select = [
+    "F",       # pyflakes: undefined names, unused imports, f-string mistakes
+    "E4",      # import placement
+    "E7",      # comparison and statement errors
+    "E9",      # syntax / IO errors
+    "B",       # bugbear: mutable defaults, loop-variable capture, silent zip
+    "S",       # security: injection, unsafe temp files, swallowed errors
+    "SIM",     # simplifications that carry a correctness edge
+    "PLW",     # pylint warnings
+    "PLE",     # pylint errors
+    "RUF",     # ruff's own
+    "UP",      # syntax a supported Python does better
+    "I",       # import order
+    "EXE",     # shebang vs executable bit — a real trap for scripts we ship
+    "ASYNC",   # nothing async today; here so the first one added is watched
+]
+
+ignore = [
+    # ── Style, no behavioural edge ────────────────────────────────────────
+    # %-format strings, ~125 hits spread over the whole tree (cast.py 39,
+    # calibrate.py 30 — the file where the last three nights of real
+    # bug-hunting happened; re-measure with --isolated --select UP031).
+    # Rewriting them finds nothing and churns blame. The %-form stays.
+    "UP031",
+    "RUF005",  # args + [x] reads fine; [*args, x] is a preference
+    "RUF046",  # int(round(x)) is redundant but explicit, and it is arithmetic
+    "PLW0108", # lambdas in test wiring
+    "UP012", "UP015", "UP041",  # .encode("utf-8"), open(…, "r"), socket.timeout
+
+    # The author writes with en and em dashes. RUF001/RUF003 would fight the
+    # prose in every comment in the tree.
+    "RUF001", "RUF003",
+
+    # ── Verified deliberate, 2026-08-09 ───────────────────────────────────
+    # Subprocess: every call site passes a literal argv list, never a shell
+    # string. Partial paths (pactl, pw-play, bluetoothctl) are the POINT — a
+    # widget that ships to many distros must not hardcode /usr/bin.
+    "S603", "S607",
+
+    # cast.py:453 — urlopen on a LOCATION from an unauthenticated SSDP reply.
+    # _http_get refuses every scheme but http(s) BEFORE opening, uses an
+    # opener that will not follow a redirect off http(s), and caps the read.
+    # Ruff cannot see the guard; the guard is the whole function.
+    "S310",
+    # cast.py:478 — ET.fromstring on a LAN device description. The bytes are
+    # scanned for <!DOCTYPE / <!ENTITY and a UTF-16 BOM and refused outright
+    # before parsing, so entity expansion never reaches expat. defusedxml
+    # would mean a runtime dependency a plasmoid cannot assume.
+    "S314",
+    # cast.py:758 — sha1 of a descriptor URL, used as a CACHE KEY for a
+    # renderer with no UDN. Not a security primitive; nothing verifies it.
+    "S324",
+
+    # Best-effort cleanup in scripts that must never die of their own
+    # housekeeping: killing a wedged capture, reaping a zombie, reading one
+    # sink's mute state inside a loop over many. Logging every miss would
+    # bury the lines that matter. Checked one by one — each has a comment
+    # saying what it is swallowing and why.
+    "S110", "S112", "SIM105",
+
+    # tempfile.NamedTemporaryFile(delete=False).name is the idiom for handing
+    # a path to an external process (pw-play, pw-record). A context manager
+    # would delete the file before the process could open it.
+    "SIM115",
+
+    # `line = line.strip()` and `token = token.strip('"')` — normalising the
+    # loop variable in place, used immediately after. Both sites read clearly.
+    "PLW2901",
+
+    # subprocess.run without check=: these read returncode themselves where
+    # it matters and deliberately ignore it where a failure is expected (a
+    # probe against a device that may not answer).
+    "PLW1510",
+]
+
+[lint.per-file-ignores]
+# Tests assert on private helpers, load modules by exec, build inputs in /tmp
+# and seed a PRNG for repeatability. All of that is the job.
+"tests/*" = [
+    "S101",    # assert IS the tool here
+    "S102",    # exec() loads the module under test from a non-importable path
+    "S108",    # fixed /tmp paths are fixture arguments, never opened
+    "S311",    # seeded random builds repeatable noise for signal tests
+    "RUF012",  # a class-level list on a test fake is a shared registry, on purpose
+]
+
+[format]
+# Not part of the gate. Reformatting the tree would move ~2500 lines (2562 on
+# 2026-08-09, 841 of them in calibrate.py; re-measure: ruff format --check
+# --diff package tests scripts) and would poison git blame on the sync code
+# exactly while it is being refactored. Revisit after that campaign, in a
+# commit of its own that scripts/movecheck.py can confirm changed nothing
+# but layout.
+docstring-code-format = false

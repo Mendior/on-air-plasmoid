@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A dead import lands in shipped Python — the ruff half of the gate must say so.
+
+history:
+  The Python rules arrived 2026-08-09 (ruff.toml, ceiling zero) with the same
+  worry every guard in this project has earned: a check can be wired, look
+  green, and be dead. Two guards spent weeks that way. This mutant is the
+  red-path proof for the ruff step in dev.sh lint — if that step is unplugged
+  or its failure stops reaching the gate's exit code, this survives and the
+  survivor report points here.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+  import hashlib
+  import http.client
+
+replace:
+  import hashlib
+  import wave as _ruff_gate_probe
+  import http.client
+
+expect:
+  The ruff step in scripts/dev.sh lint: F401 (unused import) fires on the
+  probe, the step sets fail=1, lint exits red.

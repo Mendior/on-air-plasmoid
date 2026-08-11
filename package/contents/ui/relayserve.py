@@ -34,6 +34,20 @@ buf_path, port_file = sys.argv[1], sys.argv[2]
 # Icecast itself sends on connect).
 LEAD_BYTES = 512 * 1024
 LEAD_SEC = 1.5
+# ...but the clock was releasing the fat streams too, which is the whole
+# reason they were given a byte target in the first place. Measured on
+# the two stations the reporter named (2026-08-11): frequence3gold.flac
+# arrives at 1181 kbps and radioparadise flacm at 749 kbps, so the byte
+# target needs 3.6 s and 5.6 s of collecting — the 1.5 s clock always won
+# first, and they started with a fifth of the intended cushion. The
+# burst-on-connect the old comment counted on is not there on these two.
+# So the clock now releases only a stream thin enough never to have
+# starved; a fat one collects until the byte target or the cap, whichever
+# comes first. The cap keeps a stalled source from holding a listener
+# forever, and five seconds of silence before a lossless station is a
+# fair trade against the micro-cuts they reported through its first ten.
+FAT_RATE = 50 * 1024
+MAX_LEAD_SEC = 5.0
 # The wait between "the file has nothing new" and the next look. At 200 ms
 # this was itself a stall the player could hear once its own buffer ran
 # thin; the read costs nothing when the answer is empty.
@@ -91,11 +105,18 @@ def serve(sock: socket.socket) -> None:
     # constants). A buffer that vanishes mid-wait is a torn-down arm: the
     # open below fails and the caller's handler ends this tap.
     lead = 0.0
-    while lead < LEAD_SEC:
+    while lead < MAX_LEAD_SEC:
         try:
-            if os.path.getsize(buf_path) >= LEAD_BYTES:
-                break
+            have = os.path.getsize(buf_path)
         except OSError:
+            break
+        if have >= LEAD_BYTES:
+            break
+        # A thin stream leaves on the short clock: it never starved, and
+        # making its listener wait for a cushion it does not need would
+        # be a fresh bug. The rate is measured from what has actually
+        # arrived, so no stream has to be recognised in advance.
+        if lead >= LEAD_SEC and have / max(lead, 0.1) < FAT_RATE:
             break
         time.sleep(0.1)
         lead += 0.1

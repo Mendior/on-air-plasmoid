@@ -16,10 +16,12 @@ import org.kde.plasma.plasma5support 2.0 as P5Support
 import org.kde.plasma.plasmoid
 
 import "AlarmLogic.js" as AlarmLogic
+import "ExecClass.js" as ExecClass
 import "FaviconLogic.js" as FaviconLogic
 import "EpisodeState.js" as EpisodeState
 import "HostGuard.js" as HostGuard
 import "HealLogic.js" as HealLogic
+import "NameGuard.js" as NameGuard
 import "OpmlLogic.js" as OpmlLogic
 import "PodcastLogic.js" as PodcastLogic
 import "RecLogic.js" as RecLogic
@@ -66,21 +68,44 @@ PlasmoidItem {
     property string metadata: ""
     property string currentStation: ""
     property string currentStationFavicon: ""
-    property string albumArtUrl: ""
     property string trackArtist: ""
     property string trackTitle: ""
     property bool isError: false
     property int lastPlay: 0
-    property int view: 0
+    // 0 = Stations. A listener who lives in one page can have the widget
+    // open there instead of walking back every time (asked for alongside
+    // the tab switches): the page is remembered on every move and read
+    // back at startup, but only when they asked for it.
+    property int view: Plasmoid.configuration.rememberLastTab === true
+                       ? Math.max(0, Math.min(4, Plasmoid.configuration.lastTab || 0))
+                       : 0
     // Which pages this listener wants. Stations and Playing are the widget
     // — the other three are answers to "I don't use those, give the room to
     // my stations" (asked for on GitHub). Hiding a page never deletes what
     // it holds: alarms still fire, downloads still land.
     function viewVisible(i) {
+        // The listener's own answer first — then the one rule none of the
+        // switches may break: SOMETHING has to be on screen. A widget whose
+        // every tab was switched off is a widget with nothing to click, and
+        // no settings dialog inside it to undo that with.
+        var want = _viewWanted(i);
+        if (want) return true;
+        return i === _lastStandingView();
+    }
+    function _viewWanted(i) {
+        if (i === 0) return Plasmoid.configuration.showStationsTab !== false;
+        if (i === 1) return Plasmoid.configuration.showPlayingTab !== false;
         if (i === 2) return Plasmoid.configuration.showMusicTab !== false;
         if (i === 3) return Plasmoid.configuration.showPodcastsTab !== false;
         if (i === 4) return Plasmoid.configuration.showTimersTab !== false;
         return true;
+    }
+    // -1 while any tab is wanted; otherwise Stations, which is where a
+    // widget that switched everything off comes back from.
+    function _lastStandingView() {
+        for (var i = 0; i <= 4; i++)
+            if (_viewWanted(i)) return -1;
+        return 0;
     }
     // A hidden page can still be arrived at — a swipe, a restored index, a
     // tab switched off while standing on it. Walk on rather than stare at
@@ -93,7 +118,43 @@ PlasmoidItem {
             if (viewVisible(b)) { view = b; return; }
         view = 0;
     }
-    onViewChanged: _ensureViewVisible()
+    // Asked for in Discussions, shipped OFF by default with the guard the
+    // discussion itself named: switching takes the screen away from
+    // someone mid-browse, so the jump only happens if the listener has
+    // not touched the popup since the station started. Any view change
+    // (theirs or ours) disarms it; so does an active search.
+    Timer {
+        id: autoPlayingTimer
+        interval: 4000
+        repeat: false
+        onTriggered: {
+            if (Plasmoid.configuration.autoSwitchToPlaying !== true) return;
+            if (!isPlaying() && !_casting) return;
+            if (searchFilter !== "") return;
+            if (view === 1) return;
+            view = 1;
+        }
+    }
+
+    onViewChanged: {
+        autoPlayingTimer.stop();
+        _ensureViewVisible();
+        // Landing on the Playing page fires one immediate poll if the
+        // poll is stopped without a definitive no-metadata verdict. The
+        // stuck-titles reporters all describe the same ritual — switch
+        // away, switch back, the title is fresh — and until now that was
+        // superstition: the tab switch touched nothing on the data side.
+        // Now the ritual is real, ONE bounded request per visit, and it
+        // recovers the one case nothing else can: a Qt backend that
+        // delivered a first title and went quiet, holding the latch.
+        if (view === 1 && (isPlaying() || _casting)
+            && !infoTimer.running
+            && root._noIcySource !== playMusic.source.toString())
+            getStreamInfo();
+        if (Plasmoid.configuration.rememberLastTab === true
+            && Plasmoid.configuration.lastTab !== view)
+            Plasmoid.configuration.lastTab = view;
+    }
     // Switching a tab off while STANDING on it moves no view, so the guard
     // above never hears about it — the listener would be left looking at a
     // page whose tab just disappeared (measured on the bench).
@@ -108,16 +169,32 @@ PlasmoidItem {
     // (LAN-only, captive portal) can still reach a LAN stream server — the
     // old strict === Online disabled the whole station list on such setups.
     property bool isConnected: NetworkInformation.reachability !== NetworkInformation.Reachability.Disconnected
-    property var _artCache: ({})
 
     // ── 2026 signature palette: true black + emerald. Independent of the system
     //    theme by default; users who prefer their Plasma accent can enable
     //    followSystemAccent in settings and the whole UI recolors accordingly.
-    readonly property bool _followAccent: Plasmoid.configuration.followSystemAccent
-    readonly property color accent: _followAccent ? Kirigami.Theme.highlightColor : "#6FCF97"
-    readonly property color accentBright: _followAccent ? Qt.lighter(Kirigami.Theme.highlightColor, 1.2) : "#3BEE96"
-    readonly property color accentTeal: _followAccent ? Kirigami.Theme.highlightColor : "#2BB3A3"
-    readonly property color accentTextOn: _followAccent ? Kirigami.Theme.highlightedTextColor : "#04140B"
+    //    Three answers, because a free colour picker would be a promise
+    //    nobody measures: every shade has to stay readable on both light
+    //    and dark Plasma schemes, and the emerald below only does because
+    //    it was measured. 0 = emerald, 1 = the system accent (whatever the
+    //    listener's Plasma is), 2 = plain — the widget borrows the theme's
+    //    own text colour and stops having a colour of its own, which is the
+    //    "I don't want your green" answer.
+    readonly property int _accentMode: (Plasmoid.configuration.accentMode === 0
+                                        && Plasmoid.configuration.followSystemAccent === true)
+                                       ? 1 : Plasmoid.configuration.accentMode
+    readonly property bool _followAccent: _accentMode === 1
+    readonly property bool _plainAccent: _accentMode === 2
+    readonly property color accent: _plainAccent ? Kirigami.Theme.textColor
+                                  : (_followAccent ? Kirigami.Theme.highlightColor : "#6FCF97")
+    readonly property color accentBright: _plainAccent ? Kirigami.Theme.textColor
+                                        : (_followAccent ? Qt.lighter(Kirigami.Theme.highlightColor, 1.2) : "#3BEE96")
+    readonly property color accentTeal: _plainAccent ? Kirigami.Theme.textColor
+                                      : (_followAccent ? Kirigami.Theme.highlightColor : "#2BB3A3")
+    // Text ON an accent fill: in plain mode the fill IS the text colour, so
+    // the only readable thing to write on it is the background.
+    readonly property color accentTextOn: _plainAccent ? Kirigami.Theme.backgroundColor
+                                        : (_followAccent ? Kirigami.Theme.highlightedTextColor : "#04140B")
     // The accent WRITTEN AS TEXT, which is a different job from the accent
     // used as a fill. The emerald was picked against a dark panel and it is
     // beautiful there — measured 8.8:1 on Breeze Dark. On a light colour
@@ -131,7 +208,10 @@ PlasmoidItem {
     // change — fills, borders, icons and the aurora keep the full colour,
     // because contrast rules are about what you read, not what you look at.
     readonly property bool _lightSurface: Kirigami.Theme.backgroundColor.hslLightness >= 0.5
-    readonly property color accentText: _lightSurface ? Qt.darker(accent, 1.8) : accent
+    // Plain mode is already the theme's text colour — darkening it would
+    // push it off the scheme it came from.
+    readonly property color accentText: _plainAccent ? Kirigami.Theme.textColor
+                                      : (_lightSurface ? Qt.darker(accent, 1.8) : accent)
     // Recording red, same treatment: 4.0:1 as text on either scheme is just
     // under the line, and it is the colour that carries error messages.
     readonly property color recordRed: "#E0463C"
@@ -308,6 +388,7 @@ PlasmoidItem {
     // On many streams the Qt FFmpeg backend provides the ICY title directly via
     // metaData — when that works, no reader.py processes need to be spawned at all.
     property bool _qtMetaWorks: false
+    property string _qtMetaFirstTitle: ""
 
     // Consecutive stall retries — drives an exponential backoff so we don't
     // hammer a permanently broken stream every 15 seconds.
@@ -364,7 +445,19 @@ PlasmoidItem {
     // Whether a wake-up alarm currently owns the audio state (ringing, or
     // its one-shot volume floor still standing). The sync's automatic
     // care must NEVER measure or correct over an alarm.
-    readonly property bool alarmEngaged: _alarmFallbackArmed || _volumeOverridePct >= 0
+    // "An alarm is engaging the room right now" — what the sync engine asks
+    // before it measures anything. The override alone used to answer yes
+    // forever: it survives until the listener picks a station, stops, or
+    // touches the volume, and someone who simply lets the wake-up play had
+    // their speaker drift-check blocked for the rest of the day (measured
+    // in the home journal, 2026-08-11: an eight-minute hole and counting).
+    // The wake-up window is what this question is really about, so the
+    // override's answer expires with it — the LOUDNESS stays, the veto
+    // does not.
+    readonly property bool alarmEngaged: _alarmFallbackArmed
+                                         || (_volumeOverridePct >= 0
+                                             && Date.now() - _volumeOverrideAtMs < 30 * 60 * 1000)
+    property double _volumeOverrideAtMs: 0
 
     function parseFavorites(s) {
         try {
@@ -1206,960 +1299,143 @@ PlasmoidItem {
     // not this one. All feed content is untrusted input; PodcastLogic.js
     // gates and sanitizes it before anything here touches it.
 
-    ListModel { id: podcastSubsModel }      // {title, author, art, feedUrl}
-    ListModel { id: podcastSearchModel }    // merged directory results, same roles
-    ListModel { id: podcastTrendingModel }  // the charts: Apple top list, fyyd standing in
-    ListModel { id: podcastEpisodesModel }  // open feed: {title,url,guid,pubMs,durationSec,sizeBytes}
-    // Episode-level hits across ALL shows — the search's second answer:
-    // {title, show, art, url, guid, feed, dateMs, durationMs}
-    ListModel { id: podcastEpSearchModel }
+    // The subscription list, the search, the charts and the open feed live
+    // in PodcastEngine now (second slice). Models forward as plain
+    // references — nothing ever reassigns them — and the two properties the
+    // UI writes back (closing a show, clearing an error) stay writable
+    // through aliases. Unqualified names in FullRepresentation resolve
+    // against these root properties exactly as they resolved against the
+    // old ids.
+    readonly property var podcastSubsModel: podcastEngine.subsModel
+    readonly property var podcastSearchModel: podcastEngine.searchModel
+    readonly property var podcastTrendingModel: podcastEngine.trendingModel
+    readonly property var podcastEpisodesModel: podcastEngine.episodesModel
+    readonly property var podcastEpSearchModel: podcastEngine.epSearchModel
+    readonly property alias podcastSearchBusy: podcastEngine.podcastSearchBusy
+    readonly property alias podcastTrendingBusy: podcastEngine.podcastTrendingBusy
+    property alias podcastEpisodesFor: podcastEngine.podcastEpisodesFor
+    readonly property alias podcastEpisodesTitle: podcastEngine.podcastEpisodesTitle
+    readonly property alias podcastEpisodesArt: podcastEngine.podcastEpisodesArt
+    readonly property alias podcastFeedLoading: podcastEngine.podcastFeedLoading
+    property alias podcastFeedError: podcastEngine.podcastFeedError
 
-    property bool podcastSearchBusy: false
-    property int _podSearchSeq: 0
-    // How many directory responses the current search still waits for.
-    property int _podSearchPending: 0
-    property bool podcastTrendingBusy: false
-    property int _podTrendSeq: 0
-    property string podcastEpisodesFor: ""   // feedUrl the episodes model shows
-    property string podcastEpisodesTitle: ""
-    // The open show's artwork — the subscription/search row's art if it has
-    // one, else the feed's own channel image. Fallback cover for episode rows
-    // and the now-playing panel; always http(s)-gated before it is shown.
-    property string podcastEpisodesArt: ""
-    property bool podcastFeedLoading: false
-    property string podcastFeedError: ""
-    property int _podFeedSeq: 0
-    // One download at a time — deterministic, and the status line stays honest.
-    property string _podDownloadKey: ""
-    property string _podDownloadTitle: ""
-    // The download in flight, remembered in full: the OK ack writes this
-    // into the downloads ledger so the Downloaded view can show the episode
-    // as an EPISODE — show, cover, resume — not as a bare file name.
-    property var _podDownloadMeta: null
-    // filename → { key, title, show, art, feed, at }. The ledger behind the
-    // Downloaded view; entries whose file is gone simply never render, and
-    // the same at-based pruner the positions use caps it.
-    property var _podDownloads: ({})
-    property int _podDlRev: 0
+    function podcastSearch(q) { podcastEngine.podcastSearch(q); }
+    function podcastLoadTrending() { podcastEngine.podcastLoadTrending(); }
+    function loadPodcastFeed(feedUrl, showTitle, showArt, noRescue) { podcastEngine.loadPodcastFeed(feedUrl, showTitle, showArt, noRescue); }
+    function isPodcastSubscribed(feedUrl) { return podcastEngine.isPodcastSubscribed(feedUrl); }
+    function addPodcastSub(title, author, art, feedUrl) { return podcastEngine.addPodcastSub(title, author, art, feedUrl); }
+    function removePodcastSub(feedUrl) { podcastEngine.removePodcastSub(feedUrl); }
+    function exportSubscriptions() { podcastEngine.exportSubscriptions(); }
+    function importSubscriptionsFromPath(path) { podcastEngine.importSubscriptionsFromPath(path); }
+    function _loadPodcastSubs() { podcastEngine.loadSubs(); }
+    readonly property var _podSeen: podcastEngine.seen
+    function _loadPodSeen() { podcastEngine.loadSeen(); }
+    function _savePodSeen() { podcastEngine.saveSeen(); }
+    // The downloads ledger lives in PodcastEngine now (first slice of the
+    // podcast extraction); these forwards keep the thirty-odd readers and
+    // the UI pointed at the same names they always used. Writers mutate the
+    // engine's own map through the reference, then save through the wrapper.
+    readonly property var _podDownloads: podcastEngine.downloads
+    readonly property int _podDlRev: podcastEngine.dlRev
 
-    function _loadPodDownloads() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.podcastDownloads || "{}");
-            _podDownloads = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _podDownloads = {};
+    function _loadPodDownloads() { podcastEngine.loadDownloads(); }
+    function _savePodDownloads() { podcastEngine.saveDownloads(); }
+    function podcastDownloadMeta(fileName) { return podcastEngine.downloadMeta(fileName); }
+    function podcastFileForKey(key) { return podcastEngine.fileForKey(key); }
+    function deletePodcastDownload(fileName) { podcastEngine.deleteDownload(fileName); }
+    // The download pipeline lives in the engine (slice 3a): the badge in
+    // EpisodeListItem reads the in-flight key, the refresh machine enqueues.
+    readonly property alias _podDownloadKey: podcastEngine._podDownloadKey
+    function downloadEpisode(title, url, guid) { podcastEngine.downloadEpisode(title, url, guid); }
+    function _podEnqueueDownload(job) { return podcastEngine._podEnqueueDownload(job); }
+    function podcastFileName(title, url, feed, guid) { return podcastEngine.podcastFileName(title, url, feed, guid); }
+    function podcastFileNameLegacy(title, url) { return podcastEngine.podcastFileNameLegacy(title, url); }
+    function podcastLegacyIsOurs(fileName, feed, guid, url) { return podcastEngine.podcastLegacyIsOurs(fileName, feed, guid, url); }
+    // Slice 3b: refresh, scan, queue, positions, speeds and played-marks
+    // live in the engine; the play path still stamps through these forwards.
+    readonly property var _podPositions: podcastEngine._podPositions
+    property alias _podPosRev: podcastEngine._podPosRev
+    readonly property var _podUpNext: podcastEngine._podUpNext
+    property alias _podUpNextRev: podcastEngine._podUpNextRev
+    readonly property var _podSpeeds: podcastEngine._podSpeeds
+    readonly property var _podPlayed: podcastEngine._podPlayed
+    property alias _podPlayedRev: podcastEngine._podPlayedRev
+    function _savePodPositions() { podcastEngine._savePodPositions(); }
+    function _loadPodPositions() { podcastEngine._loadPodPositions(); }
+    function _loadPodSpeeds() { podcastEngine._loadPodSpeeds(); }
+    function _loadPodPlayed() { podcastEngine._loadPodPlayed(); }
+    function _loadPodUpNext() { podcastEngine._loadPodUpNext(); }
+    function podcastPositionSec(key) { return podcastEngine.podcastPositionSec(key); }
+    function _savePodUpNext() { podcastEngine._savePodUpNext(); }
+    function podcastQueueHas(key) { return podcastEngine.podcastQueueHas(key); }
+    function podcastQueueToggle(entry) { return podcastEngine.podcastQueueToggle(entry); }
+    function _podSpeedFor(feed) { return podcastEngine._podSpeedFor(feed); }
+    function isEpisodePlayed(key) { return podcastEngine.isEpisodePlayed(key); }
+    function episodeState(key) { return podcastEngine.episodeState(key); }
+    function markEpisodePlayed(key) { podcastEngine.markEpisodePlayed(key); }
+    function markEpisodeUnplayed(key) { podcastEngine.markEpisodeUnplayed(key); }
+    function toggleEpisodePlayed(key) { podcastEngine.toggleEpisodePlayed(key); }
+    function markEpisodesPlayed(keys) { podcastEngine.markEpisodesPlayed(keys); }
+    function _podFileUrl(fileName) { return podcastEngine._podFileUrl(fileName); }
+    function _podFileOfUrl(url) { return podcastEngine._podFileOfUrl(url); }
+    // The scan's mid-play half stays here: it touches the playing identity.
+    function applyFreshScan(sf, sil, chs) {
+        if (_podPlayingUrl !== "" && podcastEngine._podFileOfUrl(_podPlayingUrl) === sf) {
+            if (sil.length > 0) _podSilCur = sil;
+            if (chs.length > 0) _podChaptersCur = chs;
         }
     }
-
-    function _savePodDownloads() {
-        _podDownloads = PodcastLogic.prunePositions(_podDownloads, 500);
-        Plasmoid.configuration.podcastDownloads = JSON.stringify(_podDownloads);
-        _podDlRev++;
-    }
-
-    function podcastDownloadMeta(fileName) {
-        void _podDlRev;
-        var e = _podDownloads[fileName];
-        return (e && typeof e === "object") ? e : null;
-    }
-
-    // The file an episode was downloaded to, found by the episode's OWN
-    // identity rather than by recomputing its name. The name carries a tag
-    // derived from the feed, and a feed can move: `_podFeedRescue` rewrites
-    // the subscription when a show changes host, and from that moment every
-    // recomputed name misses — the row reads "not downloaded", tapping it
-    // streams over the network while the file sits on disk, and ⬇ fetches a
-    // second copy. The key never moves, so the ledger is asked instead.
-    function podcastFileForKey(key) {
-        void _podDlRev;
-        if (!key) return "";
-        for (var fn in _podDownloads) {
-            var e = _podDownloads[fn];
-            if (e && typeof e === "object" && e.key === key) return fn;
-        }
-        return "";
-    }
-
-    // Remove one downloaded episode: the FILE (guarded to the Podcasts
-    // folder — the name must be bare, no path parts) and its ledger row.
-    // Positions and played-marks stay: re-downloading resumes where the
-    // listener left off, which is the whole promise of the position map.
-    property var _podRmByTok: ({})
-    property int _podRmTok: 0
-    // Files whose playback erred, awaiting shell proof of absence before
-    // the ledger row falls (shares the token counter with POD_RM).
-    property var _podGoneByTok: ({})
-
-    function deletePodcastDownload(fileName) {
-        var name = (fileName || "").toString();
-        if (name === "" || name.indexOf("/") !== -1 || name.indexOf("\\") !== -1
-            || name.charAt(0) === ".") return;
-        // The ledger row falls ONLY when the file is provably gone — the rm
-        // is asynchronous, and dropping the metadata up front turned a
-        // failed delete (read-only mount) into a bare-name row that had
-        // lost its cover and resume point. The token maps the ack back to
-        // the name without the name ever riding a shell sentinel.
-        var tok = ++_podRmTok;
-        _podRmByTok[tok] = name;
-        executable.exec(": POD_RM " + tok + "; rm -f -- "
-            + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name)
-            + " " + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name + ".part")
-            + "; [ ! -e " + PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + name) + " ]"
-            + " && echo __POD_RM_OK__; true # " + nextSeq());
-    }
-    // Resume bookkeeping: the playing episode's key and the seek waiting
-    // for the media to load.
-    property string _podPlayingKey: ""
-    property var _podPositions: ({})
-    // Bumped on every positions-map mutation: the map itself is mutated in
-    // place (no change signal), so badges bind through this tick instead.
-    property int _podPosRev: 0
+    // The playing identity lives in the engine now (A2). Same names
+    // forward as WRITABLE aliases: every reader and writer in this file
+    // and the whole UI keeps working verbatim, and the engine is where
+    // the tests can finally reach the lifecycle.
+    property alias _podPlayingKey: podcastEngine._podPlayingKey
+    property alias _podPlayingUrl: podcastEngine._podPlayingUrl
+    property alias _podPlayingRawUrl: podcastEngine._podPlayingRawUrl
+    property alias _podPlayingArt: podcastEngine._podPlayingArt
+    property alias _podPlayingShow: podcastEngine._podPlayingShow
+    property alias _podSilCur: podcastEngine._podSilCur
+    property alias _podChaptersCur: podcastEngine._podChaptersCur
+    property alias _currentEpisodeFeed: podcastEngine._currentEpisodeFeed
+    property alias podcastRate: podcastEngine.podcastRate
+    property alias _podStarting: podcastEngine._podStarting
     property string _podPendingSeekUrl: ""
     property int _podPendingSeekSec: 0
-    // The exact source URL of the tracked episode. The position-stamp and
-    // played-mark act ONLY when the current source is this — otherwise a
-    // file:// alarm chime playing over a stale _podPlayingKey would stamp
-    // and mark the WRONG episode (the key is not cleared on every stop).
-    property string _podPlayingUrl: ""
-    // Cover for the episode currently playing — the show art captured when it
-    // started. Non-empty ONLY while a podcast plays (cleared on handoff), so
-    // it never overrides a station's own art. Feeds the now-playing panel.
-    property string _podPlayingArt: ""
-    // The playing episode's show name — shown small above the episode title,
-    // the way every podcast app frames "Show › Episode". Same lifecycle as
-    // _podPlayingArt (set on play, cleared on handoff/stop).
-    property string _podPlayingShow: ""
-    // Playback speed for local playback. Remembered per show (feedUrl of the
-    // playing episode) over a global default; pitch-corrected where the
-    // backend can, so voices don't chipmunk. A radio stream always plays 1x.
-    property real podcastRate: 1.0
-    property string _currentEpisodeFeed: ""
-    property var _podSpeeds: ({})
-    // Played/unplayed memory: an episodeKey -> timestamp map. Filled when an
-    // episode finishes (or is manually marked); the delegate reads it through
-    // the change tick, since the map is mutated in place.
-    property var _podPlayed: ({})
-    property int _podPlayedRev: 0
 
-    function _loadPodcastSubs() {
-        try {
-            const arr = JSON.parse(Plasmoid.configuration.podcastSubs || "[]");
-            podcastSubsModel.clear();
-            for (var i = 0; i < arr.length && i < 100; i++) {
-                const e = arr[i] || {};
-                if (!PodcastLogic.urlAllowed(e.feedUrl)) continue;
-                podcastSubsModel.append({
-                    "title": String(e.title || "").substring(0, 200),
-                    "author": String(e.author || "").substring(0, 200),
-                    "art": PodcastLogic.urlAllowed(e.art) ? String(e.art).substring(0, 2048) : "",
-                    "feedUrl": e.feedUrl
-                });
-            }
-        } catch (e) {
-            console.log("[ARP] loadPodcastSubs: " + e);
-        }
-    }
 
-    function _savePodcastSubs() {
-        const arr = [];
-        for (var i = 0; i < podcastSubsModel.count; i++) {
-            const p = podcastSubsModel.get(i);
-            arr.push({ "title": p.title, "author": p.author, "art": p.art, "feedUrl": p.feedUrl });
-        }
-        Plasmoid.configuration.podcastSubs = JSON.stringify(arr);
-    }
 
-    function isPodcastSubscribed(feedUrl) {
-        for (var i = 0; i < podcastSubsModel.count; i++)
-            if (podcastSubsModel.get(i).feedUrl === feedUrl) return true;
-        return false;
-    }
 
-    function addPodcastSub(title, author, art, feedUrl) {
-        if (!PodcastLogic.urlAllowed(feedUrl) || isPodcastSubscribed(feedUrl)) return false;
-        // The cap the loader enforces, enforced at the door too: an OPML
-        // with a thousand feeds used to bloat the config past what the next
-        // start would silently drop at 100 — everything past the cap looked
-        // imported and then vanished on restart.
-        if (podcastSubsModel.count >= 100) return false;
-        podcastSubsModel.append({
-            "title": String(title || "").substring(0, 200),
-            "author": String(author || "").substring(0, 200),
-            // Capped like the texts: a feed-controlled megabyte "URL" must
-            // not ride into the config file.
-            "art": PodcastLogic.urlAllowed(art) ? String(art).substring(0, 2048) : "",
-            "feedUrl": feedUrl
-        });
-        _savePodcastSubs();
-        return true;
-    }
 
-    function removePodcastSub(feedUrl) {
-        for (var i = 0; i < podcastSubsModel.count; i++) {
-            if (podcastSubsModel.get(i).feedUrl === feedUrl) {
-                podcastSubsModel.remove(i);
-                _savePodcastSubs();
-                return;
-            }
-        }
-    }
 
-    // ── OPML — the universal subscription backup / migration format ───────
-    property string _opmlExportPath: ""
-    function exportSubscriptions() {
-        var subs = [];
-        for (var i = 0; i < podcastSubsModel.count; i++) {
-            var p = podcastSubsModel.get(i);
-            subs.push({ title: p.title, feedUrl: p.feedUrl });
-        }
-        if (subs.length === 0) {
-            notify(i18n("Nothing to export"), i18n("Subscribe to a show first."), "dialog-information");
-            return;
-        }
-        var opml = OpmlLogic.buildOpml(subs);
-        _opmlExportPath = downloadDirPath + "/onair-subscriptions.opml";
-        // The whole document goes through the one tested quoter — titles and
-        // feed URLs are user/feed data and must not reach the shell raw.
-        executable.exec(": OPML_EXPORT; mkdir -p " + PodcastLogic.shQuote(downloadDirPath)
-            + " && printf '%s' " + PodcastLogic.shQuote(opml)
-            + " > " + PodcastLogic.shQuote(_opmlExportPath)
-            + " && echo __OPML_OK__ || echo __OPML_FAIL__; true # " + nextSeq());
-    }
-    // Read an OPML file the user picked and subscribe to every feed in it.
-    // The file is read through the exec channel (a QML file:// XHR is
-    // sandboxed), parsed by the never-throws OpmlLogic, and every feedUrl
-    // still passes addPodcastSub's HostGuard gate + the 100-sub cap.
-    function importSubscriptionsFromPath(path) {
-        if (!path) return;
-        var p = path.toString().replace(/^file:\/\//, "");
-        try { p = decodeURIComponent(p); } catch (e) {}
-        executable.exec(": OPML_IMPORT; cat " + PodcastLogic.shQuote(p)
-            + " 2>/dev/null; true # " + nextSeq());
-    }
-    function _applyImportedOpml(xml) {
-        var subs = OpmlLogic.parseOpml(xml);
-        var added = 0;
-        for (var i = 0; i < subs.length; i++) {
-            if (addPodcastSub(subs[i].title, "", "", subs[i].feedUrl)) added++;
-        }
-        if (added > 0)
-            notify(i18n("Subscriptions imported"),
-                   i18np("%1 show added", "%1 shows added", added), "application-rss+xml");
-        else
-            notify(i18n("Nothing imported"),
-                   i18n("No new podcast feeds were found in that file."), "dialog-information");
-    }
 
-    // Show search via the iTunes directory — keyless, so no secret ever
-    // sits in a public plasmoid (the PodcastIndex API wants a signed
-    // key and is out for exactly that reason).
-    function podcastSearch(term) {
-        var q = (term || "").trim();
-        // The early returns bump the sequence too: an older query's XHR still
-        // in flight must find itself stale, or its late response repopulates
-        // the list the clear below just emptied.
-        // A single character buys four API calls and burns the shared
-        // per-IP budget the cover search also lives on — no directory
-        // answers anything useful to it anyway.
-        if (q.length < 2) {
-            _podSearchSeq++; podcastSearchModel.clear(); podcastEpSearchModel.clear();
-            podcastSearchBusy = false; return;
-        }
-        // A pasted feed URL is not a directory query — the shows view offers a
-        // direct "open this feed" action for it, so no iTunes round-trip here.
-        if (/^https?:\/\//i.test(q)) {
-            _podSearchSeq++; podcastSearchModel.clear(); podcastEpSearchModel.clear();
-            podcastSearchBusy = false; return;
-        }
-        // THREE directories at once — iTunes (primary, biggest index),
-        // fyyd.de and gpodder.net — plus iTunes again at the EPISODE level,
-        // which finds the needle no show-title search can (a topic, a guest,
-        // one famous interview). Show results merge as they land, deduped by
-        // canonical feed key; a source failing just means the others answer.
-        podcastSearchBusy = true;
-        var seq = ++_podSearchSeq;
-        podcastSearchModel.clear();
-        podcastEpSearchModel.clear();
-        _podSearchPending = 4;
-        _podSearchITunes(q, seq);
-        _podSearchFyyd(q, seq);
-        _podSearchGpodder(q, seq);
-        _podSearchEpisodes(q, seq);
-    }
 
     // One merged row, whatever directory it came from: gated, capped, deduped.
     // fyyd's own image host 403s hotlinks (measured live: every UA refused),
     // so its art is a dead cover walking — any twin's working art beats it.
     readonly property var _podFyydArt: /^https?:\/\/img-\d+\.fyyd\.de\//i
 
-    function _podAppendSearchRow(title, author, art, feed, rank) {
-        feed = String(feed || "").trim();
-        if (!PodcastLogic.urlAllowed(feed)) return;
-        // Cross-directory twins wear different coats for one address —
-        // http vs https, a trailing slash, a shouting host. The canonical
-        // key sees through all three. A twin does not vanish: it UPGRADES
-        // the row it duplicates — the fast directory used to win the slot
-        // with a missing (or dead-host) cover while the slow one arrived
-        // holding the real artwork, and the real artwork was thrown away.
-        var fkey = PodcastLogic.feedKey(feed);
-        for (var i = 0; i < podcastSearchModel.count; i++) {
-            if (PodcastLogic.feedKey(podcastSearchModel.get(i).feedUrl) !== fkey) continue;
-            var row = podcastSearchModel.get(i);
-            var artOk = PodcastLogic.urlAllowed(art);
-            if (artOk && (row.art === ""
-                          || (_podFyydArt.test(row.art) && !_podFyydArt.test(art))))
-                podcastSearchModel.setProperty(i, "art", String(art).substring(0, 2048));
-            if (row.author === "" && author)
-                podcastSearchModel.setProperty(i, "author", String(author).substring(0, 200));
-            return;
-        }
-        if (podcastSearchModel.count >= 50) return;
-        // Sources land in whatever order the network felt like — the same
-        // query used to open with a different first row every time, the
-        // fastest directory claiming the top. Each source carries a rank
-        // (iTunes 0, fyyd 1, gpodder 2) and a row files in behind its own
-        // block, so the order is the directories' judgment, not the race's.
-        var r = rank === undefined ? 9 : rank;
-        var at = podcastSearchModel.count;
-        for (var p = 0; p < podcastSearchModel.count; p++) {
-            if (podcastSearchModel.get(p).rank > r) { at = p; break; }
-        }
-        podcastSearchModel.insert(at, {
-            "title": String(title || "").substring(0, 200),
-            "author": String(author || "").substring(0, 200),
-            "art": PodcastLogic.urlAllowed(art) ? String(art).substring(0, 2048) : "",
-            "feedUrl": feed,
-            "rank": r
-        });
-    }
 
-    // A source finished (well or badly) — the spinner stops when the last
-    // one is in. A stale seq never settles: the counter belongs to the
-    // query that superseded it.
-    function _podSearchSettle(seq) {
-        if (seq !== _podSearchSeq) return;
-        _podSearchPending--;
-        if (_podSearchPending <= 0) podcastSearchBusy = false;
-    }
 
-    function _podSearchITunes(q, seq) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            // The same 512 KB leash the gpodder handler carries: a search
-            // answer is a few dozen KB, anything bigger is broken or hostile.
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podSearchSeq) return;   // a newer search took over
-            try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                for (var i = 0; i < res.length; i++) {
-                    var r = res[i] || {};
-                    root._podAppendSearchRow(r.collectionName, r.artistName,
-                        String(r.artworkUrl600 || r.artworkUrl100 || "").trim(),
-                        r.feedUrl, 0);
-                }
-            } catch (e) {
-                console.log("[ARP] podcastSearch(iTunes): " + e);
-            }
-            root._podSearchSettle(seq);
-        };
-        xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
-                        + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    function _podSearchFyyd(q, seq) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podSearchSeq) return;
-            try {
-                var res = JSON.parse(xhr.responseText || "{}").data || [];
-                for (var i = 0; i < res.length; i++) {
-                    var r = res[i] || {};
-                    root._podAppendSearchRow(r.title, r.author,
-                        String(r.smallImageURL || r.imgURL || "").trim(),
-                        r.xmlURL, 1);
-                }
-            } catch (e) {
-                console.log("[ARP] podcastSearch(fyyd): " + e);
-            }
-            root._podSearchSettle(seq);
-        };
-        xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
-                        + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    // gpodder.net — the open-source directory, keyless like fyyd, with the
-    // feed URL first-class in every row. No author field; the show's own
-    // website host stands in so the row is not naked.
-    function _podSearchGpodder(q, seq) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podSearchSeq) return;
-            try {
-                var res = JSON.parse(xhr.responseText || "[]") || [];
-                for (var i = 0; i < res.length && i < 30; i++) {
-                    var r = res[i] || {};
-                    var hm = /^https?:\/\/([^\/?#:]+)/i.exec(String(r.website || ""));
-                    var host = hm ? hm[1] : "";
-                    root._podAppendSearchRow(r.title, host,
-                        String(r.logo_url || "").trim(), r.url, 2);
-                }
-            } catch (e) {
-                console.log("[ARP] podcastSearch(gpodder): " + e);
-            }
-            root._podSearchSettle(seq);
-        };
-        xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    // Episode-level search across every show — iTunes carries it keyless
-    // under the same endpoint (entity=podcastEpisode), and it answers the
-    // queries a show-title search cannot: a topic, a guest's name, that
-    // one famous interview. The row plays directly (the enclosure URL is
-    // in the answer) and carries its show's feed for the "open the show"
-    // road. Verified live 2026-08-06: episodeUrl + feedUrl + duration in
-    // every row.
-    function _podSearchEpisodes(q, seq) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podSearchSeq) return;
-            try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                for (var i = 0; i < res.length && podcastEpSearchModel.count < 30; i++) {
-                    var r = res[i] || {};
-                    var eurl = String(r.episodeUrl || "").trim();
-                    if (!PodcastLogic.urlAllowed(eurl)) continue;
-                    var seen = false;
-                    for (var d = 0; d < podcastEpSearchModel.count; d++)
-                        if (podcastEpSearchModel.get(d).url === eurl) { seen = true; break; }
-                    if (seen) continue;
-                    var eart = String(r.artworkUrl600 || r.artworkUrl160 || r.artworkUrl100 || "").trim();
-                    var efeed = String(r.feedUrl || "").trim();
-                    var dm = Date.parse(String(r.releaseDate || ""));
-                    podcastEpSearchModel.append({
-                        "title": String(r.trackName || "").substring(0, 200),
-                        "show": String(r.collectionName || "").substring(0, 200),
-                        "art": PodcastLogic.urlAllowed(eart) ? eart.substring(0, 2048) : "",
-                        "url": eurl,
-                        "guid": String(r.episodeGuid || "").substring(0, 512),
-                        "feed": PodcastLogic.urlAllowed(efeed) ? efeed.substring(0, 2048) : "",
-                        "dateMs": isFinite(dm) ? dm : 0,
-                        "durationMs": Number(r.trackTimeMillis) > 0 ? Number(r.trackTimeMillis) : 0
-                    });
-                }
-            } catch (e) {
-                console.log("[ARP] podcastSearch(episodes): " + e);
-            }
-            root._podSearchSettle(seq);
-        };
-        xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
-                        + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    // The charts. Apple's per-country top list is keyless and fresh, and
-    // ONE batch lookup turns its ids into feed URLs — two requests for a
-    // local Top 25. fyyd's worldwide hot list stands in when Apple
-    // refuses: for a small country it is no replacement (measured
-    // 2026-08-06: fyyd has zero Estonian shows — 'et' is not even in its
-    // language list), but it is better than an empty pane. Cached for the
-    // session; `force` re-fetches.
-    function podcastLoadTrending(force) {
-        if (podcastTrendingBusy) return;
-        if (!force && podcastTrendingModel.count > 0) return;
-        var seq = ++_podTrendSeq;
-        podcastTrendingBusy = true;
-        _podTrendApple(seq);
-    }
 
-    function _podTrendRow(title, author, art, feed) {
-        if (podcastTrendingModel.count >= 30) return;
-        feed = String(feed || "").trim();
-        if (!PodcastLogic.urlAllowed(feed)) return;
-        podcastTrendingModel.append({
-            "title": String(title || "").substring(0, 200),
-            "author": String(author || "").substring(0, 200),
-            "art": PodcastLogic.urlAllowed(art) ? String(art).substring(0, 2048) : "",
-            "feedUrl": feed
-        });
-    }
 
-    function _podTrendApple(seq) {
-        var cc = /^[A-Za-z]{2}$/.test(homeCountryCode) ? homeCountryCode.toLowerCase() : "us";
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podTrendSeq) return;
-            var ids = [];
-            var meta = {};
-            try {
-                var res = (JSON.parse(xhr.responseText || "{}").feed || {}).results || [];
-                for (var i = 0; i < res.length && ids.length < 25; i++) {
-                    var r = res[i] || {};
-                    var id = String(r.id || "").trim();
-                    if (!/^\d{1,12}$/.test(id)) continue;
-                    ids.push(id);
-                    meta[id] = { "name": String(r.name || ""), "artist": String(r.artistName || ""),
-                                 "art": String(r.artworkUrl100 || "").trim() };
-                }
-            } catch (e) {
-                console.log("[ARP] podcastTrending(apple): " + e);
-            }
-            if (ids.length === 0) { root._podTrendFyyd(seq); return; }
-            root._podTrendAppleResolve(seq, ids, meta);
-        };
-        xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
-                        + "/podcasts/top/25/podcasts.json");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    // The chart names shows; subscribing needs their FEEDS. One lookup
-    // call resolves the whole list, and the walk keeps the CHART's order —
-    // the lookup answers in whatever order it pleases.
-    function _podTrendAppleResolve(seq, ids, meta) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podTrendSeq) return;
-            var byId = {};
-            try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                for (var i = 0; i < res.length; i++) {
-                    var r = res[i] || {};
-                    byId[String(r.collectionId || "")] = {
-                        "feed": String(r.feedUrl || "").trim(),
-                        "art": String(r.artworkUrl600 || "").trim()
-                    };
-                }
-            } catch (e) {
-                console.log("[ARP] podcastTrending(lookup): " + e);
-            }
-            podcastTrendingModel.clear();
-            for (var k = 0; k < ids.length; k++) {
-                var m = meta[ids[k]] || {};
-                var hit = byId[ids[k]];
-                if (!hit || hit.feed === "") continue;
-                root._podTrendRow(m.name, m.artist, hit.art || m.art, hit.feed);
-            }
-            if (podcastTrendingModel.count === 0) { root._podTrendFyyd(seq); return; }
-            root.podcastTrendingBusy = false;
-        };
-        xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    function _podTrendFyyd(seq) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 512 * 1024) {
-                    aborted = true;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podTrendSeq) return;
-            root.podcastTrendingBusy = false;
-            podcastTrendingModel.clear();
-            try {
-                var res = JSON.parse(xhr.responseText || "{}").data || [];
-                for (var i = 0; i < res.length && podcastTrendingModel.count < 30; i++) {
-                    var r = res[i] || {};
-                    root._podTrendRow(r.title, r.author,
-                                      String(r.smallImageURL || r.imgURL || "").trim(),
-                                      String(r.xmlURL || "").trim());
-                }
-            } catch (e) {
-                console.log("[ARP] podcastLoadTrending: " + e);
-            }
-        };
-        xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 10000);
-        xhr.send();
-    }
 
-    function loadPodcastFeed(feedUrl, showTitle, showArt, noRescue) {
-        if (!PodcastLogic.urlAllowed(feedUrl)) {
-            podcastFeedError = i18n("This feed address is not allowed.");
-            return;
-        }
-        _podFeedNoRescue = noRescue === true;
-        var seq = ++_podFeedSeq;
-        podcastEpisodesFor = feedUrl;
-        podcastEpisodesTitle = showTitle || "";
-        // The row's own art up front (instant cover); the feed's channel image
-        // fills in below only when the row brought none (a hand-typed URL).
-        podcastEpisodesArt = PodcastLogic.urlAllowed(showArt)
-                             ? String(showArt).substring(0, 2048) : "";
-        podcastFeedLoading = true;
-        podcastFeedError = "";
-        podcastEpisodesModel.clear();
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        var partial = "";
-        xhr.onreadystatechange = function() {
-            // 4 MB cap: a mega-feed must not balloon plasmashell. Abort is
-            // DEFERRED — aborting inside the handler re-enters the dying
-            // reply and has crashed the shell before (the probe lesson).
-            // The body is SAVED first: abort clears responseText, and a
-            // 7 MB libsyn feed (measured live, perfectly valid RSS) used to
-            // parse as emptiness and earn a false 'not a podcast feed'.
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 4 * 1024 * 1024) {
-                    aborted = true;
-                    partial = xhr.responseText;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podFeedSeq) return;
-            root.podcastFeedLoading = false;
-            // urlAllowed vetted the FIRST address only — Qt follows the
-            // redirects internally. A feed answering from the LAN must not
-            // have its body parsed into enclosures: the same last-hop gate
-            // the playlist unwrapper carries.
-            if (!HostGuard.answerFromPublicHost(xhr)) {
-                root.podcastFeedError = i18n("This feed address is not allowed.");
-                return;
-            }
-            // A capped body still parses — RSS carries the newest items first.
-            var feed = PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50);
-            if (!feed.ok) {
-                // Transport failure is not directory rot: a timeout, a DNS
-                // blip or a 5xx must neither blame the address nor call the
-                // rescue — one 15 s hiccup used to rewrite a living feed's
-                // subscription to whatever iTunes matched the title to,
-                // permanently.
-                // "hiccup", not "transient": the latter is an ECMAScript
-                // future-reserved word, and Qt 6.10's parser rejects those
-                // as identifiers outright — the `var final` lesson.
-                var hiccup = xhr.status === 0 || xhr.status === 408
-                             || xhr.status === 429 || xhr.status >= 500;
-                // Directory rot is ordinary: fyyd and gpodder carry
-                // addresses their crawlers last saw months ago. Before the
-                // honest error, one rescue — the same cure the stations
-                // have: ask iTunes for the show BY TITLE and follow where
-                // it lives today. A subscribed show heals PERMANENTLY.
-                if (!hiccup && !root._podFeedNoRescue && (showTitle || "") !== "") {
-                    root._podFeedRescue(seq, feedUrl, showTitle, showArt || "",
-                                        xhr.status);
-                    return;
-                }
-                root.podcastFeedError = xhr.status === 0
-                    ? i18n("The feed could not be reached — check the connection and try again.")
-                    : xhr.status >= 400
-                      ? i18n("The feed did not answer (error %1).", xhr.status)
-                      : i18n("This address is not a podcast feed.");
-                return;
-            }
-            if (root.podcastEpisodesTitle === "" && feed.title !== "")
-                root.podcastEpisodesTitle = feed.title.substring(0, 200);
-            // A hand-typed feed URL brings no row art — adopt the show's own
-            // channel image so its episodes get a cover too.
-            if (root.podcastEpisodesArt === "" && feed.image !== "")
-                root.podcastEpisodesArt = feed.image.substring(0, 2048);
-            for (var i = 0; i < feed.episodes.length; i++)
-                podcastEpisodesModel.append(feed.episodes[i]);
-            if (feed.episodes.length === 0)
-                root.podcastFeedError = i18n("No playable episodes in this feed.");
-        };
-        xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 15000);
-        xhr.send();
-    }
 
-    property bool _podFeedNoRescue: false
 
-    function _podFeedRescue(seq, deadFeed, showTitle, showArt, deadStatus) {
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            _clearXhrTimeout(guard); guard = null;
-            if (seq !== root._podFeedSeq) return;
-            var fresh = "";
-            try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                var want = String(showTitle).replace(/\s+/g, " ").trim().toLowerCase();
-                var deadKey = PodcastLogic.feedKey(deadFeed);
-                for (var i = 0; i < res.length; i++) {
-                    var r = res[i] || {};
-                    var cand = String(r.feedUrl || "").trim();
-                    if (!PodcastLogic.urlAllowed(cand)) continue;
-                    if (PodcastLogic.feedKey(cand) === deadKey) continue;
-                    var rn = String(r.collectionName || "").replace(/\s+/g, " ").trim().toLowerCase();
-                    if (rn !== want) continue;      // identity, not resemblance
-                    fresh = cand;
-                    break;
-                }
-            } catch (e) {}
-            if (fresh === "") {
-                root.podcastFeedLoading = false;
-                root.podcastFeedError = deadStatus === 0
-                    ? i18n("The feed could not be reached — check the connection and try again.")
-                    : deadStatus >= 400
-                      ? i18n("The feed did not answer (error %1).", deadStatus)
-                      : i18n("This address is not a podcast feed.");
-                return;
-            }
-            console.log("[ARP] podcast feed heal: " + _hostOf(deadFeed) + " -> " + _hostOf(fresh));
-            // A subscribed show follows its feed for good — the seen map
-            // and the per-show speed move with it, so nothing re-announces
-            // and the remembered pace survives the move.
-            for (var si = 0; si < podcastSubsModel.count; si++) {
-                if (podcastSubsModel.get(si).feedUrl !== deadFeed) continue;
-                podcastSubsModel.setProperty(si, "feedUrl", fresh);
-                _savePodcastSubs();
-                if (_podSeen[deadFeed] !== undefined) {
-                    _podSeen[fresh] = _podSeen[deadFeed];
-                    delete _podSeen[deadFeed];
-                    _savePodSeen();
-                }
-                break;
-            }
-            loadPodcastFeed(fresh, showTitle, showArt, true);
-        };
-        xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
-                        + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 8000);
-        xhr.send();
-    }
 
-    // The exact filename an episode downloads to — the UI checks the
-    // Podcasts folder for it to tell "download" from "play". The feed+guid
-    // tag is what keeps two shows' "Trailer" apart; podcastFileNameLegacy
-    // is the pre-tag name, which files already on disk still carry.
-    function podcastFileName(title, url, feed, guid) {
-        return PodcastLogic.episodeFileName(title, url, feed, guid);
-    }
-    function podcastFileNameLegacy(title, url) {
-        return PodcastLogic.legacyEpisodeFileName(title, url);
-    }
 
-    // May THIS show claim a pre-tag file? The old name carries no feed, so
-    // the ledger is the only witness — and it is asked only to CONTRADICT.
-    // A file the ledger never knew (downloaded before it, or pruned since)
-    // still belongs to whoever opens it, exactly as it always did; a row
-    // naming a different feed is proof of the very collision the tag was
-    // added to end, and then the alias is refused rather than handing one
-    // show the other's audio under the right title.
-    function podcastLegacyIsOurs(fileName, feed, guid, url) {
-        var e = _podDownloads[fileName];
-        if (!e) return true;
-        if (e.key !== undefined && e.key !== "") {
-            var k = PodcastLogic.episodeKey(guid, url);
-            if (k !== "" && e.key === k) return true;
-        }
-        if (!e.feed || !feed) return true;
-        return e.feed === feed;
-    }
 
-    function downloadEpisode(title, url, guid) {
-        // The UI road: the open show's identity rides into the job, so the
-        // ledger row (and the Downloaded view) knows the episode's home.
-        _podEnqueueDownload({
-            "title": title, "url": url, "guid": guid,
-            "show": String(podcastEpisodesTitle || "").substring(0, 200),
-            "art": PodcastLogic.urlAllowed(podcastEpisodesArt)
-                   ? String(podcastEpisodesArt).substring(0, 2048) : "",
-            "feed": String(podcastEpisodesFor || "").substring(0, 2048)
-        });
-    }
 
-    // One transfer at a time, the rest wait in a bounded line — the queue
-    // is what lets a refresh cycle fetch three shows' new episodes without
-    // trampling the single download slot the UI also uses.
-    property var _podDlQueue: []
 
-    function _podEnqueueDownload(job) {
-        if (!job || !PodcastLogic.urlAllowed(job.url)) return false;
-        var key = PodcastLogic.episodeKey(job.guid, job.url);
-        if (_podDownloadKey === key) return true;          // already fetching
-        for (var i = 0; i < _podDlQueue.length; i++)
-            if (PodcastLogic.episodeKey(_podDlQueue[i].guid, _podDlQueue[i].url) === key)
-                return true;                               // already queued
-        if (_podDownloadKey !== "") {
-            if (_podDlQueue.length >= 20) return false;    // bounded line
-            _podDlQueue.push(job);
-            _podDlQueue = _podDlQueue;
-            return true;
-        }
-        _podStartDownload(job);
-        return true;
-    }
 
-    property bool _podDownloadAuto: false
 
-    function _podStartDownload(job) {
-        var title = job.title, url = job.url, guid = job.guid;
-        _podDownloadAuto = job.auto === true;
-        _podDownloadKey = PodcastLogic.episodeKey(guid, url);
-        // The title reaches the notification body, which Plasma renders with
-        // markup — a feed's "<a href=…>tap</a>" would become a live phishing
-        // link. Strip markup and bidi/control chars, exactly as every LAN
-        // device name is stripped before it reaches a notification or a list.
-        _podDownloadTitle = _sanitizeDeviceName(title);
-        // The episode's identity, held until the OK ack writes the ledger.
-        _podDownloadMeta = {
-            "file": podcastFileName(title, url, job.feed, guid),
-            "key": _podDownloadKey,
-            "title": _podDownloadTitle,
-            "show": String(job.show || "").substring(0, 200),
-            "art": PodcastLogic.urlAllowed(job.art) ? String(job.art).substring(0, 2048) : "",
-            "feed": String(job.feed || "").substring(0, 2048)
-        };
-        // A control character in the URL could smuggle a second line — a
-        // second directive — into the curl config written below. urlAllowed
-        // has vetted scheme and host already; an address with a newline in
-        // it is not an address.
-        if (/[\x00-\x1f\x7f]/.test(url)) {
-            _podDownloadFail("control character in enclosure URL");
-            return;
-        }
-        // The URL goes to disk first (owner-only, like reader.py's file) and
-        // curl picks it up with -K, so it never rides a long-lived argv. It
-        // is on THIS printf's command line for the microseconds the write
-        // takes — the whole-transfer exposure was the point of the change.
-        var cfgLine = 'url = "' + url.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
-        executable.exec(": POD_URL; umask 077; printf '%s' "
-            + PodcastLogic.shQuote(cfgLine)
-            + " > " + PodcastLogic.shQuote(_podUrlFile)
-            + " && echo __POD_URL_OK__ || echo __POD_URL_FAIL__; "
-            + "true # " + nextSeq());
-    }
 
-    // One failure road for both halves of a download: free the slot, tell
-    // the user if this was their own tap, and let the line move. The reason
-    // is for the journal, so it names no URL.
-    function _podDownloadFail(reason) {
-        console.warn("[ARP] podcast download failed: " + reason);
-        if (!_podDownloadAuto)
-            notify(i18n("Episode download failed"), _podDownloadTitle, "dialog-error");
-        _podDownloadKey = "";
-        _podDownloadTitle = "";
-        _podDownloadMeta = null;
-        if (_podDlQueue.length > 0) {
-            var nextJob = _podDlQueue.shift();
-            _podDlQueue = _podDlQueue;
-            _podStartDownload(nextJob);
-        }
-    }
 
-    // The transfer itself, started only once the URL file is on disk.
-    // Every word single-quoted through the ONE tested escaper — the file
-    // name derives from feed data, so a hand-rolled inline escape is
-    // exactly where a mistyped backslash became command injection.
-    function _podRunDownload() {
-        var pdm = _podDownloadMeta;
-        if (!pdm || !pdm.file) return;
-        var part = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + pdm.file + ".part");
-        var dest = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + pdm.file);
-        var dir = PodcastLogic.shQuote(downloadDirPath + "/Podcasts");
-        var cfg = PodcastLogic.shQuote(_podUrlFile);
-        // Staged download: .part first, atomic rename on success — the
-        // folder model never lists a half-written file as playable. The
-        // size cap guards the disk; -f keeps HTTP errors out of the file.
-        // The config file is spent the moment curl exits, either way.
-        // Redirects stay on http(s) and stop at ten hops: urlAllowed vets
-        // only the FIRST address, and a hostile enclosure answering with
-        // a Location elsewhere must not widen what -L will follow — the
-        // same leash the favicon fetcher already wears.
-        executable.exec(": POD_DL; mkdir -p " + dir + " && "
-            + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
-            + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.31' -o " + part + " -K " + cfg + "; "
-            + "rc=$?; rm -f " + cfg + "; "
-            + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
-            + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
-            + "true # " + nextSeq());
-    }
 
     // ── Podcast auto-care: refresh, auto-download, auto-clean ────────────
     // A real podcatcher checks the shows ITSELF. Every N hours (config,
@@ -2170,271 +1446,23 @@ PlasmoidItem {
     // of each such show is queued for download so the morning commute is
     // already on disk. First acquaintance seeds quietly: subscribing to a
     // hundred-episode archive must not download or announce anything.
-    property var _podSeen: ({})
-    property var _podRefreshQueue: []
-    property bool _podRefreshBusy: false
-    property var _podRefreshNews: []
-    property int _podRefreshDls: 0
-    // Serialized ffmpeg silence scans over landed files.
-    property string _podScanFile: ""
-    property var _podScanQueue: []
-    // The playing file's silence map, cached for the skip timer.
-    property var _podSilCur: []
-    // The enclosure exactly as the ROW spelled it (identity for the row
-    // ticks) — _podPlayingUrl carries the player's normalized spelling.
-    property string _podPlayingRawUrl: ""
-    // True while a podcast start rolls through the generic play roads.
-    property bool _podStarting: false
-    // The playing file's chapters ([[sec, title], …]) for the seek menu.
-    property var _podChaptersCur: []
 
-    function _loadPodSeen() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.podcastSeen || "{}");
-            _podSeen = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _podSeen = {};
-        }
-    }
 
-    function _savePodSeen() {
-        Plasmoid.configuration.podcastSeen = JSON.stringify(_podSeen);
-    }
 
-    Timer {
-        id: podRefreshTick
-        interval: 30 * 60 * 1000
-        repeat: true
-        running: true
-        onTriggered: _podRefreshMaybe()
-    }
-    // One early look after login, once the shell has settled.
-    Timer {
-        id: podRefreshKickoff
-        interval: 90 * 1000
-        repeat: false
-        running: true
-        onTriggered: _podRefreshMaybe()
-    }
 
-    function _podRefreshMaybe() {
-        var hours = parseInt(Plasmoid.configuration.podcastAutoRefreshHours);
-        if (!isFinite(hours)) hours = 12;
-        if (hours <= 0 || _podRefreshBusy || podcastSubsModel.count === 0) return;
-        var last = parseInt(Plasmoid.configuration.podcastLastRefresh) || 0;
-        if (Date.now() - last < hours * 3600 * 1000) return;
-        _podRefreshBusy = true;
-        _podRefreshNews = [];
-        _podRefreshDls = 0;
-        _podRefreshOkCount = 0;
-        _podRefreshQueue = [];
-        for (var i = 0; i < podcastSubsModel.count; i++) {
-            var sub = podcastSubsModel.get(i);
-            _podRefreshQueue.push({ "feed": sub.feedUrl, "title": sub.title, "art": sub.art });
-        }
-        _podRefreshNext();
-    }
 
-    property int _podRefreshOkCount: 0
 
-    function _podRefreshNext() {
-        if (_podRefreshQueue.length === 0) { _podRefreshFinish(); return; }
-        var job = _podRefreshQueue.shift();
-        _podFetchFeedSilent(job.feed, function(feed) {
-            if (feed && feed.ok) _podRefreshOkCount++;
-            var newest = (feed && feed.ok && feed.episodes.length > 0) ? feed.episodes[0] : null;
-            if (newest) {
-                // A guid-less feed whose enclosure URL wears a per-request
-                // token would read "new" on every fetch — the TITLE-derived
-                // filename is the stable identity to remember it by.
-                // The LEGACY (title-only) name is the right stable identity
-                // here: the tagged name folds the guid back in, and for a
-                // guid-less feed that is exactly what this branch cannot use.
-                var seenKeyOf = function(ep) {
-                    return ep.guid !== "" ? PodcastLogic.episodeKey(ep.guid, ep.url)
-                                          : "t:" + podcastFileNameLegacy(ep.title, ep.url);
-                };
-                var nk = seenKeyOf(newest);
-                var known = _podSeen[job.feed];
-                if (known === undefined) {
-                    _podSeen[job.feed] = nk;      // first acquaintance: quiet
-                } else if (known !== nk) {
-                    // Everything ABOVE the remembered key is news. Only the
-                    // newest used to count: a show dropping two episodes
-                    // between cycles announced one, and the other never got
-                    // a word or a byte. The walk stops at ten — a feed that
-                    // rewrote every key wholesale (token rotation) is not a
-                    // ten-episode news day, so it falls back to the newest.
-                    var fresh = [];
-                    for (var fi = 0; fi < feed.episodes.length && fi < 10; fi++) {
-                        if (seenKeyOf(feed.episodes[fi]) === known) break;
-                        fresh.push(feed.episodes[fi]);
-                    }
-                    if (fresh.length === 0 || fresh.length >= 10) fresh = [newest];
-                    _podSeen[job.feed] = nk;
-                    _podRefreshNews.push(_sanitizeDeviceName(job.title || feed.title || ""));
-                    for (var ni = 0; ni < fresh.length && ni < 3; ni++) {
-                        var ep = fresh[ni];
-                        var epKey = PodcastLogic.episodeKey(ep.guid, ep.url);
-                        // Either name counts as "already here": episodes fetched
-                        // before the tag existed sit under the legacy one.
-                        var legacyName = podcastFileNameLegacy(ep.title, ep.url);
-                        var already = _podDownloads[podcastFileName(ep.title, ep.url,
-                                                                    job.feed, ep.guid)] !== undefined
-                                      || (_podDownloads[legacyName] !== undefined
-                                          && podcastLegacyIsOurs(legacyName, job.feed,
-                                                                 ep.guid, ep.url));
-                        if (Plasmoid.configuration.podcastAutoDownload === true
-                            && !already && !isEpisodePlayed(epKey)) {
-                            // Counted only when the queue actually TOOK it — a
-                            // full line must not inflate the aggregate's claim.
-                            if (_podEnqueueDownload({ "title": ep.title, "url": ep.url,
-                                    "guid": ep.guid, "show": job.title || feed.title || "",
-                                    "art": job.art || feed.image || "", "feed": job.feed,
-                                    "auto": true }))
-                                _podRefreshDls++;
-                        }
-                    }
-                }
-            }
-            _podRefreshNext();
-        });
-    }
 
-    function _podRefreshFinish() {
-        _podRefreshBusy = false;
-        // A cycle where NOTHING answered is not a refresh — a laptop that
-        // woke before its WiFi used to stamp the clock and skip the real
-        // check for twelve hours. No answer, no stamp: the half-hour tick
-        // simply tries again.
-        if (_podRefreshOkCount === 0 && podcastSubsModel.count > 0) {
-            _podRefreshOkCount = 0;
-            return;
-        }
-        _podRefreshOkCount = 0;
-        Plasmoid.configuration.podcastLastRefresh = String(Date.now());
-        // Unsubscribed shows leave the seen map with them.
-        var live = {};
-        for (var i = 0; i < podcastSubsModel.count; i++)
-            live[podcastSubsModel.get(i).feedUrl] = true;
-        for (var f in _podSeen)
-            if (!live[f]) delete _podSeen[f];
-        _savePodSeen();
-        if (_podRefreshNews.length > 0) {
-            var names = _podRefreshNews.slice(0, 3).join(", ");
-            if (_podRefreshNews.length > 3)
-                names += " +" + (_podRefreshNews.length - 3);
-            var body = _podRefreshDls > 0
-                ? i18n("%1 — the newest episodes are downloading.", names)
-                : names;
-            notify(i18n("New podcast episodes"), body, "application-rss+xml");
-        }
-        // Storage auto-care, timid by design: played and old goes, past ten
-        // per show the oldest PLAYED go, the unplayed are never touched.
-        if (Plasmoid.configuration.podcastAutoClean === true) {
-            var del = PodcastLogic.cleanCandidates(_podDownloads, _podPlayed,
-                                                   Date.now(), 10, 3);
-            var removed = 0;
-            for (var d = 0; d < del.length; d++) {
-                if (_podPlayingUrl !== "" && _podFileOfUrl(_podPlayingUrl) === del[d])
-                    continue;                      // never the one on the air
-                deletePodcastDownload(del[d]);
-                removed++;
-            }
-            if (removed > 0)
-                console.log("[ARP] podcast auto-clean: removed " + removed + " played file(s)");
-        }
-    }
 
-    // A feed fetch with NO UI side effects — the refresh cycle's road.
-    // Same caps and the same deferred abort the visible loader carries.
-    function _podFetchFeedSilent(feedUrl, cb) {
-        if (!PodcastLogic.urlAllowed(feedUrl)) { cb(null); return; }
-        var xhr = new XMLHttpRequest();
-        var guard = null;
-        var aborted = false;
-        var partial = "";
-        var done = false;
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.LOADING) {
-                if (!aborted && (xhr.responseText || "").length > 4 * 1024 * 1024) {
-                    aborted = true;
-                    partial = xhr.responseText;
-                    Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });
-                }
-                return;
-            }
-            if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
-            done = true;
-            _clearXhrTimeout(guard); guard = null;
-            // Same last-hop gate as the visible loader: a feed that
-            // redirected into the LAN answers nothing to the refresh.
-            if (!HostGuard.answerFromPublicHost(xhr)) { cb(null); return; }
-            cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
-        };
-        xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
-        guard = _armXhrTimeout(xhr, 15000);
-        xhr.send();
-    }
 
     // ── Up next — the listener's own cross-show queue ────────────────────
     // Explicit picks beat every automatic road. Entries carry the whole
     // identity (key, title, show, art, feed, enclosure url), so the head
     // plays from disk when the file exists and STREAMS when it does not.
-    property var _podUpNext: []
-    property int _podUpNextRev: 0
 
-    function _loadPodUpNext() {
-        try {
-            var a = JSON.parse(Plasmoid.configuration.podcastUpNext || "[]");
-            _podUpNext = Array.isArray(a)
-                ? a.filter(function(e) {
-                      return e && typeof e === "object" && typeof e.key === "string"
-                             && e.key !== "";
-                  }).slice(0, 50)
-                : [];
-        } catch (e) {
-            _podUpNext = [];
-        }
-        _podUpNextRev++;
-    }
 
-    function _savePodUpNext() {
-        // Reassign, never just persist: in-place splices are invisible to
-        // the chip's length binding, and a "gone" queue kept its button.
-        _podUpNext = _podUpNext.slice();
-        Plasmoid.configuration.podcastUpNext = JSON.stringify(_podUpNext);
-        _podUpNextRev++;
-    }
 
-    function podcastQueueHas(key) {
-        void _podUpNextRev;
-        return PodcastLogic.upNextIndex(_podUpNext, key) >= 0;
-    }
 
-    // One tap queues, the second unqueues — entries are gated the same as
-    // every other feed-fed row before they persist.
-    function podcastQueueToggle(entry) {
-        if (!entry || !entry.key) return;
-        var idx = PodcastLogic.upNextIndex(_podUpNext, entry.key);
-        if (idx >= 0) {
-            _podUpNext.splice(idx, 1);
-        } else {
-            if (!PodcastLogic.urlAllowed(entry.url)) return;
-            _podUpNext = PodcastLogic.upNextAdd(_podUpNext, {
-                "key": String(entry.key),
-                "title": _sanitizeDeviceName(String(entry.title || "")).substring(0, 200),
-                "show": _sanitizeDeviceName(String(entry.show || "")).substring(0, 200),
-                "art": PodcastLogic.urlAllowed(entry.art)
-                       ? String(entry.art).substring(0, 2048) : "",
-                "feed": String(entry.feed || "").substring(0, 2048),
-                "url": String(entry.url).substring(0, 2048),
-                "fileTitle": String(entry.fileTitle || entry.title || "").substring(0, 200)
-            }, 50);
-        }
-        _savePodUpNext();
-    }
 
     // Pop and play the head. Disk first — the download may have landed
     // after the queueing; the stream road is the fallback, not the habit.
@@ -2464,43 +1492,8 @@ PlasmoidItem {
         return false;
     }
 
-    // A file URL the QUrl parser cannot mangle: '#' would become a
-    // fragment and '?' a query — "Episode #42.mp3" opened a truncated
-    // path on the raw-string road while the FolderListModel road (percent-
-    // encoded) worked, which is exactly the kind of split that ships.
-    function _podFileUrl(fileName) {
-        var pth = downloadDirPath + "/Podcasts/" + fileName;
-        return "file://" + pth.replace(/%/g, "%25").replace(/#/g, "%23").replace(/\?/g, "%3F");
-    }
 
-    // Ledger filename of a playing file:// URL ("" when it is not ours).
-    function _podFileOfUrl(url) {
-        var u = (url || "").toString();
-        // file:// only: a REMOTE enclosure whose basename happens to match
-        // a ledger row must not inherit that file's silence map, chapters
-        // or delete road — the wild is full of "episode.mp3".
-        if (u.indexOf("file://") !== 0) return "";
-        var base = u.split("/").pop();
-        try { base = decodeURIComponent(base); } catch (e) {}
-        return _podDownloads[base] !== undefined ? base : "";
-    }
 
-    function _podScanStart(fileName) {
-        if (_podScanFile !== "") {
-            if (_podScanQueue.length < 20) _podScanQueue.push(fileName);
-            return;
-        }
-        _podScanFile = fileName;
-        var full = PodcastLogic.shQuote(downloadDirPath + "/Podcasts/" + fileName);
-        executable.exec(": POD_SCAN; command -v ffmpeg >/dev/null 2>&1 && "
-            + "timeout 180 ffmpeg -hide_banner -nostats -i " + full
-            + " -af silencedetect=noise=-35dB:d=0.9 -f null - 2>&1"
-            + " | grep -E 'silence_(start|end)' | head -600;"
-            + " echo __CHAPTERS__;"
-            + " command -v ffprobe >/dev/null 2>&1 && "
-            + "timeout 60 ffprobe -v quiet -print_format json -show_chapters " + full
-            + " 2>/dev/null | head -c 400000; true # " + nextSeq());
-    }
 
     // Skip-silence: while a podcast plays and the map knows a stretch of
     // dead air under the needle, jump to its far edge. Seek-based — no
@@ -2520,24 +1513,8 @@ PlasmoidItem {
         }
     }
 
-    function _loadPodPositions() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.podcastPositions || "{}");
-            _podPositions = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _podPositions = {};
-        }
-    }
 
-    function _savePodPositions() {
-        _podPositions = PodcastLogic.prunePositions(_podPositions, 200);
-        Plasmoid.configuration.podcastPositions = JSON.stringify(_podPositions);
-    }
 
-    function podcastPositionSec(key) {
-        var e = _podPositions[key];
-        return (e && e.sec > 0) ? e.sec : 0;
-    }
 
     // Stamp the playing episode's position. Near the end the entry is
     // retired instead — a finished episode must not offer to "resume"
@@ -2655,22 +1632,6 @@ PlasmoidItem {
         _podPendingSeekSec = Math.max(0, Math.round(sec));
     }
 
-    // ── Playback speed + skip ────────────────────────────────────────────
-    function _loadPodSpeeds() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.podcastSpeeds || "{}");
-            _podSpeeds = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _podSpeeds = {};
-        }
-    }
-    // The rate for a show: its own if set, else the global default ("" key),
-    // else 1x. Every stored value re-clamped in case the config was edited.
-    function _podSpeedFor(feed) {
-        var v = (feed && _podSpeeds[feed] !== undefined) ? _podSpeeds[feed]
-              : _podSpeeds[""];
-        return PodcastLogic.clampRate(v === undefined ? 1.0 : v);
-    }
     // The applied rate: the show's speed for a local episode/track, always
     // 1x for a radio stream (rate-shifting a live stream is meaningless and
     // the backend mishandles it).
@@ -2727,64 +1688,6 @@ PlasmoidItem {
                                                      playMusic.duration);
     }
 
-    // ── Played / unplayed state ──────────────────────────────────────────
-    function _loadPodPlayed() {
-        try {
-            var m = JSON.parse(Plasmoid.configuration.podcastPlayed || "{}");
-            _podPlayed = (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
-        } catch (e) {
-            _podPlayed = {};
-        }
-    }
-    function _savePodPlayed() {
-        _podPlayed = EpisodeState.prunePlayed(_podPlayed, 1000);
-        Plasmoid.configuration.podcastPlayed = JSON.stringify(_podPlayed);
-    }
-    function isEpisodePlayed(key) {
-        return !!(key && _podPlayed[key] !== undefined);
-    }
-    function episodeState(key) {
-        return EpisodeState.stateOf(_podPlayed, _podPositions, key);
-    }
-    function markEpisodePlayed(key) {
-        if (!key || _podPlayed[key] !== undefined) return;
-        EpisodeState.markPlayed(_podPlayed, key, Date.now());
-        // A played episode's resume bookmark is no longer wanted — it must
-        // not offer to resume at the credits.
-        if (_podPositions[key] !== undefined) { delete _podPositions[key]; _savePodPositions(); }
-        _podPlayedRev++;
-        _podPosRev++;
-        _savePodPlayed();
-    }
-    function markEpisodeUnplayed(key) {
-        if (!key || _podPlayed[key] === undefined) return;
-        EpisodeState.markUnplayed(_podPlayed, key);
-        _podPlayedRev++;
-        _savePodPlayed();
-    }
-    function toggleEpisodePlayed(key) {
-        if (isEpisodePlayed(key)) markEpisodeUnplayed(key);
-        else markEpisodePlayed(key);
-    }
-    // Mark every episode currently listed in the open feed as played — the
-    // "I've caught up" bulk action. keys is an array of episodeKeys.
-    function markEpisodesPlayed(keys) {
-        var changed = false;
-        for (var i = 0; i < keys.length; i++) {
-            var k = keys[i];
-            if (k && _podPlayed[k] === undefined) {
-                EpisodeState.markPlayed(_podPlayed, k, Date.now());
-                if (_podPositions[k] !== undefined) delete _podPositions[k];
-                changed = true;
-            }
-        }
-        if (changed) {
-            _podPlayedRev++;
-            _podPosRev++;
-            _savePodPositions();
-            _savePodPlayed();
-        }
-    }
 
     Timer {
         id: podPositionStamp
@@ -3202,274 +2105,16 @@ PlasmoidItem {
     //   • instant: follows playback — switching station / stopping stops it;
     //   • scheduled: independent of playback (records without playing).
 
-    property bool recording: false
-    // Whether the current recording was started by the scheduler
-    property bool _recScheduled: false
-    property string _recUrl: ""
-    property string _recStationName: ""
-    property string _recFilePath: ""
-    property string _recTracksPath: ""
-    property int recElapsedSec: 0
-    // Requested length of the current recording — the completion handler
-    // compares the actual elapsed time against it to tell "ran to the end"
-    // from "the stream died halfway through".
-    property int _recDurationSec: 0
-    // Identifies the schedule entry being recorded (url + nextRun), so the
-    // completion handler can advance exactly that entry — and only after the
-    // recording actually finished, not when it started.
-    property string _recActiveSchedKey: ""
-    // Consecutive-failure backoff for scheduled recordings, keyed by
-    // schedule key: how many times in a row it failed, and the epoch ms
-    // before which the tick must not retry it. Cleared when it succeeds or
-    // the occurrence advances. Without this a persistently-failing entry
-    // (ffmpeg missing, disk full, stream refusing) relaunched every 30 s.
-    property var _recRetryCount: ({})
-    property var _recRetryAfter: ({})
-    // Same stable-id pattern as the MPRIS files: two widget instances must
-    // never kill each other's recording via a shared pid file.
-    readonly property string _recPidFile: _mprisRunDir + "/arp-rec-" + _mprisId + ".pid"
-    // The recording's own curl config, same owner-only road the podcast
-    // downloads take. A recording runs for minutes or hours, so a stream URL
-    // on ffmpeg's argv was the LONGEST-lived leak in the widget: anyone with
-    // a shell on the machine could read a per-listener token out of
-    // /proc/<pid>/cmdline the whole time. curl fetches from the file and
-    // pipes the bytes to ffmpeg, which never learns the address.
-    readonly property string _recUrlFile: _mprisRunDir + "/arp-rec-url-" + _mprisId
-    // The recording waiting for its config file to land (the write is its
-    // own short command — putting it in the same string as the recording
-    // would park the URL on THAT shell's argv for the whole session).
-    property var _recPending: null
-    property var recSchedules: []
 
     function _pad2(n) { return ("0" + n).slice(-2); }
 
-    // All three live in RecLogic.js with their tests.
-    function recElapsedText() {
-        return RecLogic.elapsedText(recElapsedSec);
-    }
 
-    function _recSanitizeName(name) {
-        return RecLogic.sanitizeStationName(name);
-    }
 
-    function canRecordUrl(url) {
-        return RecLogic.canRecordUrl(url);
-    }
 
-    // REC button: record what is playing right now.
-    function recStartCurrent() {
-        // fadeOutAnimation.running = a stop is in progress; playbackState is
-        // still Playing then, and a recording started now would survive the stop.
-        if (recording || !isPlaying() || fadeOutAnimation.running) return;
-        var url = playMusic.source.toString();
-        if (!canRecordUrl(url)) return;
-        var maxMin = Math.max(1, Plasmoid.configuration.recordMaxMinutes || 180);
-        _recStart(root.currentStation, url, maxMin * 60, false);
-    }
 
-    // Set when the user (or a station switch) asked the recording to stop —
-    // ffmpeg then exits via SIGINT with a nonzero code that is NOT an error.
-    // Without this flag the completion handler can't tell a requested stop
-    // from a stream that died on its own.
-    property bool _recStopRequested: false
 
-    // A recording that ends BEFORE its shell ever ran never reaches the
-    // completion handler — and that handler is the only place the scheduled
-    // bookkeeping is settled. Without this, a scheduled occurrence that fails
-    // this early keeps its key marked active with no backoff written, so the
-    // 30 s tick relaunches it (and notifies) for the whole window.
-    // stopped: the user called it off, so the occurrence is spent rather than
-    // retried — the same distinction the completion handler draws.
-    function _recFinishAborted(stopped) {
-        var key = _recActiveSchedKey;
-        var wasScheduled = _recScheduled;
-        recording = false;
-        _recScheduled = false;
-        _recStopRequested = false;
-        _recActiveSchedKey = "";
-        _recUrl = "";
-        _recFilePath = "";
-        _recTracksPath = "";
-        _recPending = null;
-        // The address may already be on disk with nothing left to read it.
-        executable.exec(": REC_URLCLEAN; rm -f '"
-                        + _recUrlFile.replace(/'/g, "'\\''") + "'; true # " + (++_execSeq));
-        if (!wasScheduled || key === "") return;
-        if (stopped) {
-            delete _recRetryCount[key];
-            delete _recRetryAfter[key];
-            _recSchedAdvance(key);
-            return;
-        }
-        var n = (_recRetryCount[key] || 0) + 1;
-        _recRetryCount[key] = n;
-        _recRetryAfter[key] = n >= 6
-            ? Date.now() + 3600000
-            : Date.now() + Math.min(240000, 30000 * Math.pow(2, n - 1));
-    }
 
-    function recStop() {
-        if (!recording) return;
-        _recStopRequested = true;
-        // A stop can land in the gap between the url-file write and its ack,
-        // where there is no pid yet and nothing to signal. The pending job is
-        // dropped here so the ack cannot start a recording the user (or a
-        // station switch) has already called off — it used to start anyway,
-        // and on a station switch it recorded the PREVIOUS station.
-        if (_recPending !== null) {
-            _recFinishAborted(true);
-            return;
-        }
-        var safePid = _recPidFile.replace(/'/g, "'\\''");
-        // The pid is the pipeline's ffmpeg — SIGINT (not KILL) is what lets it
-        // finish the container. Verify it is really ours before signalling: a
-        // hard-killed wrapper can leave a stale pid file, and after pid reuse
-        // a blind kill would hit an unrelated process.
-        executable.exec(": REC_STOP; p=$(cat '" + safePid + "' 2>/dev/null);"
-            + " [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'"
-            + " && kill -INT \"$p\" 2>/dev/null; true");
-    }
 
-    function _recStart(stationName, url, durationSec, scheduled) {
-        if (recording) return;
-        // Format choice. "original" (-c copy) is the professional default: the
-        // stream is already lossy-compressed, so a bit-exact copy is the best
-        // quality that exists. MP3 re-encodes for maximum device compatibility
-        // (high-quality VBR); WAV decodes to uncompressed PCM — huge files,
-        // NO quality gain over the stream, offered for editing workflows only.
-        var recFmt = (Plasmoid.configuration.recordFormat || "original").toLowerCase();
-        var codecArgs, ext;
-        // strict format: a container written to disk must be judged on the
-        // extension alone — a fuzzy "probably mp3" re-encodes (safe) instead
-        // of -c copy'ing an unknown codec into a .mp3 shell.
-        if (recFmt === "mp3" && _streamFormat(url, true) !== "mp3") {
-            codecArgs = "-c:a libmp3lame -q:a 0";
-            ext = "mp3";
-        } else if (recFmt === "wav") {
-            codecArgs = "-c:a pcm_s16le";
-            ext = "wav";
-        } else {
-            // "original" — and also "mp3" when the stream already IS mp3
-            // (an mp3→mp3 re-encode would only lose quality).
-            codecArgs = "-c copy";
-            var extMap = { "mp3": "mp3", "aac": "aac", "ogg": "ogg", "opus": "opus", "flac": "flac" };
-            ext = extMap[_streamFormat(url, true)] || "mka";
-        }
-        var d = new Date();
-        var stamp = d.getFullYear() + "-" + _pad2(d.getMonth() + 1) + "-" + _pad2(d.getDate())
-                    + " " + _pad2(d.getHours()) + "." + _pad2(d.getMinutes()) + "." + _pad2(d.getSeconds());
-        var cleanName = _recSanitizeName(stationName);
-        var base = "REC " + cleanName + " " + stamp;
-        recording = true;
-        _recScheduled = scheduled;
-        if (!scheduled) _recActiveSchedKey = "";
-        _recStopRequested = false;
-        recElapsedSec = 0;
-        _recDurationSec = Math.max(60, Math.floor(durationSec));
-        _recUrl = url;
-        _recStationName = cleanName;
-        _recFilePath = downloadDirPath + "/" + base + "." + ext;
-        _recTracksPath = downloadDirPath + "/" + base + ".tracks.txt";
-        var safeDir = downloadDirPath.replace(/'/g, "'\\''");
-        var safeOut = _recFilePath.replace(/'/g, "'\\''");
-        var safeTracks = _recTracksPath.replace(/'/g, "'\\''");
-        var safePid = _recPidFile.replace(/'/g, "'\\''");
-        // ffmpeg runs as a CHILD (&, wait) — the pid file holds the timeout
-        // wrapper's pid for SIGINT (GNU timeout forwards it, so a user stop
-        // still finalizes the container), the wrapper cleans up and reports
-        // via sentinels, and the attached process gives us a free completion
-        // event in onExited. "-t" caps recorded MEDIA time; wall-clock is
-        // bounded by the timeout prefix (~1.1× the requested duration), so even
-        // an orphaned recording can neither fill the disk nor run forever. A
-        // fixed grace was too tight — a stream that stalls burns wall time with
-        // no media progress, and -t counts only media, so a long recording got
-        // SIGINT'd before -t completed. The VLC user agent matches
-        // reader.py (some stations block ffmpeg's default UA).
-        // Pre-flight free-space check: refusing up front beats ffmpeg dying
-        // mid-file on a full disk. WAV ≈10 MiB/min, compressed ≈2 MiB/min;
-        // an empty/odd df answer fails open (the check is best-effort).
-        // Instant REC carries the full cap (up to 180 min) as its "duration"
-        // with no known length, so size its estimate against a modest floor —
-        // else an ordinary short capture is refused under ~2 GiB free. A truly
-        // full disk still trips this; mid-recording disk-full is caught later.
-        var recEstMin = scheduled ? Math.ceil(_recDurationSec / 60)
-                                  : Math.min(30, Math.ceil(_recDurationSec / 60));
-        var recNeedKiB = recEstMin * (ext === "wav" ? 10240 : 2048);
-        var safeCfg = _recUrlFile.replace(/'/g, "'\\''");
-        // A control character would smuggle a second directive into the curl
-        // config — the same guard the podcast download applies to its own.
-        if (/[\x00-\x1f\x7f]/.test(url)) {
-            notify(i18n("Recording failed"), stationName, "dialog-error");
-            _recFinishAborted(false);
-            return;
-        }
-        // Everything the recording command needs EXCEPT the address. It waits
-        // for the config write below, which is deliberately its own short
-        // command: one string carrying both would put the URL on the
-        // recording shell's argv for the whole recording — the very leak.
-        _recPending = {
-            // Every early exit takes the config file with it — the address
-            // must not outlive the recording that never started.
-            "cmd": ": REC_START; cln() { rm -f '" + safeCfg + "'; }; "
-                + "if ! command -v ffmpeg >/dev/null 2>&1; then cln; echo __NO_FFMPEG__; exit 0; fi; "
-                + "if ! command -v curl >/dev/null 2>&1; then cln; echo __NO_CURL__; exit 0; fi; "
-                + "mkdir -p '" + safeDir + "' || { cln; echo __REC_EMPTY__; exit 0; }; "
-                + "avail=$(df -Pk '" + safeDir + "' 2>/dev/null | awk 'NR==2{print $4}'); "
-                + "if [ -n \"$avail\" ] && [ \"$avail\" -lt " + recNeedKiB + " ] 2>/dev/null; then cln; echo __REC_NOSPACE__; exit 0; fi; "
-                // curl owns the network now, so its flags carry what ffmpeg's
-                // used to: -A is the VLC agent (some stations refuse ffmpeg's
-                // own), --retry replaces -reconnect, and --speed-time is the
-                // -rw_timeout twin — a server that holds the socket open
-                // while sending nothing is given up on after 30 s instead of
-                // blocking a recording for days.
-                //
-                // ONE shell, no nested `sh -c "…"`. A double-quoted inner
-                // command would be expanded by the OUTER shell first, and a
-                // station name is catalogue text: measured, "Cash $Money FM"
-                // lost its word and "Radio $(id -un) FM" ran the command.
-                // Single quotes on one level keep every name literal, exactly
-                // as they did before the URL moved off the argv.
-                //
-                // The wall-clock cap wraps CURL, and the pid written down is
-                // the pipeline's last member — ffmpeg. Stopping it finalizes
-                // the container directly and curl leaves with the broken pipe
-                // (measured: a valid file, the dollar intact, nothing left
-                // running).
-                + " timeout --signal=INT --kill-after=30 " + (_recDurationSec + Math.max(300, Math.ceil(_recDurationSec * 0.10)))
-                // --http0.9: a Shoutcast v1 server answers "ICY 200 OK", which
-                // is not an HTTP status line, and curl has refused those by
-                // default since 7.66 — exit 1, no retry, no bytes. ffmpeg's own
-                // client parsed them, so these stations recorded fine until the
-                // fetch moved to curl and then failed instantly while playback
-                // kept working. Measured against a real ICY responder: with the
-                // flag the recording is a valid file, the ICY header does not
-                // leak into it, and an ordinary HTTP station is unaffected.
-                + " curl -sS -L --http0.9 -K '" + safeCfg + "'"
-                + " -A 'VLC/3.0.20 LibVLC/3.0.20'"
-                + " --retry 20 --retry-delay 2 --speed-limit 1 --speed-time 30"
-                + " | ffmpeg -hide_banner -nostdin -loglevel error -i pipe:0 "
-                + codecArgs + " -t " + Math.max(60, Math.floor(durationSec))
-                + " -metadata title='" + base.replace(/'/g, "'\\''") + "'"
-                + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
-                + " -n '" + safeOut + "'"
-                + " & pid=$!; echo $pid > '" + safePid + "'; "
-                + "wait $pid; rc=$?; rm -f '" + safePid + "' '" + safeCfg + "'; "
-                // Report the exit code AND the file size — "file is not empty"
-                // alone reported half-dead recordings (disk full, stream died) as
-                // successes. The QML side combines rc with the elapsed time to tell
-                // a requested stop / duration cap from a mid-recording failure.
-                + "bytes=$(stat -c %s '" + safeOut + "' 2>/dev/null || echo 0); "
-                + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then echo \"__REC_DONE__ rc=$rc bytes=$bytes\"; "
-                + "else rm -f '" + safeOut + "' '" + safeTracks + "'; echo \"__REC_EMPTY__ rc=$rc\"; fi",
-            "scheduled": scheduled,
-            "station": stationName
-        };
-        var recCfgLine = 'url = "' + url.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
-        executable.exec(": REC_URL; umask 077; printf '%s' "
-            + PodcastLogic.shQuote(recCfgLine)
-            + " > " + PodcastLogic.shQuote(_recUrlFile)
-            + " && echo __REC_URL_OK__ || echo __REC_URL_FAIL__; true # " + nextSeq());
-    }
 
     // ── Scheduled recordings ─────────────────────────────────────────────────
     // Entries: { station, url, hh, mm, durationMin, repeat: "once"|"daily"|"weekly",
@@ -3477,223 +2122,18 @@ PlasmoidItem {
     // Persisted in config; the 30 s tick starts a due entry even if the exact
     // start moment was missed (machine asleep) — it records the REMAINDER.
 
-    function _loadRecSchedules() {
-        // Field-by-field validation lives in AlarmLogic (tested): a config
-        // entry with a mangled nextRun or a hand-edited hour used to sit in
-        // the list looking armed and never record anything.
-        recSchedules = AlarmLogic.sanitizeRecSchedules(Plasmoid.configuration.recSchedules);
-    }
 
-    function _saveRecSchedules() {
-        Plasmoid.configuration.recSchedules = JSON.stringify(recSchedules);
-    }
 
-    // Next occurrence of hh:mm strictly after fromMs — the wall-clock (DST
-    // safe) math lives in AlarmLogic.js, where qmltestrunner covers it.
-    function _nextOccurrence(hh, mm, repeat, weekday, fromMs) {
-        return AlarmLogic.nextOccurrence(hh, mm, repeat, weekday, fromMs);
-    }
 
-    function addRecSchedule(stationName, url, hh, mm, durationMin, repeat, weekday) {
-        if (!url || !canRecordUrl(url)) return;
-        // One defaulted weekday for BOTH the stored entry and the schedule
-        // math — same fix as addAlarm; the raw undefined made a weekly
-        // schedule's first nextRun disagree with its stored weekday.
-        var wd = weekday === undefined ? new Date().getDay() : weekday;
-        var list = recSchedules.slice();
-        list.push({
-            "station": stationName || url,
-            "url": url,
-            "hh": hh, "mm": mm,
-            "durationMin": Math.max(1, durationMin),
-            "repeat": repeat || "once",
-            "weekday": wd,
-            "nextRun": _nextOccurrence(hh, mm, repeat || "once", wd, Date.now())
-        });
-        recSchedules = list;
-        _saveRecSchedules();
-    }
 
-    function removeRecSchedule(index) {
-        if (index < 0 || index >= recSchedules.length) return;
-        var list = recSchedules.slice();
-        list.splice(index, 1);
-        recSchedules = list;
-        _saveRecSchedules();
-    }
 
     // One-shot notification guard per schedule occurrence — a due entry stays
-    // in the list for its whole window now (see below), so without this the
-    // 30 s tick would repeat "skipped"/"failed" notifications until it closes.
-    property var _recSchedNotified: ({})
 
-    function _recSchedKey(s) {
-        return s.url + "@" + s.nextRun;
-    }
 
-    function _recSchedNotifyOnce(key, title, text, icon) {
-        if (_recSchedNotified[key]) return;
-        if (Object.keys(_recSchedNotified).length > 50) _recSchedNotified = {};
-        _recSchedNotified[key] = true;
-        notify(title, text, icon);
-    }
 
-    // Advance (or remove, for "once") the schedule entry that just produced a
-    // FINISHED recording. Called from the completion handler and from the
-    // tick's missed-window path — advancing at start (the old behaviour) threw
-    // the rest of the window away whenever a recording died halfway: the entry
-    // had already moved to tomorrow, so nothing ever resumed.
-    function _recSchedAdvance(key) {
-        if (!key) return;
-        // The occurrence is over — its failure backoff dies with it (the key
-        // embeds nextRun, so the advanced entry gets a clean slate anyway).
-        delete _recRetryCount[key];
-        delete _recRetryAfter[key];
-        var list = recSchedules.slice();
-        for (var i = 0; i < list.length; i++) {
-            var s = list[i];
-            if (_recSchedKey(s) !== key) continue;
-            if (s.repeat === "once") {
-                list.splice(i, 1);
-            } else {
-                s.nextRun = _nextOccurrence(s.hh, s.mm, s.repeat, s.weekday, Date.now());
-            }
-            recSchedules = list;
-            _saveRecSchedules();
-            return;
-        }
-    }
 
-    function _recScheduleTick() {
-        if (recSchedules.length === 0) return;
-        var now = Date.now();
-        // Same zone watch the alarm tick runs — a recording schedule used to
-        // go an hour wrong at a DST flip while the machine was running,
-        // because only alarms watched the offset.
-        _schedApplyTzChange(now);
-        // Snapshot: _recSchedAdvance below replaces recSchedules itself.
-        var due = recSchedules.slice();
-        for (var i = 0; i < due.length; i++) {
-            var s = due[i];
-            if (now < s.nextRun) continue;
-            var key = _recSchedKey(s);
-            var endMs = s.nextRun + s.durationMin * 60000;
-            // Our own entry, still recording past the nominal window end:
-            // ffmpeg's connect/buffer latency pushes its real exit a few
-            // seconds past endMs, and the completion handler owns advancing
-            // it. This guard MUST precede the missed branch, or a tick in
-            // that gap fires a false "missed" toast and advances the entry
-            // out from under a recording that is seconds from finishing.
-            if (recording && root._recActiveSchedKey === key) continue;
-            if (now >= endMs) {
-                // The window closed without a completed recording (the machine
-                // was off, or every attempt failed) — only now is it missed.
-                _recSchedNotifyOnce(key, i18n("Scheduled recording missed"),
-                                    s.station, "dialog-warning");
-                _recSchedAdvance(key);
-                continue;
-            }
-            if (recording) {
-                _recSchedNotifyOnce(key, i18n("Scheduled recording skipped"),
-                                    i18n("%1 — another recording is already running.", s.station),
-                                    "dialog-warning");
-                continue; // the entry stays — it can still start if REC ends in time
-            }
-            // A persistently failing entry (ffmpeg missing, disk full, stream
-            // refusing) must not be re-launched on every 30 s tick — that is
-            // a notification and process storm for the whole window. Hold off
-            // until the backoff deadline this entry earned from its failures.
-            if (root._recRetryAfter[key] !== undefined && now < root._recRetryAfter[key])
-                continue;
-            var remainSec = Math.round((endMs - now) / 1000);
-            if (remainSec >= 60) {
-                // Record the remainder of the window. The entry is advanced
-                // when the recording FINISHES — if the stream dies mid-way,
-                // the next tick lands back here and resumes with what's left.
-                root._recActiveSchedKey = key;
-                _recStart(s.station, s.url, remainSec, true);
-            }
-            // < 60 s left: not worth an ffmpeg spawn; the entry ages into the
-            // missed branch above unless a recording already completed.
-        }
-    }
 
-    Timer {
-        id: recScheduleTimer
-        interval: 30000
-        repeat: true
-        running: root.recSchedules.length > 0
-        onTriggered: root._recScheduleTick()
-    }
 
-    Timer {
-        id: recElapsedTimer
-        interval: 1000
-        repeat: true
-        running: root.recording
-        onTriggered: root.recElapsedSec += 1
-    }
-
-    // ── Wake-up alarms ───────────────────────────────────────────────────────
-    // Entries: { station, url, favicon, uuid, hh, mm,
-    //            repeat: "once"|"daily"|"weekly",
-    //            weekday: 0-6, volumePct, keepAwake, nextRun: epoch ms }.
-    // uuid is the radio-browser identity when the station came from the
-    // search — it gives a deleted station's alarm the byuuid heal road.
-    // Same wall-clock scheduling as the recordings above (AlarmLogic.js), but
-    // a SEPARATE list on purpose: a recording entry means "capture the rest
-    // of its window", an alarm means "start playing, loud enough to wake" —
-    // mixing the two semantics in one list is how scheduler bugs are born.
-    property var alarms: []
-
-    function _loadAlarms() {
-        alarms = AlarmLogic.sanitizeAlarms(Plasmoid.configuration.alarms);
-    }
-
-    function _saveAlarms() {
-        Plasmoid.configuration.alarms = JSON.stringify(alarms);
-    }
-
-    function addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake, uuid) {
-        if (!url) return;
-        // One defaulted weekday for BOTH the stored entry and the schedule
-        // math — feeding nextOccurrence the raw undefined made the computed
-        // nextRun disagree with the weekday the entry then carried.
-        var wd = weekday === undefined ? new Date().getDay() : weekday;
-        var list = alarms.slice();
-        list.push({
-            "station": stationName || url,
-            "url": url,
-            "favicon": favicon || "",
-            "uuid": (uuid || "").toString(),
-            "hh": hh, "mm": mm,
-            "repeat": repeat || "once",
-            "weekday": wd,
-            "volumePct": Math.max(15, Math.min(100, volumePct || 40)),
-            "keepAwake": keepAwake === true,
-            "nextRun": AlarmLogic.nextOccurrence(hh, mm, repeat || "once", wd, Date.now())
-        });
-        alarms = list;
-        _saveAlarms();
-        _alarmArmInhibit();
-    }
-
-    function removeAlarm(index) {
-        if (index < 0 || index >= alarms.length) return;
-        var list = alarms.slice();
-        list.splice(index, 1);
-        alarms = list;
-        _saveAlarms();
-        _alarmArmInhibit();
-    }
-
-    Timer {
-        id: alarmTimer
-        interval: 30000
-        repeat: true
-        running: root.alarms.length > 0
-        onTriggered: root._alarmTick()
-    }
 
     // Watches for the system time zone moving under the scheduler (travel,
     // a VPN-driven tzdata change, a DST flip): stored nextRun instants belong
@@ -3717,361 +2157,16 @@ PlasmoidItem {
         // A first-ever stamp has nothing to correct — sanitize just built
         // every nextRun at this very offset.
         if (first) return true;
-        if (alarms.length > 0) {
-            var al = alarms.slice();
-            // shouldRetime: an entry missed under every possible zone keeps
-            // its stale instant so the fire scan's "missed" road reports and
-            // retires it — retiming would resurrect it on the wrong day.
-            for (var a = 0; a < al.length; a++)
-                if (AlarmLogic.shouldRetime(al[a], now))
-                    al[a].nextRun = AlarmLogic.retimeForZone(al[a], now);
-            alarms = al;
-            _saveAlarms();
-            _alarmArmInhibit();
-        }
-        if (recSchedules.length > 0) {
-            var rl = recSchedules.slice();
-            for (var r = 0; r < rl.length; r++) {
-                // shouldRetime first: an entry missed under every possible
-                // zone keeps its stale instant so the fire scan's "missed"
-                // road reports and retires it. (An ACTIVE recording can
-                // never be that stale, so the gate cannot strand the key
-                // follow below.)
-                if (!AlarmLogic.shouldRetime(rl[r], now)) continue;
-                // The ACTIVE recording's entry is keyed url@nextRun, and
-                // the running ffmpeg was started under the OLD instant —
-                // retiming it out from under the key orphans the guards:
-                // the tick reads its own recording as a stranger's ('...
-                // skipped — another recording is already running') and the
-                // completion path loses the entry it should advance. The
-                // key follows the retime.
-                var wasKey = _recSchedKey(rl[r]);
-                rl[r].nextRun = AlarmLogic.retimeForZone(rl[r], now);
-                if (recording && root._recActiveSchedKey === wasKey)
-                    root._recActiveSchedKey = _recSchedKey(rl[r]);
-            }
-            recSchedules = rl;
-            _saveRecSchedules();
-        }
+        // Both halves live in their engines now: the alarms' retime keeps
+        // the shouldRetime rule, the recordings' keeps its url@nextRun key
+        // with the active recording's key following.
+        alarmEngine.applyTzRetime(now);
+        recordingEngine.applyTzRetime(now);
         return true;
     }
 
-    function _alarmTick() {
-        var now = Date.now();
-        // Zone check first, on the shared path — the fire scan below then
-        // reads the corrected instants.
-        _schedApplyTzChange(now);
-        var list = alarms.slice();
-        var changed = false;
-        var due = [];
-        for (var i = list.length - 1; i >= 0; i--) {
-            var a = list[i];
-            var dec = AlarmLogic.fireDecision(a.nextRun, now, AlarmLogic.GRACE_MS);
-            if (dec === "wait") continue;
-            if (dec === "missed") {
-                notify(i18n("Wake-up alarm missed"),
-                       i18n("%1 was set for %2 — the computer was off or asleep at that time.",
-                            a.station, _pad2(a.hh) + ":" + _pad2(a.mm)),
-                       "dialog-warning");
-            } else {
-                due.push(a);
-            }
-            // The entry advances (or leaves) BEFORE any side effect — a fire
-            // path that throws must never leave a due entry behind to re-fire
-            // on every subsequent tick.
-            var next = AlarmLogic.advance(a, now);
-            if (next < 0) list.splice(i, 1);
-            else a.nextRun = next;
-            changed = true;
-        }
-        if (changed) {
-            alarms = list;
-            _saveAlarms();
-            _alarmArmInhibit();
-        } else if (_alarmInhibitUntil > 0 && now > _alarmInhibitUntil - 120000
-                   && AlarmLogic.earliestKeepAwake(alarms) > 0) {
-            // The 12 h-capped holder is about to let go while a keep-awake
-            // alarm is still ahead — chain a fresh one so the coverage is
-            // continuous all the way to the fire moment.
-            _alarmArmInhibit();
-        }
-        if (due.length > 0) {
-            // One player, one stream: the first due entry (list order — the
-            // scan ran newest-index first) plays; the rest must not vanish
-            // in silence, so their owner at least learns what happened.
-            due.reverse();
-            _alarmFire(due[0]);
-            if (due.length > 1) {
-                var others = [];
-                for (var j = 1; j < due.length; j++) others.push(due[j].station);
-                notify(i18n("Wake-up alarm"),
-                       i18n("%1 came due at the same time — playing %2 instead.",
-                            others.join(", "), due[0].station),
-                       "clock");
-            }
-        }
-    }
 
-    // Fire = the reason this feature exists, so every step is belt and
-    // braces: a wake-up must never end in silence.
-    function _alarmFire(a) {
-        // A podcast alarm wakes with the SHOW, not a stream: the newest
-        // unheard downloaded episode — fully offline, the one wake-up no
-        // dead WiFi can silence. Nobody else in the world does this.
-        if ((a.url || "").indexOf("podcast:") === 0) { _alarmFirePodcast(a); return; }
-        // The alarm outranks whatever the evening left behind: a sleep fade
-        // mid-flight would drag the volume right back down, and a pending
-        // sleep timer would stop the just-started station minutes later.
-        cancelSleepTimer();
-        // Last night's episode has to be handed over before the station takes
-        // the player, exactly as _playStation and playLocalFile do it. Left
-        // standing, the episode's key outlives it: the stall timer then files
-        // the STATION's position under the episode's bookmark, and the connect
-        // watchdog reads "a podcast is playing" and stops instead of healing —
-        // so the one thing an alarm may never do, end in silence, is what the
-        // recovery road would have done.
-        _podHandoff();
-        alarmFallbackTimer.interval = 25000;   // a kick may have shortened it
-        // ...and a sink left muted last night would turn the wake-up into
-        // silence — unmute it, best-effort (no pactl / no PulseAudio is fine).
-        executable.exec(": ALARM_UNMUTE; pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null; true");
-        // Volume floor as a one-shot override so startWithFade's fade-in
-        // target picks it up immediately — the debounced setUserVolume path
-        // would lose the race against the fade, and writing the config
-        // would permanently overwrite the level the user chose last night.
-        _volumeOverridePct = Math.max(15, Math.min(100, a.volumePct || 40));
-        // If cast devices are checked, startWithFade routes the alarm to
-        // them — waking up to the same bedroom speaker the evening ended on
-        // is correct, and the fallback below knows local silence is fine.
-        // But cast delivery starts UNPROVEN: only a fresh __CAST_OK__ from a
-        // device upgrades it to confirmed, and the wake-tone gate trusts
-        // nothing less. Clearing the last-pushed URL forces the re-push (and
-        // with it the fresh acknowledgement) even when the bedtime stream is
-        // the same one — that is exactly the route that dies overnight.
-        _alarmCastConfirmed = false;
-        _castCurrentUrl = "";
-        // The evening's last act may have been a search preview, and the
-        // preview pair outlives the popup: left set, the alarm's own stream
-        // inherits the preview's short connect leash, and the failure roads
-        // would retry LAST NIGHT's candidate under this alarm's station
-        // name. The alarm starts clean.
-        _previewUrl = "";
-        _previewCodec = "";
-        _previewUuid = "";
-        // startWithFade is called directly (no _playStation), so the
-        // origin/resolved pair would still describe LAST NIGHT's stream —
-        // and an error on the alarm stream would then heal the wrong
-        // station. Point both at the alarm's own URL.
-        _currentOrigUrl = a.url;
-        _currentUnwrappedUrl = a.url;
-        _currentResolvedUrl = a.url;
-        // An alarm IS a standing order — whatever it takes, keep trying.
-        // But the recovery roads replay lastPlay, which still points at last
-        // night's station until the callLater below finds this one: clear it
-        // and stop any retry armed by yesterday's outage, so a network edge
-        // during the alarm window can only ever restart the alarm's own url,
-        // never resurrect whatever played last evening.
-        _wantsPlaying = true;
-        _healRetryAttempts = 0;
-        lastPlay = -1;
-        healRetryTimer.stop();
-        netResumeTimer.stop();
-        // The order's own copy: recovery must survive the station having
-        // been deleted from the list. Every road that used to look the
-        // station up by row index falls back to this via _orderSubject —
-        // without it, a mid-alarm stream death ended the wake-up for good.
-        _orphanOrder = { "name": a.station, "hostname": a.url,
-                         "favicon": a.favicon || "",
-                         "uuid": (a.uuid || "").toString() };
-        startWithFade({ "name": a.station, "hostname": a.url,
-                        "favicon": a.favicon || "", "active": true });
-        // The floor must reach the DEVICES too: while casting, the local
-        // output is muted and playMusicOutput's level is irrelevant — a
-        // bedroom speaker left whisper-quiet last night would wake nobody.
-        // Goes through the standard debounced path, so per-device balances
-        // still apply on top.
-        _castSetVolume(targetVolume());
-        _alarmFallbackArmed = true;
-        alarmFallbackTimer.restart();
-        // Keep the station list's playing-row marker honest when the alarm
-        // station is in the visible list (same courtesy the heal path pays).
-        // Deleted-station recovery itself rides _orphanOrder (set above) —
-        // the roads fall back to it via _orderSubject when no row answers.
-        Qt.callLater(function() {
-            for (var k = 0; k < stationsModel.count; k++) {
-                if (stationsModel.get(k).hostname === a.url) {
-                    lastPlay = k;
-                    break;
-                }
-            }
-        });
-        notify(i18n("Wake-up alarm"), a.station, "clock");
-    }
 
-    // The wake tone: if the station has not become audibly alive within the
-    // window (network down, stream dead, resolver hung), the bundled chime
-    // takes over. An alarm that fails must fail LOUDLY. Disarmed by an
-    // explicit stop or a manual station pick — either one means "I'm up".
-    property bool _alarmFallbackArmed: false
-
-    // Set by the CAST_PLAY dispatcher on a device's __CAST_OK__ — the only
-    // evidence that "casting" is more than an optimistic flag. Reset by
-    // every _alarmFire, so yesterday's proof cannot vouch for today's alarm.
-    property bool _alarmCastConfirmed: false
-
-    // The bundled chime's identity, resolved once — compared wherever the
-    // tone needs special-casing (the infinite loop in startWithFade; file://
-    // already keeps it off the cast branch).
-    readonly property url _alarmToneUrl: Qt.resolvedUrl("../sounds/alarm-fallback.ogg")
-
-    // While the alarm road itself starts a local track, playLocalFile's
-    // "picking a track means I'm up" stand-down must hold its fire — the
-    // alarm is the one caller that is NOT the user being awake.
-    property bool _alarmFiring: false
-
-    function _alarmFirePodcast(a) {
-        cancelSleepTimer();
-        // A local file needs no heal roads — and yesterday's standing order
-        // must not be able to replay a station over the morning episode.
-        _wantsPlaying = false;
-        _orphanOrder = null;
-        healRetryTimer.stop();
-        netResumeTimer.stop();
-        lastPlay = -1;
-        // Stale cast state from the evening must not gag the chime: the
-        // wake-tone gate trusts only a FRESH device acknowledgement, and a
-        // podcast alarm plays locally by definition.
-        _alarmCastConfirmed = false;
-        _castCurrentUrl = "";
-        // The same two hardware guarantees the station road makes: the sink
-        // may have been muted overnight, and the volume floor must reach the
-        // fade target — playLocalFile is told not to stand either down.
-        executable.exec(": ALARM_UNMUTE; pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null; true # " + (++_execSeq));
-        _volumeOverridePct = Math.max(15, Math.min(100, a.volumePct || 40));
-        var feed = a.url.substring(8);
-        var f = PodcastLogic.newestForAlarm(_podDownloads, feed, _podPlayed);
-        if (f !== "") {
-            var meta = _podDownloads[f];
-            var furl = _podFileUrl(f);
-            _alarmFiring = true;
-            try {
-                // Already on the air (fell asleep to it): playPodcastEpisode
-                // would TOGGLE it off — raise the floor instead and let it be.
-                if (!(isPlaying() && playMusic.source.toString() === furl))
-                    playPodcastEpisode(furl, meta.title || f, meta.key || "",
-                                       meta.show || a.station || "", meta.art || "",
-                                       meta.feed || "");
-                else
-                    playMusicOutput.volume = targetVolume();
-            } finally {
-                _alarmFiring = false;
-            }
-            // Armed AFTER the play call — playLocalFile stops this very
-            // timer on its way through, and a fallback armed before it was
-            // a fallback already disarmed.
-            _alarmFallbackArmed = true;
-            alarmFallbackTimer.interval = 25000;
-            alarmFallbackTimer.restart();
-            notify(i18n("Wake-up alarm"), meta.title || a.station, "clock");
-        } else {
-            // Nothing of the show on disk: the chime takes over almost at
-            // once — 25 seconds of silence at 07:00 helps nobody.
-            _alarmFallbackArmed = true;
-            alarmFallbackTimer.interval = 1200;
-            alarmFallbackTimer.restart();
-            notify(i18n("Wake-up alarm"),
-                   i18n("No downloaded episode of %1 was on disk — waking with the chime.",
-                        a.station || i18n("the show")),
-                   "clock");
-        }
-    }
-
-    Timer {
-        id: alarmFallbackTimer
-        interval: 25000
-        repeat: false
-        onTriggered: {
-            if (!root._alarmFallbackArmed) return;
-            root._alarmFallbackArmed = false;
-            // Casting-only is a healthy route ONLY once a device actually
-            // acknowledged the play command. The optimistic _casting flag
-            // alone would let a speaker unplugged overnight silence the
-            // alarm entirely — the one failure this tone exists to catch.
-            if (AlarmLogic.castSilencesWakeTone(root._casting,
-                                                root._alarmCastConfirmed,
-                                                root._castLocalPlay)) return;
-            if (isPlaying() && playMusic.mediaStatus === MediaPlayer.BufferedMedia) return;
-            // The tone is the LAST word — nothing may replace it. A heal
-            // audition launched a beat ago has an XHR in flight whose
-            // callback would call startWithFade on the found stream and kill
-            // the looping chime. Retire every heal leg (bump the generation,
-            // stop the timers, drop the pending audition) and end the
-            // standing-order replay so no road can start a station over the
-            // tone. The person is asleep; the tone must not go quiet.
-            _healSeq++;
-            _healClearPending();
-            _healRun = null;
-            // A preview retry rung still in flight holds the same power as
-            // a heal audition — its startWithFade would replace the tone
-            // just the same. Same bump, same reason.
-            _previewSeq++;
-            _previewUrl = "";
-            _previewCodec = "";
-            _previewUuid = "";
-            healTimer.stop();
-            healRetryTimer.stop();
-            netResumeTimer.stop();
-            connectWatchdog.stop();
-            _wantsPlaying = false;
-            // A podcast alarm that never got going hands its episode over
-            // here: the tone is taking the player, so the needle is filed
-            // and the episode's identity retired before it can follow the
-            // chime around.
-            _podHandoff();
-            // file:// skips the cast branch in startWithFade — the tone
-            // plays locally, which is exactly where the sleeper is. The tone
-            // starts BEFORE the toast: the sleeper needs sound, not words,
-            // and nothing is allowed to sit between them and it.
-            startWithFade({ "name": i18n("Wake-up alarm"),
-                            "hostname": root._alarmToneUrl,
-                            "favicon": "", "active": true });
-            notify(i18n("Wake-up alarm"),
-                   i18n("The station could not start — playing the built-in tone instead."),
-                   "dialog-warning");
-        }
-    }
-
-    // "Keep the computer awake" holder: one short-lived process group —
-    // setsid + systemd-inhibit + sleep holds the inhibit fd until just past
-    // the soonest keep-awake alarm, then everything exits by itself. No
-    // daemon, nothing to leak. Re-arming kills the previous group first,
-    // identity-checked: a pid file can survive a reboot and the number may
-    // belong to an innocent process by then.
-    readonly property string _alarmInhibitPidFile: _mprisRunDir + "/arp-alarm-inhibit-" + _mprisId + ".pid"
-
-    // When the current inhibit holder lets go (epoch ms), 0 when none is
-    // held. The holder is capped at 12 h (AlarmLogic.INHIBIT_MAX_S) so a
-    // weekly alarm can't pin the machine awake for six days — _alarmTick
-    // re-arms a fresh one as this deadline approaches.
-    property double _alarmInhibitUntil: 0
-
-    function _alarmArmInhibit() {
-        var now = Date.now();
-        var secs = AlarmLogic.inhibitSeconds(AlarmLogic.earliestKeepAwake(alarms), now);
-        var pf = _alarmInhibitPidFile.replace(/'/g, "'\\''");
-        var cmd = ": ALARM_INHIBIT; "
-            + "if [ -f '" + pf + "' ]; then p=$(cat '" + pf + "' 2>/dev/null); "
-            + "[ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'systemd-inhibit.*On Air' "
-            + "&& kill -- -\"$p\" 2>/dev/null; rm -f '" + pf + "'; fi; ";
-        if (secs > 0) {
-            cmd += "command -v systemd-inhibit >/dev/null 2>&1 && { "
-                + "setsid systemd-inhibit --what=sleep --who='On Air' "
-                + "--why='Wake-up alarm' sleep " + secs + " >/dev/null 2>&1 & "
-                + "echo $! > '" + pf + "'; }; ";
-        }
-        _alarmInhibitUntil = secs > 0 ? now + secs * 1000 : 0;
-        executable.exec(cmd + "true # " + (++_execSeq));
-    }
 
     // Play a downloaded file (My Music page)
     // The local track whose sidecar cover currently owns albumArtUrl — the
@@ -4101,8 +2196,7 @@ PlasmoidItem {
         // EXCEPT when the alarm itself is the caller — the one road where
         // the track starting must not disarm the very net that guards it.
         if (!root._alarmFiring) {
-            _alarmFallbackArmed = false;
-            alarmFallbackTimer.stop();
+            alarmEngine.standDown();
             _volumeOverridePct = -1;
         }
         // Look for the track's own cover: the hidden .covers/ subfolder
@@ -4636,7 +2730,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.32");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4908,6 +3002,75 @@ PlasmoidItem {
         }
     }
 
+    PodcastEngine {
+        id: podcastEngine
+        app: root
+        cfg: Plasmoid.configuration
+    }
+
+    ArtworkEngine {
+        id: artworkEngine
+        app: root
+        cfg: Plasmoid.configuration
+    }
+
+    RecordingEngine {
+        id: recordingEngine
+        app: root
+        cfg: Plasmoid.configuration
+    }
+    // A stop fade in progress — recStartCurrent must not start a new capture
+    // on top of a station that is fading out.
+    readonly property bool fadeStopInProgress: fadeOutAnimation.running
+    // Readonly forwards: anythingPlaying, SyncEngine and the UI badge all
+    // read `recording`; the Timers tab reads recSchedules; both are
+    // engine-owned now.
+    readonly property alias recording: recordingEngine.recording
+    readonly property alias recSchedules: recordingEngine.recSchedules
+    readonly property alias _recScheduled: recordingEngine._recScheduled
+    readonly property alias _recStationName: recordingEngine._recStationName
+    function recStop() { recordingEngine.recStop(); }
+    function recStartCurrent() { recordingEngine.recStartCurrent(); }
+    function recElapsedText() { return recordingEngine.recElapsedText(); }
+    function canRecordUrl(url) { return recordingEngine.canRecordUrl(url); }
+    function addRecSchedule(s, u, hh, mm, dm, rp, wd) { return recordingEngine.addRecSchedule(s, u, hh, mm, dm, rp, wd); }
+    function removeRecSchedule(i) { recordingEngine.removeRecSchedule(i); }
+    function _loadRecSchedules() { recordingEngine._loadRecSchedules(); }
+
+    AlarmEngine {
+        id: alarmEngine
+        app: root
+        cfg: Plasmoid.configuration
+    }
+    // Readonly forward: the Timers tab reads root.alarms; add and remove
+    // keep the names FullRepresentation has always called.
+    readonly property alias alarms: alarmEngine.alarms
+    function addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake, uuid) {
+        alarmEngine.addAlarm(stationName, url, favicon, hh, mm, repeat, weekday, volumePct, keepAwake, uuid);
+    }
+    function removeAlarm(index) { alarmEngine.removeAlarm(index); }
+    // Readonly forwards the rest of main still reads.
+    readonly property alias _alarmFallbackArmed: alarmEngine._alarmFallbackArmed
+    readonly property alias _alarmToneUrl: alarmEngine._alarmToneUrl
+    readonly property alias _alarmFiring: alarmEngine._alarmFiring
+    // The fire half's levers, named for the engine (and its mocks): a
+    // property cannot carry its own id's name, hence the Ref suffix.
+    readonly property var healRetryTimerRef: healRetryTimer
+    readonly property var netResumeTimerRef: netResumeTimer
+    readonly property var healTimerRef: healTimer
+    readonly property var connectWatchdogRef: connectWatchdog
+    readonly property var playMusicRef: playMusic
+    readonly property var playMusicOutputRef: playMusicOutput
+    readonly property var stationsModelRef: stationsModel
+    // The engine's guard against repainting a local file's sidecar cover.
+    function playerSourceString() { return playMusic.source.toString(); }
+    property alias albumArtUrl: artworkEngine.albumArtUrl
+    property alias _albumArtKey: artworkEngine._albumArtKey
+    property alias _artLookupPendingRaw: artworkEngine._artLookupPendingRaw
+    property alias _artPendingKey: artworkEngine._artPendingKey
+    function lookupAlbumArt(trackString) { artworkEngine.lookupAlbumArt(trackString); }
+    function _artFromCache(query) { return artworkEngine._artFromCache(query); }
+
     SyncEngine {
         id: syncEngine
         app: root
@@ -4940,7 +3103,12 @@ PlasmoidItem {
     // it. Through the relay it HAS one (the relay arms for auditions too,
     // that is how they play at all), and a FLAC listener lives in search
     // previews — so where the buffer exists, the pause is honest.
+    // The floor rides along: for the first seconds of a station the engine
+    // refuses to park (too little buffer to resume into), and an icon that
+    // says "pause" there performed a full stop instead — the listener's
+    // "it jumped straight to live" starts here.
     readonly property bool tsPauseAvailable: timeshift.active && timeshift.writerUp
+                                             && timeshift.parkable
                                              && !_casting
                                              && (_previewUrl === "" || timeshift.relay)
                                              && _podPlayingKey === "" && !timeshift.shifted
@@ -4992,7 +3160,54 @@ PlasmoidItem {
         // The podcast road survives for exactly this ordering reason.
         root._tsPendingSeekUrl = fileUrl;
         root._tsPendingSeekMs = posMs;
+        // A fresh open means a fresh horizon — the watchdog starts counting
+        // from this reader, not from the one it just replaced.
+        root._tsLastPosMs = -1;
+        root._tsFrozenSinceMs = 0;
         playMusic.play();
+    }
+
+    // The horizon watchdog. Qt estimates a growing buffer's duration when it
+    // OPENS the file and never revises it — and on this stack (Qt 6.11.1 +
+    // FFmpeg 9, measured live on the home machine 2026-08-11, twice) the
+    // player reaching that frozen horizon does NOT deliver EndOfMedia: the
+    // position pins, playbackState stays PlayingState and mediaStatus stays
+    // BufferedMedia. Since playerEndOfMedia() sits behind EndOfMedia alone,
+    // the engine's whole reopen-or-return machinery was dead code on this
+    // road: a resumed pause played its parked minutes and then went silent
+    // FOREVER while the widget still said "playing". Nothing else watches —
+    // the buffer road deliberately stops the stall timer, the connect
+    // watchdog and the heal road, because an ending buffer is the engine's
+    // business. So the widget has to notice the freeze itself.
+    property double _tsLastPosMs: -1
+    property double _tsFrozenSinceMs: 0
+    Timer {
+        id: tsHorizonWatch
+        interval: 1000
+        repeat: true
+        running: timeshift.shifted && playMusic.playbackState === MediaPlayer.PlayingState
+        onTriggered: {
+            var pos = playMusic.position;
+            var now = Date.now();
+            // Any forward movement is a healthy reader; only a position that
+            // stands still while the player claims to be playing counts.
+            if (pos !== root._tsLastPosMs) {
+                root._tsLastPosMs = pos;
+                root._tsFrozenSinceMs = now;
+                return;
+            }
+            if (root._tsFrozenSinceMs <= 0) { root._tsFrozenSinceMs = now; return; }
+            // Three seconds of a pinned position: a live decoder does not
+            // sit that still, and the cost of being wrong is one reopen at
+            // the same spot, which the engine's own stall guard absorbs.
+            if (now - root._tsFrozenSinceMs < 3000) return;
+            console.log("[ARP] timeshift: horizon reached without EndOfMedia — "
+                        + "position frozen at " + pos + " for "
+                        + (now - root._tsFrozenSinceMs) + " ms; handing to the engine");
+            root._tsFrozenSinceMs = 0;
+            root._tsLastPosMs = -1;
+            timeshift.playerEndOfMedia(pos, now);
+        }
     }
 
     // The loopback tap for a stream the backend cannot drink directly.
@@ -5046,6 +3261,34 @@ PlasmoidItem {
     // player pauses in place like any file; a live player with a ready
     // buffer parks into it; everything else declines and the caller does
     // what it always did — a full stop.
+    property double _btMemberLostAt: 0
+    property double _tsParkedAt: 0
+    property bool _tsParkFromMpris: false
+    property bool _mprisCmdActive: false
+
+    // The sync engine reports a Bluetooth member vanishing without being
+    // asked. If a park landed moments before — the speaker's own farewell
+    // pause, in the other arrival order — the room gets its music back.
+    function noteBtMemberLost() {
+        _btMemberLostAt = Date.now();
+        // Thirty seconds, not four: the AVRCP pause arrives the instant
+        // the power button is pressed, but Bluetooth takes its time
+        // admitting a device is gone (5-20 s of link timeout, measured
+        // live when the four-second window sailed past the loss). The
+        // wide window is safe because it only ever matches a park whose
+        // ORIGIN was the MPRIS channel — the speaker's own voice. A park
+        // the listener made in the widget is never resumed over.
+        // 120 s, not 30: the acoustic arbitration may have to wait out a
+        // periodic probe's microphone hold (retries every 6 s, up to 15),
+        // and a verdict that arrives late must still be allowed to give
+        // the room its music back.
+        if (_tsPaused && _tsParkFromMpris && Date.now() - _tsParkedAt < 120000) {
+            console.log("[ARP] the park was a departing speaker's last"
+                        + " breath — resuming for the room that stays");
+            timeshiftResume();
+        }
+    }
+
     function timeshiftPause() {
         if (timeshift.shifted) {
             playMusic.pause();
@@ -5071,6 +3314,15 @@ PlasmoidItem {
         // title and cover — a park must keep showing the sentence it parked
         // on, not fall back to the station logo.
         root._tsPaused = true;
+        root._tsParkedAt = Date.now();
+        root._tsParkFromMpris = root._mprisCmdActive;
+        // Parking IS the listener saying "I'm up": every other silencing
+        // road stands the wake-up down, and this one did not — so a pause
+        // pressed to quiet the alarm left the 25 s net armed and the chime
+        // started over the parked station half a minute later. The volume
+        // floor goes with it, or the whole day plays at wake-up loudness.
+        alarmEngine.standDown();
+        _volumeOverridePct = -1;
         playMusic.stop();
         return true;
     }
@@ -5082,6 +3334,34 @@ PlasmoidItem {
             // died, arm torn down) — a stale flag must not eat every
             // future play click.
             root._tsPaused = false;
+            // ...and neither may the click itself vanish. Every caller
+            // threw this false away, so the first press did nothing at all
+            // and only the second one — landing on the ordinary play road
+            // — started the station: the listener's "it jumped straight to
+            // live" with an extra press in front of it. One press, one
+            // audible answer: the park is gone, so live is the honest one.
+            console.log("[ARP] timeshift: park could not be resumed — going live instead");
+            // Three roads to live, in order of certainty, because the
+            // first one has a hole a listener fell into: a speaker
+            // powering off rebuilds the group, the rebuild disarms the
+            // timeshift, and its streamUrl empties — so the guard below
+            // refused, nothing played, and the room stayed silent with
+            // the widget still showing a station. The station is still
+            // known by two other spellings and by its row; the resume
+            // falls through them until something can carry sound.
+            if (root.currentStation !== "" && timeshift.streamUrl !== "") {
+                tsPlayLive(timeshift.streamUrl);
+            } else if (root.currentStation !== "" && root._currentResolvedUrl !== "") {
+                root._wantsPlaying = true;
+                startWithFade({ "name": root.currentStation,
+                                "hostname": root._currentResolvedUrl,
+                                "favicon": root.currentStationFavicon,
+                                "active": true });
+            } else if (lastPlay >= 0 && lastPlay < stationsModel.count) {
+                console.log("[ARP] timeshift: no live address left —"
+                            + " restarting the station from its row");
+                refreshServer(lastPlay);
+            }
             return false;
         }
         return true;
@@ -5167,13 +3447,12 @@ PlasmoidItem {
         return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac);
     }
 
-    // Device-supplied display text (cast beacons, Bluetooth aliases): markup
-    // metacharacters would read as rich text, control chars and bidi
-    // formatting marks (LRM/RLM/embedding/override/isolate) can hide or
-    // reorder what a row shows, and an unbounded name can flood the layout.
+    // Device-supplied display text (cast beacons, Bluetooth aliases, feed
+    // titles). Eight callers keep reaching it by this name on purpose: the
+    // wrapper is what lets the body live in NameGuard.js, where a test can
+    // call it. What each character group buys is written there.
     function _sanitizeDeviceName(s) {
-        return (s || "").replace(/[<>&\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
-                        .substring(0, 120);
+        return NameGuard.sanitize(s);
     }
 
     // ── In-menu pairing — a NEW speaker is one click away too ────────────────
@@ -6207,8 +4486,7 @@ PlasmoidItem {
         // wake-up to the bedtime volume and disarm the fallback tone, so the
         // alarm would continue near-silent with no safety net.
         if (!automated) {
-            _alarmFallbackArmed = false;
-            alarmFallbackTimer.stop();
+            alarmEngine.standDown();
             _volumeOverridePct = -1;
         }
         // A station taking over from a podcast episode saves the episode's
@@ -6296,8 +4574,7 @@ PlasmoidItem {
         // A stop inside the wake-tone window is the person saying "I'm up" —
         // the fallback chime must not blare over it half a minute later, and
         // the alarm's volume override dies with the session it raised.
-        _alarmFallbackArmed = false;
-        alarmFallbackTimer.stop();
+        alarmEngine.standDown();
         _volumeOverridePct = -1;
         root._previewUrl = "";
         root._previewCodec = "";
@@ -6431,6 +4708,7 @@ PlasmoidItem {
         root._noIcySource = "";
         root._icyEmptyCount = 0;
         root._qtMetaWorks = false;
+        root._qtMetaFirstTitle = "";
         root._stallAttempts = 0;
         // Whatever starts now is not the parked shift — a stale flag here
         // turned the play button into a resume of a buffer long gone.
@@ -6619,13 +4897,6 @@ PlasmoidItem {
         executable.exec(cmd);
     }
 
-    // FIFO queue to bound _artCache — plasmashell runs for weeks, and an
-    // unbounded cache would be a slow memory leak.
-    property var _artCacheKeys: []
-    // Misses are retried after this long. Radio repeats its playlist all day,
-    // and a single bad moment on the first play (XHR timeout, iTunes 403,
-    // network blip) must not leave that track coverless for the whole session.
-    readonly property int _artNegativeTtlMs: 30 * 60 * 1000
 
     // Also used for the art-cache key: trackArtistTitleKey() and the lookup
     // query MUST normalize identically, or fetched art is silently never
@@ -6639,323 +4910,19 @@ PlasmoidItem {
         return TrackLogic.preCleanTrack(s);
     }
 
-    // definitive=false means the empty result came from a transient failure
-    // (timeout, HTTP error, rate limit) — it is NOT cached, so the next play
-    // of the same track simply tries again. Definitive empties are cached
-    // with a timestamp and expire after _artNegativeTtlMs.
-    function _artFinish(cacheKey, url, definitive) {
-        // Event-only log — keys and URLs are the listening history, which
-        // has no business sitting in the journal.
-        console.log("[ARP] artFinish " + (url ? "art found" : "no art")
-                    + (definitive ? "" : " (transient, not cached)"));
-        if (url || definitive) {
-            if (_artCache[cacheKey] === undefined) {
-                _artCacheKeys.push(cacheKey);
-                if (_artCacheKeys.length > 200) {
-                    delete _artCache[_artCacheKeys.shift()];
-                }
-            }
-            _artCache[cacheKey] = { "url": url || "", "t": Date.now() };
-        }
-        var currentKey = trackArtistTitleKey();
-        if (url && currentKey === cacheKey) {
-            albumArtUrl = url;
-            _albumArtKey = cacheKey;
-            console.log("[ARP] albumArtUrl set");
-        } else if (!url && definitive && currentKey === cacheKey) {
-            // A definitive miss for the CURRENT track clears the panel —
-            // the previous track's cover posing over a new song is worse
-            // than the honest vinyl.
-            albumArtUrl = "";
-            _albumArtKey = "";
-        }
-    }
 
-    // Which track's key the shown albumArtUrl belongs to — so a track
-    // change can clear a stale cover the moment the new lookup starts,
-    // instead of letting the old song's face sit there until (unless)
-    // the new answer lands.
-    property string _albumArtKey: ""
 
     function trackArtistTitleKey() {
         return _normalizeQuery((root.trackArtist + " " + root.trackTitle).trim() || root.title);
     }
 
-    // All three query callbacks are (url, definitive): definitive=true means
-    // the service really answered (with a result or a real "no match");
-    // definitive=false is a transient failure — timeout/abort (status 0),
-    // an HTTP error (iTunes rate-limits at ~20 req/min with 403), a quota
-    // error or an unparseable body — and must not be negative-cached.
-    function _queryItunes(query, cacheKey, onResult, want) {
-        console.log("[ARP] iTunes query");
-        var xhr = new XMLHttpRequest;
-        var guard = null;
-        xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=song&limit=10&media=music");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            _clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data.results && data.results.length > 0) {
-                        var icands = [];
-                        for (var ii = 0; ii < data.results.length; ii++)
-                            icands.push({ "artist": data.results[ii].artistName || "",
-                                          "title": data.results[ii].trackName || "" });
-                        var ip = SearchLogic.artPick(want.artist, want.title, icands);
-                        var artUrl = ip >= 0 ? (data.results[ip].artworkUrl100 || "") : "";
-                        if (artUrl) {
-                            onResult(artUrl.replace("100x100bb", "300x300bb"), true);
-                            return;
-                        }
-                    }
-                    if (data.results !== undefined) {
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
-        };
-        guard = _armXhrTimeout(xhr, 2500);
-        xhr.send();
-    }
 
-    // A Deezer entity without an image still returns a VALID URL — it just
-    // has an empty image id ("…/images/artist//250x250-….jpg") and serves a
-    // grey placeholder silhouette. Accepting one poisons the art cache with
-    // junk for the whole session; treat it as "no image". The empty id has
-    // a second spelling: d41d8cd98f00b204e9800998ecf8427e is the MD5 of ""
-    // — the same grey silhouette wearing a hash (caught live: artist
-    // fallback for an unmatched track showed the silhouette instead of
-    // falling through to the station's own logo).
-    function _deezerRealArt(url) {
-        var u = (url || "").toString();
-        if (u === "" || /\/images\/\w+\/\//.test(u)
-            || u.indexOf("d41d8cd98f00b204e9800998ecf8427e") !== -1) return "";
-        return u;
-    }
 
-    function _queryDeezer(query, cacheKey, onResult, want) {
-        console.log("[ARP] Deezer query");
-        var xhr = new XMLHttpRequest;
-        var guard = null;
-        xhr.open("GET", "https://api.deezer.com/search?q=" + encodeURIComponent(query) + "&limit=10");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            _clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    // Deezer reports quota/rate problems as 200 + {"error"} —
-                    // that is a transient failure, not "no such track".
-                    if (!data.error) {
-                        if (data.data && data.data.length > 0) {
-                            // Five candidates, and the one whose ARTIST is
-                            // ours — not simply the first. Nothing matching
-                            // is an honest "no cover": see artPick.
-                            var cands = [];
-                            for (var ci = 0; ci < data.data.length; ci++)
-                                cands.push({ "artist": ((data.data[ci] || {}).artist || {}).name || "",
-                                             "title": (data.data[ci] || {}).title || "" });
-                            var pi = SearchLogic.artPick(want.artist, want.title, cands);
-                            if (pi >= 0) {
-                                var album = data.data[pi].album || {};
-                                var artUrl = _deezerRealArt(album.cover_big)
-                                             || _deezerRealArt(album.cover_medium)
-                                             || _deezerRealArt((data.data[pi].artist || {}).picture_medium);
-                                if (artUrl) {
-                                    onResult(artUrl, true);
-                                    return;
-                                }
-                            }
-                        }
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
-        };
-        guard = _armXhrTimeout(xhr, 2500);
-        xhr.send();
-    }
 
-    function _queryDeezerArtist(artistName, cacheKey, onResult) {
-        console.log("[ARP] DeezerArtist query");
-        var xhr = new XMLHttpRequest;
-        var guard = null;
-        xhr.open("GET", "https://api.deezer.com/search/artist?q=" + encodeURIComponent(artistName) + "&limit=1");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            _clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (!data.error) {
-                        if (data.data && data.data.length > 0) {
-                            var artist = data.data[0];
-                            // The photo of SOME artist is not a fallback,
-                            // it is a wrong picture with a friendly face —
-                            // the name has to be the one we asked for.
-                            if (SearchLogic.nameAkin(SearchLogic.fold(artistName),
-                                                     SearchLogic.fold(artist.name || ""))) {
-                                var artUrl = _deezerRealArt(artist.picture_big)
-                                             || _deezerRealArt(artist.picture_medium);
-                                if (artUrl) {
-                                    onResult(artUrl, true);
-                                    return;
-                                }
-                            }
-                        }
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
-        };
-        guard = _armXhrTimeout(xhr, 2500);
-        xhr.send();
-    }
 
-    function _primaryArtist(artist) {
-        return TrackLogic.primaryArtist(artist);
-    }
 
-    // A flapping StreamTitle (rotating ad text, titles carrying elapsed
-    // time) used to launch a full art-lookup chain per flap. Debounced to
-    // one chain per stable window; the ~1.5 s later cover is acceptable.
-    property string _artLookupPendingRaw: ""
-    // The normalized lookup key the pending debounce is already aimed at —
-    // so same-key raw flaps (an embedded per-second counter) don't restart
-    // the timer forever and starve the lookup.
-    property string _artPendingKey: ""
 
-    Timer {
-        id: artLookupDebounce
-        interval: 1500
-        repeat: false
-        onTriggered: root.lookupAlbumArt(root._artLookupPendingRaw)
-    }
 
-    // What the cache already knows about a lookup key, applied at once.
-    // True means the cache settled it — either a cover, or a still-fresh
-    // "this track has none", which is just as final and costs no network.
-    function _artFromCache(query) {
-        var hit = _artCache[query];
-        if (hit === undefined) return false;
-        if (hit.url === "" && Date.now() - hit.t >= _artNegativeTtlMs) return false;
-        albumArtUrl = hit.url;
-        _albumArtKey = hit.url ? query : "";
-        return true;
-    }
-
-    function lookupAlbumArt(trackString) {
-        // A local track's own sidecar cover outranks any network guess.
-        if (root._localArtForSource !== ""
-            && playMusic.source.toString() === root._localArtForSource)
-            return;
-        if (!Plasmoid.configuration.albumArtEnabled) {
-            albumArtUrl = "";
-            return;
-        }
-        if (!trackString || trackString.length === 0) {
-            albumArtUrl = "";
-            return;
-        }
-        var parsed = parseTrackString(_preCleanTrack(trackString));
-        var query = _normalizeQuery((parsed.artist + " " + parsed.title).trim() || trackString);
-        if (query.length === 0) {
-            albumArtUrl = "";
-            _albumArtKey = "";
-            return;
-        }
-        if (_artFromCache(query)) return;
-        // A NEW track's lookup begins: the old track's cover must not pose
-        // over it while the network answers (or fails to).
-        if (albumArtUrl !== "" && _albumArtKey !== query) {
-            albumArtUrl = "";
-            _albumArtKey = "";
-        }
-
-        // One request at a time, Deezer first: its rate limit is far
-        // friendlier than iTunes' (~20 req/min per IP), so the common case
-        // costs a single Deezer call and iTunes only ever sees fallbacks.
-        // The old parallel-pair start burned both quotas on every track.
-        // What the stream said it is playing — every candidate a music
-        // service offers is judged against this, never accepted on faith.
-        var want = { "artist": parsed.artist || "", "title": parsed.title || "" };
-        var attempts = [
-            {fn: _queryDeezer, q: query},
-            // Deezer's field search, for the records filed under a name the
-            // stream does not use: measured, "Bodies Without Organs" returns
-            // three karaoke pressings by free text, while track:"Sunshine In
-            // The Rain" has the real one — under "BWO". The picker's initial
-            // matching recognizes the pair; free text alone never could.
-            {fn: _queryDeezer, q: 'track:"' + (parsed.title || "").replace(/"/g, " ") + '"'},
-            {fn: _queryItunes, q: query}
-        ];
-        var primary = _primaryArtist(parsed.artist);
-        if (primary && parsed.title) {
-            attempts.push({fn: _queryDeezer, q: primary + " " + parsed.title});
-            attempts.push({fn: _queryItunes, q: primary + " " + parsed.title});
-        }
-        if (primary) {
-            attempts.push({fn: _queryDeezerArtist, q: primary});
-        } else if (parsed.title) {
-            attempts.push({fn: _queryDeezer, q: parsed.title});
-            attempts.push({fn: _queryItunes, q: parsed.title});
-        }
-
-        // Two of these repeat earlier ones byte for byte in the ordinary
-        // "Artist - Title" case: _primaryArtist hands back the artist
-        // unchanged when it carries no splitter, and _normalizeQuery is a
-        // no-op on a title with no bracket, pipe or kbps tag — so the
-        // primary+title Deezer attempt is the plain Deezer one again, and
-        // likewise for iTunes. Checked against the real functions on
-        // "ABBA - Dancing Queen", "Curly Strings - Kuu" and
-        // "Metallica - Nothing Else Matters - Raadio 2": six attempts, two
-        // of them exact repeats. They only run on the MISS path, which is
-        // precisely where someone is already waiting longest, and the cache
-        // is keyed on the track rather than the attempt, so each repeat
-        // really does go back out to the network.
-        var uniqAttempts = [];
-        for (var ai = 0; ai < attempts.length; ai++) {
-            var isDup = false;
-            for (var bi = 0; bi < uniqAttempts.length; bi++) {
-                if (uniqAttempts[bi].fn === attempts[ai].fn
-                    && uniqAttempts[bi].q === attempts[ai].q) { isDup = true; break; }
-            }
-            if (!isDup) uniqAttempts.push(attempts[ai]);
-        }
-        attempts = uniqAttempts;
-
-        var sawTransient = false;
-
-        function runNext() {
-            // The track changed while the chain was running: stop burning
-            // requests on it. Nothing is cached (the chain is incomplete);
-            // the track's next play starts fresh.
-            if (trackArtistTitleKey() !== query) return;
-            if (attempts.length === 0) {
-                // Cache the miss only when every source really said "no
-                // match" — a timeout/quota blip must retry on the next play.
-                _artFinish(query, "", !sawTransient);
-                return;
-            }
-            var step = attempts.shift();
-            step.fn(step.q, query, function(url, definitive) {
-                if (url) {
-                    _artFinish(query, url, true);
-                    return;
-                }
-                if (!definitive) sawTransient = true;
-                runNext();
-            }, want);
-        }
-        runNext();
-    }
 
     function parseTrackString(s) {
         return TrackLogic.parseTrackString(s);
@@ -7129,7 +5096,23 @@ PlasmoidItem {
 
     function _handleMprisCommand(cmd) {
         if (!cmd) return;
-        if (cmd === "Stop") {
+        // A Bluetooth speaker powering OFF sends an AVRCP Pause as its
+        // dying breath — the JBL does, measured live (2026-08-11 13:2x):
+        // the journal showed the park land in the same second the member
+        // left the group. With the combine active and OTHER speakers
+        // still in the room, that pause is not the listener's word, and
+        // honouring it silenced the whole room. The two events can arrive
+        // in either order, so both sides check: a pause inside the
+        // departure window is ignored here, and a departure right after
+        // a park resumes it (below, noteBtMemberLost).
+        root._mprisCmdActive = true;
+        var _deathbedPause = (cmd === "Pause" || cmd === "PlayPause")
+                             && syncEngine._combineActive
+                             && Date.now() - root._btMemberLostAt < 4000;
+        if (_deathbedPause) {
+            console.log("[ARP] a pause arrived in a departing speaker's"
+                        + " last breath — the room plays on");
+        } else if (cmd === "Stop") {
             // Stop must NEVER start playback — only stop if playing.
             // Cast-only playback counts: the media key must reach the
             // bedroom speaker too. And a standing order mid-recovery counts
@@ -7209,6 +5192,7 @@ PlasmoidItem {
                 setUserVolume(v);
             }
         }
+        root._mprisCmdActive = false;
     }
 
     onMetadataChanged: function() {
@@ -7237,15 +5221,11 @@ PlasmoidItem {
             if (playMusic.source.toString().indexOf("file://") !== 0) {
                 _pushHistory(parsed.artist, parsed.title, root.currentStation);
             }
-            // Track log sidecar for an INSTANT recording of this same stream —
-            // no per-track splitting, but the times + titles are all there.
-            if (root.recording && !root._recScheduled && root._recTracksPath !== ""
-                && _icyStreamTarget(playMusic.source) === root._recUrl && parsed.title) {
-                var recLine = "[" + root.recElapsedText() + "] "
-                              + (parsed.artist ? parsed.artist + " - " : "") + parsed.title;
-                executable.exec(": REC_TRACK; printf '%s\\n' '" + recLine.replace(/'/g, "'\\''")
-                                + "' >> '" + root._recTracksPath.replace(/'/g, "'\\''") + "'");
-            }
+            // Track log sidecar for an INSTANT recording of this same
+            // stream — the engine owns the shell; it only needs the stream
+            // target (a player fact) and the parsed title.
+            recordingEngine.noteTrack(_icyStreamTarget(playMusic.source),
+                                      parsed.artist, parsed.title);
             // Restart the debounce only when the NORMALIZED key moves — a title
             // carrying a per-second counter would otherwise restart the 1.5 s
             // timer forever and the art never fires. Same key = same query, so
@@ -7282,13 +5262,13 @@ PlasmoidItem {
                                  && artKey.length > 0
                                  && root._artFromCache(artKey);
                 }
-                if (artSettled) artLookupDebounce.stop();
-                else artLookupDebounce.restart();
+                if (artSettled) artworkEngine.debounceStop();
+                else artworkEngine.debounceRestart();
             }
         } else {
             // A lookup still waiting out its debounce is for a title that no
             // longer exists — it must not repaint the art after this clear.
-            artLookupDebounce.stop();
+            artworkEngine.debounceStop();
             // Drop the pending key so the same track returning fires a fresh
             // lookup instead of being swallowed as a same-key flap.
             root._artPendingKey = "";
@@ -7327,7 +5307,7 @@ PlasmoidItem {
         _loadRecSchedules();
         // Alarms re-arm their keep-awake holder every start: the pid file
         // kill-and-rearm cycle also cleans up after a crashed session.
-        _loadAlarms();
+        alarmEngine.start();
         // A time-zone change that happened while the widget was NOT running
         // (reboot after a DST flip, a laptop opened in a new zone) is caught
         // here, once both lists are loaded — the live ticks only see changes
@@ -7335,7 +5315,7 @@ PlasmoidItem {
         var storedTz = Plasmoid.configuration.schedTzOffset;
         _schedTzOffset = (typeof storedTz === "number") ? storedTz : 9999;
         _schedApplyTzChange(Date.now());
-        _alarmArmInhibit();
+        alarmEngine._alarmArmInhibit();
         syncFavicons();
         favBackfillTimer.restart();
         playMusicOutput.volume = targetVolume();
@@ -7358,27 +5338,8 @@ PlasmoidItem {
         _loadPodSpeeds();
         _loadPodPlayed();
         _applyAudioOutputDevice();
-        // A plasmashell crash can orphan a recording ffmpeg — the pid file
-        // survives, so stop the orphan on the next start. ("-t" already caps
-        // how long it could have kept running.)
-        var safePid = _recPidFile.replace(/'/g, "'\\''");
-        // Signal only if the pid is still OUR ffmpeg — a stale pid file plus
-        // pid reuse would otherwise SIGINT an innocent process on startup.
-        // The file is removed either way (it is this session's to clean).
-        executable.exec(": REC_CLEAN; p=$(cat '" + safePid + "' 2>/dev/null);"
-            // The identity check must name what the recording's argv ACTUALLY
-            // says. It looked for -rw_timeout, a flag that left with the move
-            // to curl, so the sweep stopped matching anything — and since the
-            // pid file is removed either way, a crash left an orphan recording
-            // running with nothing able to reach it. Same pattern the stop
-            // road uses.
-            + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'; then"
-            + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "'; true");
-        // The resume tick waits for the sweep's ack (see the REC_CLEAN
-        // handler): both run async shells over the SAME pid file, and a
-        // resume that started first wrote a fresh ffmpeg pid into the very
-        // file the sweep was about to kill and delete — the orphan sweep
-        // then shot the just-started continuation instead of the orphan.
+        recordingEngine.start();
+
     }
 
     Component.onDestruction: {
@@ -7400,12 +5361,12 @@ PlasmoidItem {
         // outliving its widget does.
         executable.exec("rm -f '" + _icyUrlFile.replace(/'/g, "'\\''")
                         + "' '" + _podUrlFile.replace(/'/g, "'\\''")
-                        + "' '" + _recUrlFile.replace(/'/g, "'\\''") + "'");
+                        + "' '" + recordingEngine._recUrlFile.replace(/'/g, "'\\''") + "'");
         // The keep-awake holder is a DETACHED process group (setsid) that
         // outlives the widget — removing the plasmoid would otherwise leave
         // the machine unable to sleep for up to 12 hours, plus a stale pid
         // file. Kill it identity-checked, the same block the re-arm uses.
-        var pf = _alarmInhibitPidFile.replace(/'/g, "'\\''");
+        var pf = alarmEngine._alarmInhibitPidFile.replace(/'/g, "'\\''");
         executable.exec(": ALARM_INHIBIT; if [ -f '" + pf + "' ]; then "
             + "p=$(cat '" + pf + "' 2>/dev/null); "
             + "[ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'systemd-inhibit.*On Air' "
@@ -7546,8 +5507,20 @@ PlasmoidItem {
         }
     }
 
+    // Missing tool (127) or timed-out command (124): one journal line per
+    // tool a session, so a silent background failure leaves a trace to grep.
+    // Journal only — the listener-facing "install X" verdict is a later
+    // decision; the classification itself lives in ExecClass.js.
+    property var _execFailLogged: ({})
+
     Connections {
         function onExited(cmd, exitCode, exitStatus, stdout, stderr) {
+            var _fail = ExecClass.classify(exitCode);
+            var _lbl = _fail !== "" ? ExecClass.label(cmd) : "";
+            if (_fail !== "" && !root._execFailLogged[_lbl]) {
+                root._execFailLogged[_lbl] = true;
+                console.warn("[ARP] exec " + _fail + " (exit " + exitCode + "): " + _lbl);
+            }
             // MPRIS launcher failed (missing python-dbus/PyGObject, dead bus…):
             // surface it and stop churning writes/polls against a dead daemon.
             // Prefix sentinel, not a substring: this branch returns, so a
@@ -7587,155 +5560,23 @@ PlasmoidItem {
                     getStreamInfo(playMusic.source, root.metadata);
                 return;
             }
-            // The recording's address landed in its owner-only file — now the
-            // recording itself can start, carrying no URL of its own.
-            if (cmd.indexOf(": REC_URL;") === 0) {
-                var recJob = root._recPending;
-                root._recPending = null;
-                // Called off in the gap (a stop, a station switch): recStop
-                // already settled the state, and starting now would record
-                // the address of a station the user has left.
-                if (!recJob) return;
-                if ((stdout || "").indexOf("__REC_URL_OK__") === -1) {
-                    notify(i18n("Recording failed"), recJob.station, "dialog-error");
-                    root._recFinishAborted(false);
-                    return;
-                }
-                executable.exec(recJob.cmd);
-                if (recJob.scheduled)
-                    notify(i18n("Scheduled recording started"), recJob.station, "media-record");
-                return;
-            }
             // Whole-room sync: every PW_*/BT_KICK round-trip belongs to
             // the engine, which answers true when the command was its own.
-            if (syncEngine.handleExec(cmd, stdout, stderr)) return;
-            if (timeshift.handleExec(cmd, stdout, Date.now())) return;
+            if (syncEngine.handleExec(cmd, stdout, stderr, exitCode)) return;
+            if (timeshift.handleExec(cmd, stdout, Date.now(), exitCode)) return;
             // The download's first half came home: the URL is in the
             // owner-only config file (or the write failed, which ends the
             // job on the same road a failed transfer takes). Only now does
             // curl start, with a command line that names paths, not the URL.
-            if (cmd.indexOf(": POD_URL;") === 0) {
-                if (root._podDownloadKey === "") return;
-                if ((stdout || "").indexOf("__POD_URL_OK__") !== -1)
-                    root._podRunDownload();
-                else
-                    root._podDownloadFail("could not stage the URL file");
-                return;
-            }
-            // Podcast episode download finished — one honest word either
-            // way, and the single-download slot frees up. The Podcasts
-            // folder model watches the directory itself, so the new file
-            // appears without a manual refresh.
-            if (cmd.indexOf(": POD_DL;") === 0) {
-                var podOk = (stdout || "").indexOf("__POD_OK__") !== -1;
-                if (podOk) {
-                    // The ledger row, written only on a landed file: the
-                    // Downloaded view joins the folder against this to show
-                    // an EPISODE — show, cover, resume — not a bare name.
-                    var pdm = root._podDownloadMeta;
-                    if (pdm && pdm.file) {
-                        root._podDownloads[pdm.file] = {
-                            "key": pdm.key, "title": pdm.title, "show": pdm.show,
-                            "art": pdm.art, "feed": pdm.feed, "at": Date.now()
-                        };
-                        root._savePodDownloads();
-                    }
-                    // A night cycle's transfers stay quiet — the aggregate
-                    // already spoke for them; the user's own taps keep their
-                    // one honest word each.
-                    if (!root._podDownloadAuto)
-                        notify(i18n("Episode downloaded"), root._podDownloadTitle, "folder-music");
-                } else {
-                    console.warn("[ARP] podcast download failed: "
-                                 + (stderr || "").trim().split("\n").slice(-2).join(" "));
-                    if (!root._podDownloadAuto)
-                        notify(i18n("Episode download failed"), root._podDownloadTitle, "dialog-error");
-                }
-                root._podDownloadKey = "";
-                root._podDownloadTitle = "";
-                var scanFile = podOk && root._podDownloadMeta ? root._podDownloadMeta.file : "";
-                root._podDownloadMeta = null;
-                // The landed file gets its silence map (for skip-silence)…
-                if (scanFile !== "") root._podScanStart(scanFile);
-                // …and the line moves: next queued transfer starts now.
-                if (root._podDlQueue.length > 0) {
-                    var nextJob = root._podDlQueue.shift();
-                    root._podDlQueue = root._podDlQueue;
-                    root._podStartDownload(nextJob);
-                }
-                return;
-            }
             // The silence scan came home — closed pairs land in the ledger
             // row, and skip-silence starts honoring them mid-play if this
             // very file is on the speakers right now.
-            if (cmd.indexOf(": POD_SCAN;") === 0) {
-                var sf = root._podScanFile;
-                root._podScanFile = "";
-                if (sf !== "" && root._podDownloads[sf] !== undefined) {
-                    var scanParts = (stdout || "").split("__CHAPTERS__");
-                    var sil = PodcastLogic.parseSilences(scanParts[0] || "", 0.9);
-                    var chs = PodcastLogic.parseChapters(scanParts[1] || "", 100);
-                    var dirty = false;
-                    if (sil.length > 0) { root._podDownloads[sf].sil = sil; dirty = true; }
-                    if (chs.length > 0) { root._podDownloads[sf].ch = chs; dirty = true; }
-                    if (dirty) {
-                        root._savePodDownloads();
-                        if (root._podPlayingUrl !== ""
-                            && root._podFileOfUrl(root._podPlayingUrl) === sf) {
-                            if (sil.length > 0) root._podSilCur = sil;
-                            if (chs.length > 0) root._podChaptersCur = chs;
-                        }
-                    }
-                }
-                if (root._podScanQueue.length > 0)
-                    root._podScanStart(root._podScanQueue.shift());
-                return;
-            }
-            if (cmd.indexOf(": POD_RM") === 0) {
-                var rmTokM = cmd.match(/^: POD_RM (\d+);/);
-                var rmName = rmTokM ? root._podRmByTok[rmTokM[1]] : undefined;
-                if (rmTokM) delete root._podRmByTok[rmTokM[1]];
-                if (rmName !== undefined
-                    && (stdout || "").indexOf("__POD_RM_OK__") !== -1
-                    && root._podDownloads[rmName] !== undefined) {
-                    delete root._podDownloads[rmName];
-                    root._savePodDownloads();
-                } else if (rmName !== undefined
-                           && (stdout || "").indexOf("__POD_RM_OK__") === -1) {
-                    console.warn("[ARP] podcast delete: file still present — ledger kept for " + rmName);
-                }
-                return;
-            }
-            // A playback error blamed a file; the row falls only if the
-            // file is PROVABLY missing — a healthy download whose decode
-            // hiccuped keeps its cover and resume point.
-            if (cmd.indexOf(": POD_GONE") === 0) {
-                var goneM = cmd.match(/^: POD_GONE (\d+);/);
-                var goneName = goneM ? root._podGoneByTok[goneM[1]] : undefined;
-                if (goneM) delete root._podGoneByTok[goneM[1]];
-                if (goneName !== undefined
-                    && (stdout || "").indexOf("__POD_GONE__") !== -1
-                    && root._podDownloads[goneName] !== undefined) {
-                    delete root._podDownloads[goneName];
-                    root._savePodDownloads();
-                }
-                return;
-            }
-            // OPML export written (or not) — one honest word with the path.
-            if (cmd.indexOf(": OPML_EXPORT;") === 0) {
-                if ((stdout || "").indexOf("__OPML_OK__") !== -1)
-                    notify(i18n("Subscriptions exported"), root._opmlExportPath, "application-rss+xml");
-                else
-                    notify(i18n("Export failed"),
-                           i18n("Could not write the subscriptions file."), "dialog-error");
-                return;
-            }
-            // OPML import — the file's contents come back as stdout; parse
-            // and subscribe (each feed still gated by addPodcastSub).
-            if (cmd.indexOf(": OPML_IMPORT;") === 0) {
-                root._applyImportedOpml(stdout || "");
-                return;
-            }
+            // The downloads ledger answers its own POD_RM/POD_GONE
+            // round-trips inside the engine, same contract as the two
+            // handleExec calls above.
+            if (podcastEngine.handleExec(cmd, stdout)) return;
+            if (recordingEngine.handleExec(cmd, stdout, stderr, exitCode)) return;
+            if (alarmEngine.handleExec(cmd, stdout)) return;
             // Timezone → home country, for the search page's local chips.
             // Anything but a clean ISO code leaves the locale fallback ruling.
             if (cmd.indexOf(": TZ_CC;") === 0) {
@@ -7860,7 +5701,7 @@ PlasmoidItem {
                     // A device really took the stream — the wake-tone gate
                     // may now trust the casting route (multi-device: any one
                     // confirmed speaker is enough to wake the room).
-                    root._alarmCastConfirmed = true;
+                    alarmEngine._alarmCastConfirmed = true;
                     // Playing — a device without a stored balance adopts the
                     // loudness it is at right now (see _castAdoptTrim). The
                     // uuid is read back from the argv this very command
@@ -8127,16 +5968,9 @@ PlasmoidItem {
                 btList();
                 return;
             }
-            if (cmd.indexOf(": ALARM_INHIBIT;") === 0) {
-                return; // fire-and-forget
-            }
             // Orphan sweep done — only NOW may a due schedule resume: both
             // shells work the same pid file, and a resume racing the sweep
             // used to get its fresh ffmpeg shot as "the orphan".
-            if (cmd.indexOf(": REC_CLEAN;") === 0) {
-                Qt.callLater(_recScheduleTick);
-                return;
-            }
             // inotifywait availability probe (for the MPRIS command channel)
             if (cmd.indexOf("command -v inotifywait") === 0) {
                 root._hasInotify = (stdout || "").indexOf("INOTIFY_YES") !== -1;
@@ -8193,117 +6027,6 @@ PlasmoidItem {
                 return;
             }
             // Recording finished (stopped, duration cap, stream died) → notify
-            if (cmd.indexOf(": REC_START;") === 0) {
-                var recFile = root._recFilePath;
-                var recDur = root.recElapsedText();
-                var recElapsed = root.recElapsedSec;
-                var recWanted = root._recDurationSec;
-                var recWasScheduled = root._recScheduled;
-                var recSchedKey = root._recActiveSchedKey;
-                var recWasStopRequested = root._recStopRequested;
-                root.recording = false;
-                root._recScheduled = false;
-                root._recStopRequested = false;
-                root._recActiveSchedKey = "";
-                root._recUrl = "";
-                root._recFilePath = "";
-                root._recTracksPath = "";
-                var recOut = stdout || "";
-                var recName = recFile.substring(recFile.lastIndexOf("/") + 1);
-                // Success is judged on evidence, not on "the file is not empty":
-                //   • a user stop / the duration cap ending the recording is fine;
-                //   • anything that ends the recording early on its own (stream
-                //     died, disk full) is an interruption, whatever ffmpeg's rc;
-                //   • a file far too small for its duration (< ~10 KB/min — real
-                //     audio is at least 60 KB/min) is a broken capture.
-                var recDone = recOut.indexOf("__REC_DONE__") !== -1;
-                var recBytesM = recOut.match(/__REC_DONE__ rc=(-?\d+) bytes=(\d+)/);
-                var recRc = recBytesM ? parseInt(recBytesM[1], 10) : -1;
-                var recBytes = recBytesM ? parseInt(recBytesM[2], 10) : 0;
-                var recRanFull = recElapsed >= recWanted - 5;
-                var recTooSmall = recBytes < Math.max(1, recElapsed / 60) * 10240;
-                var recOk = recDone && (recWasStopRequested || (recRanFull && recRc === 0)) && !recTooSmall;
-                var recInterrupted = recDone && !recOk;
-                var recTitle, recText, recIcon;
-                if (recOut.indexOf("__NO_FFMPEG__") !== -1) {
-                    recTitle = i18n("ffmpeg is not installed");
-                    recText = i18n("Install ffmpeg to record radio.");
-                    recIcon = "dialog-warning";
-                } else if (recOut.indexOf("__NO_CURL__") !== -1) {
-                    // curl fetches the stream so the address never rides on a
-                    // command line — no curl, no recording.
-                    recTitle = i18n("curl is not installed");
-                    recText = i18n("Install curl to record radio.");
-                    recIcon = "dialog-warning";
-                } else if (recOut.indexOf("__REC_NOSPACE__") !== -1) {
-                    recTitle = i18n("Not enough disk space for this recording");
-                    recText = i18n("Free some space in %1 and try again.", root.downloadDirPath);
-                    recIcon = "dialog-warning";
-                } else if (recOk) {
-                    recTitle = i18n("Recording saved ✓ (%1)", recDur);
-                    recText = recName;
-                    recIcon = "media-record";
-                } else if (recInterrupted) {
-                    recTitle = i18n("Recording interrupted (%1 captured)", recDur);
-                    recText = recTooSmall
-                        ? i18n("%1 — the file is much smaller than expected.", recName)
-                        : recName;
-                    recIcon = "dialog-warning";
-                } else {
-                    recTitle = i18n("Recording failed");
-                    recText = ((stderr || "").split("\n").filter(function(l){ return l.trim() !== ""; })[0] || i18n("The stream could not be captured.")).substring(0, 120);
-                    recIcon = "dialog-error";
-                }
-                // A missing tool is a missing tool — curl counts like ffmpeg:
-                // neither will appear inside a recording window.
-                var recNoFfmpeg = recOut.indexOf("__NO_FFMPEG__") !== -1
-                                  || recOut.indexOf("__NO_CURL__") !== -1;
-                var recNoSpace = recOut.indexOf("__REC_NOSPACE__") !== -1;
-                // A near-instant failure (ffmpeg absent, mkdir/disk failure,
-                // stream refused at once) is what storms — a real capture
-                // that ran a while and got interrupted is not. Only the
-                // former earns backoff; the latter resumes right away.
-                var recFailedFast = !recOk && !recWasStopRequested
-                                    && (recNoFfmpeg || recElapsed < 5 || !recDone);
-                notify(recTitle, recText, recIcon);
-                if (recWasScheduled && recSchedKey) {
-                    if (recOk || recWasStopRequested) {
-                        // The occurrence is done — move the entry forward (or
-                        // drop a "once") only NOW, after the actual outcome.
-                        delete _recRetryCount[recSchedKey];
-                        delete _recRetryAfter[recSchedKey];
-                        _recSchedAdvance(recSchedKey);
-                    } else if (recNoFfmpeg || recNoSpace) {
-                        // ffmpeg (or the missing disk space) will not appear
-                        // inside this window — retrying is pointless. Give up
-                        // on the occurrence with the one toast already shown,
-                        // and advance it.
-                        delete _recRetryCount[recSchedKey];
-                        delete _recRetryAfter[recSchedKey];
-                        _recSchedAdvance(recSchedKey);
-                    } else if (recFailedFast) {
-                        // Back off: 30 s, then doubling to 4 min, and after
-                        // six straight fast failures let the window age into
-                        // "missed" rather than keep pounding a dead stream.
-                        var rc = (_recRetryCount[recSchedKey] || 0) + 1;
-                        _recRetryCount[recSchedKey] = rc;
-                        if (rc >= 6) {
-                            _recRetryAfter[recSchedKey] = Date.now() + 3600000;
-                        } else {
-                            _recRetryAfter[recSchedKey] =
-                                Date.now() + Math.min(240000, 30000 * Math.pow(2, rc - 1));
-                            Qt.callLater(_recScheduleTick);
-                        }
-                    } else {
-                        // A real interruption mid-window (stream died after
-                        // recording a while): resume with the remaining time.
-                        delete _recRetryCount[recSchedKey];
-                        delete _recRetryAfter[recSchedKey];
-                        Qt.callLater(_recScheduleTick);
-                    }
-                }
-                return;
-            }
             // Local track's sidecar cover found → show it (and pin it against
             // the network art lookup for as long as this source plays).
             if (cmd.indexOf(": ART_LOCAL ") === 0) {
@@ -8542,20 +6265,9 @@ PlasmoidItem {
                 // everything (the bookmark survives, the row's next tap
                 // retries) — both continue with the queue, then the show.
                 var deadFile = root._podFileOfUrl(pfSrc);
-                root._podPlayingKey = "";
-                root._podPlayingUrl = "";
-                root._podPlayingRawUrl = "";
-                root._podPlayingArt = "";
-                root._podPlayingShow = "";
-                root._podSilCur = [];
-                root._podChaptersCur = [];
-                if (deadFile !== "") {
-                    var goneTok = ++root._podRmTok;
-                    root._podGoneByTok[goneTok] = deadFile;
-                    executable.exec(": POD_GONE " + goneTok + "; [ ! -e "
-                        + PodcastLogic.shQuote(root.downloadDirPath + "/Podcasts/" + deadFile)
-                        + " ] && echo __POD_GONE__; true # " + nextSeq());
-                }
+                podcastEngine.clearPlaying();
+                if (deadFile !== "")
+                    podcastEngine.requestGoneCheck(deadFile);
                 if (root._podPlayUpNextHead()) return;
                 if (Plasmoid.configuration.podcastContinuous !== false && deadFeed) {
                     var aliveNext = PodcastLogic.nextUnplayed(root._podDownloads, deadFeed,
@@ -8623,6 +6335,9 @@ PlasmoidItem {
             }
         }
         onPlayingChanged: {
+            if (isPlaying() && Plasmoid.configuration.autoSwitchToPlaying === true
+                && root.view !== 1)
+                autoPlayingTimer.restart();
             if (!isPlaying()) {
                 // A timeshift park (or a shifted reader mid-reopen) is not a
                 // stop: the listener comes back to this exact sentence, and
@@ -8633,8 +6348,8 @@ PlasmoidItem {
             _mprisQueueWrite();
         }
         onMetaDataChanged: {
-            // On many streams the Qt FFmpeg backend provides the ICY StreamTitle
-            // directly — then no reader.py processes need to be spawned at all.
+            // Only a backend that maps ICY titles spares reader.py: GStreamer's
+            // icydemux does, Qt FFmpeg NEVER (no streamtitle key, 6.7…6.11).
             // An EPISODE's ID3 title is not track metadata: it must not feed
             // the radio history, the Deezer art lookup or the MPRIS track
             // line — the podcast state already names what plays.
@@ -8645,9 +6360,19 @@ PlasmoidItem {
             var cleaned = String(t).replace(/\t/g, " ").trim();
             var ph = ["", "-", "--", "unknown", "n/a", "none", "null"];
             if (ph.indexOf(cleaned.toLowerCase()) !== -1) return;
-            root._qtMetaWorks = true;
-            infoTimer.stop();
-            fastRetryTimer.stop();
+            // The latch waits for a SECOND, DIFFERENT title. One title only
+            // proves the backend delivered the tag it saw at connect; the
+            // stuck-titles report (issue #10) is exactly the world where
+            // that first tag arrives and no mid-stream update ever follows
+            // — and the old latch retired the polling fallback on the
+            // strength of that single hello. Two different titles prove
+            // updates flow, and only then is the poll's job truly done.
+            if (cleaned !== root._qtMetaFirstTitle && root._qtMetaFirstTitle !== "") {
+                root._qtMetaWorks = true;
+                infoTimer.stop();
+                fastRetryTimer.stop();
+            }
+            if (root._qtMetaFirstTitle === "") root._qtMetaFirstTitle = cleaned;
             var newMeta = cleaned + "\t";
             if (root.metadata !== newMeta) root.metadata = newMeta;
         }
@@ -8776,13 +6501,7 @@ PlasmoidItem {
                             root._podPosRev++;
                             podPositionsPersist.restart();
                         }
-                        root._podPlayingKey = "";
-                        root._podPlayingUrl = "";
-                        root._podPlayingRawUrl = "";
-                        root._podPlayingArt = "";
-                        root._podPlayingShow = "";
-                        root._podSilCur = [];
-                        root._podChaptersCur = [];
+                        podcastEngine.clearPlaying();
                         isError = true;
                         errorTimer.restart();
                         playMusic.source = "";
@@ -8790,13 +6509,7 @@ PlasmoidItem {
                         return;
                     }
                     root.markEpisodePlayed(endedKey);
-                    root._podPlayingKey = "";
-                    root._podPlayingUrl = "";
-                    root._podPlayingRawUrl = "";
-                    root._podPlayingArt = "";
-                    root._podPlayingShow = "";
-                    root._podSilCur = [];
-                    root._podChaptersCur = [];
+                    podcastEngine.clearPlaying();
                     // What plays next, in order of the listener's own word:
                     // the Up-next queue first (their explicit picks, across
                     // shows), then continuous listening — oldest unheard
@@ -9236,13 +6949,7 @@ PlasmoidItem {
             if (root._podPlayingKey !== ""
                 && playMusic.source.toString() === root._podPlayingUrl) {
                 playMusic.stop();
-                root._podPlayingKey = "";
-                root._podPlayingUrl = "";
-                root._podPlayingRawUrl = "";
-                root._podPlayingArt = "";
-                root._podPlayingShow = "";
-                root._podSilCur = [];
-                root._podChaptersCur = [];
+                podcastEngine.clearPlaying();
                 isError = true;
                 errorTimer.restart();
                 return;
@@ -9273,6 +6980,17 @@ PlasmoidItem {
         interval: 5000
         onTriggered: {
             isError = false;
+            // A non-fatal errorOccurred stopped the title poll while the
+            // stream itself played on (GStreamer surfaces those more than
+            // FFmpeg does) — and nothing restarted it: the only automatic
+            // road back needs a BufferedMedia transition that an unbroken
+            // pipe never makes again. If the music is flowing and neither
+            // the Qt latch nor a no-metadata pin owns the silence, the
+            // poll gets its life back here.
+            if (isPlaying() && !root._qtMetaWorks
+                && root._noIcySource !== playMusic.source.toString()
+                && !infoTimer.running)
+                infoTimer.restart();
         }
     }
 
@@ -9296,6 +7014,7 @@ PlasmoidItem {
             root._noIcySource = "";
             root._icyEmptyCount = 0;
             root._qtMetaWorks = false;
+            root._qtMetaFirstTitle = "";
             root._stallAttempts = 0;
             playMusic.stop();
             playMusic.source = "";

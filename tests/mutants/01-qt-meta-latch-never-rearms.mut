@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The Qt-metadata latch fires on the FIRST title again, killing the fallback.
+
+history:
+  Issue #10 (2026-08-08, Fedora): Now Playing froze on the first track. The
+  latch is one-way — once Qt hands over a single title, infoTimer stops itself
+  and the only ways back are a station change or a bitrate fallback. Measured
+  2026-08-09: Qt's ffmpeg backend emits metaDataChanged exactly once per load,
+  so a stream that goes quiet leaves both sources dead.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (cleaned !== root._qtMetaFirstTitle && root._qtMetaFirstTitle !== "") {
+                  root._qtMetaWorks = true;
+                  infoTimer.stop();
+                  fastRetryTimer.stop();
+              }
+              if (root._qtMetaFirstTitle === "") root._qtMetaFirstTitle = cleaned;
+
+replace:
+              if (true) {
+                  root._qtMetaWorks = true;
+                  infoTimer.stop();
+                  fastRetryTimer.stop();
+              }
+              if (root._qtMetaFirstTitle === "") root._qtMetaFirstTitle = cleaned;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_stuck_titles_holes_stay_closed —
+  the two-title gate is the 2026-08-11 fix for exactly the freeze this mutant
+  documents: latching on the FIRST title retires the polling fallback on the
+  strength of a single hello, and a backend that never emits a mid-stream
+  update leaves both sources dead. The invariant greps for the gate this
+  mutant deletes. The replacement stays line-neutral so the size ratchet can
+  never claim this kill.

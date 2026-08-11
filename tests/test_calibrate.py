@@ -939,7 +939,7 @@ def _capture_with_stimuli(calib, rate, plays, gains, seconds, seed=7):
     n = int(rate * seconds)
     buf = _noise(n, 120.0, seed=seed)
     stim = _stimulus_samples(calib)
-    for t, g in zip(plays, gains):
+    for t, g in zip(plays, gains, strict=True):
         if g <= 0:
             continue
         at = int(t * rate)
@@ -962,7 +962,7 @@ def test_slots_find_every_stimulus_in_one_capture(calib):
     # difference between two members: with the answer taken as a difference,
     # a room in perfect tune reported itself 800 ms out — which is exactly
     # what the end-to-end test caught the day this was written.
-    for t0, a in zip(plays, got):
+    for t0, a in zip(plays, got, strict=True):
         assert a is not None, (t0, got)
         assert abs(a - sweep_at) < 0.020, (t0, a)
     # Said plainly, because it is the whole contract: two speakers that are

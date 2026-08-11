@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The chosen chime's road disappears — a ringer alarm falls through to
+  the station machinery with a sentinel for a URL.
+
+history:
+  The listener asked for the chime as a pickable wake sound (2026-08-10)
+  and the add form stores the "chime:" sentinel for it. If the fire
+  path's dispatch stops recognising the sentinel, the alarm tries to
+  play "chime:" as a stream URL: heal roads spin on garbage and the
+  morning is carried by the fallback net alone — a silent regression a
+  refactor of the dispatch chain could ship without noticing.
+
+target:
+  package/contents/ui/AlarmEngine.qml
+
+find:
+          if ((a.url || "") === "chime:") { _alarmFireChime(a); return; }
+
+replace:
+          if ((a.url || "") === "chime-x:") { _alarmFireChime(a); return; }
+
+expect:
+  Killed by tst_alarmengine.qml
+  test_the_chime_choice_rides_its_own_road: the fire falls through to
+  the station road, startWithFade carries "chime:" instead of the
+  bundled tone and the hostname verify goes red.

@@ -625,11 +625,11 @@ TestCase {
     function test_episode_key_is_capped() {
         // The key is persisted into the plasma config, which the shell
         // rewrites whole on every change; a feed's guid is publisher text.
-        var long = ""
-        for (var i = 0; i < 500; i++) long += "x"
+        var overlong = ""
+        for (var i = 0; i < 500; i++) overlong += "x"
         // 240 kept + "#" + an 8-char tag of the whole string: bounded,
         // and still an identity (see the long-guid test above).
-        compare(PL.episodeKey(long, "").length, 249)
+        compare(PL.episodeKey(overlong, "").length, 249)
         compare(PL.episodeKey("", "https://a.fm/e.mp3"), "https://a.fm/e.mp3")
         compare(PL.episodeKey("g", "u"), "g")
     }

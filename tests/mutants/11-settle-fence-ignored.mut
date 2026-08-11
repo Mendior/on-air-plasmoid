@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The fold ignores the fence around a deferred settle repair — a waiting
+  full-size correction gets clamped back to 60 ms.
+
+history:
+  Found on the 2026-08-10 foreign-desk review: with two Bluetooth members
+  (or any geometry that would move a BT loopback) the settle road writes
+  its full correction to the map and waits for a rebuild to land it. The
+  periodic fold rewrites map entries from the DEPLOYED base, so without
+  the fence it overwrote the waiting repair with its own 60 ms step some
+  eighteen minutes later — the feature's core promise lost silently, on
+  desks this one cannot reproduce. The mutant flips the fence's condition,
+  the way a hasty refactor would.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          for (var dm in _settleDeferredMacs)
+              if (steps[dm] !== undefined) delete steps[dm];
+
+replace:
+          for (var dm in _settleDeferredMacs)
+              if (steps[dm] === undefined) delete steps[dm];
+
+expect:
+  Killed by tst_syncengine.qml
+  test_a_deferred_settle_repair_is_fenced_from_the_fold: with the fence
+  set, three agreeing readings must leave the map at 145; the flipped
+  condition folds them in and the compare goes red.

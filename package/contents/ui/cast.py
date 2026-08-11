@@ -88,7 +88,7 @@ def _dbg(context, exc):
 
 def _import():
     """Import pychromecast lazily so `probe` can report absence cleanly."""
-    import pychromecast  # noqa: F401
+    import pychromecast
     return pychromecast
 
 

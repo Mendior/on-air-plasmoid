@@ -98,6 +98,8 @@ Item {
                 notes.push({ title: t, text: x, icon: i });
             }
             function isPlaying() { return playing; }
+            property int btLost: 0
+            function noteBtMemberLost() { btLost++; }
             function setAudioOutputDevice(id) { lastOutputDevice = id; }
             function btList() { btListed++; }
             function _btValidMac(mac) { return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac); }
@@ -113,6 +115,7 @@ Item {
             property int syncVerifiedMs: -1
             property string syncOffsetMap: "{}"
             property string syncRefLatMap: "{}"
+            property string syncSweepBiasMap: "{}"
             property bool syncAutoCare: false
             // Mirrors config/main.xml's default: the sweep is on unless
             // someone turns it off.
@@ -703,6 +706,156 @@ Item {
             compare(r.e._appliedDelayMs(wired, s) - r.e._appliedDelayMs(btSink, s), 156);
         }
 
+        function test_a_wired_residual_finally_lowers_the_map() {
+            // The live case, 2026-08-11: ear says 152, map says 195, verify
+            // reads the WIRED member 43 ms late twice — which IS what a
+            // too-high map looks like — and used to write nothing. Only
+            // differences ever mattered, so the wired residual shifts the
+            // reference: every Bluetooth member is 43 early, and the map
+            // finally has a road down that is not the listener's hand.
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: '{"' + btMac + '":195}' });
+            activate(r);
+            r.e._verifyPending = true;
+            r.e._verifyCorrected = false;
+            var vOut = "VERIFY_LAG " + wired + " 43\n"
+                     + "VERIFY_LAG " + btSink + " 0\n"
+                     + "VERIFY_OK 43\n";
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut, "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 195);   // one pass proposes only
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut, "");
+            var map = JSON.parse(r.cfg.syncOffsetMap);
+            compare(map[btMac], 152);                               // 195 - 43
+            compare(map[wired], undefined);                         // still never written
+        }
+
+        function test_an_artifact_sized_wired_residual_still_writes_nothing() {
+            // The fence the old refusal was built for: a member woken
+            // mid-measurement reads hundreds of ms late (419-508 live).
+            // That class must not become a "correction" either way.
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: '{"' + btMac + '":195}' });
+            activate(r);
+            r.e._verifyPending = true;
+            r.e._verifyCorrected = false;
+            var vOut = "VERIFY_LAG " + wired + " 111\n"
+                     + "VERIFY_LAG " + btSink + " 0\n"
+                     + "VERIFY_OK 111\n";
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut, "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut, "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 195);   // untouched
+        }
+
+        function test_the_verify_teaches_the_sweep_its_own_error() {
+            // The loop that closes the whole morning: sweeps called an
+            // ear-perfect room 24 ms out and walked the map three times.
+            // When the music-path check finds the wired member late, that
+            // number is not only a correction - it is the sweep's measured
+            // bias on this desk, and the sweep gets taught.
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncOffsetMap: '{"' + btMac + '":195}' });
+            activate(r);
+            r.e._verifyPending = true;
+            r.e._verifyCorrected = false;
+            var vOut = "VERIFY_LAG " + wired + " 43\n"
+                     + "VERIFY_LAG " + btSink + " 0\n"
+                     + "VERIFY_OK 43\n";
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut, "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut, "");
+            compare(JSON.parse(r.cfg.syncSweepBiasMap)[btMac], 43);   // seeded whole
+            // A second lesson averages in - a fluke never owns the number.
+            // (A completed cycle arms a confirming pass; clear the whole
+            // verify state so this reads as a fresh measurement, the same
+            // way a new calibration day would.)
+            r.e._verifyPending = true;
+            r.e._verifyCorrected = false;
+            r.e._verifyProposal = null;
+            // 31, not something smaller: the verify acts only above its own
+            // 25 ms threshold, and a lesson it never acts on is no lesson.
+            var vOut2 = "VERIFY_LAG " + wired + " 31\n"
+                      + "VERIFY_LAG " + btSink + " 0\n"
+                      + "VERIFY_OK 31\n";
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut2, "");
+            r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";", vOut2, "");
+            compare(JSON.parse(r.cfg.syncSweepBiasMap)[btMac], 37);   // (43+31)/2
+        }
+
+        function test_a_learned_bias_stops_the_settle_walking() {
+            // The 09:22 case replayed with a taught sweep: readings 23/24/25
+            // were genuinely flat and genuinely wrong - pure systematic
+            // bias. With 24 learned, the same room reads ~0 and the settle
+            // finds nothing to fix, which is what the ear said all along.
+            var r = settleRig();
+            r.cfg.syncSweepBiasMap = '{"' + btMac + '":24}';
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1483), "");   // raw +23
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1474), "");   // raw +24
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1452, 1477), "");   // raw +25
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);        // stays put
+        }
+
+        function test_the_listeners_hand_teaches_the_sweep() {
+            // Measured live, twice in one morning: the ear called the room
+            // right, the sweeps kept reading the Bluetooth member ~20 late,
+            // and no microphone run was needed to know which one to
+            // believe. Setting the slider IS an ear verdict - the next
+            // three flat periodic readings on that unchanged deployment are
+            // the sweep's own error, and half of it gets learned.
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: '{"' + btMac + '":173}' });
+            activate(r);
+            r.e.setSyncOffset(173);                    // the ear speaks
+            function probe(off) {
+                return "DRIFT_EAR " + wired + " 1400\n"
+                     + "DRIFT_EAR " + btSink + " " + (1400 + off) + "\n"
+                     + "DRIFT_EST " + Math.abs(off) + "\n";
+            }
+            // Five readings with a flyer at each end - what a real room
+            // delivers (measured spreads that session: 124, 3, 2, 7, 126,
+            // 1, 4, 9, 35, 6). Extremes trimmed, the middle three agree,
+            // their median teaches.
+            r.e.handleExec(": PW_DRIFT;", probe(124), "");   // flyer
+            r.e.handleExec(": PW_DRIFT;", probe(20), "");
+            // Mid-lesson the history must ALREADY be empty — not only after.
+            // A lesson abandoned here (another road rewriting the map)
+            // would otherwise leave two ear-calibration readings sitting in
+            // the fold's evidence, and the fold walks off them later.
+            compare(r.e._driftHistory.length, 0);
+            r.e.handleExec(": PW_DRIFT;", probe(21), "");
+            r.e.handleExec(": PW_DRIFT;", probe(19), "");
+            r.e.handleExec(": PW_DRIFT;", probe(-40), "");   // flyer
+            compare(JSON.parse(r.cfg.syncSweepBiasMap)[btMac], 10);   // half of 20
+            // The three lesson readings are the ear's calibration data, not
+            // drift evidence: the fold must not have walked the map off the
+            // very deployment the listener just approved.
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 173);
+            compare(r.e._driftHistory.length, 0);
+        }
+
+        function test_a_lesson_dies_when_another_road_rewrites_the_map() {
+            // A settle or fold landing between the hand and the readings
+            // means the deployment the ear approved no longer exists - the
+            // lesson must retire, not learn from the wrong room.
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: '{"' + btMac + '":173}' });
+            activate(r);
+            r.e.setSyncOffset(173);
+            r.cfg.syncOffsetMap = '{"' + btMac + '":190}';   // another road wrote
+            function probe(off) {
+                return "DRIFT_EAR " + wired + " 1400\n"
+                     + "DRIFT_EAR " + btSink + " " + (1400 + off) + "\n"
+                     + "DRIFT_EST " + Math.abs(off) + "\n";
+            }
+            r.e.handleExec(": PW_DRIFT;", probe(20), "");
+            r.e.handleExec(": PW_DRIFT;", probe(21), "");
+            r.e.handleExec(": PW_DRIFT;", probe(19), "");
+            r.e.handleExec(": PW_DRIFT;", probe(20), "");
+            r.e.handleExec(": PW_DRIFT;", probe(21), "");
+            compare(r.cfg.syncSweepBiasMap, "{}");           // nothing learned
+        }
+
         function test_the_slider_sets_the_difference_not_one_end() {
             // The complaint that found all of this: typing 145 changed
             // nothing audible, because the wired member's own 154 subtracted
@@ -942,19 +1095,26 @@ Item {
             compare(r.e._appliedDelayMs(wired, s) - r.e._appliedDelayMs(btSink, s), before);
         }
 
-        function test_sync_offset_persists_per_mac_and_rebuilds() {
+        function test_sync_offset_persists_per_mac_and_lands_wired_only() {
+            // The slider used to trigger a FULL rebuild, and the rebuild's
+            // handover re-rolled the Bluetooth transport on every nudge —
+            // the listener set 154 by ear and the room had moved before
+            // their hand left the slider (live, 2026-08-11). An ear-tune
+            // only ever changes the WIRED delays on the ordinary desk, so
+            // it lands through the quiet swap now: wired re-delayed,
+            // Bluetooth stream untouched.
             var r = rig([dev(wired), dev(btSink)]);
             activate(r);
             r.e.setSyncOffset(250);
             compare(r.cfg.syncOffsetMs, 250);
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 250);
             var before = r.mock.execLog.length;
-            wait(500);                          // the 300 ms rebuild debounce
+            wait(500);                          // the 300 ms landing debounce
             verify(r.mock.execLog.length > before);
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
-            verify(cmd.indexOf(": PW_RELOOP " + r.e._combineLoadSeq + ";") === 0);
+            verify(cmd.indexOf(": PW_LBSWAP ") === 0);
             verify(cmd.indexOf("sink='" + wired + "' latency_msec=310") !== -1);
-            verify(cmd.indexOf("sink='" + btSink + "' latency_msec=60") !== -1);
+            verify(cmd.indexOf(btSink) === -1);   // the BT stream is not touched
         }
 
         function test_calibration_failure_is_a_notification_not_a_crash() {
@@ -2354,7 +2514,12 @@ Item {
             r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             verify(r.e._driftProbeStale);
-            // No answer ever arrives; the next probe launches fresh.
+            // No answer ever arrives: the lost probe's leash runs out
+            // FIRST — one probe in the air at a time means the next launch
+            // waits for the guard, exactly as the wall clock has it (the
+            // leash is ≤93 s, the next tick six minutes away). Then the
+            // next probe launches fresh.
+            r.e._driftGuardExpired();
             r.e._driftProbe();
             verify(!r.e._driftProbeStale);
             var p = "DRIFT_EAR " + wired + " 1434\nDRIFT_EAR " + btSink + " 1451\nDRIFT_EST 17\n";
@@ -3092,5 +3257,440 @@ Item {
                 if (r.mock.execLog[j].indexOf(": PW_REFLAT C " + wired) === 0) wiredAsked = true;
             compare(wiredAsked, false);
         }
+
+        // ── the settle road: full-size repair of a freshly rebuilt room ──
+
+        function settleRig(mapObj) {
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true,
+                          syncOffsetMap: JSON.stringify(mapObj || { "AA:BB:CC:DD:EE:FF": 145 }) });
+            activate(r);
+            r.mock.anythingPlaying = true;
+            return r;
+        }
+
+        function settleEars(wiredAt, btAt) {
+            return "DRIFT_EAR " + wired + " " + wiredAt + "\n"
+                 + "DRIFT_EAR " + btSink + " " + btAt + "\n"
+                 + "DRIFT_EST " + Math.abs(btAt - wiredAt) + "\n";
+        }
+
+        function test_a_build_arms_the_settle_road_only_with_the_caretaker_on() {
+            var r = settleRig();
+            verify(r.e._settleTimerRunningForTest());
+            var r2 = rig([dev(wired), dev(btSink)], { syncAutoCare: false });
+            activate(r2);
+            verify(!r2.e._settleTimerRunningForTest());
+        }
+
+        function test_three_flat_settle_readings_repair_the_room_whole() {
+            // A restart-sized error (100 ms) — far past the periodic fold's
+            // 60 ms leash — lands in ONE move, and the landing touches only
+            // the wired loopback: no suspend-flush, no Bluetooth unload, so
+            // the very operating point the readings measured stays put.
+            var r = settleRig();
+            r.e._settleTick();
+            verify(r.mock.execLog[r.mock.execLog.length - 1].indexOf(": PW_DRIFT;") === 0);
+            r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1563), "");   // +103
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);        // one reading moves nothing
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1547), "");   // +97
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);        // two is not a verdict
+            r.e._settleTick();
+            var from = r.mock.execLog.length;
+            r.e.handleExec(": PW_DRIFT;", settleEars(1440, 1540), "");   // +100 — flat, same sign
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 245);        // 145 + median 100
+            var swapCmd = "";
+            for (var i = from; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_LBSWAP") === 0) swapCmd = r.mock.execLog[i];
+            verify(swapCmd !== "");
+            verify(swapCmd.indexOf("sink='" + wired + "' latency_msec=305") !== -1);  // 60+(245-0)
+            verify(swapCmd.indexOf("unload-module 101") !== -1);          // the wired module
+            verify(swapCmd.indexOf("unload-module 102") === -1);          // never the Bluetooth one
+            verify(swapCmd.indexOf("suspend-sink") === -1);               // and no birth flush
+            // Make before break: the replacement loads FIRST, muzzled at
+            // birth, and the old stream is cut only after the crossfade
+            // has taken it to zero — a live cut was the measured crack.
+            verify(swapCmd.indexOf("load-module") < swapCmd.indexOf("unload-module 101"));
+            verify(swapCmd.indexOf("\"$nsi\" 0%") !== -1);                // muzzled birth
+            verify(swapCmd.indexOf("\"$osi\" 0%") !== -1);                // faded out before the cut
+            verify(swapCmd.indexOf("sleep 0.8") !== -1);                  // buffer fill at the new delay
+            verify(r.e._combineReloopBusy);
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x",
+                           "LBSWAP 205 " + wired + " 101\n", "");
+            verify(!r.e._combineReloopBusy);
+            verify(r.e._combineLoopbackIds.indexOf("205") !== -1);
+            verify(r.e._combineLoopbackIds.indexOf("101") === -1);
+            verify(r.e._combineLoopbackIds.indexOf("102") !== -1);
+            compare(r.e._builtLags[btSink], 245);                         // the frame moved whole
+            compare(r.e._driftHistory.length, 0);
+        }
+
+        function test_settle_readings_that_keep_moving_never_move_the_map() {
+            // A reading that will not sit still is a link still settling:
+            // the road waits it out, and when the round runs dry it walks
+            // away with the map exactly as it found it.
+            var r = settleRig();
+            var jolts = [[1460, 1563], [1490, 1450], [1440, 1520],
+                         [1520, 1460], [1450, 1500]];   // +103 -40 +80 -60 +50
+            for (var t = 0; t < 5; t++) {
+                r.e._settleTick();
+                r.e.handleExec(": PW_DRIFT;", settleEars(jolts[t][0], jolts[t][1]), "");
+            }
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                verify(r.mock.execLog[i].indexOf(": PW_LBSWAP") !== 0);
+            // And the round is spent — no sixth reading gets taken.
+            compare(r.e._settleReadsLeft, 0);
+        }
+
+        function test_a_warming_ramp_cannot_become_a_correction() {
+            // The regression behind this rule, replayed: a warming link
+            // rose about ten ms a minute, adjacent readings agreed pair by
+            // pair, and the +13 their mean produced put a room the listener
+            // had just called good audibly out. Every three-read window on
+            // a steady ramp fails first-against-last flatness, so the round
+            // burns its reads and leaves the map alone.
+            var r = settleRig();
+            var ramp = [7, 19, 31, 43, 55];
+            for (var t = 0; t < 5; t++) {
+                r.e._settleTick();
+                r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1450 + ramp[t]), "");
+            }
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                verify(r.mock.execLog[i].indexOf(": PW_LBSWAP") !== 0);
+        }
+
+        function test_a_settle_fix_that_would_move_the_bluetooth_loopback_waits() {
+            // With a wired member slower than the corrected Bluetooth one,
+            // landing the fix would re-delay the BT loopback itself — the
+            // measured clatter AND a fresh re-roll. The map is written, the
+            // landing waits for a rebuild that was going to happen anyway.
+            var m0 = {}; m0[wired] = 80; m0[btMac] = 145;
+            var r = settleRig(m0);
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1560, 1462), "");    // -98: bt heard early
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1550, 1448), "");    // -102
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1548, 1448), "");    // -100 — flat
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 45);          // 145 + median(-100)
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                verify(r.mock.execLog[i].indexOf(": PW_LBSWAP") !== 0);
+            verify(r.e.driftLastText.indexOf("next time the music pauses") !== -1);
+            verify(!r.e._combineReloopBusy);
+        }
+
+        function test_a_failed_settle_swap_rebuilds_the_group_whole() {
+            var r = settleRig();
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1563), "");
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1547), "");
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1440, 1540), "");
+            var from = r.mock.execLog.length;
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x",
+                           "LBSWAPFAIL " + wired + "\n", "");
+            var rebuilt = false;
+            for (var i = from; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) rebuilt = true;
+            verify(rebuilt);
+        }
+
+        function test_a_faint_but_audible_residual_is_fixed_too() {
+            // The first live round left 17 ms standing under a 25 ms
+            // threshold and the listener heard it. The band the road may
+            // call "nothing" ends at 10 now.
+            var r = settleRig();
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1475), "");    // +15
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1467), "");    // +17
+            r.e._settleTick();
+            r.e.handleExec(": PW_DRIFT;", settleEars(1452, 1467), "");    // +15 — flat
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 160);         // 145 + median 15
+            var swapped = false;
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_LBSWAP") === 0
+                    && r.mock.execLog[i].indexOf("latency_msec=220") !== -1) swapped = true;
+            verify(swapped);                                              // 60+(160-0)
+        }
+
+        function test_one_probe_in_the_air_routes_to_its_own_road() {
+            // Two roads, one badge: a periodic launch over an in-flight
+            // settle probe used to erase the badge and hand the settle
+            // answer to the periodic history. The second launch is refused
+            // outright now, so the answer lands where its probe belongs.
+            var r = settleRig();
+            r.e._settleTick();
+            var flights = 0;
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_DRIFT;") === 0) flights++;
+            compare(flights, 1);
+            r.e._driftProbe();                       // the periodic road tries
+            var flights2 = 0;
+            for (var j = 0; j < r.mock.execLog.length; j++)
+                if (r.mock.execLog[j].indexOf(": PW_DRIFT;") === 0) flights2++;
+            compare(flights2, 1);                    // refused: one in the air
+            r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1563), "");
+            compare(r.e._settleEarsRuns.length, 1);  // the settle road got it
+            compare(r.e._driftHistory.length, 0);    // the periodic one did not
+        }
+
+        function test_a_settle_probe_lost_with_its_shell_rearms_the_round() {
+            var r = settleRig();
+            r.e._settleTick();
+            verify(r.e._settleProbeOut);
+            r.e._driftGuardExpired();                // the shell never answered
+            verify(!r.e._settleProbeOut);
+            verify(r.e._settleTimerRunningForTest());
+        }
+
+        function test_a_deferred_settle_repair_is_fenced_from_the_fold() {
+            // Multi-Bluetooth geometry defers the landing; the periodic
+            // fold used to rewrite those map entries from the deployed
+            // base and clamp a waiting 150 ms repair back to 60.
+            var r = settleRig();
+            r.e._settleDeferredMacs = ({ "AA:BB:CC:DD:EE:FF": true });
+            var p = "DRIFT_EAR " + wired + " 1460\nDRIFT_EAR " + btSink + " 1447\nDRIFT_EST 13\n";
+            r.e.handleExec(": PW_DRIFT;", p, "");
+            r.e.handleExec(": PW_DRIFT;", p, "");
+            r.e.handleExec(": PW_DRIFT;", p, "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);   // fold declined
+            // The rebuild lands the map and takes the fence down.
+            r.e._combineRebuildLoopbacks();
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+                           "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
+            var fenced = false;
+            for (var m in r.e._settleDeferredMacs) fenced = true;
+            verify(!fenced);
+        }
+
+        function test_an_empty_swap_answer_is_a_failure_not_an_adoption() {
+            // A shell killed mid-swap answers with nothing; adopting that
+            // as success wrote a frame no loopback carries.
+            var r = settleRig();
+            r.e._settleTick(); r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1563), "");
+            r.e._settleTick(); r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1547), "");
+            r.e._settleTick(); r.e.handleExec(": PW_DRIFT;", settleEars(1440, 1540), "");
+            var from = r.mock.execLog.length;
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x", "", "");
+            var rebuilt = false;
+            for (var i = from; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) rebuilt = true;
+            verify(rebuilt);
+            // The rescue rebuild recomputes the frame from the map it is
+            // now deploying — what must NOT happen is a silent adoption
+            // with no rebuild, which left books no loopback carried.
+            verify(r.e._combineReloopBusy);          // the rescue is in flight
+            compare(r.e._builtLags[btSink], 245);    // the frame follows the deploy
+        }
+
+        function test_the_settle_road_stays_home_when_it_cannot_measure() {
+            // No sweep tone or no wired reference means no landings can
+            // ever come — five doomed microphone captures per rebuild.
+            var r2 = rig([dev(wired), dev(btSink)],
+                         { syncAutoCare: true, syncUltrasonic: false });
+            activate(r2);
+            verify(!r2.e._settleTimerRunningForTest());
+            var r3 = rig([dev(btSink), dev("bluez_output.11_22_33_44_55_66.1")],
+                         { syncAutoCare: true });
+            r3.e._combineAvailable = true;
+            r3.e.combineOutputsEnable();
+            verify(!r3.e._settleTimerRunningForTest());
+        }
+
+        function test_a_stale_settle_swap_ack_unloads_its_strays() {
+            var r = settleRig();
+            var from = r.mock.execLog.length;
+            r.e.handleExec(": PW_LBSWAP 9999; x", "LBSWAP 205 " + wired + " 101\n", "");
+            var swept = false;
+            for (var i = from; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_UNCOMBINE;") === 0
+                    && r.mock.execLog[i].indexOf("unload-module 205") !== -1) swept = true;
+            verify(swept);
+            verify(r.e._combineLoopbackIds.indexOf("205") === -1);
+            verify(r.e._combineLoopbackIds.indexOf("101") !== -1);
+        }
+    function test_a_joining_speaker_hands_the_others_over_instead_of_cutting_them() {
+        // The listener connected a Bluetooth speaker mid-song and the wired
+        // pair CRACKED - hard enough to startle (2026-08-11). The rebuild
+        // that lets the newcomer in was tearing every existing loopback
+        // down first, and a stream cut mid-waveform is a step function.
+        var r = rig([dev(wired), dev(btSink)], { syncOffsetMs: 150 });
+        activate(r);
+        var from = r.mock.execLog.length;
+        r.e._combineRebuildLoopbacks();
+        var cmd = "";
+        for (var i = from; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) cmd = r.mock.execLog[i];
+        verify(cmd !== "");
+        // The wired member was playing through module 101 (see activate):
+        // its replacement must be LOADED before that one is unloaded, be
+        // muzzled at birth, and the old one cut only after the fade.
+        var loadAt = cmd.indexOf("load-module module-loopback");
+        var unloadAt = cmd.indexOf("unload-module 101");
+        verify(loadAt !== -1);
+        verify(unloadAt !== -1);
+        verify(loadAt < unloadAt);
+        verify(cmd.indexOf("\"$nsi\" 0%") !== -1);        // born silent
+        verify(cmd.indexOf("sleep 0.8") !== -1);           // filled first
+        verify(cmd.indexOf("\"$osi\" 0%") !== -1);        // faded out before the cut
+    }
+
+    function test_a_member_that_left_is_still_unloaded_up_front() {
+        // A loopback whose sink is gone has nobody to hand over to: the
+        // blanket unload stays for exactly those.
+        var r = rig([dev(wired), dev(btSink)]);
+        activate(r);
+        r.mock.mediaDevs = { audioOutputs: [dev(wired)] };   // the speaker left
+        var from = r.mock.execLog.length;
+        r.e._combineRebuildLoopbacks();
+        var cmd = "";
+        for (var i = from; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) cmd = r.mock.execLog[i];
+        verify(cmd !== "");
+        verify(cmd.indexOf("unload-module 102") !== -1);     // the departed one
+        verify(cmd.indexOf("unload-module 102") < cmd.indexOf("load-module"));
+    }
+
+    function test_every_adopted_loopback_gets_its_level_asserted() {
+        // A handover muzzles the newborn and fades it up, so a shell that
+        // dies mid-fade leaves a member at 0 % while the widget insists it
+        // is playing — found live on this desk, the Bluetooth loopback at
+        // -inf dB after a restart landed in the middle of a rebuild. The
+        // ack now asserts the intended level for EVERY adopted module, not
+        // just the trimmed ones.
+        var r = rig([dev(wired), dev(btSink)]);
+        activate(r);
+        r.e._combineRebuildLoopbacks();
+        var from = r.mock.execLog.length;
+        r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+                       "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
+        // The pending map is what the apply timer drains.
+        compare(r.e._trimPendingLocal["301"], 100);
+        compare(r.e._trimPendingLocal["302"], 100);
+    }
+
+    function test_two_silent_sweeps_while_playing_kick_the_zombie_node() {
+        // Live incident: a powered-off speaker's lingering bluez node
+        // wedged the whole combined graph - wired silent too, and no
+        // event ever fired because the device never left. Two sweeps the
+        // microphone cannot hear, while music claims to flow, resuscitate
+        // the room with the same suspend-cycle a power-cycle performs.
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.mock.playing = true;
+        var from = r.mock.execLog.length;
+        r.e.handleExec(": PW_DRIFT;", "no signal\n", "");     // quiet #1
+        compare(r.mock.execLog.length, from);                  // one is patience
+        r.e.handleExec(": PW_DRIFT;", "no signal\n", "");     // quiet #2
+        var kick = "";
+        for (var i = from; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": PW_ROOMKICK;") === 0) kick = r.mock.execLog[i];
+        verify(kick !== "");
+        verify(kick.indexOf("suspend-sink '" + btSink + "' 1") !== -1);
+        verify(kick.indexOf("suspend-sink '" + btSink + "' 0") !== -1);
+        verify(kick.indexOf(wired) === -1);                    // wired is never cycled
+        // And the cooldown holds: two more silences do not kick again.
+        var after = r.mock.execLog.length;
+        r.e.handleExec(": PW_DRIFT;", "no signal\n", "");
+        r.e.handleExec(": PW_DRIFT;", "no signal\n", "");
+        for (var j = after; j < r.mock.execLog.length; j++)
+            verify(r.mock.execLog[j].indexOf(": PW_ROOMKICK;") !== 0);
+    }
+
+    function test_a_readable_sweep_resets_the_silence_streak() {
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.mock.playing = true;
+        var from = r.mock.execLog.length;
+        r.e.handleExec(": PW_DRIFT;", "no signal\n", "");
+        r.e.handleExec(": PW_DRIFT;",
+                       "DRIFT_EAR " + wired + " 1400\nDRIFT_EAR " + btSink
+                       + " 1410\nDRIFT_EST 10\n", "");       // the room speaks
+        r.e.handleExec(": PW_DRIFT;", "no signal\n", "");     // silence again, but streak restarted
+        for (var i = from; i < r.mock.execLog.length; i++)
+            verify(r.mock.execLog[i].indexOf(": PW_ROOMKICK;") !== 0);
+    }
+
+    function test_a_departed_member_takes_the_full_rebuild_road() {
+        // The live silent-room incident (2026-08-11 13:0x): the speaker
+        // left, the debounce landed on the QUIET road, which re-delays
+        // what exists and cannot retire the departed member's loopback -
+        // the orphan stayed loaded, WirePlumber moved its stream onto the
+        // wired sink, and the room wedged. Membership changes must take
+        // the full rebuild, which unloads the orphan up front.
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.mock.mediaDevs = { audioOutputs: [dev(wired)] };   // the speaker left
+        var from = r.mock.execLog.length;
+        r.e.onOutputsChanged();
+        wait(500);                                           // the debounce
+        var cmd = "";
+        for (var i = from; i < r.mock.execLog.length; i++) {
+            verify(r.mock.execLog[i].indexOf(": PW_LBSWAP") !== 0);
+            if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) cmd = r.mock.execLog[i];
+        }
+        verify(cmd !== "");
+        verify(cmd.indexOf("unload-module 102") !== -1);     // the orphan dies
+    }
+
+    function test_settle_readings_teach_the_lesson_and_defer_to_the_ear() {
+        // The afternoon the map ate three ear-sets (152 -> 172 -> 176):
+        // post-rebuild settle readings routed AROUND the lesson and wrote
+        // the map first, killing the armed lesson every time - so the
+        // bias was never learned and the walking never stopped. Now the
+        // ear's window outranks the settle verdict, and the settle's own
+        // readings are the lesson's teachers.
+        var r = settleRig();
+        r.e.setSyncOffset(145);                     // the ear speaks
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1480), "");   // +20
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1471), "");   // +21
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1452, 1471), "");   // +19
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1455, 1477), "");   // +22
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1458, 1476), "");   // +18
+        compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);        // the map STAYS
+        compare(JSON.parse(r.cfg.syncSweepBiasMap)[btMac], 10);      // and the sweep learned
+    }
+
+    function test_the_ears_window_expires_and_the_settle_resumes_duty() {
+        var r = settleRig();
+        r.e.setSyncOffset(145);
+        r.e._earSetAt = Date.now() - 11 * 60 * 1000;   // eleven minutes ago
+        r.e._earLessonLeft = 0;                        // lesson long since done
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1460, 1563), "");   // +103
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1547), "");   // +97
+        r.e._settleTick();
+        r.e.handleExec(": PW_DRIFT;", settleEars(1452, 1552), "");   // +100
+        compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 245);        // 145 + median 100
+    }
+
+
+
+
+
+    }
+
+    function test_a_departure_noticed_first_makes_the_dying_pause_a_no_op() {
+        // The chain that actually worked, three times running, the night
+        // the acoustic judge was retired: the engine reports the member
+        // gone, and the pause that arrives in its wake is ignored - the
+        // room never falls silent for the speakers still in it.
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.mock.mediaDevs = { audioOutputs: [dev(wired)] };
+        var lostBefore = r.mock.btLost;
+        r.e.onOutputsChanged();
+        compare(r.mock.btLost, lostBefore + 1);
     }
 }

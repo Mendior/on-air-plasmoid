@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Egon Greenberg
 # SPDX-License-Identifier: LGPL-2.0-or-later
 """MPRIS2 DBus bridge for the On Air plasmoid.
@@ -22,9 +21,9 @@ import time
 from pathlib import Path
 
 import dbus
-import dbus.service
 import dbus.mainloop.glib
-from gi.repository import GLib, Gio
+import dbus.service
+from gi.repository import Gio, GLib
 
 # The public MPRIS name: what `playerctl -l` and media controls list.
 # Renamed from the inherited "advancedradio" to match the published id —

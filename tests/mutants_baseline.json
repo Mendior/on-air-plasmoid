@@ -1,0 +1,10 @@
+{
+  "_what": "The mutants expected to SURVIVE today, each a documented blind spot with the test that will one day kill it. `scripts/mutants.py --check-baseline` stays green while the survivor set is a subset of this list; a mutant that WAS being killed and now survives is a real regression (a guard lost its teeth) and goes red. A mutant listed here that gets killed is good news — tighten this file in the same commit that added the test.",
+  "_measured_at": "2026-08-09, baseline 6/9 killed",
+  "_how_to_remeasure": "python3 scripts/mutants.py   (full run, ~25 min; --quick for a weaker fast look)",
+  "expected_survivors": {
+    "01-qt-meta-latch-never-rearms": "no lifecycle test yet — killed when the metadata engine moves out of main.qml and under qmltestrunner (plan stage 4)",
+    "02-icy-inflight-never-cleared": "needs a two-title-query behavioural test, which wants the same metadata engine extraction first",
+    "07-sink-mute-absolute": "the volume path's absolute-0 unmute has no invariant; its neighbour toggleSinkMasterMute does, so a text guard cannot tell them apart"
+  }
+}

@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+#
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+# The mutation suite, run by the clock instead of by memory. Each mutant is a
+# bug this project has already shipped once, reduced to a single text swap; the
+# gate must go red for the ones we expect to catch. Six of nine do today, and
+# 01/02/07 survive by design (tests/mutants_baseline.json says why). This job
+# is green while that holds and red the night a guard quietly loses its teeth —
+# the exact regression no push-time check would ever run long enough to see.
+#
+# It is deliberately its own workflow, not another job in check.yml: a ~25-minute
+# run has no place on every push, and the fast gate must not learn to wait for it.
+name: nightly
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # 03:17 UTC — off the top of the hour, where scheduled runs pile up and slip.
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  mutants:
+    name: mutation baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container: archlinux:latest
+    steps:
+      - name: Install Plasma toolchain and the pinned ruff
+        # Same toolchain as check.yml's qml job, plus ruff — mutants.py runs the
+        # FULL gate per mutant, and mutant 09 is the one ruff catches, so without
+        # ruff here that mutant would survive and read as a false regression.
+        # Pinned to match check.yml: a newer ruff could fire on untouched code
+        # and turn the unmutated control run red, which aborts the whole suite.
+        run: |
+          pacman -Syu --noconfirm --needed \
+            git which gettext python python-pytest python-pip ttf-dejavu dbus \
+            qt6-declarative qt6-multimedia-ffmpeg \
+            plasma-sdk plasma-workspace plasma-desktop plasma5support knotifications \
+            breeze-icons
+          python -m pip install --break-system-packages ruff==0.16.2
+      - uses: actions/checkout@v4
+      - name: Every shipped bug still trips the gate
+        # dbus-run-session wraps the WHOLE run so every per-mutant `dev.sh check`
+        # inherits a session bus for its offscreen plasmoidviewer smoke test.
+        run: dbus-run-session -- python scripts/mutants.py --check-baseline

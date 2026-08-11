@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The wake tone's flowed-audio evidence goes out of reach — an audible
+  station gets ruled dead again.
+
+history:
+  Measured live 2026-08-10 23:08:46, from the fallback's own evidence
+  line: playing=true, position=24917, mediaStatus=4. A live stream plays
+  for minutes sitting in BufferingMedia and never reaches BufferedMedia,
+  and the status-only gate replaced a station the sleeper could hear
+  with the chime — the one thing a wake-up may never do to a working
+  wake-up. The position floor is the fix; this mutant raises it out of
+  reach, which is what any "tidy the magic number" edit would do.
+
+target:
+  package/contents/ui/AlarmEngine.qml
+
+find:
+              if (app.isPlaying() && (app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia
+                                  || app.playMusicRef.position > 5000)) return;
+
+replace:
+              if (app.isPlaying() && (app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia
+                                  || app.playMusicRef.position > 99999999)) return;
+
+expect:
+  Killed by tst_alarmengine.qml
+  test_a_station_that_streamed_stands_the_tone_down: position 24917 no
+  longer clears the floor, the tone fires over the playing station and
+  the faded-count compare goes red.

@@ -23,7 +23,14 @@ PlasmaComponents3.ItemDelegate {
     // Reordering works on the list the user actually sees — with a search
     // filter active the visible neighbours aren't the real neighbours, so the
     // arrows hide themselves instead of doing something surprising.
-    readonly property bool reorderable: root.searchFilter === ""
+    // ...and only while the listener wants the controls at all: switched
+    // off in Appearance, the row gives its width back to the station name.
+    // Settings can always reorder — nothing becomes unreachable.
+    readonly property bool reorderable: rowEditing && root.searchFilter === ""
+    // The row's editing furniture at all — off in Appearance gives the
+    // width back to the station name. Settings can always reorder and
+    // remove, so nothing becomes unreachable.
+    readonly property bool rowEditing: Plasmoid.configuration.showReorderHandles !== false
     readonly property bool isCurrent: lastPlay === listItem.targetIndex && (isPlaying() || root._casting)
     // Cast-only playback buffers on the device — the idle local player would
     // otherwise leave the current row on an eternal BusyIndicator.
@@ -169,7 +176,12 @@ PlasmaComponents3.ItemDelegate {
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     smooth: true
-                    visible: status === Image.Ready && !listItem.hovered && !listItem.isCurrent
+                    // The logo STAYS under the pointer now — asked for in
+                    // Discussions: the old hover state swapped the artwork
+                    // out for a bare glyph, which read as the row losing
+                    // its face right as you reached for it. The glyph
+                    // arrives on a translucent scrim OVER the logo instead.
+                    visible: status === Image.Ready && !listItem.isCurrent
                     // Self-healing, two rungs. A corrupted CACHE file goes
                     // through the central _favBroken map, which flips every
                     // faviconSrc binding to the remote URL — an imperative
@@ -232,7 +244,21 @@ PlasmaComponents3.ItemDelegate {
                     barColor: root.accentTextOn
                 }
 
+                // The scrim under the hover glyph: dark, pulled toward
+                // the accent's hue so the brand shows, and translucent so
+                // the logo keeps breathing underneath. Dark specifically —
+                // a white glyph over a darkened logo reads on EVERY logo,
+                // where a bright accent wash failed on bright artwork.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius !== undefined ? parent.radius : 0
+                    color: Qt.alpha(Qt.darker(root.accentTeal, 2.4), 0.42)
+                    visible: hoverGlyph.visible && faviconImage.visible
+                    Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+                }
+
                 Kirigami.Icon {
+                    id: hoverGlyph
                     anchors.centerIn: parent
                     width: parent.width * 0.55
                     height: parent.height * 0.55
@@ -241,9 +267,13 @@ PlasmaComponents3.ItemDelegate {
                             return "media-playback-stop"
                         return "media-playback-start"
                     }
+                    // Over the scrimmed logo the glyph is always on a dark
+                    // ground, whatever the theme — white is the honest ink
+                    // there. The current row keeps its accent-flood pairing,
+                    // and a logo-less row keeps the theme's own text colour.
                     color: listItem.isCurrent
                            ? root.accentTextOn
-                           : Kirigami.Theme.textColor
+                           : (faviconImage.visible ? "#FFFFFF" : Kirigami.Theme.textColor)
                     visible: {
                         // While the row is being DRAGGED the position number
                         // takes this slot — not the play/stop affordance, on
@@ -451,7 +481,11 @@ PlasmaComponents3.ItemDelegate {
             // visible:false items are skipped by Tab and screen readers
             opacity: armed ? 1.0 : ((listItem.hovered || listItem.isKeyboardCurrent || activeFocus
                                      || Kirigami.Settings.tabletMode) ? 0.6 : 0.0)
-            visible: true            // reserved slot — see the arrows above
+            // Travels with the drag handle under one Appearance switch: the
+            // Discussions ask (2026-08) was "no reorder AND no delete in
+            // the widget, Settings does both" — the row's whole editing
+            // furniture, or none of it.
+            visible: listItem.rowEditing
             enabledState: opacity > 0
             tooltipText: armed
                          ? i18n("Click again to confirm removal")

@@ -10,6 +10,15 @@ import pytest
 UI_DIR = pathlib.Path(__file__).resolve().parent.parent / "package" / "contents" / "ui"
 
 
+def pytest_configure(config):
+    # dev.sh lint runs -m 'not slow'; dev.sh check and CI clear the mark.
+    config.addinivalue_line(
+        "markers",
+        "slow: takes seconds per test (subprocess runs of calibrate.py); "
+        "skipped by dev.sh lint, always run by dev.sh check and CI",
+    )
+
+
 @pytest.fixture(scope="session")
 def cast():
     """cast.py imported as a module (stdlib-only, guarded by __main__)."""

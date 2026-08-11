@@ -44,7 +44,10 @@ def _delayed(src, delay_ms, gain=1.0):
 
 
 def _mix(a, b):
-    return [x + y for x, y in zip(a, b)]
+    # strict: the two programmes are built to the same length on purpose. If
+    # they ever drift apart, zip's default would quietly mix the shorter one
+    # and the drift test would measure a window nobody asked for.
+    return [x + y for x, y in zip(a, b, strict=True)]
 
 
 def test_split_arrivals_read_as_drift():

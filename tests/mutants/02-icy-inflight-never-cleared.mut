@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The exit-handler clear of the in-flight guard is gone — titles freeze for
+  the playing station.
+
+history:
+  The flag exists because two overlapping reader.py runs raced and the slower
+  one overwrote the newer title. It has two clear sites (measured 2026-08-09:
+  main.qml 8443 in the exit handler, 8515 in onSourceChanged since 2026-07-28,
+  so a new station never inherits a raised flag). This mutant drops the exit
+  handler's one — the widget asks once and every later query on the SAME
+  station is skipped; only switching stations re-arms it. Losing the other
+  site instead would be quieter still, which is what makes the pair worth a
+  behavioural test rather than a grep.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+  // exit from this handler.
+              root._icyInFlight = false;
+
+replace:
+  // exit from this handler.
+              // root._icyInFlight = false;
+
+expect:
+  A test that issues two title queries in sequence and asserts the second one
+  actually goes out. No such test exists yet — this mutant is expected to
+  survive until the metadata engine is testable (stage 4 of the plan).

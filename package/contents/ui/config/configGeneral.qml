@@ -247,7 +247,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.32");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -298,7 +298,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.32");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -485,7 +485,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         var keptPrefix = "";
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.31)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.32)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
@@ -677,7 +677,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.31");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.32");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             // A "logo" that streams past 512 KiB is not a logo — cap the
@@ -1113,7 +1113,11 @@ KCM.ScrollViewKCM {
     Labs.FileDialog {
         id: openFileDialog
 
-        nameFilters: ["ARP Stations Backup (*.arp)"]
+        // Any file may be opened, not only *.arp: backups made before the
+        // suffix was enforced (and files a listener renamed by hand) are
+        // still perfectly good JSON, and the import path validates the
+        // content anyway — a filter that hides them helps nobody.
+        nameFilters: ["ARP Stations Backup (*.arp)", "All files (*)"]
         fileMode: Labs.FileDialog.OpenFile
         folder: Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation)
         onAccepted: {
@@ -1125,6 +1129,12 @@ KCM.ScrollViewKCM {
         id: saveFileDialog
 
         nameFilters: ["ARP Stations Backup (*.arp)"]
+        // A backup saved as "minu jaamad" — no extension, because the name
+        // field is free text — was then INVISIBLE to the import dialog,
+        // whose filter shows *.arp only: the file existed and the listener
+        // could not find it. The suffix is added when the typed name has
+        // none, which is exactly the case that went missing.
+        defaultSuffix: "arp"
         folder: Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation)
         fileMode: Labs.FileDialog.SaveFile
         onVisibleChanged: {

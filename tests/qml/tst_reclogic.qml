@@ -23,8 +23,8 @@ TestCase {
 
     function test_names_fold_cap_and_never_vanish() {
         compare(RecLogic.sanitizeStationName("  Raadio   Elmar  "), "Raadio Elmar")
-        var long = RecLogic.sanitizeStationName(new Array(30).join("abc "))
-        verify(long.length <= 60)
+        var capped = RecLogic.sanitizeStationName(new Array(30).join("abc "))
+        verify(capped.length <= 60)
         compare(RecLogic.sanitizeStationName(""), "Radio")
         compare(RecLogic.sanitizeStationName("'''"), "---")
     }

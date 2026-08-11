@@ -50,9 +50,12 @@ RowLayout {
                    : Kirigami.Theme.textColor
         }
 
-        // 2026 signature: emerald-gradient strip below the title
+        // 2026 signature: emerald-gradient strip below the title. The one
+        // piece of pure identity on the page — so it is also the first
+        // thing plain mode retires.
         Rectangle {
             id: accentUnderline
+            visible: root._accentMode !== 2
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: Math.min(primaryLabel.contentWidth * 0.7, headingRoot.width * 0.45)
             Layout.preferredHeight: 3

@@ -85,6 +85,10 @@
             <label>Per-device lag in ms — Bluetooth keyed by MAC, wired keyed by sink name (JSON)</label>
             <default>{}</default>
         </entry>
+        <entry name="syncSweepBiasMap" type="String">
+            <label>Per-speaker correction the inaudible sweep measurement has learned about its own systematic error, keyed by Bluetooth MAC (JSON)</label>
+            <default>{}</default>
+        </entry>
         <entry name="syncMicName" type="String">
             <label>The microphone the last calibration measured as the best ear in this machine — asked for again by name so later checks listen through the same one</label>
             <default></default>
@@ -241,6 +245,10 @@
             <label>Clean up track title with Claude CLI before searching/downloading — opt-in: sends track names to an external service</label>
             <default>false</default>
         </entry>
+        <entry name="accentMode" type="Int">
+            <label>Colours: 0 = the built-in emerald, 1 = the system accent colour, 2 = plain (no colour of its own)</label>
+            <default>0</default>
+        </entry>
         <entry name="followSystemAccent" type="bool">
             <label>Use the system accent color instead of the built-in emerald theme</label>
             <default>false</default>
@@ -259,6 +267,46 @@
         </entry>
         <entry name="showTimersTab" type="bool">
             <label>Show the Timers tab</label>
+            <default>true</default>
+        </entry>
+        <entry name="showStationsTab" type="bool">
+            <label>Show the Stations tab (the last remaining tab always stays)</label>
+            <default>true</default>
+        </entry>
+        <entry name="showPlayingTab" type="bool">
+            <label>Show the Playing tab (the last remaining tab always stays)</label>
+            <default>true</default>
+        </entry>
+        <entry name="autoSwitchToPlaying" type="Bool">
+            <label>A few seconds after a station starts playing, switch the popup to the Playing page — unless the listener is doing something in it</label>
+            <default>false</default>
+        </entry>
+        <entry name="rememberLastTab" type="bool">
+            <label>Open the widget on the tab it was left on</label>
+            <default>false</default>
+        </entry>
+        <entry name="lastTab" type="Int">
+            <label>The tab the widget was last left on</label>
+            <default>0</default>
+        </entry>
+        <entry name="showBitrateBadge" type="bool">
+            <label>Show the bitrate badge on the Playing page</label>
+            <default>true</default>
+        </entry>
+        <entry name="showCoverArt" type="bool">
+            <label>Show the cover on the Playing page</label>
+            <default>true</default>
+        </entry>
+        <entry name="showSearchRow" type="bool">
+            <label>Show the search field above the stations</label>
+            <default>true</default>
+        </entry>
+        <entry name="showDiscoveryRow" type="bool">
+            <label>Show the discovery row (Trending, the country list, the genre chips) above the stations</label>
+            <default>true</default>
+        </entry>
+        <entry name="showReorderHandles" type="bool">
+            <label>Show the drag handle and the remove button on each station row in the widget (Settings can always reorder and remove)</label>
             <default>true</default>
         </entry>
         <entry name="saveOnBattery" type="bool">

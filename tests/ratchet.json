@@ -1,0 +1,17 @@
+{
+  "_what": "Ceilings that may only ever go DOWN. Raising one is allowed exactly once per deliberate decision, in its own commit, with the reason in the message.",
+  "_measured_at": "e4d9eb1 + NameGuard extraction, 2026-08-09; connectsource added same day at 967306c",
+  "_how_to_remeasure": [
+    "lines:            wc -l package/contents/ui/main.qml package/contents/ui/FullRepresentation.qml",
+    "direct_exec:      grep -rhoE 'executable\\.exec\\(' package --include='*.qml' | wc -l   (then subtract the facade's own body — tests/test_ratchet.py does that part)",
+    "connectsource:    grep -rn 'connectSource(\"' package --include='*.qml' | wc -l"
+  ],
+
+  "lines": {
+    "package/contents/ui/main.qml": 7239,
+    "package/contents/ui/FullRepresentation.qml": 6858
+  },
+
+  "direct_exec_calls": 42,
+  "direct_connectsource_calls": 2
+}

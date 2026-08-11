@@ -419,5 +419,38 @@ Item {
             verify(r.e.active);                  // the buffer keeps growing
             verify(r.e.writerUp);
         }
+    function test_the_park_button_stops_promising_what_the_floor_refuses() {
+        // "It jumped straight to live" starts here: for the first seconds
+        // of a station there is too little buffer to resume into, the
+        // gesture refuses, and the caller performs a full stop — while the
+        // button showed a pause icon the whole time.
+        var r = rig({ timeshiftEnabled: true });
+        armed(r);
+        var t0 = 1000000;
+        compare(r.e.parkable, false);                       // the countdown runs
+        compare(r.e.pauseGesture(t0 + 1000), -1);           // one second of buffer
+        // The button's promise arrives on its own clock — and it must
+        // ARRIVE: bound to Date.now() in a binding it never did.
+        tryVerify(function() { return r.e.parkable; }, 8000);
+        verify(r.e.pauseGesture(t0 + 30000) >= 0);
+    }
+
+    function test_an_hour_capped_station_loses_the_park_honestly() {
+        // Checked rather than assumed: when the writer exits at the window
+        // cap, a listener who is NOT already shifted loses the arm, so the
+        // pause icon disappears instead of offering a park that cannot be
+        // served. The frozen-capture branch is unreachable for them by
+        // design — this test is what keeps that claim true.
+        var r = rig({ timeshiftEnabled: true });
+        armed(r);
+        var t0 = 1000000;
+        r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__", t0 + 3600000);
+        verify(r.e.windowFull);
+        verify(!r.e.writerUp);
+        compare(r.e.active, false);
+        compare(r.e.parkable, false);
+        compare(r.e.pauseGesture(t0 + 3600000), -1);
+    }
+
     }
 }

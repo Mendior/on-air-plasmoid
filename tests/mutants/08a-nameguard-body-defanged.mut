@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stripper returns before it strips anything — the character class stays
+  in the file, unreached.
+
+history:
+  Names arrive from radio-browser, from podcast feeds and from devices on
+  the network, and they end up in filenames, in the UI and on shell command
+  lines. Stripping happens once, at the model's door, so no later caller
+  has to remember. The class covers markup, C0/C1 controls, the bidi
+  embedding and override codes and the isolates; that middle group is what
+  lets a crafted name display as something other than what it is.
+
+  This mutant is shaped to leave the guarded TEXT in place and break only
+  the BEHAVIOUR, because that is the seam a grep cannot see. Measured
+  2026-08-09, while the body still lived in main.qml: this exact shape
+  survived the whole gate, and so did a second version that merely renamed
+  the old function and left the class sitting beside it. Both left the
+  invariant happy. The body now lives in NameGuard.js so a test can call it.
+
+target:
+  package/contents/ui/NameGuard.js
+
+find:
+  function sanitize(s) {
+      return (s || "").replace(
+
+replace:
+  function sanitize(s) {
+      if (s !== null) return String(s).substring(0, 120);
+      return (s || "").replace(
+
+expect:
+  tests/qml/tst_nameguard.qml — every case that asserts a control or bidi
+  character is gone. It calls the function, so a body that returns early
+  cannot hide behind text that is still in the file.

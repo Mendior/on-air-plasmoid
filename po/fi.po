@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-08-07 06:50+0300\n"
+"POT-Creation-Date: 2026-08-11 12:20+0300\n"
 "PO-Revision-Date: 2026-07-24 12:17+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Finnish\n"
@@ -16,7 +16,8 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/FullRepresentation.qml:5329
+#: package/contents/ui/config/configAppearance.qml:92
+#: package/contents/ui/FullRepresentation.qml:5449
 msgid "Stations"
 msgstr "Asemat"
 
@@ -36,6 +37,41 @@ msgstr "Haku"
 msgid "Automation"
 msgstr "Automaatio"
 
+#: package/contents/ui/AlarmEngine.qml:122
+msgid "Wake-up alarm missed"
+msgstr "Herätys jäi väliin"
+
+#: package/contents/ui/AlarmEngine.qml:123
+msgid "%1 was set for %2 — the computer was off or asleep at that time."
+msgstr "%1 oli asetettu ajalle %2 — tietokone oli tuolloin sammutettuna tai lepotilassa."
+
+#: package/contents/ui/AlarmEngine.qml:157
+#: package/contents/ui/AlarmEngine.qml:281
+#: package/contents/ui/AlarmEngine.qml:325
+#: package/contents/ui/AlarmEngine.qml:327
+#: package/contents/ui/AlarmEngine.qml:374
+#: package/contents/ui/AlarmEngine.qml:381
+#: package/contents/ui/AlarmEngine.qml:456
+#: package/contents/ui/AlarmEngine.qml:459
+msgid "Wake-up alarm"
+msgstr "Herätys"
+
+#: package/contents/ui/AlarmEngine.qml:158
+msgid "%1 came due at the same time — playing %2 instead."
+msgstr "%1 osui samaan aikaan — toistetaan sen sijaan %2."
+
+#: package/contents/ui/AlarmEngine.qml:383
+msgid "the show"
+msgstr "ohjelma"
+
+#: package/contents/ui/AlarmEngine.qml:382
+msgid "No downloaded episode of %1 was on disk — waking with the chime."
+msgstr "Ohjelman %1 ladattuja jaksoja ei ollut levyllä — herätys soi merkkiäänellä."
+
+#: package/contents/ui/AlarmEngine.qml:460
+msgid "The station could not start — playing the built-in tone instead."
+msgstr "Asema ei käynnistynyt — toistetaan sen sijaan sisäänrakennettua ääntä."
+
 #: package/contents/ui/CompactRepresentation.qml:51
 msgid "%1 — recording"
 msgstr "%1 — nauhoitetaan"
@@ -45,13 +81,13 @@ msgid "%1 — playing %2"
 msgstr "%1 — toistetaan: %2"
 
 #: package/contents/ui/CompactRepresentation.qml:93
-#: package/contents/ui/config/configAppearance.qml:119
+#: package/contents/ui/config/configAppearance.qml:235
 msgid "Audio"
 msgstr "Ääni"
 
 #: package/contents/ui/CompactRepresentation.qml:93
-#: package/contents/ui/FullRepresentation.qml:4871
-#: package/contents/ui/FullRepresentation.qml:5737
+#: package/contents/ui/FullRepresentation.qml:4968
+#: package/contents/ui/FullRepresentation.qml:5899
 msgid "Volume"
 msgstr "Äänenvoimakkuus"
 
@@ -59,208 +95,288 @@ msgstr "Äänenvoimakkuus"
 msgid "Muted"
 msgstr "Vaimennettu"
 
-#: package/contents/ui/config/configAppearance.qml:43
+#: package/contents/ui/config/configAppearance.qml:53
+msgid "Colours"
+msgstr "Värit"
+
+#: package/contents/ui/config/configAppearance.qml:62
+msgid "Accent:"
+msgstr "Korostus:"
+
+#: package/contents/ui/config/configAppearance.qml:63
+msgid "On Air green"
+msgstr "On Airin vihreä"
+
+#: package/contents/ui/config/configAppearance.qml:63
+msgid "System accent colour"
+msgstr "Järjestelmän korostusväri"
+
+#: package/contents/ui/config/configAppearance.qml:63
+msgid "Plain — no colour of its own"
+msgstr "Vaatimaton – ilman omaa väriä"
+
+#: package/contents/ui/config/configAppearance.qml:75
 msgid "Tabs"
 msgstr "Välilehdet"
 
-#: package/contents/ui/config/configAppearance.qml:53
+#: package/contents/ui/config/configAppearance.qml:91
+#: package/contents/ui/config/configAppearance.qml:124
+#: package/contents/ui/config/configAppearance.qml:143
 msgid "Show:"
 msgstr "Näytä:"
 
-#: package/contents/ui/config/configAppearance.qml:54
-#: package/contents/ui/FullRepresentation.qml:3292
-#: package/contents/ui/FullRepresentation.qml:5356
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:4145
+#: package/contents/ui/config/configAppearance.qml:96
+#: package/contents/ui/FullRepresentation.qml:5471
+#: package/contents/ui/FullRepresentation.qml:5630
+msgid "Playing"
+msgstr "Toistetaan"
+
+#: package/contents/ui/config/configAppearance.qml:100
+#: package/contents/ui/FullRepresentation.qml:3377
+#: package/contents/ui/FullRepresentation.qml:5496
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2236
 msgid "My Music"
 msgstr "Oma musiikki"
 
-#: package/contents/ui/config/configAppearance.qml:58
+#: package/contents/ui/config/configAppearance.qml:104
 #: package/contents/ui/config/configAutomation.qml:37
-#: package/contents/ui/FullRepresentation.qml:5370
+#: package/contents/ui/FullRepresentation.qml:5521
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Podcastit"
 
-#: package/contents/ui/config/configAppearance.qml:62
-#: package/contents/ui/FullRepresentation.qml:5384
+#: package/contents/ui/config/configAppearance.qml:108
+#: package/contents/ui/FullRepresentation.qml:5546
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Ajastimet"
 
-#: package/contents/ui/config/configAppearance.qml:66
+#: package/contents/ui/config/configAppearance.qml:112
+msgid "Stations page"
+msgstr "Asemasivu"
+
+#: package/contents/ui/config/configAppearance.qml:125
+msgid "Search field"
+msgstr "Hakukenttä"
+
+#: package/contents/ui/config/configAppearance.qml:129
+msgid "Discovery row (Trending, country, genres)"
+msgstr "Löytörivi (Nousussa, maa, tyylilajit)"
+
+#: package/contents/ui/config/configAppearance.qml:133
+msgid "Reorder and remove controls on each row"
+msgstr "Järjestely- ja poistopainikkeet joka rivillä"
+
+#: package/contents/ui/config/configAppearance.qml:137
+msgid "Playing page"
+msgstr "Toistosivu"
+
+#: package/contents/ui/config/configAppearance.qml:144
+msgid "Cover picture"
+msgstr "Kansikuva"
+
+#: package/contents/ui/config/configAppearance.qml:148
+msgid "Bitrate badge"
+msgstr "Bittinopeusmerkki"
+
+#: package/contents/ui/config/configAppearance.qml:152
+msgid "On opening:"
+msgstr "Avattaessa:"
+
+#: package/contents/ui/config/configAppearance.qml:153
+msgid "Return to the tab I was last on"
+msgstr "Palaa välilehdelle, jolla olin"
+
+#: package/contents/ui/config/configAppearance.qml:157
+msgid "While playing:"
+msgstr "Toiston aikana:"
+
+#: package/contents/ui/config/configAppearance.qml:158
+msgid "Jump to Playing soon after a station starts"
+msgstr "Siirry Toisto-sivulle pian aseman käynnistyttyä"
+
+#: package/contents/ui/config/configAppearance.qml:162
+msgid "Everything back:"
+msgstr "Kaikki takaisin:"
+
+#: package/contents/ui/config/configAppearance.qml:164
+msgid "Show all of it again"
+msgstr "Näytä kaikki uudelleen"
+
+#: package/contents/ui/config/configAppearance.qml:182
 msgid "Panel"
 msgstr "Paneeli"
 
-#: package/contents/ui/config/configAppearance.qml:71
+#: package/contents/ui/config/configAppearance.qml:187
 msgid "Panel icon:"
 msgstr "Paneelin kuvake:"
 
-#: package/contents/ui/config/configAppearance.qml:86
+#: package/contents/ui/config/configAppearance.qml:202
 msgid "Reset"
 msgstr "Palauta"
 
-#: package/contents/ui/config/configAppearance.qml:99
+#: package/contents/ui/config/configAppearance.qml:215
 msgid "Your icon theme does not have this icon — the widget is using its own."
 msgstr "Kuvaketeemassasi ei ole tätä kuvaketta — sovelma käyttää omaansa."
 
-#: package/contents/ui/config/configAppearance.qml:124
+#: package/contents/ui/config/configAppearance.qml:240
 msgid "Default volume:"
 msgstr "Oletusäänenvoimakkuus:"
 
-#: package/contents/ui/config/configAppearance.qml:143
+#: package/contents/ui/config/configAppearance.qml:259
 msgid "Smooth fade:"
 msgstr "Pehmeä häivytys:"
 
-#: package/contents/ui/config/configAppearance.qml:144
+#: package/contents/ui/config/configAppearance.qml:260
 msgid "Fade volume when changing stations"
 msgstr "Häivytä äänenvoimakkuutta asemaa vaihdettaessa"
 
-#: package/contents/ui/config/configAppearance.qml:149
+#: package/contents/ui/config/configAppearance.qml:265
 msgid "Fade duration (ms):"
 msgstr "Häivytyksen kesto (ms):"
 
-#: package/contents/ui/config/configAppearance.qml:158
+#: package/contents/ui/config/configAppearance.qml:274
 msgid "Stream quality:"
 msgstr "Suoratoiston laatu:"
 
-#: package/contents/ui/config/configAppearance.qml:159
+#: package/contents/ui/config/configAppearance.qml:275
 msgid "Automatically switch to the highest-bitrate variant of a station"
 msgstr "Siirry automaattisesti aseman suurimman bittinopeuden versioon"
 
-#: package/contents/ui/config/configAppearance.qml:162
+#: package/contents/ui/config/configAppearance.qml:278
 msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
 msgstr "Hakee aseman radio-browser.info-palvelusta ja valitsee laadultaan parhaan suoratoisto-URL:n"
 
-#: package/contents/ui/config/configAppearance.qml:167
+#: package/contents/ui/config/configAppearance.qml:283
 msgid "Find a station's new address when its stream dies"
 msgstr "Etsi aseman uusi osoite, kun sen suoratoisto lakkaa toimimasta"
 
-#: package/contents/ui/config/configAppearance.qml:170
+#: package/contents/ui/config/configAppearance.qml:286
 msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
 msgstr "Asemat vaihtavat palvelimia; kun toisto epäonnistuu, asema haetaan radio-browser.info-palvelusta ja sen tällä hetkellä toimiva osoite tallennetaan luetteloosi"
 
-#: package/contents/ui/config/configAppearance.qml:175
+#: package/contents/ui/config/configAppearance.qml:291
 msgid "Count my listening in the worldwide station catalog"
 msgstr "Laske kuunteluni mukaan maailmanlaajuiseen asemaluetteloon"
 
-#: package/contents/ui/config/configAppearance.qml:178
+#: package/contents/ui/config/configAppearance.qml:294
 msgid "When a station starts playing, a click is reported to radio-browser.info — the request carries the station id only, no account or personal data is added; popular stations become easier to find for everyone"
 msgstr "Kun asema alkaa soida, radio-browser.info-palveluun ilmoitetaan kuuntelukerta — pyyntö sisältää vain aseman tunnisteen, ei tiliä eikä henkilötietoja; suositut asemat on kaikkien helpompi löytää"
 
-#: package/contents/ui/config/configAppearance.qml:186
+#: package/contents/ui/config/configAppearance.qml:302
 msgid "Visuals"
 msgstr "Visuaalit"
 
-#: package/contents/ui/config/configAppearance.qml:192
+#: package/contents/ui/config/configAppearance.qml:308
 msgid "Album art:"
 msgstr "Kansikuva:"
 
-#: package/contents/ui/config/configAppearance.qml:193
+#: package/contents/ui/config/configAppearance.qml:309
 msgid "Look up cover art online (Deezer, iTunes)"
 msgstr "Hae kansikuvat verkosta (Deezer, iTunes)"
 
-#: package/contents/ui/config/configAppearance.qml:198
+#: package/contents/ui/config/configAppearance.qml:314
 msgid "Backdrop:"
 msgstr "Tausta:"
 
-#: package/contents/ui/config/configAppearance.qml:199
+#: package/contents/ui/config/configAppearance.qml:315
 msgid "Blurred album art behind now playing"
 msgstr "Sumennettu kansikuva Nyt soi -näkymän taustalla"
 
-#: package/contents/ui/config/configAppearance.qml:205
+#: package/contents/ui/config/configAppearance.qml:321
 msgid "Accent color:"
 msgstr "Korostusväri:"
 
-#: package/contents/ui/config/configAppearance.qml:206
+#: package/contents/ui/config/configAppearance.qml:322
 msgid "Follow the system accent color instead of the built-in emerald"
 msgstr "Käytä järjestelmän korostusväriä sisäänrakennetun smaragdinvihreän sijaan"
 
-#: package/contents/ui/config/configAppearance.qml:211
+#: package/contents/ui/config/configAppearance.qml:327
 msgid "On battery:"
 msgstr "Akkuvirralla:"
 
-#: package/contents/ui/config/configAppearance.qml:212
+#: package/contents/ui/config/configAppearance.qml:328
 msgid "Hold the animations still and check less often"
 msgstr "Pysäytä animaatiot ja tarkista harvemmin"
 
-#: package/contents/ui/config/configAppearance.qml:218
+#: package/contents/ui/config/configAppearance.qml:334
 msgid "Unplugged, the record stops spinning and the equalizer bars hold still; background checks slow down. Sound and every control work exactly as before. The system's power-saver profile counts too."
 msgstr "Verkkovirrasta irrotettuna levy ei enää pyöri ja taajuuskorjaimen palkit pysyvät paikallaan; taustatarkistukset harvenevat. Ääni ja kaikki säätimet toimivat aivan kuten ennenkin. Myös järjestelmän virransäästöprofiili lasketaan."
 
-#: package/contents/ui/config/configAppearance.qml:229
+#: package/contents/ui/config/configAppearance.qml:345
 msgid "Integration"
 msgstr "Integraatio"
 
-#: package/contents/ui/config/configAppearance.qml:235
+#: package/contents/ui/config/configAppearance.qml:351
 msgid "System integration:"
 msgstr "Järjestelmäintegraatio:"
 
-#: package/contents/ui/config/configAppearance.qml:236
+#: package/contents/ui/config/configAppearance.qml:352
 msgid "Allow control via media keys (MPRIS)"
 msgstr "Salli ohjaus medianäppäimillä (MPRIS)"
 
-#: package/contents/ui/config/configAppearance.qml:244
+#: package/contents/ui/config/configAppearance.qml:360
 msgid "Downloads"
 msgstr "Lataukset"
 
-#: package/contents/ui/config/configAppearance.qml:250
+#: package/contents/ui/config/configAppearance.qml:366
 #: package/contents/ui/config/configRecording.qml:27
 msgid "Format:"
 msgstr "Muoto:"
 
-#: package/contents/ui/config/configAppearance.qml:252
+#: package/contents/ui/config/configAppearance.qml:368
 msgid "Best quality (no re-encode)"
 msgstr "Paras laatu (ei uudelleenkoodausta)"
 
-#: package/contents/ui/config/configAppearance.qml:253
+#: package/contents/ui/config/configAppearance.qml:369
 msgid "MP3"
 msgstr "MP3"
 
-#: package/contents/ui/config/configAppearance.qml:254
+#: package/contents/ui/config/configAppearance.qml:370
 msgid "Opus"
 msgstr "Opus"
 
-#: package/contents/ui/config/configAppearance.qml:255
+#: package/contents/ui/config/configAppearance.qml:371
 msgid "MP4 (video)"
 msgstr "MP4 (video)"
 
-#: package/contents/ui/config/configAppearance.qml:265
+#: package/contents/ui/config/configAppearance.qml:381
 msgid "Save to folder:"
 msgstr "Tallennuskansio:"
 
-#: package/contents/ui/config/configAppearance.qml:272
+#: package/contents/ui/config/configAppearance.qml:388
 msgid "Title cleanup:"
 msgstr "Otsikoiden siistiminen:"
 
-#: package/contents/ui/config/configAppearance.qml:273
+#: package/contents/ui/config/configAppearance.qml:389
 msgid "Use Claude CLI to clean up messy titles before download (optional)"
 msgstr "Siisti sotkuiset otsikot Claude CLI:llä ennen lataamista (valinnainen)"
 
-#: package/contents/ui/config/configAppearance.qml:281
+#: package/contents/ui/config/configAppearance.qml:397
 msgid "Behavior"
 msgstr "Toiminta"
 
-#: package/contents/ui/config/configAppearance.qml:286
+#: package/contents/ui/config/configAppearance.qml:402
 msgid "Marquee speed:"
 msgstr "Tekstin vieritysnopeus:"
 
-#: package/contents/ui/config/configAppearance.qml:304
+#: package/contents/ui/config/configAppearance.qml:420
 msgid "Slower"
 msgstr "Hitaampi"
 
-#: package/contents/ui/config/configAppearance.qml:306
+#: package/contents/ui/config/configAppearance.qml:422
 msgid "Faster"
 msgstr "Nopeampi"
 
-#: package/contents/ui/config/configAppearance.qml:312
+#: package/contents/ui/config/configAppearance.qml:428
 msgid "Panel click:"
 msgstr "Paneelin napsautus:"
 
-#: package/contents/ui/config/configAppearance.qml:313
+#: package/contents/ui/config/configAppearance.qml:429
 msgid "Middle click to toggle last station"
 msgstr "Soita tai pysäytä viimeisin asema keskinapsautuksella"
 
-#: package/contents/ui/config/configAppearance.qml:317
+#: package/contents/ui/config/configAppearance.qml:433
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "Paneelikuvakkeen keskinapsautus soittaa tai pysäyttää viimeisimmän aseman"
 
@@ -329,7 +445,7 @@ msgid "Auto-care:"
 msgstr "Automaattinen ylläpito:"
 
 #: package/contents/ui/config/configAutomation.qml:105
-#: package/contents/ui/FullRepresentation.qml:6058
+#: package/contents/ui/FullRepresentation.qml:6220
 msgid "Keep sync tuned automatically"
 msgstr "Pidä synkronointi kohdillaan automaattisesti"
 
@@ -359,10 +475,10 @@ msgstr "Puskuri enintään:"
 
 #: package/contents/ui/config/configAutomation.qml:140
 #: package/contents/ui/config/configRecording.qml:53
-#: package/contents/ui/FullRepresentation.qml:4431
-#: package/contents/ui/FullRepresentation.qml:4683
-#: package/contents/ui/FullRepresentation.qml:4965
-#: package/contents/ui/FullRepresentation.qml:5047
+#: package/contents/ui/FullRepresentation.qml:4516
+#: package/contents/ui/FullRepresentation.qml:4768
+#: package/contents/ui/FullRepresentation.qml:5071
+#: package/contents/ui/FullRepresentation.qml:5153
 msgid "%1 min"
 msgstr "%1 min"
 
@@ -428,55 +544,55 @@ msgstr "esim. https://example.com/logo.png"
 msgid "Active"
 msgstr "Käytössä"
 
-#: package/contents/ui/config/configGeneral.qml:1204
+#: package/contents/ui/config/configGeneral.qml:1214
 msgid "Configuration has been loaded. Click 'Apply' to save changes."
 msgstr "Asetukset on ladattu. Tallenna muutokset napsauttamalla 'Käytä'."
 
-#: package/contents/ui/config/configGeneral.qml:1206
+#: package/contents/ui/config/configGeneral.qml:1216
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "Virhe asetuksia ladattaessa. Kokeile valita toinen tiedosto."
 
-#: package/contents/ui/config/configGeneral.qml:1210
+#: package/contents/ui/config/configGeneral.qml:1220
 msgid "Your configuration was saved successfully."
 msgstr "Asetukset tallennettiin onnistuneesti."
 
-#: package/contents/ui/config/configGeneral.qml:1212
+#: package/contents/ui/config/configGeneral.qml:1222
 msgid "Error, make sure the selected directory is writable!"
 msgstr "Virhe, varmista, että valittuun kansioon voi kirjoittaa!"
 
-#: package/contents/ui/config/configGeneral.qml:1272
+#: package/contents/ui/config/configGeneral.qml:1282
 msgid "Add…"
 msgstr "Lisää…"
 
-#: package/contents/ui/config/configGeneral.qml:1281
+#: package/contents/ui/config/configGeneral.qml:1291
 msgid "Fetching… %1 / %2"
 msgstr "Noudetaan… %1 / %2"
 
-#: package/contents/ui/config/configGeneral.qml:1282
+#: package/contents/ui/config/configGeneral.qml:1292
 msgid "Fetch missing logos"
 msgstr "Nouda puuttuvat logot"
 
-#: package/contents/ui/config/configGeneral.qml:1291
+#: package/contents/ui/config/configGeneral.qml:1301
 msgid "Re-fetch all"
 msgstr "Nouda kaikki uudelleen"
 
-#: package/contents/ui/config/configGeneral.qml:1296
+#: package/contents/ui/config/configGeneral.qml:1306
 msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
 msgstr "Nouda uudet logot kaikille asemille; nykyiset logot säilytetään, jos parempaa ei löydy"
 
-#: package/contents/ui/config/configGeneral.qml:1311
+#: package/contents/ui/config/configGeneral.qml:1321
 msgid "Import…"
 msgstr "Tuo…"
 
-#: package/contents/ui/config/configGeneral.qml:1317
+#: package/contents/ui/config/configGeneral.qml:1327
 msgid "Export…"
 msgstr "Vie…"
 
-#: package/contents/ui/config/configGeneral.qml:1333
+#: package/contents/ui/config/configGeneral.qml:1343
 msgid "Report an issue"
 msgstr "Ilmoita ongelmasta"
 
-#: package/contents/ui/config/configGeneral.qml:1339
+#: package/contents/ui/config/configGeneral.qml:1349
 msgid "Suggest a feature"
 msgstr "Ehdota ominaisuutta"
 
@@ -509,7 +625,7 @@ msgid "A hard safety cap for one recording — protects the disk if you forget t
 msgstr "Yhden tallennuksen ehdoton yläraja — suojaa levyä, jos unohdat pysäyttää."
 
 #: package/contents/ui/config/configRecording.qml:70
-#: package/contents/ui/FullRepresentation.qml:4934
+#: package/contents/ui/FullRepresentation.qml:5040
 msgid "Scheduled recordings"
 msgstr "Ajastetut tallennukset"
 
@@ -583,13 +699,13 @@ msgstr "Asema on lisätty. Tallenna muutokset napsauttamalla 'Käytä'."
 
 #: package/contents/ui/config/configSearch.qml:625
 #: package/contents/ui/EpisodeListItem.qml:370
-#: package/contents/ui/FullRepresentation.qml:2466
-#: package/contents/ui/FullRepresentation.qml:6223
+#: package/contents/ui/FullRepresentation.qml:2542
+#: package/contents/ui/FullRepresentation.qml:6385
 msgid "Stop"
 msgstr "Pysäytä"
 
 #: package/contents/ui/config/configSearch.qml:625
-#: package/contents/ui/FullRepresentation.qml:2467
+#: package/contents/ui/FullRepresentation.qml:2543
 msgid "Play"
 msgstr "Toista"
 
@@ -654,12 +770,12 @@ msgid "Tags:"
 msgstr "Tunnisteet:"
 
 #: package/contents/ui/config/configSearch.qml:941
-#: package/contents/ui/FullRepresentation.qml:5460
+#: package/contents/ui/FullRepresentation.qml:5622
 msgid "Error: %1"
 msgstr "Virhe: %1"
 
 #: package/contents/ui/EpisodeListItem.qml:63
-#: package/contents/ui/FullRepresentation.qml:3591
+#: package/contents/ui/FullRepresentation.qml:3676
 msgid "Episode"
 msgstr "Jakso"
 
@@ -680,12 +796,12 @@ msgid "Play next (add to the queue)"
 msgstr "Toista seuraavaksi (lisää jonoon)"
 
 #: package/contents/ui/EpisodeListItem.qml:326
-#: package/contents/ui/FullRepresentation.qml:2820
+#: package/contents/ui/FullRepresentation.qml:2896
 msgid "Mark as unplayed"
 msgstr "Merkitse kuuntelemattomaksi"
 
 #: package/contents/ui/EpisodeListItem.qml:327
-#: package/contents/ui/FullRepresentation.qml:2821
+#: package/contents/ui/FullRepresentation.qml:2897
 msgid "Mark as played"
 msgstr "Merkitse kuunnelluksi"
 
@@ -709,545 +825,545 @@ msgstr "Toista jakso"
 msgid "Download episode for offline listening"
 msgstr "Lataa jakso kuunneltavaksi ilman verkkoyhteyttä"
 
-#: package/contents/ui/FullRepresentation.qml:1217
+#: package/contents/ui/FullRepresentation.qml:1279
 msgid "Search station or country… (e.g. Finland, jazz)"
 msgstr "Hae asemaa tai maata… (esim. Suomi, jazz)"
 
-#: package/contents/ui/FullRepresentation.qml:1266
+#: package/contents/ui/FullRepresentation.qml:1328
 msgid "Show all stations"
 msgstr "Näytä kaikki asemat"
 
-#: package/contents/ui/FullRepresentation.qml:1266
+#: package/contents/ui/FullRepresentation.qml:1328
 msgid "Show only favorites"
 msgstr "Näytä vain suosikit"
 
-#: package/contents/ui/FullRepresentation.qml:1296
+#: package/contents/ui/FullRepresentation.qml:1363
 msgid "Searching only in %1 — tap to search everywhere"
 msgstr "Haetaan vain kohteesta %1 — napsauta hakeaksesi kaikkialta"
 
-#: package/contents/ui/FullRepresentation.qml:1300
+#: package/contents/ui/FullRepresentation.qml:1367
 msgid "Results are limited to %1 — tap to search everywhere again"
 msgstr "Tulokset on rajattu kohteeseen %1 — napsauta hakeaksesi taas kaikkialta"
 
-#: package/contents/ui/FullRepresentation.qml:1331
+#: package/contents/ui/FullRepresentation.qml:1398
 msgid "All"
 msgstr "Kaikki"
 
-#: package/contents/ui/FullRepresentation.qml:1332
+#: package/contents/ui/FullRepresentation.qml:1399
 msgid "Genre"
 msgstr "Tyylilaji"
 
-#: package/contents/ui/FullRepresentation.qml:1333
+#: package/contents/ui/FullRepresentation.qml:1400
 msgid "Country"
 msgstr "Maa"
 
-#: package/contents/ui/FullRepresentation.qml:1334
+#: package/contents/ui/FullRepresentation.qml:1401
 msgid "Language"
 msgstr "Kieli"
 
-#: package/contents/ui/FullRepresentation.qml:1355
+#: package/contents/ui/FullRepresentation.qml:1422
 msgid "Top voted"
 msgstr "Äänestetyimmät"
 
-#: package/contents/ui/FullRepresentation.qml:1356
+#: package/contents/ui/FullRepresentation.qml:1423
 msgid "Trending"
 msgstr "Nousussa"
 
-#: package/contents/ui/FullRepresentation.qml:1357
+#: package/contents/ui/FullRepresentation.qml:1424
 msgid "Bitrate"
 msgstr "Bittinopeus"
 
-#: package/contents/ui/FullRepresentation.qml:1376
+#: package/contents/ui/FullRepresentation.qml:1443
 msgid "Trending now"
 msgstr "Nousussa nyt"
 
-#: package/contents/ui/FullRepresentation.qml:1387
+#: package/contents/ui/FullRepresentation.qml:1454
 msgid "Popular in %1"
 msgstr "Suosituimmat maassa %1"
 
-#: package/contents/ui/FullRepresentation.qml:1417
+#: package/contents/ui/FullRepresentation.qml:1484
 msgid "Search again — right-click removes this entry"
 msgstr "Hae uudelleen — oikea napsautus poistaa tämän merkinnän"
 
-#: package/contents/ui/FullRepresentation.qml:1431
+#: package/contents/ui/FullRepresentation.qml:1498
 msgid "Clear search history"
 msgstr "Tyhjennä hakuhistoria"
 
-#: package/contents/ui/FullRepresentation.qml:1595
+#: package/contents/ui/FullRepresentation.qml:1668
 msgid "Searching the web…"
 msgstr "Haetaan verkosta…"
 
-#: package/contents/ui/FullRepresentation.qml:1596
+#: package/contents/ui/FullRepresentation.qml:1669
 msgid "From the web"
 msgstr "Verkosta"
 
-#: package/contents/ui/FullRepresentation.qml:1596
-#: package/contents/ui/FullRepresentation.qml:3066
-#: package/contents/ui/FullRepresentation.qml:3292
+#: package/contents/ui/FullRepresentation.qml:1669
+#: package/contents/ui/FullRepresentation.qml:3151
+#: package/contents/ui/FullRepresentation.qml:3377
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
-#: package/contents/ui/FullRepresentation.qml:1630
+#: package/contents/ui/FullRepresentation.qml:1705
 msgid "Stop preview: %1"
 msgstr "Pysäytä esikuuntelu: %1"
 
-#: package/contents/ui/FullRepresentation.qml:1631
+#: package/contents/ui/FullRepresentation.qml:1706
 msgid "Preview: %1"
 msgstr "Esikuuntele: %1"
 
-#: package/contents/ui/FullRepresentation.qml:1756
+#: package/contents/ui/FullRepresentation.qml:1831
 msgid "not answering"
 msgstr "ei vastaa"
 
-#: package/contents/ui/FullRepresentation.qml:1769
-#: package/contents/ui/FullRepresentation.qml:2323
+#: package/contents/ui/FullRepresentation.qml:1844
+#: package/contents/ui/FullRepresentation.qml:2399
 msgid "%1 kb/s"
 msgstr "%1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:1818
-#: package/contents/ui/FullRepresentation.qml:2683
+#: package/contents/ui/FullRepresentation.qml:1893
+#: package/contents/ui/FullRepresentation.qml:2759
 msgid "Add to my stations + favorites"
 msgstr "Lisää omiin asemiin + suosikkeihin"
 
-#: package/contents/ui/FullRepresentation.qml:1830
+#: package/contents/ui/FullRepresentation.qml:1905
 msgid "Click = stop preview"
 msgstr "Napsautus = pysäytä esikuuntelu"
 
-#: package/contents/ui/FullRepresentation.qml:1831
+#: package/contents/ui/FullRepresentation.qml:1906
 msgid "Click = preview · ⭐ = add to my stations"
 msgstr "Napsautus = esikuuntelu · ⭐ = lisää omiin asemiin"
 
-#: package/contents/ui/FullRepresentation.qml:1841
+#: package/contents/ui/FullRepresentation.qml:1916
 msgid "Show more results"
 msgstr "Näytä lisää tuloksia"
 
-#: package/contents/ui/FullRepresentation.qml:1866
-#: package/contents/ui/FullRepresentation.qml:1896
+#: package/contents/ui/FullRepresentation.qml:1941
+#: package/contents/ui/FullRepresentation.qml:1971
 msgid "The station directory is not reachable"
 msgstr "Asemahakemistoon ei saada yhteyttä"
 
-#: package/contents/ui/FullRepresentation.qml:1894
+#: package/contents/ui/FullRepresentation.qml:1969
 msgid "No favorite stations yet"
 msgstr "Ei vielä suosikkiasemia"
 
-#: package/contents/ui/FullRepresentation.qml:1897
+#: package/contents/ui/FullRepresentation.qml:1972
 msgid "No matching stations"
 msgstr "Ei hakua vastaavia asemia"
 
-#: package/contents/ui/FullRepresentation.qml:1897
+#: package/contents/ui/FullRepresentation.qml:1972
 msgid "No stations"
 msgstr "Ei asemia"
 
-#: package/contents/ui/FullRepresentation.qml:1910
+#: package/contents/ui/FullRepresentation.qml:1985
 msgid "Tap the heart on a station to add it here"
 msgstr "Napauta aseman sydäntä lisätäksesi sen tähän"
 
-#: package/contents/ui/FullRepresentation.qml:1912
+#: package/contents/ui/FullRepresentation.qml:1987
 msgid "Check the connection and type to search again"
 msgstr "Tarkista yhteys ja kirjoita hakeaksesi uudelleen"
 
-#: package/contents/ui/FullRepresentation.qml:1913
+#: package/contents/ui/FullRepresentation.qml:1988
 msgid "Try a different search term"
 msgstr "Kokeile toista hakusanaa"
 
-#: package/contents/ui/FullRepresentation.qml:2255
+#: package/contents/ui/FullRepresentation.qml:2330
 msgid "LIVE"
 msgstr "LIVE"
 
-#: package/contents/ui/FullRepresentation.qml:2295
+#: package/contents/ui/FullRepresentation.qml:2370
 msgid "Paused · %1 behind live"
 msgstr "Tauolla · %1 jäljessä"
 
-#: package/contents/ui/FullRepresentation.qml:2296
+#: package/contents/ui/FullRepresentation.qml:2371
 msgid "%1 behind live — tap to catch up"
 msgstr "%1 jäljessä — napauta kuroaksesi kiinni"
 
-#: package/contents/ui/FullRepresentation.qml:2306
+#: package/contents/ui/FullRepresentation.qml:2381
 msgid "Back to live"
 msgstr "Takaisin suoraan lähetykseen"
 
-#: package/contents/ui/FullRepresentation.qml:2416
+#: package/contents/ui/FullRepresentation.qml:2492
 msgid "Nothing playing"
 msgstr "Mikään ei soi"
 
-#: package/contents/ui/FullRepresentation.qml:2438
+#: package/contents/ui/FullRepresentation.qml:2514
 msgid "Previous station"
 msgstr "Edellinen asema"
 
-#: package/contents/ui/FullRepresentation.qml:2466
+#: package/contents/ui/FullRepresentation.qml:2542
 msgid "Pause"
 msgstr "Tauko"
 
-#: package/contents/ui/FullRepresentation.qml:2494
+#: package/contents/ui/FullRepresentation.qml:2570
 msgid "Next station"
 msgstr "Seuraava asema"
 
-#: package/contents/ui/FullRepresentation.qml:2526
+#: package/contents/ui/FullRepresentation.qml:2602
 msgid "Seek"
 msgstr "Kelaus"
 
-#: package/contents/ui/FullRepresentation.qml:2559
+#: package/contents/ui/FullRepresentation.qml:2635
 msgid "Skip back 15 seconds"
 msgstr "Siirry 15 sekuntia taaksepäin"
 
-#: package/contents/ui/FullRepresentation.qml:2571
+#: package/contents/ui/FullRepresentation.qml:2647
 msgid "Playback speed"
 msgstr "Toistonopeus"
 
-#: package/contents/ui/FullRepresentation.qml:2574
+#: package/contents/ui/FullRepresentation.qml:2650
 msgid "Playback speed — tap to change"
 msgstr "Toistonopeus — napauta vaihtaaksesi"
 
-#: package/contents/ui/FullRepresentation.qml:2593
+#: package/contents/ui/FullRepresentation.qml:2669
 msgid "Skip forward 30 seconds"
 msgstr "Siirry 30 sekuntia eteenpäin"
 
-#: package/contents/ui/FullRepresentation.qml:2604
-#: package/contents/ui/FullRepresentation.qml:2605
+#: package/contents/ui/FullRepresentation.qml:2680
+#: package/contents/ui/FullRepresentation.qml:2681
 msgid "Chapters"
 msgstr "Luvut"
 
-#: package/contents/ui/FullRepresentation.qml:2644
+#: package/contents/ui/FullRepresentation.qml:2720
 msgid "Skipping silences — tap to keep them"
 msgstr "Hiljaisuudet ohitetaan — napauta säilyttääksesi ne"
 
-#: package/contents/ui/FullRepresentation.qml:2645
+#: package/contents/ui/FullRepresentation.qml:2721
 msgid "Skip silences in this episode"
 msgstr "Ohita hiljaisuudet tässä jaksossa"
 
-#: package/contents/ui/FullRepresentation.qml:2669
+#: package/contents/ui/FullRepresentation.qml:2745
 msgid "Search this track on YouTube"
 msgstr "Etsi tätä kappaletta YouTubesta"
 
-#: package/contents/ui/FullRepresentation.qml:2684
-#: package/contents/ui/MediaListItem.qml:499
+#: package/contents/ui/FullRepresentation.qml:2760
+#: package/contents/ui/MediaListItem.qml:533
 msgid "Remove from favorites"
 msgstr "Poista suosikeista"
 
-#: package/contents/ui/FullRepresentation.qml:2684
-#: package/contents/ui/MediaListItem.qml:499
+#: package/contents/ui/FullRepresentation.qml:2760
+#: package/contents/ui/MediaListItem.qml:533
 msgid "Add to favorites"
 msgstr "Lisää suosikkeihin"
 
-#: package/contents/ui/FullRepresentation.qml:2718
-#: package/contents/ui/FullRepresentation.qml:3213
+#: package/contents/ui/FullRepresentation.qml:2794
+#: package/contents/ui/FullRepresentation.qml:3298
 msgid "Remove from liked songs"
 msgstr "Poista tykätyistä kappaleista"
 
-#: package/contents/ui/FullRepresentation.qml:2719
+#: package/contents/ui/FullRepresentation.qml:2795
 msgid "Like this song (saved to My Music)"
 msgstr "Tykkää tästä kappaleesta (tallennetaan Omaan musiikkiin)"
 
-#: package/contents/ui/FullRepresentation.qml:2742
+#: package/contents/ui/FullRepresentation.qml:2818
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Ääni lähetetty — kiitos aseman tukemisesta!"
 
-#: package/contents/ui/FullRepresentation.qml:2743
+#: package/contents/ui/FullRepresentation.qml:2819
 msgid "Sending the vote…"
 msgstr "Lähetetään ääntä…"
 
-#: package/contents/ui/FullRepresentation.qml:2744
+#: package/contents/ui/FullRepresentation.qml:2820
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Äänestä tätä asemaa maailmanlaajuisessa luettelossa"
 
-#: package/contents/ui/FullRepresentation.qml:2763
-#: package/contents/ui/FullRepresentation.qml:5442
-#: package/contents/ui/MediaListItem.qml:529
+#: package/contents/ui/FullRepresentation.qml:2839
+#: package/contents/ui/FullRepresentation.qml:5604
+#: package/contents/ui/MediaListItem.qml:563
 msgid "Downloading…"
 msgstr "Ladataan…"
 
-#: package/contents/ui/FullRepresentation.qml:2764
-#: package/contents/ui/MediaListItem.qml:531
+#: package/contents/ui/FullRepresentation.qml:2840
+#: package/contents/ui/MediaListItem.qml:565
 msgid "Download this track (for offline listening)"
 msgstr "Lataa tämä kappale (kuunneltavaksi ilman verkkoyhteyttä)"
 
-#: package/contents/ui/FullRepresentation.qml:2789
+#: package/contents/ui/FullRepresentation.qml:2865
 msgid "A scheduled recording is running (%1)"
 msgstr "Ajastettu tallennus on käynnissä (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2791
+#: package/contents/ui/FullRepresentation.qml:2867
 msgid "Recording %1 — click to stop"
 msgstr "Tallennetaan: %1 — pysäytä napsauttamalla"
 
-#: package/contents/ui/FullRepresentation.qml:2793
-#: package/contents/ui/FullRepresentation.qml:5094
+#: package/contents/ui/FullRepresentation.qml:2869
+#: package/contents/ui/FullRepresentation.qml:5200
 msgid "This source cannot be recorded"
 msgstr "Tätä lähdettä ei voi tallentaa"
 
-#: package/contents/ui/FullRepresentation.qml:2794
+#: package/contents/ui/FullRepresentation.qml:2870
 msgid "Record this station (personal use only)"
 msgstr "Tallenna tämä asema (vain omaan käyttöön)"
 
-#: package/contents/ui/FullRepresentation.qml:2832
+#: package/contents/ui/FullRepresentation.qml:2908
 msgid "Go to this show"
 msgstr "Siirry tähän ohjelmaan"
 
-#: package/contents/ui/FullRepresentation.qml:2888
-#: package/contents/ui/FullRepresentation.qml:2909
+#: package/contents/ui/FullRepresentation.qml:2973
+#: package/contents/ui/FullRepresentation.qml:2994
 msgid "Podcast downloads (%1)"
 msgstr "Podcast-lataukset (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2990
+#: package/contents/ui/FullRepresentation.qml:3075
 msgid "Downloading: %1"
 msgstr "Ladataan: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3043
+#: package/contents/ui/FullRepresentation.qml:3128
 msgid "Stop recording"
 msgstr "Pysäytä tallennus"
 
-#: package/contents/ui/FullRepresentation.qml:3067
+#: package/contents/ui/FullRepresentation.qml:3152
 msgid "Liked songs"
 msgstr "Tykätyt kappaleet"
 
-#: package/contents/ui/FullRepresentation.qml:3067
+#: package/contents/ui/FullRepresentation.qml:3152
 msgid "Recently played"
 msgstr "Viimeksi soitetut"
 
-#: package/contents/ui/FullRepresentation.qml:3082
+#: package/contents/ui/FullRepresentation.qml:3167
 msgid "Show play history"
 msgstr "Näytä toistohistoria"
 
-#: package/contents/ui/FullRepresentation.qml:3083
+#: package/contents/ui/FullRepresentation.qml:3168
 msgid "Show liked songs"
 msgstr "Näytä tykätyt kappaleet"
 
-#: package/contents/ui/FullRepresentation.qml:3093
+#: package/contents/ui/FullRepresentation.qml:3178
 msgid "Clear history"
 msgstr "Tyhjennä historia"
 
-#: package/contents/ui/FullRepresentation.qml:3123
+#: package/contents/ui/FullRepresentation.qml:3208
 msgid "Search YouTube for %1"
 msgstr "Etsi YouTubesta: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3202
+#: package/contents/ui/FullRepresentation.qml:3287
 msgid "Download this track"
 msgstr "Lataa tämä kappale"
 
-#: package/contents/ui/FullRepresentation.qml:3226
+#: package/contents/ui/FullRepresentation.qml:3311
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Napsautus = haku YouTubesta · ⬇ = lataus"
 
-#: package/contents/ui/FullRepresentation.qml:3301
+#: package/contents/ui/FullRepresentation.qml:3386
 msgid "Open folder in file manager"
 msgstr "Avaa kansio tiedostonhallinnassa"
 
-#: package/contents/ui/FullRepresentation.qml:3343
+#: package/contents/ui/FullRepresentation.qml:3428
 msgid "Stop: %1"
 msgstr "Pysäytä: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3343
+#: package/contents/ui/FullRepresentation.qml:3428
 msgid "Play: %1"
 msgstr "Toista: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3428
+#: package/contents/ui/FullRepresentation.qml:3513
 msgid "Click again to confirm delete"
 msgstr "Vahvista poisto napsauttamalla uudelleen"
 
-#: package/contents/ui/FullRepresentation.qml:3428
+#: package/contents/ui/FullRepresentation.qml:3513
 msgid "Delete file"
 msgstr "Poista tiedosto"
 
-#: package/contents/ui/FullRepresentation.qml:3484
+#: package/contents/ui/FullRepresentation.qml:3569
 msgid "Nothing here yet"
 msgstr "Täällä ei ole vielä mitään"
 
-#: package/contents/ui/FullRepresentation.qml:3495
+#: package/contents/ui/FullRepresentation.qml:3580
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Kun radiossa soi hyvä kappale, paina ⬇ — se tallennetaan tänne kuunneltavaksi ilman verkkoyhteyttä"
 
-#: package/contents/ui/FullRepresentation.qml:3634
+#: package/contents/ui/FullRepresentation.qml:3719
 msgid "Back to shows"
 msgstr "Takaisin ohjelmiin"
 
-#: package/contents/ui/FullRepresentation.qml:3645
+#: package/contents/ui/FullRepresentation.qml:3730
 msgid "Search podcasts, or paste a feed URL…"
 msgstr "Etsi podcasteja tai liitä syötteen URL…"
 
-#: package/contents/ui/FullRepresentation.qml:3665
-#: package/contents/ui/FullRepresentation.qml:3706
+#: package/contents/ui/FullRepresentation.qml:3750
+#: package/contents/ui/FullRepresentation.qml:3791
 msgid "Back to my shows"
 msgstr "Takaisin omiin ohjelmiin"
 
-#: package/contents/ui/FullRepresentation.qml:3666
+#: package/contents/ui/FullRepresentation.qml:3751
 msgid "Popular now — the top charts"
 msgstr "Suosittua nyt — listojen kärki"
 
-#: package/contents/ui/FullRepresentation.qml:3688
+#: package/contents/ui/FullRepresentation.qml:3773
 msgid "Up next (%1) — tap to play: %2"
 msgstr "Seuraavaksi (%1) — toista napauttamalla: %2"
 
-#: package/contents/ui/FullRepresentation.qml:3707
+#: package/contents/ui/FullRepresentation.qml:3792
 msgid "Downloaded episodes (%1)"
 msgstr "Ladatut jaksot (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:3722
+#: package/contents/ui/FullRepresentation.qml:3807
 msgid "Import subscriptions (OPML)"
 msgstr "Tuo tilaukset (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:3733
+#: package/contents/ui/FullRepresentation.qml:3818
 msgid "Export subscriptions (OPML)"
 msgstr "Vie tilaukset (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:3738
+#: package/contents/ui/FullRepresentation.qml:3823
 msgid "Import subscriptions"
 msgstr "Tuo tilaukset"
 
-#: package/contents/ui/FullRepresentation.qml:3739
+#: package/contents/ui/FullRepresentation.qml:3824
 msgid "OPML files (*.opml *.xml)"
 msgstr "OPML-tiedostot (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:3739
+#: package/contents/ui/FullRepresentation.qml:3824
 msgid "All files (*)"
 msgstr "Kaikki tiedostot (*)"
 
-#: package/contents/ui/FullRepresentation.qml:3745
-#: package/contents/ui/FullRepresentation.qml:3967
+#: package/contents/ui/FullRepresentation.qml:3830
+#: package/contents/ui/FullRepresentation.qml:4052
 msgid "Episodes"
 msgstr "Jaksot"
 
-#: package/contents/ui/FullRepresentation.qml:3773
+#: package/contents/ui/FullRepresentation.qml:3858
 msgid "Waking up with this show at %1 — tap to remove"
 msgstr "Herätys tähän ohjelmaan kello %1 — poista napauttamalla"
 
-#: package/contents/ui/FullRepresentation.qml:3776
+#: package/contents/ui/FullRepresentation.qml:3861
 msgid "Wake up with this show"
 msgstr "Herää tähän ohjelmaan"
 
-#: package/contents/ui/FullRepresentation.qml:3792
+#: package/contents/ui/FullRepresentation.qml:3877
 msgid "Wake up with this show, daily"
 msgstr "Herää tähän ohjelmaan joka päivä"
 
-#: package/contents/ui/FullRepresentation.qml:3801
+#: package/contents/ui/FullRepresentation.qml:3886
 msgid "Hour"
 msgstr "Tunti"
 
-#: package/contents/ui/FullRepresentation.qml:3808
+#: package/contents/ui/FullRepresentation.qml:3893
 msgid "Minute"
 msgstr "Minuutti"
 
-#: package/contents/ui/FullRepresentation.qml:3811
+#: package/contents/ui/FullRepresentation.qml:3896
 msgid "Set"
 msgstr "Aseta"
 
-#: package/contents/ui/FullRepresentation.qml:3813
+#: package/contents/ui/FullRepresentation.qml:3898
 msgid "Podcast"
 msgstr "Podcast"
 
-#: package/contents/ui/FullRepresentation.qml:3824
+#: package/contents/ui/FullRepresentation.qml:3909
 msgid "Plays the newest unheard downloaded episode — works with no network at all."
 msgstr "Toistaa uusimman kuuntelemattoman ladatun jakson — toimii täysin ilman verkkoyhteyttä."
 
-#: package/contents/ui/FullRepresentation.qml:3843
+#: package/contents/ui/FullRepresentation.qml:3928
 msgid "Showing unplayed — tap for all"
 msgstr "Näytetään kuuntelemattomat — näytä kaikki napauttamalla"
 
-#: package/contents/ui/FullRepresentation.qml:3844
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Show only unplayed"
 msgstr "Näytä vain kuuntelemattomat"
 
-#: package/contents/ui/FullRepresentation.qml:3859
+#: package/contents/ui/FullRepresentation.qml:3944
 msgid "Mark all as played"
 msgstr "Merkitse kaikki kuunnelluiksi"
 
-#: package/contents/ui/FullRepresentation.qml:3889
+#: package/contents/ui/FullRepresentation.qml:3974
 msgid "Unsubscribe from this show"
 msgstr "Peru tämän ohjelman tilaus"
 
-#: package/contents/ui/FullRepresentation.qml:3890
+#: package/contents/ui/FullRepresentation.qml:3975
 msgid "Subscribe to this show"
 msgstr "Tilaa tämä ohjelma"
 
-#: package/contents/ui/FullRepresentation.qml:3907
+#: package/contents/ui/FullRepresentation.qml:3992
 msgid "Refresh episodes"
 msgstr "Päivitä jaksot"
 
-#: package/contents/ui/FullRepresentation.qml:3923
-#: package/contents/ui/FullRepresentation.qml:3934
+#: package/contents/ui/FullRepresentation.qml:4008
+#: package/contents/ui/FullRepresentation.qml:4019
 msgid "Open this feed"
 msgstr "Avaa tämä syöte"
 
-#: package/contents/ui/FullRepresentation.qml:3963
+#: package/contents/ui/FullRepresentation.qml:4048
 msgid "Shows"
 msgstr "Ohjelmat"
 
-#: package/contents/ui/FullRepresentation.qml:3994
+#: package/contents/ui/FullRepresentation.qml:4079
 msgid "Loading episodes…"
 msgstr "Ladataan jaksoja…"
 
-#: package/contents/ui/FullRepresentation.qml:3995
+#: package/contents/ui/FullRepresentation.qml:4080
 msgid "Searching…"
 msgstr "Haetaan…"
 
-#: package/contents/ui/FullRepresentation.qml:3996
+#: package/contents/ui/FullRepresentation.qml:4081
 msgid "Loading the charts…"
 msgstr "Ladataan listoja…"
 
-#: package/contents/ui/FullRepresentation.qml:4142
+#: package/contents/ui/FullRepresentation.qml:4227
 msgid "resume at %1"
 msgstr "jatka kohdasta %1"
 
-#: package/contents/ui/FullRepresentation.qml:4164
+#: package/contents/ui/FullRepresentation.qml:4249
 msgid "Tap again to delete the file"
 msgstr "Poista tiedosto napauttamalla uudelleen"
 
-#: package/contents/ui/FullRepresentation.qml:4165
+#: package/contents/ui/FullRepresentation.qml:4250
 msgid "Delete the downloaded file"
 msgstr "Poista ladattu tiedosto"
 
-#: package/contents/ui/FullRepresentation.qml:4332
+#: package/contents/ui/FullRepresentation.qml:4417
 msgid "Unsubscribe"
 msgstr "Peru tilaus"
 
-#: package/contents/ui/FullRepresentation.qml:4333
+#: package/contents/ui/FullRepresentation.qml:4418
 msgid "Subscribe"
 msgstr "Tilaa"
 
-#: package/contents/ui/FullRepresentation.qml:4372
+#: package/contents/ui/FullRepresentation.qml:4457
 msgid "No shows found"
 msgstr "Ohjelmia ei löytynyt"
 
-#: package/contents/ui/FullRepresentation.qml:4373
+#: package/contents/ui/FullRepresentation.qml:4458
 msgid "The charts did not answer — try again in a moment"
 msgstr "Listat eivät vastanneet — yritä hetken kuluttua uudelleen"
 
-#: package/contents/ui/FullRepresentation.qml:4374
+#: package/contents/ui/FullRepresentation.qml:4459
 msgid "No subscriptions yet"
 msgstr "Ei vielä tilauksia"
 
-#: package/contents/ui/FullRepresentation.qml:4386
+#: package/contents/ui/FullRepresentation.qml:4471
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Hae ohjelmaa yltä, merkitse se tähdellä, niin sen jaksot latautuvat tänne kuunneltaviksi ilman verkkoyhteyttä"
 
-#: package/contents/ui/FullRepresentation.qml:4540
+#: package/contents/ui/FullRepresentation.qml:4625
 msgid "Open the show"
 msgstr "Avaa ohjelma"
 
-#: package/contents/ui/FullRepresentation.qml:4570
+#: package/contents/ui/FullRepresentation.qml:4655
 msgid "No episodes found"
 msgstr "Jaksoja ei löytynyt"
 
-#: package/contents/ui/FullRepresentation.qml:4612
+#: package/contents/ui/FullRepresentation.qml:4697
 msgid "All caught up — no unplayed episodes"
 msgstr "Kaikki kuunneltu — ei kuuntelemattomia jaksoja"
 
-#: package/contents/ui/FullRepresentation.qml:4663
+#: package/contents/ui/FullRepresentation.qml:4748
 msgid "Sleep timer"
 msgstr "Uniajastin"
 
-#: package/contents/ui/FullRepresentation.qml:4669
-#: package/contents/ui/FullRepresentation.qml:5439
+#: package/contents/ui/FullRepresentation.qml:4754
+#: package/contents/ui/FullRepresentation.qml:5601
 msgid "Sleeping in %1"
 msgstr "Nukkumaan %1 kuluttua"
 
-#: package/contents/ui/FullRepresentation.qml:4689
+#: package/contents/ui/FullRepresentation.qml:4774
 msgid "Cancel"
 msgstr "Peru"
 
-#: package/contents/ui/FullRepresentation.qml:4697
+#: package/contents/ui/FullRepresentation.qml:4782
 msgid "Playback fades out and stops when the timer ends."
 msgstr "Toisto hiljenee ja pysähtyy, kun ajastin päättyy."
 
-#: package/contents/ui/FullRepresentation.qml:4732
+#: package/contents/ui/FullRepresentation.qml:4817
 msgid "Wake-up alarms"
 msgstr "Herätykset"
 
@@ -1259,1079 +1375,1078 @@ msgstr "Herätykset"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:4757
-#: package/contents/ui/FullRepresentation.qml:4852
-#: package/contents/ui/FullRepresentation.qml:4959
-#: package/contents/ui/FullRepresentation.qml:5067
+#: package/contents/ui/FullRepresentation.qml:4842
+#: package/contents/ui/FullRepresentation.qml:4949
+#: package/contents/ui/FullRepresentation.qml:5065
+#: package/contents/ui/FullRepresentation.qml:5173
 msgid "Sun"
 msgstr "su"
 
-#: package/contents/ui/FullRepresentation.qml:4757
-#: package/contents/ui/FullRepresentation.qml:4852
-#: package/contents/ui/FullRepresentation.qml:4959
-#: package/contents/ui/FullRepresentation.qml:5067
+#: package/contents/ui/FullRepresentation.qml:4842
+#: package/contents/ui/FullRepresentation.qml:4949
+#: package/contents/ui/FullRepresentation.qml:5065
+#: package/contents/ui/FullRepresentation.qml:5173
 msgid "Mon"
 msgstr "ma"
 
-#: package/contents/ui/FullRepresentation.qml:4757
-#: package/contents/ui/FullRepresentation.qml:4852
-#: package/contents/ui/FullRepresentation.qml:4959
-#: package/contents/ui/FullRepresentation.qml:5067
+#: package/contents/ui/FullRepresentation.qml:4842
+#: package/contents/ui/FullRepresentation.qml:4949
+#: package/contents/ui/FullRepresentation.qml:5065
+#: package/contents/ui/FullRepresentation.qml:5173
 msgid "Tue"
 msgstr "ti"
 
-#: package/contents/ui/FullRepresentation.qml:4757
-#: package/contents/ui/FullRepresentation.qml:4852
-#: package/contents/ui/FullRepresentation.qml:4959
-#: package/contents/ui/FullRepresentation.qml:5067
+#: package/contents/ui/FullRepresentation.qml:4842
+#: package/contents/ui/FullRepresentation.qml:4949
+#: package/contents/ui/FullRepresentation.qml:5065
+#: package/contents/ui/FullRepresentation.qml:5173
 msgid "Wed"
 msgstr "ke"
 
-#: package/contents/ui/FullRepresentation.qml:4758
-#: package/contents/ui/FullRepresentation.qml:4853
-#: package/contents/ui/FullRepresentation.qml:4960
-#: package/contents/ui/FullRepresentation.qml:5068
+#: package/contents/ui/FullRepresentation.qml:4843
+#: package/contents/ui/FullRepresentation.qml:4950
+#: package/contents/ui/FullRepresentation.qml:5066
+#: package/contents/ui/FullRepresentation.qml:5174
 msgid "Thu"
 msgstr "to"
 
-#: package/contents/ui/FullRepresentation.qml:4758
-#: package/contents/ui/FullRepresentation.qml:4853
-#: package/contents/ui/FullRepresentation.qml:4960
-#: package/contents/ui/FullRepresentation.qml:5068
+#: package/contents/ui/FullRepresentation.qml:4843
+#: package/contents/ui/FullRepresentation.qml:4950
+#: package/contents/ui/FullRepresentation.qml:5066
+#: package/contents/ui/FullRepresentation.qml:5174
 msgid "Fri"
 msgstr "pe"
 
-#: package/contents/ui/FullRepresentation.qml:4758
-#: package/contents/ui/FullRepresentation.qml:4853
-#: package/contents/ui/FullRepresentation.qml:4960
-#: package/contents/ui/FullRepresentation.qml:5068
+#: package/contents/ui/FullRepresentation.qml:4843
+#: package/contents/ui/FullRepresentation.qml:4950
+#: package/contents/ui/FullRepresentation.qml:5066
+#: package/contents/ui/FullRepresentation.qml:5174
 msgid "Sat"
 msgstr "la"
 
-#: package/contents/ui/FullRepresentation.qml:4760
-#: package/contents/ui/FullRepresentation.qml:4844
-#: package/contents/ui/FullRepresentation.qml:4962
-#: package/contents/ui/FullRepresentation.qml:5060
+#: package/contents/ui/FullRepresentation.qml:4845
+#: package/contents/ui/FullRepresentation.qml:4941
+#: package/contents/ui/FullRepresentation.qml:5068
+#: package/contents/ui/FullRepresentation.qml:5166
 msgid "Daily"
 msgstr "Päivittäin"
 
-#: package/contents/ui/FullRepresentation.qml:4761
-#: package/contents/ui/FullRepresentation.qml:4963
+#: package/contents/ui/FullRepresentation.qml:4846
+#: package/contents/ui/FullRepresentation.qml:5069
 msgid "Every %1"
 msgstr "Joka %1"
 
-#: package/contents/ui/FullRepresentation.qml:4776
+#: package/contents/ui/FullRepresentation.qml:4861
 msgid "Remove this alarm"
 msgstr "Poista tämä herätys"
 
-#: package/contents/ui/FullRepresentation.qml:4784
+#: package/contents/ui/FullRepresentation.qml:4869
 msgid "No alarms yet — add one below."
 msgstr "Ei vielä herätyksiä — lisää uusi alta."
 
-#: package/contents/ui/FullRepresentation.qml:4799
-#: package/contents/ui/FullRepresentation.qml:5001
+#: package/contents/ui/FullRepresentation.qml:4884
+#: package/contents/ui/FullRepresentation.qml:5107
 msgid "Station:"
 msgstr "Asema:"
 
-#: package/contents/ui/FullRepresentation.qml:4807
-#: package/contents/ui/FullRepresentation.qml:5009
+#: package/contents/ui/FullRepresentation.qml:4893
+#: package/contents/ui/FullRepresentation.qml:5115
 msgid "Station"
 msgstr "Asema"
 
-#: package/contents/ui/FullRepresentation.qml:4811
-#: package/contents/ui/FullRepresentation.qml:5013
+#: package/contents/ui/FullRepresentation.qml:4903
+msgid "Wake with the built-in tone (no station)"
+msgstr "Herätä sisäänrakennetulla äänellä (ilman asemaa)"
+
+#: package/contents/ui/FullRepresentation.qml:4908
+#: package/contents/ui/FullRepresentation.qml:5119
 msgid "Start:"
 msgstr "Aloitus:"
 
-#: package/contents/ui/FullRepresentation.qml:4822
-#: package/contents/ui/FullRepresentation.qml:5024
+#: package/contents/ui/FullRepresentation.qml:4919
+#: package/contents/ui/FullRepresentation.qml:5130
 msgid "Start hour"
 msgstr "Aloitustunti"
 
-#: package/contents/ui/FullRepresentation.qml:4832
-#: package/contents/ui/FullRepresentation.qml:5034
+#: package/contents/ui/FullRepresentation.qml:4929
+#: package/contents/ui/FullRepresentation.qml:5140
 msgid "Start minute"
 msgstr "Aloitusminuutti"
 
-#: package/contents/ui/FullRepresentation.qml:4837
-#: package/contents/ui/FullRepresentation.qml:5053
+#: package/contents/ui/FullRepresentation.qml:4934
+#: package/contents/ui/FullRepresentation.qml:5159
 msgid "Repeat:"
 msgstr "Toistuvuus:"
 
-#: package/contents/ui/FullRepresentation.qml:4844
-#: package/contents/ui/FullRepresentation.qml:5060
+#: package/contents/ui/FullRepresentation.qml:4941
+#: package/contents/ui/FullRepresentation.qml:5166
 msgid "Once"
 msgstr "Kerran"
 
-#: package/contents/ui/FullRepresentation.qml:4844
-#: package/contents/ui/FullRepresentation.qml:5060
+#: package/contents/ui/FullRepresentation.qml:4941
+#: package/contents/ui/FullRepresentation.qml:5166
 msgid "Weekly"
 msgstr "Viikoittain"
 
-#: package/contents/ui/FullRepresentation.qml:4846
-#: package/contents/ui/FullRepresentation.qml:5061
+#: package/contents/ui/FullRepresentation.qml:4943
+#: package/contents/ui/FullRepresentation.qml:5167
 msgid "Repeat"
 msgstr "Toistuvuus"
 
-#: package/contents/ui/FullRepresentation.qml:4855
-#: package/contents/ui/FullRepresentation.qml:5070
+#: package/contents/ui/FullRepresentation.qml:4952
+#: package/contents/ui/FullRepresentation.qml:5176
 msgid "Weekday"
 msgstr "Viikonpäivä"
 
-#: package/contents/ui/FullRepresentation.qml:4860
+#: package/contents/ui/FullRepresentation.qml:4957
 msgid "Volume:"
 msgstr "Äänenvoimakkuus:"
 
-#: package/contents/ui/FullRepresentation.qml:4882
+#: package/contents/ui/FullRepresentation.qml:4979
 msgid "Keep the computer awake until the alarm"
 msgstr "Pidä tietokone hereillä herätykseen asti"
 
-#: package/contents/ui/FullRepresentation.qml:4888
-#: package/contents/ui/FullRepresentation.qml:5106
+#: package/contents/ui/FullRepresentation.qml:4985
+#: package/contents/ui/FullRepresentation.qml:5212
 msgid "Add"
 msgstr "Lisää"
 
-#: package/contents/ui/FullRepresentation.qml:4978
+#: package/contents/ui/FullRepresentation.qml:4992
+msgid "Wake-up tone"
+msgstr "Herätysääni"
+
+#: package/contents/ui/FullRepresentation.qml:5084
 msgid "Remove this schedule"
 msgstr "Poista tämä ajastus"
 
-#: package/contents/ui/FullRepresentation.qml:4986
+#: package/contents/ui/FullRepresentation.qml:5092
 msgid "No scheduled recordings yet — add one below."
 msgstr "Ei vielä ajastettuja tallennuksia — lisää uusi alta."
 
-#: package/contents/ui/FullRepresentation.qml:5039
+#: package/contents/ui/FullRepresentation.qml:5145
 msgid "Duration:"
 msgstr "Kesto:"
 
-#: package/contents/ui/FullRepresentation.qml:5049
+#: package/contents/ui/FullRepresentation.qml:5155
 msgid "Duration in minutes"
 msgstr "Kesto minuutteina"
 
-#: package/contents/ui/FullRepresentation.qml:5081
+#: package/contents/ui/FullRepresentation.qml:5187
 msgid "Recordings are for personal use only."
 msgstr "Tallenteet ovat vain henkilökohtaiseen käyttöön."
 
-#: package/contents/ui/FullRepresentation.qml:5298
+#: package/contents/ui/FullRepresentation.qml:5404
 msgid "Keep open"
 msgstr "Pidä avoinna"
 
-#: package/contents/ui/FullRepresentation.qml:5342
-#: package/contents/ui/FullRepresentation.qml:5468
-msgid "Playing"
-msgstr "Toistetaan"
-
-#: package/contents/ui/FullRepresentation.qml:5445
-#: package/contents/ui/main.qml:145
+#: package/contents/ui/FullRepresentation.qml:5607
+#: package/contents/ui/main.qml:223
 msgid "Casting to %1"
 msgstr "Lähetetään kohteeseen %1"
 
-#: package/contents/ui/FullRepresentation.qml:5451
+#: package/contents/ui/FullRepresentation.qml:5613
 msgid "Paused — the station keeps recording"
 msgstr "Tauko — asema tallentuu edelleen"
 
-#: package/contents/ui/FullRepresentation.qml:5453
+#: package/contents/ui/FullRepresentation.qml:5615
 msgid "Check internet connection…"
 msgstr "Tarkista internetyhteys…"
 
-#: package/contents/ui/FullRepresentation.qml:5463
+#: package/contents/ui/FullRepresentation.qml:5625
 msgid "Bitrate: %1 kb/s"
 msgstr "Bittinopeus: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:5468
-#: package/contents/ui/FullRepresentation.qml:5471
+#: package/contents/ui/FullRepresentation.qml:5630
+#: package/contents/ui/FullRepresentation.qml:5633
 msgid "Connecting…"
 msgstr "Yhdistetään…"
 
-#: package/contents/ui/FullRepresentation.qml:5473
+#: package/contents/ui/FullRepresentation.qml:5635
 msgid "Choose station and enjoy…"
 msgstr "Valitse asema ja nauti…"
 
-#: package/contents/ui/FullRepresentation.qml:5503
+#: package/contents/ui/FullRepresentation.qml:5665
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Lähetetään kohteeseen %1 — valitse tai pysäytä napsauttamalla"
 
-#: package/contents/ui/FullRepresentation.qml:5505
+#: package/contents/ui/FullRepresentation.qml:5667
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Äänenvoimakkuus, äänilähtö ja laitteet (Chromecast, TV, kaiutin)"
 
-#: package/contents/ui/FullRepresentation.qml:5506
+#: package/contents/ui/FullRepresentation.qml:5668
 msgid "Volume and audio output"
 msgstr "Äänenvoimakkuus ja äänilähtö"
 
-#: package/contents/ui/FullRepresentation.qml:5670
+#: package/contents/ui/FullRepresentation.qml:5832
 msgid "Play on"
 msgstr "Toista laitteella"
 
-#: package/contents/ui/FullRepresentation.qml:5717
+#: package/contents/ui/FullRepresentation.qml:5879
 msgid "Unmute"
 msgstr "Poista mykistys"
 
-#: package/contents/ui/FullRepresentation.qml:5717
+#: package/contents/ui/FullRepresentation.qml:5879
 msgid "Mute"
 msgstr "Mykistä"
 
-#: package/contents/ui/FullRepresentation.qml:5755
+#: package/contents/ui/FullRepresentation.qml:5917
 msgid "This computer"
 msgstr "Tämä tietokone"
 
-#: package/contents/ui/FullRepresentation.qml:5779
+#: package/contents/ui/FullRepresentation.qml:5941
 msgid "System default output"
 msgstr "Järjestelmän oletusäänilähtö"
 
-#: package/contents/ui/FullRepresentation.qml:5806
+#: package/contents/ui/FullRepresentation.qml:5968
 msgid "All local outputs, in sync"
 msgstr "Kaikki paikalliset äänilähdöt samassa tahdissa"
 
-#: package/contents/ui/FullRepresentation.qml:5855
+#: package/contents/ui/FullRepresentation.qml:6017
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Toistaa kaikilla yhdistetyillä kaiuttimilla samanaikaisesti — langallisia lähtöjä viivästetään, jotta ne pysyvät Bluetooth-kaiuttimen tahdissa."
 
-#: package/contents/ui/FullRepresentation.qml:5871
+#: package/contents/ui/FullRepresentation.qml:6033
 msgid "Keep it in tune by itself"
 msgstr "Pidä itsestään vireessä"
 
-#: package/contents/ui/FullRepresentation.qml:5886
+#: package/contents/ui/FullRepresentation.qml:6048
 msgid "Listens now and then while music plays and puts the speakers back in step on its own. Nothing is audible and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you."
 msgstr "Kuuntelee silloin tällöin musiikin taustalla ja tahdistaa kaiuttimet itse uudelleen. Mitään ei kuulu eikä musiikki koskaan keskeydy — jos se ei jossain vaiheessa saa eroa itse korjattua, se kertoo siitä ja jättää mittaamisen sinulle."
 
-#: package/contents/ui/FullRepresentation.qml:5902
-#: package/contents/ui/FullRepresentation.qml:5919
+#: package/contents/ui/FullRepresentation.qml:6064
+#: package/contents/ui/FullRepresentation.qml:6081
 msgid "Sync fine-tune"
 msgstr "Synkronoinnin hienosäätö"
 
-#: package/contents/ui/FullRepresentation.qml:5912
+#: package/contents/ui/FullRepresentation.qml:6074
 msgid "How far behind the Bluetooth speaker runs — the other outputs are held back by this much to match it. The automatic check below reports something else: how far apart they still land."
 msgstr "Kuinka paljon Bluetooth-kaiutin laahaa perässä — muita ulostuloja pidätellään saman verran. Alla oleva automaattitarkistus kertoo eri asian: kuinka paljon eroa on vielä jäljellä."
 
-#: package/contents/ui/FullRepresentation.qml:5953
+#: package/contents/ui/FullRepresentation.qml:6115
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Jos Bluetooth-kaiutin laahaa yhä langallisten perässä, nosta tätä, kunnes ne soivat yhtä aikaa."
 
-#: package/contents/ui/FullRepresentation.qml:5965
+#: package/contents/ui/FullRepresentation.qml:6127
 msgid "Sync delay in milliseconds"
 msgstr "Synkronointiviive millisekunteina"
 
-#: package/contents/ui/FullRepresentation.qml:5987
+#: package/contents/ui/FullRepresentation.qml:6149
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Kirjoita tarkka viive millisekunteina — liukusäädin liikkuu kymmenen yksikön askelin."
 
-#: package/contents/ui/FullRepresentation.qml:5991
+#: package/contents/ui/FullRepresentation.qml:6153
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:6006
+#: package/contents/ui/FullRepresentation.qml:6168
 msgid "Calibrate with the microphone"
 msgstr "Kalibroi mikrofonilla"
 
-#: package/contents/ui/FullRepresentation.qml:6018
+#: package/contents/ui/FullRepresentation.qml:6180
 msgid "Measures with a tone too high to hear how far the Bluetooth speaker trails, and sets the delay automatically. Speaker balance is left as it is — matching loudness needs a sound you would hear."
 msgstr "Mittaa kuulumattomalla äänellä, kuinka paljon Bluetooth-kaiutin laahaa, ja asettaa viiveen itse. Kaiuttimien tasapaino jää ennalleen — äänenvoimakkuuden tasaus vaatii kuuluvan äänen."
 
-#: package/contents/ui/FullRepresentation.qml:6019
+#: package/contents/ui/FullRepresentation.qml:6181
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Toistaa muutaman kovan naksahduksen jokaisesta kaiuttimesta ja mittaa mikrofonilla, kuinka paljon Bluetooth-kaiutin laahaa perässä — viive asetetaan automaattisesti."
 
-#: package/contents/ui/FullRepresentation.qml:6032
+#: package/contents/ui/FullRepresentation.qml:6194
 msgid "Calibration needs a Bluetooth speaker in the group — connect one and the button wakes up."
 msgstr "Kalibrointi tarvitsee ryhmään Bluetooth-kaiuttimen — yhdistä sellainen, niin painike herää."
 
-#: package/contents/ui/FullRepresentation.qml:6061
+#: package/contents/ui/FullRepresentation.qml:6223
 msgid "Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Soittaa muutaman minuutin välein jokaisesta kaiuttimesta äänen, joka on liian korkea kuultavaksi, ja tarkistaa synkronoinnin uudelleen, kun kaiuttimet erkanevat. Ääni käsitellään vain tässä tietokoneessa — sitä ei tallenneta eikä lähetetä minnekään."
 
-#: package/contents/ui/FullRepresentation.qml:6102
+#: package/contents/ui/FullRepresentation.qml:6264
 msgid "Tuned automatically — %1"
 msgstr "Viritetty automaattisesti — %1"
 
-#: package/contents/ui/FullRepresentation.qml:6127
+#: package/contents/ui/FullRepresentation.qml:6289
 msgid "Set the delay by ear (no microphone)"
 msgstr "Aseta viive korvakuulolta (ilman mikrofonia)"
 
-#: package/contents/ui/FullRepresentation.qml:6130
+#: package/contents/ui/FullRepresentation.qml:6292
 msgid "Hides the microphone measurement and the automatic checks, and never listens to the room. Use the fine-tune slider above until the speakers sound together."
 msgstr "Piilottaa mikrofonimittauksen ja automaattiset tarkistukset eikä kuuntele huonetta koskaan. Käytä yllä olevaa hienosäätöliukua, kunnes kaiuttimet soivat yhdessä."
 
-#: package/contents/ui/FullRepresentation.qml:6146
+#: package/contents/ui/FullRepresentation.qml:6308
 msgid "Measure with a tone too high to hear"
 msgstr "Mittaa äänellä, joka on liian korkea kuultavaksi"
 
-#: package/contents/ui/FullRepresentation.qml:6149
+#: package/contents/ui/FullRepresentation.qml:6311
 msgid "Measures with an 18–19 kHz sweep, which most adults cannot hear and music does not reach, so the room can stay noisy. Younger ears often can hear it, and dogs and cats certainly do — turn it off and measurement uses a short audible click instead, which needs a quiet room."
 msgstr "Mittaa 18–19 kHz:n pyyhkäisyllä, jota useimmat aikuiset eivät kuule ja johon musiikki ei yllä, joten huone saa olla meluisa. Nuoremmat korvat kuulevat sen usein, koirat ja kissat varmasti. Pois päältä mittaus käyttää lyhyttä kuuluvaa napsahdusta, joka vaatii hiljaisen huoneen."
 
-#: package/contents/ui/FullRepresentation.qml:6178
+#: package/contents/ui/FullRepresentation.qml:6340
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 muistetaan synkronointia varten — yhdistä se, niin se liittyy takaisin automaattisesti."
 
-#: package/contents/ui/FullRepresentation.qml:6203
+#: package/contents/ui/FullRepresentation.qml:6365
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Kierros 1/2 — naksahduksia jokaisesta kaiuttimesta…"
 
-#: package/contents/ui/FullRepresentation.qml:6204
+#: package/contents/ui/FullRepresentation.qml:6366
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Kierros 2/2 — hiljaisuus, tarkistetaan tulosta…"
 
-#: package/contents/ui/FullRepresentation.qml:6226
+#: package/contents/ui/FullRepresentation.qml:6388
 msgid "Stops the measurement, unmutes every speaker and gives the music back."
 msgstr "Pysäyttää mittauksen, poistaa kaikkien kaiuttimien mykistyksen ja palauttaa musiikin."
 
-#: package/contents/ui/FullRepresentation.qml:6255
+#: package/contents/ui/FullRepresentation.qml:6417
 msgid "%1 plays in the group"
 msgstr "%1 soi ryhmässä"
 
-#: package/contents/ui/FullRepresentation.qml:6268
+#: package/contents/ui/FullRepresentation.qml:6430
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Soiko tämä kaiutin ryhmässä — poista valinta jättääksesi sen pois katkaisematta yhteyttä. Muistetaan laitekohtaisesti."
 
-#: package/contents/ui/FullRepresentation.qml:6277
+#: package/contents/ui/FullRepresentation.qml:6439
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (mitään ei ole kytkettynä)"
 
-#: package/contents/ui/FullRepresentation.qml:6291
+#: package/contents/ui/FullRepresentation.qml:6453
 msgid "Balance of %1"
 msgstr "Laitteen %1 tasapaino"
 
-#: package/contents/ui/FullRepresentation.qml:6300
+#: package/contents/ui/FullRepresentation.qml:6462
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "Tämän kaiuttimen osuus äänenvoimakkuudesta — tasapaino seuraa jokaista pääsäätimen liikettä ja muistetaan laitekohtaisesti. Se skaalaa vain tämän sovelman toistamaa ääntä; järjestelmän ääniasetusten laitekohtainen äänenvoimakkuus on erillinen, koskematon kerros — siksi ne lukemat eroavat näistä liukusäätimistä."
 
-#: package/contents/ui/FullRepresentation.qml:6317
+#: package/contents/ui/FullRepresentation.qml:6479
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:6318
+#: package/contents/ui/FullRepresentation.qml:6480
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:6319
+#: package/contents/ui/FullRepresentation.qml:6481
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:6320
+#: package/contents/ui/FullRepresentation.qml:6482
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:6325
+#: package/contents/ui/FullRepresentation.qml:6487
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Mitä kanavia tämä kaiutin toistaa: stereo, vain vasen, vain oikea tai molempien monomiksaus. Aseta yksi kaiutin kanavalle L ja toinen kanavalle R saadaksesi aidon stereoparin — muistetaan laitekohtaisesti."
 
-#: package/contents/ui/FullRepresentation.qml:6356
+#: package/contents/ui/FullRepresentation.qml:6518
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:6371
+#: package/contents/ui/FullRepresentation.qml:6533
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth on pois päältä tai sovitinta ei ole käytettävissä — tarkista Järjestelmäasetukset."
 
-#: package/contents/ui/FullRepresentation.qml:6382
+#: package/contents/ui/FullRepresentation.qml:6544
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "Ei paritettuja Bluetooth-äänilaitteita — käytä alta \"Parita uusi kaiutin…\" tai parita kerran Järjestelmäasetuksissa."
 
-#: package/contents/ui/FullRepresentation.qml:6424
+#: package/contents/ui/FullRepresentation.qml:6586
 msgid "Tap again to forget — pairing again is the only way back"
 msgstr "Napauta uudelleen unohtaaksesi — ainoa tie takaisin on parittaa uudelleen"
 
-#: package/contents/ui/FullRepresentation.qml:6425
+#: package/contents/ui/FullRepresentation.qml:6587
 msgid "Forget this device (unpair)"
 msgstr "Unohda tämä laite (poista paritus)"
 
-#: package/contents/ui/FullRepresentation.qml:6456
+#: package/contents/ui/FullRepresentation.qml:6618
 msgid "%1 — connecting…"
 msgstr "%1 — yhdistetään…"
 
-#: package/contents/ui/FullRepresentation.qml:6458
+#: package/contents/ui/FullRepresentation.qml:6620
 msgid "%1 — linked, no sound yet"
 msgstr "%1 — yhdistetty, ei vielä ääntä"
 
-#: package/contents/ui/FullRepresentation.qml:6490
+#: package/contents/ui/FullRepresentation.qml:6652
 msgid "%1 — pairing…"
 msgstr "%1 — paritetaan…"
 
-#: package/contents/ui/FullRepresentation.qml:6491
+#: package/contents/ui/FullRepresentation.qml:6653
 msgid "%1 — new, click to pair"
 msgstr "%1 — uusi, parita napsauttamalla"
 
-#: package/contents/ui/FullRepresentation.qml:6501
+#: package/contents/ui/FullRepresentation.qml:6663
 msgid "Pair a new speaker…"
 msgstr "Parita uusi kaiutin…"
 
-#: package/contents/ui/FullRepresentation.qml:6517
+#: package/contents/ui/FullRepresentation.qml:6679
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Etsitään — aseta kaiutin paritustilaan…"
 
-#: package/contents/ui/FullRepresentation.qml:6538
+#: package/contents/ui/FullRepresentation.qml:6700
 msgid "WiFi & network"
 msgstr "WiFi ja verkko"
 
-#: package/contents/ui/FullRepresentation.qml:6570
+#: package/contents/ui/FullRepresentation.qml:6732
 msgid "%1 (speaker group)"
 msgstr "%1 (kaiutinryhmä)"
 
-#: package/contents/ui/FullRepresentation.qml:6598
+#: package/contents/ui/FullRepresentation.qml:6760
 msgid "Balance"
 msgstr "Tasapaino"
 
-#: package/contents/ui/FullRepresentation.qml:6612
+#: package/contents/ui/FullRepresentation.qml:6774
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "Tämän laitteen osuus äänenvoimakkuudesta — tasapaino seuraa jokaista pääsäätimen liikettä ja muistetaan laitekohtaisesti."
 
-#: package/contents/ui/FullRepresentation.qml:6634
+#: package/contents/ui/FullRepresentation.qml:6796
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Jokainen laite puskuroi itsekseen, joten huoneet voivat soida muutaman sekunnin eri tahdissa. Täydellisesti synkronoidut kaiuttimet saat ryhmittelemällä ne Google Home -sovelluksessa — ryhmä näkyy täällä yhtenä laitteena."
 
-#: package/contents/ui/FullRepresentation.qml:6644
+#: package/contents/ui/FullRepresentation.qml:6806
 msgid "Stop casting everywhere"
 msgstr "Lopeta lähetys kaikkialla"
 
-#: package/contents/ui/FullRepresentation.qml:6662
+#: package/contents/ui/FullRepresentation.qml:6824
 msgid "Searching for devices…"
 msgstr "Etsitään laitteita…"
 
-#: package/contents/ui/FullRepresentation.qml:6671
+#: package/contents/ui/FullRepresentation.qml:6833
 msgid "No devices found on your network"
 msgstr "Verkosta ei löytynyt laitteita"
 
-#: package/contents/ui/main.qml:440
+#: package/contents/ui/main.qml:530
 msgid "Station list could not be read"
 msgstr "Asemaluetteloa ei voitu lukea"
 
-#: package/contents/ui/main.qml:441
+#: package/contents/ui/main.qml:531
 msgid "The saved station configuration is malformed. Your data was not changed; fix the servers entry or use Settings → Import."
 msgstr "Tallennettu asemamääritys on viallinen. Tietojasi ei muutettu; korjaa servers-kohta tai käytä toimintoa Asetukset → Tuo."
 
-#: package/contents/ui/main.qml:833
+#: package/contents/ui/main.qml:923
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "Asema ei vastannut — se voi olla poissa verkosta tai ei saatavilla maassasi. Kokeile toista tulosta."
 
-#: package/contents/ui/main.qml:906
+#: package/contents/ui/main.qml:996
 msgid "Download gave no answer"
 msgstr "Lataus ei vastannut"
 
-#: package/contents/ui/main.qml:907
+#: package/contents/ui/main.qml:997
 msgid "Nothing came back from the downloader — try again."
 msgstr "Lataajalta ei tullut mitään takaisin — yritä uudelleen."
 
-#: package/contents/ui/main.qml:1406
+#: package/contents/ui/main.qml:2822
+msgid "%1 devices"
+msgstr "%1-laitteet"
+
+#: package/contents/ui/main.qml:3645
+msgid "The Bluetooth speaker"
+msgstr "Bluetooth-kaiutin"
+
+#: package/contents/ui/main.qml:3644
+msgid "%1 is connected, but its sound never arrived"
+msgstr "%1 on yhdistetty, mutta ääntä ei kuulunut"
+
+#: package/contents/ui/main.qml:3646
+msgid "Turn the speaker off and on again, then reconnect it."
+msgstr "Katkaise kaiuttimesta virta, käynnistä se uudelleen ja yhdistä sitten uudestaan."
+
+#: package/contents/ui/main.qml:4061
+msgid "Station seems to be off the air"
+msgstr "Asema vaikuttaa olevan poissa eetteristä"
+
+#: package/contents/ui/main.qml:4062
+msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
+msgstr "%1 ei vastaa yhdestäkään hakemiston tuntemasta osoitteesta. Se säilyy luettelossasi — yritetään uudelleen taustalla."
+
+#: package/contents/ui/main.qml:4134
+msgid "Playing from a backup address"
+msgstr "Toistetaan varaosoitteesta"
+
+#: package/contents/ui/main.qml:4135
+msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
+msgstr "Aseman tallennettu osoite ei vastaa — toistetaan toistaiseksi hakemiston lähintä vastinetta. Tallennettu osoitteesi säilytettiin."
+
+#: package/contents/ui/main.qml:4175
+msgid "Station found at a new address"
+msgstr "Asema löytyi uudesta osoitteesta"
+
+#: package/contents/ui/main.qml:4176
+msgid "%1 moved — the new address was saved to your list."
+msgstr "%1 on muuttanut — uusi osoite tallennettiin luetteloosi."
+
+#: package/contents/ui/main.qml:5595
+msgid "Casting needs pychromecast"
+msgstr "Lähettäminen vaatii pychromecastia"
+
+#: package/contents/ui/main.qml:5596
+msgid "Install the pychromecast library to cast to your devices."
+msgstr "Asenna pychromecast-kirjasto, jotta voit lähettää ääntä laitteillesi."
+
+#: package/contents/ui/main.qml:5617
+msgid "the device"
+msgstr "laite"
+
+#: package/contents/ui/main.qml:5617
+msgid "Could not cast to %1"
+msgstr "Ei voitu lähettää laitteelle %1"
+
+#: package/contents/ui/main.qml:5618
+msgid "The device could not play this station."
+msgstr "Laite ei voinut toistaa tätä asemaa."
+
+#: package/contents/ui/main.qml:5664
+msgid "Casting"
+msgstr "Lähetetään"
+
+#: package/contents/ui/main.qml:5665
+msgid "The device did not stop — it may still be playing."
+msgstr "Laite ei pysähtynyt — se saattaa yhä toistaa."
+
+#: package/contents/ui/main.qml:5743
+msgid "Bluetooth is switched off"
+msgstr "Bluetooth on pois päältä"
+
+#: package/contents/ui/main.qml:5744
+msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
+msgstr "Sovitin ei käynnistynyt — tarkista ilmoitusalueen Bluetooth-kytkin tai järjestelmäasetukset."
+
+#: package/contents/ui/main.qml:5763 package/contents/ui/main.qml:5881
+msgid "the Bluetooth device"
+msgstr "Bluetooth-laite"
+
+#: package/contents/ui/main.qml:5762
+msgid "Could not connect to %1"
+msgstr "Ei voitu yhdistää laitteeseen %1"
+
+#: package/contents/ui/main.qml:5764
+msgid "Make sure the speaker is switched on and in range."
+msgstr "Varmista, että kaiutin on päällä ja kantaman sisällä."
+
+#: package/contents/ui/main.qml:5880
+msgid "Could not pair with %1"
+msgstr "Laiteparia ei voitu muodostaa laitteen %1 kanssa"
+
+#: package/contents/ui/main.qml:5882
+msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
+msgstr "Aseta kaiutin paritustilaan (pidä sen Bluetooth-painiketta pohjassa) ja yritä uudelleen."
+
+#: package/contents/ui/main.qml:5980 package/contents/ui/main.qml:6049
+msgid "yt-dlp is not installed"
+msgstr "yt-dlp ei ole asennettu"
+
+#: package/contents/ui/main.qml:5981 package/contents/ui/main.qml:6050
+msgid "Install yt-dlp (and ffmpeg) to download tracks."
+msgstr "Asenna yt-dlp (ja ffmpeg) ladataksesi kappaleita."
+
+#: package/contents/ui/main.qml:6000 package/contents/ui/main.qml:6069
+msgid "Nothing found to download"
+msgstr "Ladattavaa ei löytynyt"
+
+#: package/contents/ui/main.qml:6001 package/contents/ui/main.qml:6070
+msgid "No track matched \"%1\" — a show or album title often has no single track to find."
+msgstr "Mikään kappale ei vastannut hakua \"%1\" — ohjelman tai albumin nimen takana ei usein ole yhtä kappaletta."
+
+#: package/contents/ui/main.qml:6013
+msgid "Found only a different show — skipped"
+msgstr "Löytyi vain eri ohjelma — ohitettiin"
+
+#: package/contents/ui/main.qml:6014
+msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
+msgstr "Paras osuma haulle \"%1\" oli \"%2\". Väärää ei ladata."
+
+#: package/contents/ui/main.qml:6036
+msgid "Downloading again without the cover"
+msgstr "Ladataan uudelleen ilman kansikuvaa"
+
+#: package/contents/ui/main.qml:6037
+msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
+msgstr "Tunnisteiden upottaminen vaatii python-mutagen-paketin — asenna se saadaksesi kansikuvat tiedostoihisi."
+
+#: package/contents/ui/main.qml:6065
+msgid "Track downloaded ✓"
+msgstr "Kappale ladattu ✓"
+
+#: package/contents/ui/main.qml:6066
+msgid "Saved as \"%1\" — newest first in My Music"
+msgstr "Tallennettu nimellä \"%1\" — uusin ensin Oma musiikki -sivulla"
+
+#: package/contents/ui/main.qml:6074
+msgid "Download failed"
+msgstr "Lataus epäonnistui"
+
+#: package/contents/ui/main.qml:6075
+msgid "Unknown error"
+msgstr "Tuntematon virhe"
+
+#: package/contents/ui/main.qml:6529
+msgid "Audio output changed"
+msgstr "Äänilähtö vaihtui"
+
+#: package/contents/ui/main.qml:6530
+msgid "The chosen output device disappeared — using the system default instead."
+msgstr "Valittu äänilaite katosi — käytetään sen sijaan järjestelmän oletusta."
+
+#: package/contents/ui/MediaListItem.qml:491
+msgid "Click again to confirm removal"
+msgstr "Vahvista poisto napsauttamalla uudelleen"
+
+#: package/contents/ui/MediaListItem.qml:492
+msgid "Remove station from list"
+msgstr "Poista asema luettelosta"
+
+#: package/contents/ui/MediaListItem.qml:566
+msgid "Waiting for track info…"
+msgstr "Odotetaan kappaletietoja…"
+
+#: package/contents/ui/PodcastEngine.qml:202
+msgid "Subscriptions exported"
+msgstr "Tilaukset viety"
+
+#: package/contents/ui/PodcastEngine.qml:204
+msgid "Export failed"
+msgstr "Vienti epäonnistui"
+
+#: package/contents/ui/PodcastEngine.qml:205
+msgid "Could not write the subscriptions file."
+msgstr "Tilaustiedostoa ei voitu kirjoittaa."
+
+#: package/contents/ui/PodcastEngine.qml:244
+msgid "Episode downloaded"
+msgstr "Jakso ladattu"
+
+#: package/contents/ui/PodcastEngine.qml:249
+#: package/contents/ui/PodcastEngine.qml:1123
+msgid "Episode download failed"
+msgstr "Jakson lataus epäonnistui"
+
+#: package/contents/ui/PodcastEngine.qml:396
 msgid "Nothing to export"
 msgstr "Ei vietävää"
 
-#: package/contents/ui/main.qml:1406
+#: package/contents/ui/PodcastEngine.qml:396
 msgid "Subscribe to a show first."
 msgstr "Tilaa ensin jokin ohjelma."
 
-#: package/contents/ui/main.qml:1436
+#: package/contents/ui/PodcastEngine.qml:428
 msgid "Subscriptions imported"
 msgstr "Tilaukset tuotu"
 
-#: package/contents/ui/main.qml:1437
+#: package/contents/ui/PodcastEngine.qml:429
 msgid "%1 show added"
 msgid_plural "%1 shows added"
 msgstr[0] "%1 ohjelma lisätty"
 msgstr[1] "%1 ohjelmaa lisätty"
 
-#: package/contents/ui/main.qml:1439
+#: package/contents/ui/PodcastEngine.qml:431
 msgid "Nothing imported"
 msgstr "Mitään ei tuotu"
 
-#: package/contents/ui/main.qml:1440
+#: package/contents/ui/PodcastEngine.qml:432
 msgid "No new podcast feeds were found in that file."
 msgstr "Tiedostosta ei löytynyt uusia podcast-syötteitä."
 
-#: package/contents/ui/main.qml:1855 package/contents/ui/main.qml:1897
+#: package/contents/ui/PodcastEngine.qml:842
+#: package/contents/ui/PodcastEngine.qml:884
 msgid "This feed address is not allowed."
 msgstr "Tämä syöteosoite ei ole sallittu."
 
-#: package/contents/ui/main.qml:1924 package/contents/ui/main.qml:1975
+#: package/contents/ui/PodcastEngine.qml:911
+#: package/contents/ui/PodcastEngine.qml:960
 msgid "The feed could not be reached — check the connection and try again."
 msgstr "Syötettä ei tavoitettu — tarkista yhteys ja yritä uudelleen."
 
-#: package/contents/ui/main.qml:1926 package/contents/ui/main.qml:1977
+#: package/contents/ui/PodcastEngine.qml:913
+#: package/contents/ui/PodcastEngine.qml:962
 msgid "The feed did not answer (error %1)."
 msgstr "Syöte ei vastannut (virhe %1)."
 
-#: package/contents/ui/main.qml:1927 package/contents/ui/main.qml:1978
+#: package/contents/ui/PodcastEngine.qml:914
+#: package/contents/ui/PodcastEngine.qml:963
 msgid "This address is not a podcast feed."
 msgstr "Tämä osoite ei ole podcast-syöte."
 
-#: package/contents/ui/main.qml:1939
+#: package/contents/ui/PodcastEngine.qml:926
 msgid "No playable episodes in this feed."
 msgstr "Syötteessä ei ole toistettavia jaksoja."
 
-#: package/contents/ui/main.qml:2114 package/contents/ui/main.qml:7642
-msgid "Episode download failed"
-msgstr "Jakson lataus epäonnistui"
-
-#: package/contents/ui/main.qml:2318
+#: package/contents/ui/PodcastEngine.qml:1309
 msgid "%1 — the newest episodes are downloading."
 msgstr "%1 — uusimpia jaksoja ladataan."
 
-#: package/contents/ui/main.qml:2320
+#: package/contents/ui/PodcastEngine.qml:1311
 msgid "New podcast episodes"
 msgstr "Uusia podcast-jaksoja"
 
-#: package/contents/ui/main.qml:3392 package/contents/ui/main.qml:7590
-#: package/contents/ui/main.qml:8243
+#: package/contents/ui/RecordingEngine.qml:232
+#: package/contents/ui/RecordingEngine.qml:506
+#: package/contents/ui/RecordingEngine.qml:576
 msgid "Recording failed"
 msgstr "Nauhoitus epäonnistui"
 
-#: package/contents/ui/main.qml:3581
+#: package/contents/ui/RecordingEngine.qml:410
 msgid "Scheduled recording missed"
 msgstr "Ajastettu tallennus jäi väliin"
 
-#: package/contents/ui/main.qml:3587
+#: package/contents/ui/RecordingEngine.qml:416
 msgid "Scheduled recording skipped"
 msgstr "Ajastettu tallennus ohitettiin"
 
-#: package/contents/ui/main.qml:3588
+#: package/contents/ui/RecordingEngine.qml:417
 msgid "%1 — another recording is already running."
 msgstr "%1 — toinen tallennus on jo käynnissä."
 
-#: package/contents/ui/main.qml:3762
-msgid "Wake-up alarm missed"
-msgstr "Herätys jäi väliin"
-
-#: package/contents/ui/main.qml:3763
-msgid "%1 was set for %2 — the computer was off or asleep at that time."
-msgstr "%1 oli asetettu ajalle %2 — tietokone oli tuolloin sammutettuna tai lepotilassa."
-
-#: package/contents/ui/main.qml:3797 package/contents/ui/main.qml:3898
-#: package/contents/ui/main.qml:3965 package/contents/ui/main.qml:3972
-#: package/contents/ui/main.qml:4025 package/contents/ui/main.qml:4028
-msgid "Wake-up alarm"
-msgstr "Herätys"
-
-#: package/contents/ui/main.qml:3798
-msgid "%1 came due at the same time — playing %2 instead."
-msgstr "%1 osui samaan aikaan — toistetaan sen sijaan %2."
-
-#: package/contents/ui/main.qml:3974
-msgid "the show"
-msgstr "ohjelma"
-
-#: package/contents/ui/main.qml:3973
-msgid "No downloaded episode of %1 was on disk — waking with the chime."
-msgstr "Ohjelman %1 ladattuja jaksoja ei ollut levyllä — herätys soi merkkiäänellä."
-
-#: package/contents/ui/main.qml:4029
-msgid "The station could not start — playing the built-in tone instead."
-msgstr "Asema ei käynnistynyt — toistetaan sen sijaan sisäänrakennettua ääntä."
-
-#: package/contents/ui/main.qml:4731
-msgid "%1 devices"
-msgstr "%1-laitteet"
-
-#: package/contents/ui/main.qml:5418
-msgid "The Bluetooth speaker"
-msgstr "Bluetooth-kaiutin"
-
-#: package/contents/ui/main.qml:5417
-msgid "%1 is connected, but its sound never arrived"
-msgstr "%1 on yhdistetty, mutta ääntä ei kuulunut"
-
-#: package/contents/ui/main.qml:5419
-msgid "Turn the speaker off and on again, then reconnect it."
-msgstr "Katkaise kaiuttimesta virta, käynnistä se uudelleen ja yhdistä sitten uudestaan."
-
-#: package/contents/ui/main.qml:5834
-msgid "Station seems to be off the air"
-msgstr "Asema vaikuttaa olevan poissa eetteristä"
-
-#: package/contents/ui/main.qml:5835
-msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
-msgstr "%1 ei vastaa yhdestäkään hakemiston tuntemasta osoitteesta. Se säilyy luettelossasi — yritetään uudelleen taustalla."
-
-#: package/contents/ui/main.qml:5907
-msgid "Playing from a backup address"
-msgstr "Toistetaan varaosoitteesta"
-
-#: package/contents/ui/main.qml:5908
-msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
-msgstr "Aseman tallennettu osoite ei vastaa — toistetaan toistaiseksi hakemiston lähintä vastinetta. Tallennettu osoitteesi säilytettiin."
-
-#: package/contents/ui/main.qml:5948
-msgid "Station found at a new address"
-msgstr "Asema löytyi uudesta osoitteesta"
-
-#: package/contents/ui/main.qml:5949
-msgid "%1 moved — the new address was saved to your list."
-msgstr "%1 on muuttanut — uusi osoite tallennettiin luetteloosi."
-
-#: package/contents/ui/main.qml:7596
+#: package/contents/ui/RecordingEngine.qml:512
 msgid "Scheduled recording started"
 msgstr "Ajastettu tallennus käynnistyi"
 
-#: package/contents/ui/main.qml:7637
-msgid "Episode downloaded"
-msgstr "Jakso ladattu"
-
-#: package/contents/ui/main.qml:7717
-msgid "Subscriptions exported"
-msgstr "Tilaukset viety"
-
-#: package/contents/ui/main.qml:7719
-msgid "Export failed"
-msgstr "Vienti epäonnistui"
-
-#: package/contents/ui/main.qml:7720
-msgid "Could not write the subscriptions file."
-msgstr "Tilaustiedostoa ei voitu kirjoittaa."
-
-#: package/contents/ui/main.qml:7824
-msgid "Casting needs pychromecast"
-msgstr "Lähettäminen vaatii pychromecastia"
-
-#: package/contents/ui/main.qml:7825
-msgid "Install the pychromecast library to cast to your devices."
-msgstr "Asenna pychromecast-kirjasto, jotta voit lähettää ääntä laitteillesi."
-
-#: package/contents/ui/main.qml:7846
-msgid "the device"
-msgstr "laite"
-
-#: package/contents/ui/main.qml:7846
-msgid "Could not cast to %1"
-msgstr "Ei voitu lähettää laitteelle %1"
-
-#: package/contents/ui/main.qml:7847
-msgid "The device could not play this station."
-msgstr "Laite ei voinut toistaa tätä asemaa."
-
-#: package/contents/ui/main.qml:7893
-msgid "Casting"
-msgstr "Lähetetään"
-
-#: package/contents/ui/main.qml:7894
-msgid "The device did not stop — it may still be playing."
-msgstr "Laite ei pysähtynyt — se saattaa yhä toistaa."
-
-#: package/contents/ui/main.qml:7972
-msgid "Bluetooth is switched off"
-msgstr "Bluetooth on pois päältä"
-
-#: package/contents/ui/main.qml:7973
-msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
-msgstr "Sovitin ei käynnistynyt — tarkista ilmoitusalueen Bluetooth-kytkin tai järjestelmäasetukset."
-
-#: package/contents/ui/main.qml:7992 package/contents/ui/main.qml:8110
-msgid "the Bluetooth device"
-msgstr "Bluetooth-laite"
-
-#: package/contents/ui/main.qml:7991
-msgid "Could not connect to %1"
-msgstr "Ei voitu yhdistää laitteeseen %1"
-
-#: package/contents/ui/main.qml:7993
-msgid "Make sure the speaker is switched on and in range."
-msgstr "Varmista, että kaiutin on päällä ja kantaman sisällä."
-
-#: package/contents/ui/main.qml:8109
-msgid "Could not pair with %1"
-msgstr "Laiteparia ei voitu muodostaa laitteen %1 kanssa"
-
-#: package/contents/ui/main.qml:8111
-msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
-msgstr "Aseta kaiutin paritustilaan (pidä sen Bluetooth-painiketta pohjassa) ja yritä uudelleen."
-
-#: package/contents/ui/main.qml:8219
+#: package/contents/ui/RecordingEngine.qml:552
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg ei ole asennettuna"
 
-#: package/contents/ui/main.qml:8220
+#: package/contents/ui/RecordingEngine.qml:553
 msgid "Install ffmpeg to record radio."
 msgstr "Asenna ffmpeg, jotta voit tallentaa radiota."
 
-#: package/contents/ui/main.qml:8225
+#: package/contents/ui/RecordingEngine.qml:558
 msgid "curl is not installed"
 msgstr "curl ei ole asennettuna"
 
-#: package/contents/ui/main.qml:8226
+#: package/contents/ui/RecordingEngine.qml:559
 msgid "Install curl to record radio."
 msgstr "Asenna curl, jotta voit tallentaa radiota."
 
-#: package/contents/ui/main.qml:8229
+#: package/contents/ui/RecordingEngine.qml:562
 msgid "Not enough disk space for this recording"
 msgstr "Levytila ei riitä tähän tallennukseen"
 
-#: package/contents/ui/main.qml:8230
+#: package/contents/ui/RecordingEngine.qml:563
 msgid "Free some space in %1 and try again."
 msgstr "Vapauta tilaa kohteessa %1 ja yritä uudelleen."
 
-#: package/contents/ui/main.qml:8233
+#: package/contents/ui/RecordingEngine.qml:566
 msgid "Recording saved ✓ (%1)"
 msgstr "Nauhoitus tallennettu ✓ (%1)"
 
-#: package/contents/ui/main.qml:8237
+#: package/contents/ui/RecordingEngine.qml:570
 msgid "Recording interrupted (%1 captured)"
 msgstr "Nauhoitus keskeytyi (%1 tallentui)"
 
-#: package/contents/ui/main.qml:8239
+#: package/contents/ui/RecordingEngine.qml:572
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — tiedosto on paljon odotettua pienempi."
 
-#: package/contents/ui/main.qml:8244
+#: package/contents/ui/RecordingEngine.qml:577
 msgid "The stream could not be captured."
 msgstr "Suoratoistoa ei voitu tallentaa."
 
-#: package/contents/ui/main.qml:8327 package/contents/ui/main.qml:8396
-msgid "yt-dlp is not installed"
-msgstr "yt-dlp ei ole asennettu"
-
-#: package/contents/ui/main.qml:8328 package/contents/ui/main.qml:8397
-msgid "Install yt-dlp (and ffmpeg) to download tracks."
-msgstr "Asenna yt-dlp (ja ffmpeg) ladataksesi kappaleita."
-
-#: package/contents/ui/main.qml:8347 package/contents/ui/main.qml:8416
-msgid "Nothing found to download"
-msgstr "Ladattavaa ei löytynyt"
-
-#: package/contents/ui/main.qml:8348 package/contents/ui/main.qml:8417
-msgid "No track matched \"%1\" — a show or album title often has no single track to find."
-msgstr "Mikään kappale ei vastannut hakua \"%1\" — ohjelman tai albumin nimen takana ei usein ole yhtä kappaletta."
-
-#: package/contents/ui/main.qml:8360
-msgid "Found only a different show — skipped"
-msgstr "Löytyi vain eri ohjelma — ohitettiin"
-
-#: package/contents/ui/main.qml:8361
-msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
-msgstr "Paras osuma haulle \"%1\" oli \"%2\". Väärää ei ladata."
-
-#: package/contents/ui/main.qml:8383
-msgid "Downloading again without the cover"
-msgstr "Ladataan uudelleen ilman kansikuvaa"
-
-#: package/contents/ui/main.qml:8384
-msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
-msgstr "Tunnisteiden upottaminen vaatii python-mutagen-paketin — asenna se saadaksesi kansikuvat tiedostoihisi."
-
-#: package/contents/ui/main.qml:8412
-msgid "Track downloaded ✓"
-msgstr "Kappale ladattu ✓"
-
-#: package/contents/ui/main.qml:8413
-msgid "Saved as \"%1\" — newest first in My Music"
-msgstr "Tallennettu nimellä \"%1\" — uusin ensin Oma musiikki -sivulla"
-
-#: package/contents/ui/main.qml:8421
-msgid "Download failed"
-msgstr "Lataus epäonnistui"
-
-#: package/contents/ui/main.qml:8422
-msgid "Unknown error"
-msgstr "Tuntematon virhe"
-
-#: package/contents/ui/main.qml:8896
-msgid "Audio output changed"
-msgstr "Äänilähtö vaihtui"
-
-#: package/contents/ui/main.qml:8897
-msgid "The chosen output device disappeared — using the system default instead."
-msgstr "Valittu äänilaite katosi — käytetään sen sijaan järjestelmän oletusta."
-
-#: package/contents/ui/MediaListItem.qml:457
-msgid "Click again to confirm removal"
-msgstr "Vahvista poisto napsauttamalla uudelleen"
-
-#: package/contents/ui/MediaListItem.qml:458
-msgid "Remove station from list"
-msgstr "Poista asema luettelosta"
-
-#: package/contents/ui/MediaListItem.qml:532
-msgid "Waiting for track info…"
-msgstr "Odotetaan kappaletietoja…"
-
-#: package/contents/ui/SyncEngine.qml:370
+#: package/contents/ui/SyncEngine.qml:391
 msgid "Could not combine the outputs"
 msgstr "Äänilähtöjä ei voitu yhdistää"
 
-#: package/contents/ui/SyncEngine.qml:371
+#: package/contents/ui/SyncEngine.qml:392
 msgid "pactl refused to create the combined output."
 msgstr "pactl ei suostunut luomaan yhdistettyä äänilähtöä."
 
-#: package/contents/ui/SyncEngine.qml:793
+#: package/contents/ui/SyncEngine.qml:637
+msgid "Auto-check %1: room put back in step"
+msgstr "Automaattitarkistus %1: huone taas synkronissa"
+
+#: package/contents/ui/SyncEngine.qml:906
 msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
 msgstr "Bluetooth-kaiutin on %1 ms jäljessä, ja jokaisen kaiuttimen äänenvoimakkuus tasattiin mikrofonin kohdalla — kaikki asetettu ja muistissa."
 
-#: package/contents/ui/SyncEngine.qml:794
+#: package/contents/ui/SyncEngine.qml:907
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Bluetooth-kaiutin on %1 ms jäljessä — viive on asetettu ja muistetaan tälle laitteelle."
 
-#: package/contents/ui/SyncEngine.qml:796
+#: package/contents/ui/SyncEngine.qml:909
 msgid "Balance levels set earlier were replaced by the measured ones."
 msgstr "Aiemmin asetetut tasapainotasot korvattiin mitatuilla."
 
-#: package/contents/ui/SyncEngine.qml:802
+#: package/contents/ui/SyncEngine.qml:915
 msgid "The speakers were matched to the quietest one and the group's volume was raised by %1% to make up for it."
 msgstr "Kaiuttimet tasattiin hiljaisimman mukaan ja ryhmän äänenvoimakkuutta nostettiin %1% sen korvaamiseksi."
 
-#: package/contents/ui/SyncEngine.qml:803
+#: package/contents/ui/SyncEngine.qml:916
 msgid "The speakers were matched to the quietest one, so the room is quieter than before — turn the volume up if you want it back."
 msgstr "Kaiuttimet tasattiin hiljaisimman mukaan, joten huone on aiempaa hiljaisempi — nosta äänenvoimakkuutta, jos haluat sen takaisin."
 
-#: package/contents/ui/SyncEngine.qml:812
+#: package/contents/ui/SyncEngine.qml:925
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
 msgstr "Mikrofonin ääni leikkautui kaiuttimella %1 — sen tasapaino jätettiin ennalleen; pienennä kaiuttimen äänenvoimakkuutta ja kalibroi uudelleen."
 
-#: package/contents/ui/SyncEngine.qml:825
+#: package/contents/ui/SyncEngine.qml:938
 msgid "Measured with %1 — the default microphone stayed silent."
 msgstr "Mitattiin mikrofonilla %1 — oletusmikrofoni pysyi hiljaisena."
 
-#: package/contents/ui/SyncEngine.qml:826
+#: package/contents/ui/SyncEngine.qml:939
 msgid "Speakers calibrated"
 msgstr "Kaiuttimet kalibroitu"
 
-#: package/contents/ui/SyncEngine.qml:839
-#: package/contents/ui/SyncEngine.qml:847
-#: package/contents/ui/SyncEngine.qml:908
-#: package/contents/ui/SyncEngine.qml:916
-#: package/contents/ui/SyncEngine.qml:920
+#: package/contents/ui/SyncEngine.qml:952
+#: package/contents/ui/SyncEngine.qml:960
+#: package/contents/ui/SyncEngine.qml:1021
+#: package/contents/ui/SyncEngine.qml:1029
+#: package/contents/ui/SyncEngine.qml:1033
 msgid "Calibration did not succeed"
 msgstr "Kalibrointi ei onnistunut"
 
-#: package/contents/ui/SyncEngine.qml:840
+#: package/contents/ui/SyncEngine.qml:953
 msgid "The inaudible tone did not reach the microphone from these speakers. Move the microphone closer, or turn off \"Measure with a tone too high to hear\" to measure with the audible clicks."
 msgstr "Kuulumaton ääni ei kantanut näistä kaiuttimista mikrofonille. Siirrä mikrofoni lähemmäs tai poista käytöstä ”Mittaa äänellä, jota ei kuule”, niin mittaus tehdään kuuluvilla napsautuksilla."
 
-#: package/contents/ui/SyncEngine.qml:848
-#: package/contents/ui/SyncEngine.qml:1221
+#: package/contents/ui/SyncEngine.qml:961
+#: package/contents/ui/SyncEngine.qml:1393
 msgid "Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."
 msgstr "Kaikki mikrofonit tuottivat pelkkää hiljaisuutta. Mikrofonin oma mykistyspainike ei näy järjestelmälle — tarkista mikrofonin oma merkkivalo tai aseta toimiva mikrofoni oletukseksi."
 
-#: package/contents/ui/SyncEngine.qml:880
+#: package/contents/ui/SyncEngine.qml:993
 msgid "Calibration"
 msgstr "Kalibrointi"
 
-#: package/contents/ui/SyncEngine.qml:882
+#: package/contents/ui/SyncEngine.qml:995
 msgid "The inaudible reading would not settle at this level — trying once more, louder."
 msgstr "Kuulumaton lukema ei asettunut tällä tasolla — yritetään vielä kerran, kovempaa."
 
-#: package/contents/ui/SyncEngine.qml:883
+#: package/contents/ui/SyncEngine.qml:996
 msgid "The clicks were too quiet for this room — trying once more, louder."
 msgstr "Naksahdukset olivat tähän huoneeseen liian hiljaisia — yritetään vielä kerran kovemmalla äänellä."
 
-#: package/contents/ui/SyncEngine.qml:909
+#: package/contents/ui/SyncEngine.qml:1022
 msgid "The two speakers timed impossibly far apart, so nothing was changed. A speaker that has just reconnected usually needs a minute to settle — try again shortly."
 msgstr "Kaiuttimet mitattiin mahdottoman kauas toisistaan, joten mitään ei muutettu. Juuri uudelleen yhdistetty kaiutin tarvitsee yleensä minuutin asettuakseen — yritä pian uudelleen."
 
-#: package/contents/ui/SyncEngine.qml:917
+#: package/contents/ui/SyncEngine.qml:1030
 msgid "The reading would not settle even with the speakers turned up — nothing was changed. Trying again usually does it."
 msgstr "Lukema ei asettunut edes kaiuttimet kovemmalla — mitään ei muutettu. Uusi yritys yleensä riittää."
 
-#: package/contents/ui/SyncEngine.qml:921
+#: package/contents/ui/SyncEngine.qml:1034
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "Varmista, ettei mikrofoni ole peitossa ja että molemmat kaiuttimet kuuluvat, ja yritä sitten uudelleen."
 
-#: package/contents/ui/SyncEngine.qml:955
-#: package/contents/ui/SyncEngine.qml:1003
-#: package/contents/ui/SyncEngine.qml:1038
-#: package/contents/ui/SyncEngine.qml:1132
-#: package/contents/ui/SyncEngine.qml:1165
-#: package/contents/ui/SyncEngine.qml:1188
-#: package/contents/ui/SyncEngine.qml:1194
-#: package/contents/ui/SyncEngine.qml:1220
-#: package/contents/ui/SyncEngine.qml:1235
-#: package/contents/ui/SyncEngine.qml:1281
-#: package/contents/ui/SyncEngine.qml:1286
-#: package/contents/ui/SyncEngine.qml:1293
-#: package/contents/ui/SyncEngine.qml:1306
+#: package/contents/ui/SyncEngine.qml:1068
+#: package/contents/ui/SyncEngine.qml:1116
+#: package/contents/ui/SyncEngine.qml:1151
+#: package/contents/ui/SyncEngine.qml:1304
+#: package/contents/ui/SyncEngine.qml:1337
+#: package/contents/ui/SyncEngine.qml:1360
+#: package/contents/ui/SyncEngine.qml:1366
+#: package/contents/ui/SyncEngine.qml:1392
+#: package/contents/ui/SyncEngine.qml:1407
+#: package/contents/ui/SyncEngine.qml:1453
+#: package/contents/ui/SyncEngine.qml:1458
+#: package/contents/ui/SyncEngine.qml:1465
+#: package/contents/ui/SyncEngine.qml:1478
 msgid "Sync check"
 msgstr "Synkronoinnin tarkistus"
 
-#: package/contents/ui/SyncEngine.qml:956
+#: package/contents/ui/SyncEngine.qml:1069
 msgid "%1 is muted, so the check skipped it. Unmute it and check again to include it."
 msgstr "%1 on mykistetty, joten tarkistus ohitti sen. Poista mykistys ja tarkista uudelleen, niin se otetaan mukaan."
 
-#: package/contents/ui/SyncEngine.qml:1004
+#: package/contents/ui/SyncEngine.qml:1117
 msgid "The speakers were %1 ms apart — measuring once more to confirm."
 msgstr "Kaiuttimet olivat %1 ms erillään — mitataan vielä kerran varmistukseksi."
 
-#: package/contents/ui/SyncEngine.qml:1039
+#: package/contents/ui/SyncEngine.qml:1152
 msgid "Two measurements disagreed about the room, so nothing was changed. If the speakers sound apart, press Calibrate."
 msgstr "Kaksi mittausta olivat eri mieltä huoneesta, joten mitään ei muutettu. Jos kaiuttimet kuulostavat eriaikaisilta, paina Kalibroi."
 
-#: package/contents/ui/SyncEngine.qml:1133
+#: package/contents/ui/SyncEngine.qml:1305
 msgid "The room still reads %1 ms apart, but the difference sits on the wired speaker's road, which does not drift by itself — nothing was changed. If the speakers sound apart, press Calibrate."
 msgstr "Huone näyttää yhä %1 ms eroa, mutta ero istuu johdollisen kaiuttimen reitillä, joka ei ajaudu itsestään — mitään ei muutettu. Jos kaiuttimet kuulostavat eriaikaisilta, paina Kalibroi."
 
-#: package/contents/ui/SyncEngine.qml:1137
+#: package/contents/ui/SyncEngine.qml:1309
 msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
 msgstr "Kaiuttimien välillä oli %1 ms ero — säädettiin mittauksen perusteella, tarkistetaan vielä kerran."
 
-#: package/contents/ui/SyncEngine.qml:1155
+#: package/contents/ui/SyncEngine.qml:1327
 msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
 msgstr "Yhden kaiuttimen reitti oli jumissa %1 ms jäljessä — se tyhjennettiin, tarkistetaan vielä kerran."
 
-#: package/contents/ui/SyncEngine.qml:1189
+#: package/contents/ui/SyncEngine.qml:1361
 msgid "The check compares speakers, and too many are muted to compare. Unmute them and check again."
 msgstr "Tarkistus vertaa kaiuttimia, ja liian moni on mykistetty vertailua varten. Poista mykistys ja tarkista uudelleen."
 
-#: package/contents/ui/SyncEngine.qml:1195
+#: package/contents/ui/SyncEngine.qml:1367
 msgid "This speaker does not carry the inaudible test tone, so the check needed the audible one — and the room was too noisy for it. Pause other audio and try again."
 msgstr "Tämä kaiutin ei toista kuulumatonta testiääntä, joten tarkistus tarvitsi kuuluvan — ja huone oli siihen liian meluisa. Keskeytä muu ääni ja yritä uudelleen."
 
-#: package/contents/ui/SyncEngine.qml:1213
+#: package/contents/ui/SyncEngine.qml:1385
 msgid "Sync check skipped"
 msgstr "Synkkatarkistus ohitettiin"
 
-#: package/contents/ui/SyncEngine.qml:1214
+#: package/contents/ui/SyncEngine.qml:1386
 msgid "The speakers here do not carry the inaudible tone to the microphone. Move the microphone closer, or turn off \"Measure with a tone too high to hear\" to use the audible clicks."
 msgstr "Nämä kaiuttimet eivät kanna kuulumatonta ääntä mikrofonille asti. Siirrä mikrofoni lähemmäs tai poista käytöstä ”Mittaa äänellä, jota ei kuule”, niin käytetään kuuluvia napsautuksia."
 
-#: package/contents/ui/SyncEngine.qml:1216
+#: package/contents/ui/SyncEngine.qml:1388
 msgid "Auto-check: cannot measure without a sound you would hear"
 msgstr "Automaattitarkistus: ei voi mitata ilman kuuluvaa ääntä"
 
-#: package/contents/ui/SyncEngine.qml:1236
+#: package/contents/ui/SyncEngine.qml:1408
 msgid "The reading from %1 would not settle, so nothing was changed. Trying again usually does it."
 msgstr "Kaiuttimen %1 lukema ei asettunut, joten mitään ei muutettu. Uusi yritys yleensä riittää."
 
-#: package/contents/ui/SyncEngine.qml:1282
+#: package/contents/ui/SyncEngine.qml:1454
 msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
 msgstr "%1 pysyi hiljaa molemmilla kierroksilla — se jätettiin pois ryhmästä. Voit valita sen takaisin kaiutinluettelosta milloin tahansa."
 
-#: package/contents/ui/SyncEngine.qml:1287
+#: package/contents/ui/SyncEngine.qml:1459
 msgid "%1 made no sound the microphone could hear. If it stays silent on the next calibration too, it will be left out of the group."
 msgstr "%1 ei tuottanut ääntä, jonka mikrofoni olisi kuullut. Jos se pysyy hiljaa myös seuraavassa kalibroinnissa, se jätetään pois ryhmästä."
 
-#: package/contents/ui/SyncEngine.qml:1294
+#: package/contents/ui/SyncEngine.qml:1466
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "Kaiutinta %1 ei kuulunut tarkistuksen aikana — se voi olla mykistetty tai pois päältä. Kalibrointi säilytettiin."
 
-#: package/contents/ui/SyncEngine.qml:1302
+#: package/contents/ui/SyncEngine.qml:1474
 msgid "Sync verified"
 msgstr "Synkronointi varmistettu"
 
-#: package/contents/ui/SyncEngine.qml:1303
+#: package/contents/ui/SyncEngine.qml:1475
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "Jokaisen kaiuttimen ääni saapuu mikrofoniin %1 ms sisällä — korvalle samassa tahdissa."
 
-#: package/contents/ui/SyncEngine.qml:1307
+#: package/contents/ui/SyncEngine.qml:1479
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "Kaiuttimien välillä on yhä %1 ms ero. Kalibroi vielä kerran tai hienosäädä viiveliukusäädintä."
 
-#: package/contents/ui/SyncEngine.qml:1344
+#: package/contents/ui/SyncEngine.qml:1521
 msgid "Auto-check %1: skipped, something else was using the speakers"
 msgstr "Automaattitarkistus %1: ohitettiin, kaiuttimet olivat muussa käytössä"
 
-#: package/contents/ui/SyncEngine.qml:1369
-#: package/contents/ui/SyncEngine.qml:1423
+#: package/contents/ui/SyncEngine.qml:1547
+#: package/contents/ui/SyncEngine.qml:1621
 msgid "Auto-check %1: settling after the adjustment"
 msgstr "Automaattitarkistus %1: asettuu säädön jälkeen"
 
-#: package/contents/ui/SyncEngine.qml:1396
+#: package/contents/ui/SyncEngine.qml:1574
 msgid "Auto-check %1: reading would not settle — the microphone may be too far from the speakers"
 msgstr "Automaattitarkistus %1: lukema ei asettunut — mikrofoni voi olla liian kaukana kaiuttimista"
 
-#: package/contents/ui/SyncEngine.qml:1400
+#: package/contents/ui/SyncEngine.qml:1579
 msgid "Auto-check %1: too quiet to tell"
 msgstr "Automaattitarkistus %1: liian hiljaista arvioitavaksi"
 
-#: package/contents/ui/SyncEngine.qml:1474
+#: package/contents/ui/SyncEngine.qml:1729
 msgid "Auto-check %1: in sync — measured %2 ms"
 msgstr "Automaattitarkistus %1: synkassa — mitattu %2 ms"
 
-#: package/contents/ui/SyncEngine.qml:1475
+#: package/contents/ui/SyncEngine.qml:1730
 msgid "Auto-check %1: in sync"
 msgstr "Automaattitarkistus %1: synkronissa"
 
-#: package/contents/ui/SyncEngine.qml:1485
+#: package/contents/ui/SyncEngine.qml:1740
 msgid "Auto-check %1: %2 ms apart — measured %3 ms"
 msgstr "Automaattitarkistus %1: %2 ms erillään — mitattu %3 ms"
 
-#: package/contents/ui/SyncEngine.qml:1486
+#: package/contents/ui/SyncEngine.qml:1741
 msgid "Auto-check %1: still %2 ms apart (0 = in step)"
 msgstr "Automaattitarkistus %1: yhä %2 ms erossa (0 = tahdissa)"
 
-#: package/contents/ui/SyncEngine.qml:1523
+#: package/contents/ui/SyncEngine.qml:1778
 msgid "Sync has drifted"
 msgstr "Synkronointi on lipsunut"
 
-#: package/contents/ui/SyncEngine.qml:1524
+#: package/contents/ui/SyncEngine.qml:1779
 msgid "The speakers are audibly apart again — run Calibrate when convenient."
 msgstr "Kaiuttimet ovat taas kuultavasti eri tahdissa — suorita kalibrointi sopivalla hetkellä."
 
-#: package/contents/ui/SyncEngine.qml:1633
+#: package/contents/ui/SyncEngine.qml:1888
 msgid "Speaker timing drifted"
 msgstr "Kaiuttimien ajoitus lipsui"
 
-#: package/contents/ui/SyncEngine.qml:1634
+#: package/contents/ui/SyncEngine.qml:1889
 msgid "A Bluetooth speaker came back noticeably off its calibration — the sync compensated automatically. Recalibrate when convenient for exact ears."
 msgstr "Bluetooth-kaiutin palasi selvästi kalibroinnistaan poikenneena — synkronointi kompensoi eron automaattisesti. Kalibroi uudelleen sopivalla hetkellä tarkkaa kuuntelua varten."
 
-#: package/contents/ui/SyncEngine.qml:2232
-#: package/contents/ui/SyncEngine.qml:2331
+#: package/contents/ui/SyncEngine.qml:2494
+#: package/contents/ui/SyncEngine.qml:2598
 msgid "Auto-check: listening…"
 msgstr "Automaattinen tarkistus: kuunnellaan…"
 
-#: package/contents/ui/SyncEngine.qml:2302
+#: package/contents/ui/SyncEngine.qml:2569
 msgid "Auto-check %1: only one speaker can hear the inaudible tone — nothing to compare"
 msgstr "Automaattitarkistus %1: vain yksi kaiutin kuulee kuulumattoman äänen — ei vertailtavaa"
 
-#: package/contents/ui/SyncEngine.qml:2349
+#: package/contents/ui/SyncEngine.qml:2628
 msgid "Auto-check %1: no answer came back"
 msgstr "Automaattitarkistus %1: vastausta ei tullut"
 
-#: package/contents/ui/SyncEngine.qml:2391
+#: package/contents/ui/SyncEngine.qml:2676
 msgid "%1: %2 ms"
 msgstr "%1: %2 ms"
 
 #. i18n() is given at runtime and the translation is
 #. silently skipped in every language.
-#: package/contents/ui/SyncEngine.qml:2872
+#: package/contents/ui/SyncEngine.qml:3235
 msgid "Sync measurement"
 msgstr "Synkronoinnin mittaus"
 
-#: package/contents/ui/SyncEngine.qml:2873
+#: package/contents/ui/SyncEngine.qml:3236
 msgid "A recording is running. The measurement plays test tones and quiets the speakers, so it waits until the recording is done."
 msgstr "Tallennus on käynnissä. Mittaus soittaa testiääniä ja hiljentää kaiuttimet, joten se odottaa tallennuksen loppuun."
 
-#: package/contents/ui/SyncEngine.qml:3050
+#: package/contents/ui/SyncEngine.qml:3413
 msgid "Measuring with a tone too high to hear — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Mitataan äänellä, joka on liian korkea kuultavaksi — yhteensä noin kaksi minuuttia. Musiikki pysyy hiljaa, kunnes tarkistus valmistuu."
 
-#: package/contents/ui/SyncEngine.qml:3051
+#: package/contents/ui/SyncEngine.qml:3414
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "Kaksi naksahduskierrosta ja niiden välissä hiljainen tarkistus — yhteensä noin kaksi minuuttia. Musiikki pysyy hiljaa, kunnes tarkistus valmistuu."
 
-#: package/contents/ui/SyncEngine.qml:3053
+#: package/contents/ui/SyncEngine.qml:3416
 msgid "Skipped (empty jack): %1."
 msgstr "Ohitettiin (tyhjä liitäntä): %1."
 
-#: package/contents/ui/SyncEngine.qml:3054
+#: package/contents/ui/SyncEngine.qml:3417
 msgid "Calibration started"
 msgstr "Kalibrointi aloitettu"
 
-#: package/contents/ui/SyncEngine.qml:3121
+#: package/contents/ui/SyncEngine.qml:3484
 msgid "All local outputs (On Air)"
 msgstr "Kaikki paikalliset äänilähdöt (On Air)"
 
-#: package/contents/ui/SyncEngine.qml:3916
+#: package/contents/ui/SyncEngine.qml:4357
 msgid "Auto-check: measured %1 ms — takes effect the next time the music pauses"
 msgstr "Automaattitarkistus: mitattu %1 ms — tulee voimaan, kun musiikki seuraavan kerran pysähtyy"
 
-#: package/contents/ui/SyncEngine.qml:3917
+#: package/contents/ui/SyncEngine.qml:4358
 msgid "Auto-check: adjusted — takes effect the next time the music pauses"
 msgstr "Automaattitarkistus: säädettiin — tulee voimaan, kun musiikki seuraavan kerran pysähtyy"
 
-#: package/contents/ui/SyncEngine.qml:4426
+#: package/contents/ui/SyncEngine.qml:4472
+msgid "Auto-check %1: confirming the room after the rebuild…"
+msgstr "Automaattitarkistus %1: vahvistetaan huonetta uudelleenrakennuksen jälkeen…"
+
+#: package/contents/ui/SyncEngine.qml:4513
+msgid "Auto-check %1: in step after the rebuild"
+msgstr "Automaattitarkistus %1: synkronissa uudelleenrakennuksen jälkeen"
+
+#: package/contents/ui/SyncEngine.qml:4547
+#: package/contents/ui/SyncEngine.qml:4585
+msgid "Auto-check %1: adjusted — takes effect the next time the music pauses"
+msgstr "Automaattitarkistus %1: säädettiin — tulee voimaan, kun musiikki seuraavan kerran pysähtyy"
+
+#: package/contents/ui/SyncEngine.qml:5159
 msgid "%1 did not join the sync"
 msgstr "%1 ei liittynyt synkronointiin"
 
-#: package/contents/ui/SyncEngine.qml:4428
+#: package/contents/ui/SyncEngine.qml:5161
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "Kaiutin on yhdistetty, mutta sitä ei saatu mukaan ryhmään — kytke synkronointi pois päältä ja takaisin päälle ryhmän rakentamiseksi uudelleen."
 
-#: package/contents/ui/SyncEngine.qml:4429
+#: package/contents/ui/SyncEngine.qml:5162
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "Kaiutin on yhdistetty, mutta sen äänilähtöä ei ilmestynyt — kytke kaiutin pois päältä ja takaisin päälle ja yhdistä se sitten uudelleen."
 
-#: package/contents/ui/TimeshiftEngine.qml:387
+#: package/contents/ui/TimeshiftEngine.qml:433
 msgid "Not enough free disk space"
 msgstr "Levyllä ei ole tarpeeksi vapaata tilaa"
+
+#~ msgid "Search and discovery row"
+#~ msgstr "Haku- ja löytörivi"
 
 #~ msgid "Listens now and then while music plays, and re-measures with short clicks if the speakers drift apart. The music pauses for about a minute when it does."
 #~ msgstr "Kuuntelee silloin tällöin musiikin taustalla ja mittaa lyhyillä napsauksilla uudelleen, jos kaiuttimet ajautuvat erilleen. Musiikki on tauolla noin minuutin sen ajan."
