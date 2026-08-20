@@ -2119,16 +2119,22 @@ Item {
             var quietFrom = r.mock.execLog.length;      // ignore the setup's own build
             r.e.handleExec(": PW_DRIFT;", out, "");     // three: the median stands
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 165);   // 178 - 13
-            // The correction is stored, but the loopbacks are NOT swapped
-            // under live music: the listener described a startling clatter
-            // the first time one landed, so the new delay waits for a
-            // rebuild that was going to happen anyway.
-            verify(r.e.driftLastText.indexOf("next time the music pauses") !== -1);
-            var swapped = false;
+            // The correction LANDS now, and the "without a sound" in this
+            // test's name is still the whole point — it just stopped meaning
+            // "nothing moved". Until 2026-08-12 the loopbacks were left
+            // alone here, because the first correction that landed under
+            // live music was a startling clatter. The make-before-break
+            // crossfade fixed that for the settle road and this one
+            // inherits it: the swap touches the WIRED loopback only, the
+            // Bluetooth stream is never cut, and nothing is muted or parked.
+            var swap = "";
             for (var j = quietFrom; j < r.mock.execLog.length; j++)
-                if (r.mock.execLog[j].indexOf("unload-module") !== -1) swapped = true;
-            verify(!swapped);
-            // And nothing was muted or parked on the way — the whole point.
+                if (r.mock.execLog[j].indexOf(": PW_LBSWAP") === 0) swap = r.mock.execLog[j];
+            verify(swap !== "");
+            verify(swap.indexOf("sink='" + wired + "'") !== -1);
+            verify(swap.indexOf("sink='" + btSink + "'") === -1);
+            verify(swap.indexOf("suspend-sink") === -1);
+            // And nothing was muted or parked on the way — still the point.
             var muted = false;
             for (var i = 0; i < r.mock.execLog.length; i++)
                 if (r.mock.execLog[i].indexOf("set-sink-mute") !== -1) muted = true;
@@ -2203,7 +2209,14 @@ Item {
             // reload, 0 next. The fold itself moves nothing physical and
             // spends nothing — the spent-at-fold flag used to throw away a
             // valid reading of a room the fold had not touched yet.
-            var m0 = {}; m0[btMac] = 125;
+            // The wired member is the slower one here (200 against the
+            // Bluetooth 125), so the correction cannot land without moving
+            // the Bluetooth loopback and the fold takes its DEFERRED road:
+            // map written, nothing deployed. Since 2026-08-12 the fold can
+            // also land its own correction where the geometry allows, and
+            // that is the other test — this one is about the case where the
+            // rebuild really is the moment the room changes.
+            var m0 = {}; m0[wired] = 200; m0[btMac] = 125;
             var r = rig([dev(wired), dev(btSink)],
                         { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
             activate(r);
@@ -2704,6 +2717,73 @@ Item {
             r.e.handleExec(": PW_DRIFT;", late, "");
             r.e.handleExec(": PW_DRIFT;", early, "");
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 178);   // untouched
+        }
+
+        function test_a_quiet_fold_lands_its_correction_without_a_rebuild() {
+            // The map used to be written and left there — "applies at the
+            // next rebuild" — which is fine for a room somebody keeps
+            // starting and stopping and useless for one that plays all
+            // evening. Measured 2026-08-12: the link drifted 1 -> 24 ms
+            // across forty minutes, the fold tracked it exactly right
+            // (134 -> 149 -> 157), and not one millisecond reached the
+            // speakers because no rebuild was due. The crossfade that made
+            // the settle's landing inaudible carries this one too.
+            var m0 = {}; m0[btMac] = 145;
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
+            activate(r);
+            var from = r.mock.execLog.length;
+            var late = function (d) {
+                return "DRIFT_EAR " + wired + " 1400\nDRIFT_EAR " + btSink + " "
+                     + (1400 + d) + "\nDRIFT_EST " + d + "\n";
+            };
+            r.e.handleExec(": PW_DRIFT;", late(40), "");
+            r.e.handleExec(": PW_DRIFT;", late(38), "");
+            r.e.handleExec(": PW_DRIFT;", late(42), "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 185);   // 145 + median 40
+            var swap = "";
+            for (var i = from; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_LBSWAP") === 0) swap = r.mock.execLog[i];
+            verify(swap !== "");                                     // it LANDED
+            verify(swap.indexOf("sink='" + wired + "'") !== -1);     // wired carries it
+            verify(swap.indexOf("sink='" + btSink + "'") === -1);    // Bluetooth untouched
+            verify(swap.indexOf("suspend-sink") === -1);             // and no birth flush
+            verify(r.e._combineReloopBusy);
+        }
+
+        function test_a_fold_that_would_move_the_bluetooth_loopback_still_waits() {
+            // Same refusal the settle makes, for the same reason: with a
+            // wired member slower than the corrected Bluetooth one, landing
+            // the correction would re-delay the BT loopback — the measured
+            // clatter AND a fresh re-roll. The map is written and the
+            // landing waits for a rebuild, exactly as before.
+            // 130, not 145: the fold clamps its step to 60, so from 145 the
+            // Bluetooth member would land at 85 and still be the slowest —
+            // the correction would live in the wired loopback and land
+            // quietly, which is the OTHER test. From 130 it lands at 70,
+            // below the wired member's 80, and now the geometry needs the
+            // Bluetooth loopback moved. That is the case that must refuse.
+            var m0 = {}; m0[wired] = 80; m0[btMac] = 130;
+            var r = rig([dev(wired), dev(btSink)],
+                        { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
+            activate(r);
+            var from = r.mock.execLog.length;
+            var early = function (d) {
+                return "DRIFT_EAR " + wired + " " + (1400 + d) + "\nDRIFT_EAR "
+                     + btSink + " 1400\nDRIFT_EST " + d + "\n";
+            };
+            r.e.handleExec(": PW_DRIFT;", early(100), "");
+            r.e.handleExec(": PW_DRIFT;", early(98), "");
+            r.e.handleExec(": PW_DRIFT;", early(102), "");
+            // 130 - 60: the fold's own step clamp, not the median. The
+            // settle may leap 600 because it measured a fresh rebuild; the
+            // periodic road runs every few minutes and a correction that
+            // cannot leap cannot run away either.
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 70);
+            for (var i = from; i < r.mock.execLog.length; i++)
+                verify(r.mock.execLog[i].indexOf(": PW_LBSWAP") !== 0);
+            verify(r.e.driftLastText.indexOf("next time the music pauses") !== -1);
+            verify(!r.e._combineReloopBusy);                         // no full rebuild either
         }
 
         function test_a_wired_residual_is_never_folded() {
@@ -3362,6 +3442,73 @@ Item {
                 verify(r.mock.execLog[i].indexOf(": PW_LBSWAP") !== 0);
         }
 
+        function test_a_settle_round_that_never_gets_a_turn_stops_and_says_so() {
+            // Ten refusals in a row used to end the round in total silence.
+            // Reading the home journal on 2026-08-12 there was a rebuild and
+            // then nothing at all — which reads exactly like a settle that
+            // never armed, the opposite defect wanting the opposite fix. The
+            // round must stop retrying, must not spend a reading on a room
+            // nobody measured, and must not leave "confirming…" standing.
+            // Clearing the word is what the give-up does and the retry does
+            // not, so it — not the timer, which a hand-driven tick never lets
+            // fire and stop itself — is what tells the two apart.
+            var r = settleRig();
+            var confirming = "Auto-check 10:00: confirming the room…";
+            r.e.driftLastText = confirming;
+            r.mock.recording = true;            // one gate, held for every try
+            for (var t = 0; t < 9; t++) r.e._settleTick();
+            compare(r.e._settleGateRetries, 1);
+            compare(r.e.driftLastText, confirming);   // still retrying, still says so
+            r.e._settleTick();                        // the tenth refusal ends the round
+            compare(r.e._settleGateRetries, 0);
+            compare(r.e.driftLastText, "");
+            compare(r.e._settleReadsLeft, 0);   // a dead round looks dead
+            verify(!r.e._settleTimerRunningForTest());
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                verify(r.mock.execLog[i].indexOf(": PW_DRIFT") !== 0);
+        }
+
+        function test_a_room_that_comes_back_unconfirmed_gets_a_second_round() {
+            // The nine-hour failure, measured 2026-08-12: a rebuild at 00:54
+            // armed a round, the music stopped around 00:57, the round died
+            // of its gates with every read unspent — and nothing ever armed
+            // another, because a settle round could only be born at a build
+            // and no build came. The room stayed 55-60 ms out until a human
+            // happened to play something for six uninterrupted minutes.
+            // Coming back is a birth too now.
+            var r = settleRig();
+            verify(r.e._settleUnconfirmed);        // the build armed one
+            r.mock.recording = true;               // a gate that holds every try
+            for (var t = 0; t < 10; t++) r.e._settleTick();
+            compare(r.e._settleGateRetries, 0);    // the round is dead
+            verify(r.e._settleUnconfirmed);        // the room is still unproven
+            r.mock.recording = false;
+            verify(r.e._combineActive);            // no build is coming
+            r.mock.anythingPlaying = false;
+            r.mock.anythingPlaying = true;
+            compare(r.e._settleGateRetries, 10);   // a fresh round, whole
+            compare(r.e._settleReadsLeft, 5);
+            verify(r.e._settleTimerRunningForTest());
+        }
+
+        function test_a_room_already_proven_in_step_is_not_measured_again() {
+            // Three readings inside the don't-care band are a verdict too —
+            // the room is right. Coming back must not spend five more
+            // microphone captures re-proving what was just proved, or the
+            // second chance turns into a tax on every pause.
+            var r = settleRig();
+            for (var t = 0; t < 3; t++) {
+                r.e._settleTick();
+                r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1452), "");  // +2
+            }
+            verify(!r.e._settleUnconfirmed);
+            compare(r.e._settleReadsLeft, 0);      // verdict landed, round closed
+            r.mock.anythingPlaying = false;
+            r.mock.anythingPlaying = true;
+            compare(r.e._settleReadsLeft, 0);      // nothing armed a new one
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);  // map untouched
+        }
+
         function test_a_settle_fix_that_would_move_the_bluetooth_loopback_waits() {
             // With a wired member slower than the corrected Bluetooth one,
             // landing the fix would re-delay the BT loopback itself — the
@@ -3466,6 +3613,19 @@ Item {
             var fenced = false;
             for (var m in r.e._settleDeferredMacs) fenced = true;
             verify(!fenced);
+        }
+
+        function test_a_folds_deferral_joins_the_fence_instead_of_replacing_it() {
+            // A settle parked a big repair behind the fence; a later fold
+            // deferring its own small step used to swap the whole fence
+            // for its own members — and the next fold overwrote the very
+            // correction the settle had measured. The fence takes members
+            // in, it never trades them away.
+            var r = settleRig();
+            r.e._settleDeferredMacs = ({ "AA:BB:CC:DD:EE:FF": true });
+            r.e._settleGuardDeferral({ "11:22:33:44:55:66": true });
+            verify(r.e._settleDeferredMacs["AA:BB:CC:DD:EE:FF"] === true);
+            verify(r.e._settleDeferredMacs["11:22:33:44:55:66"] === true);
         }
 
         function test_an_empty_swap_answer_is_a_failure_not_an_adoption() {

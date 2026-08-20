@@ -120,6 +120,39 @@ def test_a_thin_stream_pays_the_clock_and_no_more(tmp_path):
         tap.close()
 
 
+def test_a_body_that_never_began_closes_within_seconds(tmp_path):
+    """A writer dead at birth leaves a zero-byte file (a container ffmpeg
+    refuses to mux, issue #11) - and the tap used to hold the player on
+    200-OK headers with no bytes for the full 900 s idle cap: silence
+    with a playing icon. An empty body now closes in ~10 s so the player
+    gets an honest end of stream and the engine's recovery can wake.
+    """
+    buf = tmp_path.joinpath("buffer.ogg")   # the Tap fixture's own name
+    buf.write_bytes(b"")
+    tap = Tap(tmp_path)
+    try:
+        t0 = time.monotonic()
+        tap.sock.settimeout(30.0)
+        got = b""
+        while time.monotonic() - t0 < 25.0:
+            try:
+                part = tap.sock.recv(65536)
+            except TimeoutError:
+                break
+            if part == b"":
+                break                      # honest close
+            got += part
+        took = time.monotonic() - t0
+        head_end = got.find(b"\r\n\r\n")
+        body = got[head_end + 4:] if head_end >= 0 else b""
+        assert body == b"", "bytes appeared from a file nobody wrote"
+        assert took < 20.0, (
+            f"the tap held an empty body open for {took:.0f}s - the player "
+            "sits in silence exactly that long")
+    finally:
+        tap.close()
+
+
 def test_the_vanished_buffer_ends_the_tap(tmp_path):
     tmp_path.joinpath("buffer.ogg").write_bytes(b"x" * (LEAD_BYTES + 4096))
     tap = Tap(tmp_path)

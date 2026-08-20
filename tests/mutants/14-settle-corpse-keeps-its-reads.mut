@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A settle round killed by its gates keeps its unspent reads, so the room
+  coming back is never measured again — the nine-hour silence returns.
+
+history:
+  Measured on the home machine 2026-08-12. A rebuild at 00:54:23 (the
+  speaker left the group and was walked back in) armed a settle round;
+  playback stopped around 00:57 and the round died against its gates
+  with all five reads unspent. Nothing armed another, because a round
+  could only be born at a build. The room stayed 55-60 ms out for the
+  next nine hours, through a park, a wake and two mornings of periodic
+  checks, and only came right when it was finally given six
+  uninterrupted minutes — 202 -> 143, residual 56 ms -> 3 ms.
+
+  The fix has two halves and this mutant removes the quiet one. Zeroing
+  the reads is what makes a dead round LOOK dead; the resume road reads
+  that pulse to tell a corpse from a live round. Drop it and the resume
+  guard silently stops firing while every log line still looks right —
+  which is the same shape as the bug it replaced. This exact slip was
+  made once while writing the fix, and its test caught it.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+                  _settleReadsLeft = 0;
+                  settleFixTimer.stop();
+                  console.log("[ARP] sync: settle gave up its window — "
+
+replace:
+                  settleFixTimer.stop();
+                  console.log("[ARP] sync: settle gave up its window — "
+
+expect:
+  Killed by tst_syncengine.qml
+  test_a_room_that_comes_back_unconfirmed_gets_a_second_round: the dead
+  round still reports five reads left, the resume guard refuses, and the
+  fresh round's gate-retry budget never returns to ten.

@@ -46,6 +46,8 @@ Item {
             function notify(t, x, i) { notes.push({ title: t, text: x }); }
             function tsBufferDir() { return "/home/egon/.cache/onair/timeshift"; }
             function tsServeScriptPath() { return "/opt/onair/relayserve.py"; }
+            property bool playingNow: true
+            function isPlaying() { return playingNow; }
             function tsPlayBuffer(url, pos) { played.push({ kind: "buffer", url: url, pos: pos }); }
             function tsPlayLive(url) { played.push({ kind: "live", url: url, pos: -1 }); }
             function tsPlayRelay(url) { played.push({ kind: "relay", url: url, pos: -1 }); }
@@ -452,5 +454,92 @@ Item {
         compare(r.e.pauseGesture(t0 + 3600000), -1);
     }
 
+
+    function test_the_relay_shell_matches_the_stream_family() {
+        // Issue #11: the relay buffer was hard-coded .ogg, ffmpeg refused
+        // to mux the reporter's mp3 into it, the writer died at birth and
+        // the player got a tap serving an empty file. Measured live: mp3
+        // into ogg = 0 bytes; the same stream into mka = 131 KB in eight
+        // seconds. Ogg-family streams keep their Ogg shell.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        verify(r.e.bufPath.indexOf(".mka") !== -1);   // mp3-ish: Matroska
+        r.e.reset(false);
+        verify(r.e.armRelay("https://x.example/stream.flac", "F3", 2000000));
+        verify(r.e.bufPath.indexOf(".ogg") !== -1);   // Ogg-family keeps Ogg
     }
+
+    function test_a_relay_writer_dead_at_birth_returns_the_player_to_live() {
+        // Zero bytes on disk is "this stream cannot be relayed", never "a
+        // filled window": the old filing left active=false with a live tap
+        // serving nothing, silence behind a playing icon (issue #11).
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        var runCmd = "";
+        for (var i = 0; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": TS_RUN;") === 0) runCmd = r.mock.execLog[i];
+        verify(runCmd !== "");
+        var liveBefore = r.mock.played.filter(function(x){return x.kind==="live";}).length;
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=234 bytes=0", 1004800);
+        var lives = r.mock.played.filter(function(x){return x.kind==="live";});
+        compare(lives.length, liveBefore + 1);              // back to the stream
+        compare(lives[lives.length - 1].url, "https://atma.fm/channel1");
+        verify(!r.e.active);
+        verify(!r.e.windowFull);                            // NOT filed as a full window
+    }
+
+    function test_a_catalog_codec_verdict_overrules_the_bare_address() {
+        // radiomast serves FLAC from a path with no extension at all, so
+        // the address alone says "mp3-ish" and the writer would get a
+        // Matroska shell — whose titles the oggbuf reader cannot read.
+        // The caller knows better (the directory reported the codec) and
+        // its verdict must win over the URL guess.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://streams.radiomast.io/abc123", "R", 1000000, true));
+        verify(r.e.bufPath.indexOf(".ogg") !== -1);
+        // And an internal re-arm of the SAME stream — the playback-fell
+        // and window-cap roads pass no verdict — keeps the remembered
+        // family instead of re-deriving a worse one from the bare URL.
+        verify(r.e.armRelay("https://streams.radiomast.io/abc123", "R", 2000000));
+        verify(r.e.bufPath.indexOf(".ogg") !== -1);
+    }
+
+    function test_one_birth_death_ends_the_re_arming_for_the_session() {
+        // Freeze, rescue, birth-death, live, freeze again — each round
+        // audible. A stream whose writer died at birth once already gets
+        // no second writer this session: the rescue's re-arm is refused.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        var runCmd = "";
+        for (var i = 0; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": TS_RUN;") === 0) runCmd = r.mock.execLog[i];
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=234 bytes=0", 1004800);
+        var n = r.mock.execLog.length;
+        verify(!r.e.armRelay("https://atma.fm/channel1", "Atma", 1010000));
+        compare(r.mock.execLog.length, n);                  // no new writer spawned
+        verify(!r.e.active);
+    }
+
+    function test_a_parked_room_is_not_woken_by_a_writers_death() {
+        // A listener who parked the radio chose silence. The relay writer
+        // dying behind that silence is bookkeeping, not a licence to start
+        // full-volume live sound over their choice.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        var runCmd = "";
+        for (var i = 0; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": TS_RUN;") === 0) runCmd = r.mock.execLog[i];
+        r.mock.playingNow = false;
+        var liveBefore = r.mock.played.filter(function(x){return x.kind==="live";}).length;
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=234 bytes=0", 1004800);
+        var liveAfter = r.mock.played.filter(function(x){return x.kind==="live";}).length;
+        compare(liveAfter, liveBefore);                     // silence stays silent
+        verify(!r.e.active);
+    }
+
+    }
+
 }

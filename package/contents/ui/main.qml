@@ -637,6 +637,19 @@ PlasmoidItem {
                                        && _icyStreamTarget(playMusic.source) === _currentResolvedUrl))
                                && lastPlay === index));
         if (stopping) {
+            // A PARKED station's row wears the start glyph on hover — and
+            // the click did the opposite: it tore the park down silently,
+            // so the listener's next click cold-restarted the station and
+            // wiped a title and cover it had one second earlier (the
+            // "cover blinked" report, 2026-08-20 — the writer log caught
+            // REFRESH-SERVER firing on the parked row). The row honours
+            // its own icon now: a parked row resumes the park, exactly
+            // like the play button. An audibly playing or shifted row
+            // keeps its old meaning, stop.
+            if (root._tsPaused && !timeshift.shifted) {
+                timeshiftResume();
+                return;
+            }
             stopWithFade();
         } else {
             // Keep lastPlay in sync for every caller — the popup play button and
@@ -2730,7 +2743,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.32");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.33");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4785,7 +4798,7 @@ PlasmoidItem {
                 // on every retry-ladder knock — was the churn behind "plays
                 // five seconds, goes quiet, plays again": keep drinking.
             } else {
-                timeshift.armRelay(tsUrl, station.name || "", Date.now());
+                timeshift.armRelay(tsUrl, station.name || "", Date.now(), tsOgg);
             }
         } else if (tsLocal && root._previewUrl === "") {
             if (timeshift.active && timeshift.streamUrl === tsUrl) {

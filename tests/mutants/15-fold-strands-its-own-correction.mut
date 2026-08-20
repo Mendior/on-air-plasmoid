@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The periodic fold goes back to writing the map and walking away, so a
+  room that plays all evening never receives the correction it measured.
+
+history:
+  Measured on the home machine 2026-08-12, with the listener in the room.
+  The Bluetooth link drifted from 1 ms to 24 ms across forty minutes of
+  continuous listening. The fold tracked it exactly right — map 134 ->
+  149 -> 157 — and not one millisecond of it reached the speakers,
+  because the correction was written "applies at the next rebuild" and
+  no rebuild was due. The answer was correct, recorded, and useless.
+
+  For most of the road's life that was the right call, and the comment
+  said so along with the condition on which it would change: "until the
+  swap itself is proven quiet, a measurement worth keeping is not worth
+  startling anyone for." The make-before-break crossfade proved it —
+  built for the settle road 2026-08-10, and it landed two corrections
+  under live music on 2026-08-12 with the listener present, neither
+  heard. This mutant puts the strand back.
+
+  Note what it does NOT touch: the refusal. A correction that would move
+  a Bluetooth loopback still waits for a rebuild, because cutting a BT
+  stream is the measured clatter. Only the wired landing is at stake.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          var dfWhen = Qt.formatTime(new Date(), "hh:mm");
+          if (_settleQuietSwap(dfWhen, steps) !== "swapped") {
+
+replace:
+          var dfWhen = Qt.formatTime(new Date(), "hh:mm");
+          if (true) {
+
+expect:
+  Killed by tst_syncengine.qml, two tests at once:
+  test_a_quiet_fold_lands_its_correction_without_a_rebuild (no PW_LBSWAP
+  is issued and _combineReloopBusy stays false) and
+  test_three_checks_that_agree_correct_the_map_without_a_sound (same
+  missing swap on the ordinary desk). Line-neutral.

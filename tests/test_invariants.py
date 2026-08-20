@@ -991,3 +991,21 @@ def test_a_park_that_cannot_resume_always_finds_a_way_back_to_sound():
         "the room silent again")
     assert "refreshServer(lastPlay)" in body, (
         "the resume lost its last resort, the station's own row")
+
+
+def test_a_parked_stations_row_resumes_instead_of_tearing_the_park_down():
+    """The row shows the start glyph while a station is parked - and the
+    click used to do the opposite: silently stop the park, so the next
+    click cold-restarted the station and wiped a cover it had one second
+    earlier (caught live 2026-08-20 by the writer log: REFRESH-SERVER on
+    the parked row). The row must honour its own icon.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "refreshServer")
+    i = body.index("if (stopping)")
+    stop_branch = body[i:i + 900]
+    assert "timeshiftResume()" in stop_branch, (
+        "the parked row tears the park down again instead of resuming it")
+    assert "_tsPaused && !timeshift.shifted" in stop_branch, (
+        "the resume lost its guard - an audibly shifted row must keep "
+        "meaning stop")

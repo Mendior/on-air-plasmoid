@@ -24,6 +24,18 @@ function canTimeshift(url) {
     return fmt !== "hls" && fmt !== "playlist";
 }
 
+// The shell the RELAY buffer gets, judged from the address alone. Ogg
+// only for streams the URL itself proves Ogg-family — ffmpeg refuses to
+// mux mp3 into Ogg, and a writer that dies at birth hands the player a
+// tap serving an empty file (issue #11) — and Matroska for the rest.
+// The engine trusts a directory-reported codec over this when the caller
+// passes one in: the address often cannot say (radiomast serves FLAC
+// from a path with no extension at all).
+function relayExtension(url) {
+    var fmt = StreamLogic.streamFormat(url, true);
+    return (fmt === "ogg" || fmt === "opus" || fmt === "flac") ? "ogg" : "mka";
+}
+
 // The buffer always copies, never re-encodes — it runs in the background
 // for as long as the radio plays, so its CPU cost has to stay near zero.
 // Judged strictly on the extension: a fuzzy "probably mp3" written into a

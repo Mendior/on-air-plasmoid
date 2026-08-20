@@ -140,6 +140,14 @@ Item {
         // device events until the hardware is back.
         if (_resurrectTries > 0 && !_combineActive && !_combineWantActive) {
             _resurrectTries--;
+            // The insurance is finite, and when it runs out the combined
+            // output just stays down — which in the journal is total
+            // silence, indistinguishable from a wake that never happened.
+            // Seen 2026-08-12: "sound is back" at 06:03, then not one sync
+            // line for the fifteen minutes the room went on playing.
+            if (_resurrectTries === 0)
+                console.log("[ARP] sync: last resurrect knock — if the group"
+                            + " is not back after this one, it stays down");
             combineOutputsEnable();
         }
         // Death needs a birth certificate first: the check only trusts a
@@ -1605,6 +1613,23 @@ Item {
                 var dbB = _sweepBiasOf(dbMac);
                 if (dbB !== 0) deEars[dbk] -= dbB;
             }
+            // DRIFT_EST comes out of calibrate.py unsigned, so the journal
+            // has been writing "18" for a room the Bluetooth led and "54"
+            // for one the wire led, and the two read as the same kind of
+            // number. Measured here 2026-08-12: overnight the JBL landed
+            // 18 ms behind the desk, and after one rebuild the desk landed
+            // 54 ms behind the JBL — the flip was invisible without
+            // subtracting two DRIFT_EAR lines by hand. Name the late
+            // speaker in the same breath. Two members is the case worth
+            // wording; a fuller room still has its DRIFT_EAR lines above.
+            var deNames = [];
+            for (var dnk in deEars) deNames.push(dnk);
+            if (deNames.length === 2) {
+                var deGap = deEars[deNames[0]] - deEars[deNames[1]];
+                console.log("[ARP] sync: direction — "
+                            + (deGap > 0 ? deNames[0] : deNames[1])
+                            + " is " + Math.abs(deGap) + " ms late");
+            }
             // A settle reading measures the freshly rebuilt room ON PURPOSE
             // — the re-roll IS what it came for — so it routes before the
             // spent-probe rule below and never enters the periodic history.
@@ -2218,6 +2243,21 @@ Item {
                 // racing it for the default sink and the master memory.
                 if (_combineParkTail) _combineWakeQueued = true;
                 else _combineWakeFromPark();
+            // Reads left is the round's pulse — every death zeroes it now,
+            // which is what lets this road tell a live round from a corpse.
+            // The first draft asked the Timer instead and got it wrong in
+            // both directions; its own test caught that before it shipped.
+            } else if (_combineActive && _settleUnconfirmed
+                       && _settleReadsLeft <= 0 && _combineHasBtMember()) {
+                // The graph never came down, so no build will arm anything —
+                // and the round that belonged to this deployment died while
+                // the room was silent. This is the second chance it never
+                // had: the listener is back, the link is warming, and the
+                // only thing standing between them and a room 55 ms out is
+                // a measurement nobody is going to ask for by hand.
+                if (_settleArmRound())
+                    console.log("[ARP] sync: the last rebuild never got its"
+                                + " settle verdict — measuring the room again");
             }
         } else if (_combineActive && cfg.combineWanted === true) {
             idleTeardownTimer.restart();
@@ -2973,21 +3013,7 @@ Item {
         // the sweep road to exist at all: with the ultrasonic tone off the
         // probe only ever answers DRIFT_EST, no landings — five doomed
         // microphone captures per rebuild, found on review 2026-08-10.
-        if (sHasBt && sHasWired && cfg.syncAutoCare === true
-            && cfg.syncManualOnly !== true && cfg.syncUltrasonic !== false) {
-            // A probe still in the air was aimed at the room this build is
-            // replacing; its answer must not seed the fresh round.
-            if (driftGuardTimer.running) _driftProbeStale = true;
-            _settleEarsRuns = [];
-            // Five reads for a three-reading verdict: a ramp burns the
-            // extras replacing its oldest reading until the window sits flat.
-            _settleReadsLeft = 5;
-            _settleGateRetries = 10;
-            // The first reading waits out the steep end of the ramp — at
-            // 90 s it landed mid-climb every time it was watched.
-            settleFixTimer.interval = 150 * 1000;
-            settleFixTimer.restart();
-        }
+        if (sHasBt && sHasWired) _settleArmRound();
         return cmds;
     }
 
@@ -4447,34 +4473,47 @@ Item {
         _driftEstHistory = [];
         console.log("[ARP] sync: quiet fold from the median of "
                     + foldedFrom + " checks — map "
-                    + before + " -> " + cfg.syncOffsetMap
-                    + " (applies at the next rebuild)");
-        // The map is written; the LOOPBACKS are deliberately left alone.
+                    + before + " -> " + cfg.syncOffsetMap);
+        // The map is written, and now the correction goes looking for a way
+        // to actually reach the speakers.
         //
-        // Swapping a loopback mid-stream is not the small gap it was assumed
-        // to be: the listener described a startling clatter from the
-        // speakers the first time a correction landed under real music. A
-        // delay lives in the module's own parameter, so applying it means
-        // tearing a live stream down and building another, and a Bluetooth
-        // codec fed a discontinuity makes a noise nobody asked for.
+        // For most of this road's life the loopbacks were deliberately left
+        // alone here, and the reason was good: swapping a loopback
+        // mid-stream is not the small gap it was assumed to be. A delay
+        // lives in the module's own parameter, so applying it means tearing
+        // a live stream down and building another, and the listener
+        // described a startling clatter the first time a correction landed
+        // under real music. The note ended with the condition on which that
+        // would change — "until the swap itself is proven quiet, a
+        // measurement worth keeping is not worth startling anyone for."
         //
-        // Nothing is lost by waiting. The map is what every rebuild reads,
-        // and rebuilds happen on their own — the graph parks after fifteen
-        // idle minutes and comes back on the next play, a speaker joins or
-        // leaves, the slider moves. The correction lands then, in a moment
-        // that costs the room nothing. Until the swap itself is proven
-        // quiet, a measurement worth keeping is not worth startling anyone
-        // for.
-        // Honest about what it costs. A loopback carries its delay in the
-        // module's own parameter, so a new delay means a new module — the
-        // stream restarts and the speaker whose delay changed skips a
-        // moment. That is a fraction of a second against the minute of
-        // parked music the older road spent, but "no music interrupted"
-        // was a promise this code does not keep, and the listener heard it.
-        var dfSug = _driftSuggestion(foldedEars);
-        driftLastText = dfSug >= 0
-            ? i18n("Auto-check: measured %1 ms — takes effect the next time the music pauses", dfSug)
-            : i18n("Auto-check: adjusted — takes effect the next time the music pauses");
+        // It is proven now. The make-before-break crossfade was built for
+        // the settle road on 2026-08-10: the replacement is born muzzled,
+        // fills for 0.8 s at the new delay, the two are faded across in
+        // eight steps and the old one is cut at zero. It has landed
+        // corrections under live music since — twice on 2026-08-12 with the
+        // listener in the room, and neither was heard.
+        //
+        // What waiting cost, measured the same evening: the Bluetooth link
+        // drifted 1 ms -> 24 ms across forty minutes of continuous
+        // listening. The fold tracked it exactly right (map 134 -> 149 ->
+        // 157) and not one millisecond reached the speakers, because no
+        // rebuild came and none was due. "Rebuilds happen on their own" is
+        // true of a room somebody keeps starting and stopping; it is not
+        // true of one that plays all evening, which is the room this
+        // correction is for.
+        //
+        // immediate is deliberately NOT passed: that is the slider's road,
+        // and on Bluetooth geometry it takes a full rebuild — which re-rolls
+        // A2DP and would turn every drifting fold into the very loop this
+        // road exists to end.
+        var dfWhen = Qt.formatTime(new Date(), "hh:mm");
+        if (_settleQuietSwap(dfWhen, steps) !== "swapped") {
+            var dfSug = _driftSuggestion(foldedEars);
+            driftLastText = dfSug >= 0
+                ? i18n("Auto-check: measured %1 ms — takes effect the next time the music pauses", dfSug)
+                : i18n("Auto-check: adjusted — takes effect the next time the music pauses");
+        }
         return true;
     }
 
@@ -4535,6 +4574,46 @@ Item {
         onTriggered: _settleTick()
     }
 
+    // The deployment now in the loopbacks has never been confirmed: a round
+    // was armed for it and no verdict — repair, "nothing to fix", or the
+    // listener's own window outranking it — ever landed. Measured cost of
+    // not tracking this, 2026-08-12: a rebuild at 00:54 (the speaker left
+    // the group and was walked back), playback stopped at ~00:57, and the
+    // round died of its gates with three of its five reads unspent. The
+    // room stayed 55-60 ms out for the next NINE HOURS, through a park, a
+    // wake and two mornings' worth of periodic checks, because a settle
+    // round could only ever be armed by a build and no build came.
+    property bool _settleUnconfirmed: false
+
+    // One door for every settle round. The build knows its own membership
+    // from the sinks it is about to wire; a round armed later has to ask
+    // the group instead, so everything after that question lives here.
+    // The build calls this unconditionally on purpose — a room that just
+    // changed shape makes any round in flight stale, and restarting is the
+    // right answer. Callers that are NOT a build must check first that no
+    // round is already running, or they will reset a healthy one.
+    function _settleArmRound() {
+        // With the ultrasonic tone off the probe only ever answers
+        // DRIFT_EST, no landings — five doomed microphone captures per
+        // rebuild, found on review 2026-08-10.
+        if (cfg.syncAutoCare !== true || cfg.syncManualOnly === true
+            || cfg.syncUltrasonic === false) return false;
+        // A probe still in the air was aimed at the room this round is
+        // replacing; its answer must not seed the fresh one.
+        if (driftGuardTimer.running) _driftProbeStale = true;
+        _settleEarsRuns = [];
+        // Five reads for a three-reading verdict: a ramp burns the extras
+        // replacing its oldest reading until the window sits flat.
+        _settleReadsLeft = 5;
+        _settleGateRetries = 10;
+        _settleUnconfirmed = true;
+        // The first reading waits out the steep end of the ramp — at 90 s
+        // it landed mid-climb every time it was watched.
+        settleFixTimer.interval = 150 * 1000;
+        settleFixTimer.restart();
+        return true;
+    }
+
     // Tests only, same reason as _driftTimerRunningForTest.
     function _settleTimerRunningForTest() { return settleFixTimer.running; }
 
@@ -4558,10 +4637,32 @@ Item {
             if (--_settleGateRetries > 0) {
                 settleFixTimer.interval = 60 * 1000;
                 settleFixTimer.restart();
-            } else if (driftLastText.indexOf("…") !== -1) {
+            } else {
+                // Ten refusals in a row used to end the round in complete
+                // silence. Reading the journal on 2026-08-12 there was a
+                // rebuild, then nothing at all, and no way to tell a settle
+                // that never got a turn from one that never armed — the two
+                // need opposite fixes. Say which gate held it.
+                // A dead round must LOOK dead. Leaving the reads standing
+                // said "five still to go" about a round nothing would ever
+                // tick again, and the resume road cannot tell a live round
+                // from a corpse if the corpse is still holding its reads.
+                _settleReadsLeft = 0;
+                settleFixTimer.stop();
+                console.log("[ARP] sync: settle gave up its window — "
+                    + (_calibrating ? "a calibration"
+                     : _verifyPending ? "a verify"
+                     : _combineReloopBusy ? "a rebuild"
+                     : _btKickInFlight ? "a Bluetooth kick"
+                     : app.recording === true ? "a recording"
+                     : app.alarmEngaged === true ? "an alarm"
+                     : app.anythingPlaying !== true ? "nothing playing"
+                     : driftGuardTimer.running ? "a probe still out"
+                     : "no Bluetooth member")
+                    + " held every one of ten tries");
                 // A round that dies must not leave "confirming…" standing —
                 // an unfinished word reads as a check that hung.
-                driftLastText = "";
+                if (driftLastText.indexOf("…") !== -1) driftLastText = "";
             }
             return;
         }
@@ -4572,10 +4673,21 @@ Item {
         // The probe can refuse past our gates (a deaf shelf, a shrunken
         // group). Refusal leaves the guard timer cold — the read was not
         // spent, so it goes back on the shelf for the retry.
-        if (!driftGuardTimer.running && --_settleGateRetries > 0) {
-            _settleReadsLeft++;
-            settleFixTimer.interval = 60 * 1000;
-            settleFixTimer.restart();
+        if (!driftGuardTimer.running) {
+            if (--_settleGateRetries > 0) {
+                _settleReadsLeft++;
+                settleFixTimer.interval = 60 * 1000;
+                settleFixTimer.restart();
+            } else {
+                // The other way a round can end without a word: the probe
+                // itself refusing every time. Same silence, different fix.
+                _settleReadsLeft = 0;
+                settleFixTimer.stop();
+                console.log("[ARP] sync: settle gave up its window — the probe"
+                            + " refused every retry (a deaf shelf, or the group"
+                            + " lost a member)");
+                if (driftLastText.indexOf("…") !== -1) driftLastText = "";
+            }
         }
     }
 
@@ -4593,6 +4705,11 @@ Item {
         }
         var per = _driftOffsetsFromHistory(runs);
         var steps = {}, acted = false, unsettled = false, any = false;
+        // What the round actually saw, kept for the give-up message. Without
+        // it "kept moving" is a verdict with no evidence, and the question it
+        // raises — is the flatness gate too tight for this room, or is the
+        // room genuinely walking — cannot be answered from the journal at all.
+        var whyNot = [];
         for (var m in per) {
             var v = per[m];
             if (v.length < 3) continue;        // absent from one reading
@@ -4607,7 +4724,12 @@ Item {
             // at once: three readings either agree with each other, or the
             // room has not settled and gets no verdict.
             var lo = Math.min(v[0], v[1], v[2]), hi = Math.max(v[0], v[1], v[2]);
-            if (hi - lo > _settleFlatMs) { unsettled = true; continue; }
+            if (hi - lo > _settleFlatMs) {
+                unsettled = true;
+                whyNot.push(m + " [" + v[0] + " " + v[1] + " " + v[2] + "]"
+                            + " spread " + (hi - lo) + " over " + _settleFlatMs);
+                continue;
+            }
             var sameSign = (v[0] > 0 && v[1] > 0 && v[2] > 0)
                         || (v[0] < 0 && v[1] < 0 && v[2] < 0);
             var sm = v.slice().sort(function(a, b) { return a - b; });
@@ -4619,7 +4741,8 @@ Item {
         if (!any || (unsettled && !acted)) {
             if (_settleReadsLeft > 0) { _settleRearm(); return; }
             console.log("[ARP] sync: settle readings kept moving — leaving"
-                        + " the room to the periodic check");
+                        + " the room to the periodic check"
+                        + (whyNot.length ? " — " + whyNot.join(" ; ") : ""));
             // Retire the "confirming…" word, or the give-up reads as a hang.
             if (driftLastText.indexOf("…") !== -1) driftLastText = "";
             return;
@@ -4634,25 +4757,39 @@ Item {
         if (_earWindowOpen()) {
             console.log("[ARP] sync: settle verdict inside the ear's window"
                         + " — deferring to the listener's own setting");
+            // A verdict WAS reached and deliberately set aside: the room
+            // stands as the listener left it. Leaving it flagged unconfirmed
+            // would re-arm a round against a deployment they just approved
+            // by hand, which is the walk the ear's window exists to stop.
+            _settleUnconfirmed = false;
             return;
         }
         if (!acted) {
             console.log("[ARP] sync: settle check — the rebuilt room is"
                         + " within " + _settleMinFixMs + " ms, nothing to fix");
             driftLastText = i18n("Auto-check %1: in step after the rebuild", when);
+            _settleUnconfirmed = false;
             return;
         }
         var before = cfg.syncOffsetMap || "{}";
         if (!_foldStepsIntoMap(steps, _settleMaxFixMs)) return;
         console.log("[ARP] sync: settle correction from three flat readings"
                     + " — map " + before + " -> " + cfg.syncOffsetMap);
+        _settleUnconfirmed = false;
         _settleQuietSwap(when, steps);
     }
 
     // The waiting map entries get a fence the fold respects until the
     // next build lands them.
     function _settleGuardDeferral(steps) {
+        // MERGED into the standing fence, never swapped for it: a fold's
+        // small deferral used to replace a settle's big pending repair
+        // wholesale, and the next fold could then overwrite the very
+        // correction the settle had measured and parked (review find,
+        // 2026-08-20). A fence entry dies where it always died — the
+        // rebuild that lands the map.
         var fence = {};
+        for (var f in _settleDeferredMacs) fence[f] = true;
         for (var m in (steps || {})) fence[m] = true;
         _settleDeferredMacs = fence;
     }
@@ -4665,16 +4802,23 @@ Item {
     // moves the very target the hand just hit. Measured live 2026-08-11:
     // the listener set 154 by ear, the rebuild it triggered re-rolled the
     // room, and 154 was wrong before their hand left the slider.
+    // Returns which of the three things happened, because they are not the
+    // same news and a second caller now has to tell them apart:
+    //   "swapped"  — the correction is playing
+    //   "deferred" — it cannot land without moving a Bluetooth loopback (or
+    //                the room is busy); fenced, waiting for a rebuild
+    //   "absorbed" — the frame already carries the number, nothing to do
+    //   "rebuilt"  — the slider's road took a full rebuild instead
     function _settleQuietSwap(when, steps, immediate) {
         // The map is already written; the question is only whether it can
         // land NOW without touching a Bluetooth stream. A busy room keeps
         // the old behaviour — the next natural rebuild reads the map.
         if (_combineReloopBusy || _calibrating || _verifyPending
             || !_combineActive) {
-            if (immediate) { _combineRebuildLoopbacks(); return; }
+            if (immediate) { _combineRebuildLoopbacks(); return "rebuilt"; }
             _settleGuardDeferral(steps);
             driftLastText = i18n("Auto-check %1: adjusted — takes effect the next time the music pauses", when);
-            return;
+            return "deferred";
         }
         var sinks = _combineRealSinks();
         var maxLag = 0, lags = {};
@@ -4700,10 +4844,10 @@ Item {
                 // Nothing to re-delay means the hand's number is already
                 // playing — a full rebuild here would be a pointless
                 // re-roll of the very room the listener just approved.
-                if (btMoves) _combineRebuildLoopbacks();
-                else console.log("[ARP] sync: slider landed in the frame —"
-                                 + " nothing to re-delay, nothing re-rolled");
-                return;
+                if (btMoves) { _combineRebuildLoopbacks(); return "rebuilt"; }
+                console.log("[ARP] sync: slider landed in the frame —"
+                            + " nothing to re-delay, nothing re-rolled");
+                return "absorbed";
             }
             if (btMoves) _settleGuardDeferral(steps);
             console.log(btMoves
@@ -4712,7 +4856,7 @@ Item {
                 : "[ARP] sync: settle correction absorbed by the frame —"
                   + " nothing to re-delay");
             driftLastText = i18n("Auto-check %1: adjusted — takes effect the next time the music pauses", when);
-            return;
+            return btMoves ? "deferred" : "absorbed";
         }
         // Make before break, and cut only what is already silent. The first
         // live swap (2026-08-10 08:55) unloaded the playing wired loopback
@@ -4778,6 +4922,7 @@ Item {
         _combineReloopBusy = true;
         app.exec(": PW_LBSWAP " + _combineLoadSeq + "; " + cmds + "true"
                  + " # " + app.nextSeq());
+        return "swapped";
     }
 
     // Pass 1's proposed correction, waiting for pass 2 to agree. The fold

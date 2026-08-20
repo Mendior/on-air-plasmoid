@@ -16,14 +16,19 @@ history:
   of reach, which is exactly the bug shipping a "small cleanup" to the
   threshold would reintroduce.
 
+  Anchor rewritten 2026-08-12: the refusal branch grew a body (it now
+  records the three readings and the spread, so a give-up carries its own
+  evidence into the journal), and the one-line form the anchor bit on no
+  longer exists. Same gate, same swap, shorter bite — the condition alone.
+
 target:
   package/contents/ui/SyncEngine.qml
 
 find:
-              if (hi - lo > _settleFlatMs) { unsettled = true; continue; }
+              if (hi - lo > _settleFlatMs) {
 
 replace:
-              if (hi - lo > 9999999) { unsettled = true; continue; }
+              if (hi - lo > 9999999) {
 
 expect:
   Killed by tst_syncengine.qml

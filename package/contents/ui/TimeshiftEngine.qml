@@ -131,11 +131,19 @@ Item {
         // arm's delayed stop (sleep 1; rm) delete the incoming arm's
         // fresh buffer out from under its writer.
         var seq = app.nextSeq();
-        // A relay buffer is always an Ogg shell: every codec this road
-        // exists for (FLAC, Vorbis, Opus) has an Ogg mapping, and the tap
-        // needs ONE input format it can trust — the address often cannot
-        // say (radiomast serves FLAC from a path with no extension).
-        var ext = isRelay ? "ogg" : TimeshiftLogic.bufferExtension(url);
+        // A relay buffer used to be hard-coded to an Ogg shell — right
+        // for every codec the road was BUILT for (FLAC, Vorbis, Opus all
+        // have Ogg mappings), and fatally wrong for everything the
+        // rescue road later started feeding it: ffmpeg refuses to mux
+        // mp3 into Ogg, the writer died at birth with zero bytes on
+        // disk, and the player was handed a tap serving an empty file
+        // (issue #11, measured live against the reporter's station —
+        // "Unsupported codec id in stream 0", rc 234, 0 bytes; the same
+        // stream into an .mka shell wrote 131 KB in eight seconds).
+        // Matroska holds every codec either road can meet, so the relay
+        // trusts it for anything that is not known to be Ogg-family.
+        var ext = isRelay ? (relayOggFamily ? "ogg" : "mka")
+                          : TimeshiftLogic.bufferExtension(url);
         bufPath = dir + "/buffer-" + seq + "." + ext;
         cfgFilePath = dir + "/url-" + seq + ".cfg";
         pidPath = dir + "/writer-" + seq + ".pid";
@@ -171,7 +179,28 @@ Item {
     // A stream the backend cannot play directly: same arm, three
     // differences — no config gate, the relay flag, and the player is
     // pointed at the loopback tap the moment its port answers.
-    function armRelay(url, name, nowMs) {
+    // What the FIRST arm learned about the stream's family. The address
+    // often cannot say (radiomast serves FLAC from a path with no
+    // extension — the relay's original clientele, issue #3), so the
+    // caller who read the directory's codec passes the verdict in, and
+    // every internal re-arm of the same stream reuses it instead of
+    // re-deriving a worse answer from the bare URL.
+    property bool relayOggFamily: false
+    // A stream whose relay writer died at birth — a shell no container
+    // fits, a server that refuses the second connection. Re-arming it
+    // would loop: freeze, rescue, birth-death, live, freeze again, each
+    // round audible. One death is the verdict for the session.
+    property string _relayBirthDeathUrl: ""
+
+    function armRelay(url, name, nowMs, oggFamily) {
+        if (url === _relayBirthDeathUrl) {
+            console.log("[ARP] timeshift: this stream's relay writer died"
+                        + " at birth once already — not re-arming");
+            return false;
+        }
+        if (oggFamily !== undefined) relayOggFamily = (oggFamily === true);
+        else if (url !== streamUrl)
+            relayOggFamily = (TimeshiftLogic.relayExtension(url) === "ogg");
         if (!armCommon(url, name, nowMs, true)) return false;
         return true;
     }
@@ -405,6 +434,33 @@ Item {
             if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;
             writerUp = false;
             if (stdout.indexOf("__TS_EXIT__") !== -1) {
+                // The ack carries the writer's own evidence, and a birth
+                // death must not be filed as a filled window: zero bytes
+                // on disk means "this stream cannot be relayed", not "an
+                // hour of audio is waiting". The listener gets the truth
+                // and the player is sent back to the direct stream it
+                // came from instead of a tap serving an empty file
+                // forever (issue #11 — the interruption WAS this filing
+                // error, silence with a playing icon behind it).
+                var exitBytes = -1;
+                var ebM = stdout.match(/__TS_EXIT__ rc=\d+ bytes=(\d+)/);
+                if (ebM) exitBytes = parseInt(ebM[1], 10);
+                if (relay && exitBytes === 0) {
+                    console.log("[ARP] timeshift: relay writer died at birth"
+                                + " — zero bytes; returning to the direct"
+                                + " stream");
+                    var backTo = streamUrl;
+                    var wasShifted = shifted;
+                    reset(true);
+                    active = false;
+                    _relayBirthDeathUrl = backTo;
+                    // Live sound only for a room that was audibly playing:
+                    // a parked or shifted listener chose silence, and a
+                    // writer's death is no licence to override them.
+                    if (backTo !== "" && !wasShifted && app.isPlaying())
+                        app.tsPlayLive(backTo);
+                    return true;
+                }
                 // A relayed LIVE listener loses their audio source when the
                 // writer stops (window cap after an hour, upstream restart):
                 // re-arm quietly — the player coasts on the server burst it

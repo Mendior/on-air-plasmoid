@@ -55,6 +55,10 @@ Usage: scripts/dev.sh <command>
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
   mutants   break the widget on purpose, one shipped bug at a time, and demand
             the gate goes red (scripts/mutants.py; slow — one full check per mutant)
+  bench     the offline ultrasonic rig from its own branch: plays the widget's
+            own stimulus through a simulated speaker and reads it with
+            calibrate.py's own detector, no sound and no hardware
+            (no argument lists the scripts; e.g. dev.sh bench sim_speaker)
   view      plasmoidviewer on package/ (quick preview without restarting plasmashell)
   restart   systemctl --user restart plasma-plasmashell (reloads the QML)
   doctor    is this machine running the code you think it is? (git vs repo vs
@@ -295,7 +299,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       if (cd "$REPO_DIR" && git ls-files \
             | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
             | grep -vE '\.(png|ogg)$' \
-            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails' -q 3); then
+            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi
@@ -424,6 +428,36 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
   mutants)
     shift
     exec python3 "$REPO_DIR/scripts/mutants.py" "$@"
+    ;;
+  bench)
+    # The offline ultrasonic bench lives on its own branch, not in main:
+    # main's tree goes to the public repo verbatim and into the shipped
+    # .plasmoid, and neither wants a simulation rig. That kept it safe and
+    # made it invisible — nobody ran it for two weeks because nobody
+    # remembered it existed. This is the remembering.
+    shift || true
+    BENCH_BRANCH="${BENCH_BRANCH:-origin/bench/ultra-sim-20260729}"
+    git -C "$REPO_DIR" rev-parse --verify --quiet "$BENCH_BRANCH^{commit}" >/dev/null \
+      || { echo "bench: $BENCH_BRANCH not found — run 'git fetch origin' first"; exit 1; }
+    BENCH_DIR="$(mktemp -d -t onair-bench-XXXXXX)"
+    trap 'rm -rf "$BENCH_DIR"' EXIT
+    git -C "$REPO_DIR" archive "$BENCH_BRANCH" bench | tar -x -C "$BENCH_DIR"
+    # The sims resolve calibrate.py as ../package/contents/ui/ from their own
+    # directory, so the checkout needs a package/ beside the bench/ folder.
+    # A symlink keeps the repo itself untouched — an unpacked bench/ inside
+    # the working tree would read as uncommitted work to doctor.
+    ln -sfn "$PKG" "$BENCH_DIR/package"
+    if [ $# -eq 0 ]; then
+      echo "offline bench unpacked from $BENCH_BRANCH"
+      sed -n '/^| Script/,/^$/p' "$BENCH_DIR/bench/README.md" 2>/dev/null || true
+      echo "run one:  scripts/dev.sh bench sim_speaker"
+      exit 0
+    fi
+    BENCH_SCRIPT="${1%.py}.py"
+    [ -f "$BENCH_DIR/bench/$BENCH_SCRIPT" ] \
+      || { echo "bench: no such script '$BENCH_SCRIPT' — try: $(cd "$BENCH_DIR/bench" && printf '%s ' sim_*.py)"; exit 1; }
+    shift
+    ( cd "$BENCH_DIR/bench" && python3 "$BENCH_SCRIPT" "$@" )
     ;;
   view)
     exec plasmoidviewer -a "$PKG"

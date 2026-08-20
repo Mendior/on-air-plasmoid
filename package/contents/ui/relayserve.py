@@ -121,11 +121,13 @@ def serve(sock: socket.socket) -> None:
         time.sleep(0.1)
         lead += 0.1
     idle = 0.0
+    sent = 0
     with open(buf_path, "rb") as f:
         while True:
             chunk = f.read(65536)
             if chunk:
                 sock.sendall(chunk)
+                sent += len(chunk)
                 idle = 0.0
                 continue
             time.sleep(IDLE_SLEEP)
@@ -134,6 +136,15 @@ def serve(sock: socket.socket) -> None:
                 os.stat(buf_path)
             except FileNotFoundError:
                 return               # the stop road took the buffer
+            # A body that never began is not a body worth waiting on: a
+            # writer that dies at birth (a container ffmpeg refuses to
+            # mux, issue #11) leaves a zero-byte file behind, and the
+            # player sat on 200-OK headers with no bytes for as long as
+            # the idle cap allowed — silence with a playing icon. Ten
+            # seconds is far past any lead-in; close instead, so the
+            # player gets an honest end and the engine's recovery wakes.
+            if sent == 0 and idle > 10.0:
+                return               # writer never wrote a byte
             if idle > 900.0:
                 return               # writer long dead, nobody re-armed
 
