@@ -197,6 +197,64 @@ def test_the_mute_button_asks_the_sink_instead_of_its_own_cache():
         "the cached flag is being flipped to choose the command again")
 
 
+def test_the_volume_slider_unmutes_with_an_absolute_zero_never_a_toggle():
+    """The neighbouring site wants the OPPOSITE command, and only the mute
+    button's site was guarded. Raising the volume must unmute — an
+    absolute 0 is always right there, while `toggle` would mute a sink
+    that was already playing on every second drag. Bench mutant
+    07-sink-mute-absolute swaps exactly this and survived every run
+    since the bench existed; this is the test that kills it.
+    """
+    body = _function_body((UI / "main.qml").read_text(encoding="utf-8"),
+                          "setSinkMaster")
+    assert 'p > 0 ? " pactl set-sink-mute @DEFAULT_SINK@ 0 ' in body, (
+        "the volume path no longer unmutes with an absolute 0 on a "
+        "positive volume - either the unmute is gone (raising volume "
+        "leaves a muted sink silent) or it became a toggle (every second "
+        "drag mutes a playing sink)")
+    assert "set-sink-mute @DEFAULT_SINK@ toggle" not in body, (
+        "the volume path toggles the mute - right half the time, silence "
+        "the other half")
+
+
+def test_the_profile_bounce_restores_the_cards_own_a2dp_seat_first():
+    """On a multi-codec speaker every codec is its own profile, and the
+    generic a2dp-sink name is a REAL seat (the AAC one, measured on a
+    JBL Flip 7). Trying it before the captured profile always succeeded
+    and silently moved the speaker to AAC - the codec whose latency the
+    drift check cannot see through - so a user's SBC-XQ choice never
+    survived a bounce. The card's own A2DP profile comes back first;
+    only a card parked outside A2DP (off, headset) takes the generic
+    road.
+    """
+    body = _function_body((UI / "main.qml").read_text(encoding="utf-8"),
+                          "btProfileBounceShell")
+    own = body.find('case \\"$p\\" in a2dp*)')
+    generic = body.find('a2dp-sink >')
+    assert own != -1, (
+        "the bounce no longer restores the captured a2dp profile - a "
+        "multi-codec speaker lands on AAC on every kick")
+    assert generic != -1 and own < generic, (
+        "the generic a2dp-sink attempt runs before the captured profile "
+        "again - on a multi-codec card it always wins and the user's "
+        "codec choice is lost")
+
+
+def test_a_stream_the_rescue_relayed_once_arms_the_relay_at_start():
+    """The rescue needs six frozen seconds to be sure - an audible hiccup
+    on every start of the same station (issue #11's reporter measured it
+    on 2026.33). The verdict is remembered for the session: the rescue
+    records the stream, and the arm road consults the record next to the
+    codec test, so the second start goes straight through the relay.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "root._relayProven[src] = true;" in src, (
+        "the rescue no longer records the stream it relayed - every "
+        "start replays the six frozen seconds")
+    assert "tsOgg || root._relayProven[tsUrl] === true" in src, (
+        "the arm road no longer consults the rescue's session record")
+
+
 def test_the_url_file_ack_asks_for_the_title_at_once():
     """Writing the address must not cost a station its first title.
 
@@ -1009,3 +1067,73 @@ def test_a_parked_stations_row_resumes_instead_of_tearing_the_park_down():
     assert "_tsPaused && !timeshift.shifted" in stop_branch, (
         "the resume lost its guard - an audibly shifted row must keep "
         "meaning stop")
+
+
+def test_the_heal_commit_gate_is_the_tested_one_and_the_stopgap_keeps_the_lock():
+    """The permanent-write decision lives in HealLogic.commitVerdict, where
+    tst_heallogic pins it: uuid row or exact name on the station's own
+    NON-SHARED domain, everything else a session stopgap. main.qml once
+    made this call inline with a bare base-domain comparison, and a
+    contains-match on zeno.fm could rewrite a user's saved station into a
+    different tenant for good. This holds the wiring to the tested gate.
+
+    The stopgap branch must also KEEP the 10-minute lookup lock: deleting
+    it there let a flapping backup ride the search-and-notify ring with
+    no backoff at all. The lock's release moved to the user's own press
+    (refreshServer, userInitiated), where the fresh mandate actually is.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+
+    commit = src.split("function _healCommit()", 1)[1]
+    # The whole stopgap branch, up to where the permanent write begins -
+    # slicing at the first notify( once left a lock release AFTER the
+    # toast invisible to this test.
+    gate = commit.split("try {", 1)[0]
+    assert "HealLogic.commitVerdict(" in gate, (
+        "the permanent-write decision left the tested gate - an inline "
+        "base-domain comparison brought the zeno.fm rewrite back")
+    assert "delete _healTried" not in gate, (
+        "the stopgap releases the lookup lock again - a flapping backup "
+        "loops search-and-notify with no backoff")
+
+    refresh = src.split("function refreshServer(", 1)[1].split("\n    function ", 1)[0]
+    # The guard and the delete on ONE line: the same guard phrase exists
+    # elsewhere in refreshServer, and two separate substring checks once
+    # stayed green with the delete made unconditional.
+    assert "if (userInitiated !== false) delete _healTried[origHost];" in refresh, (
+        "the user's own press no longer releases the heal-lookup lock "
+        "guardedly - either the release is gone (a deliberate replay "
+        "knocks on the dead address for ten minutes) or its guard is "
+        "(every automated retry resets the backoff's own lock)")
+
+    # The candidate rows must carry the exact-name verdict into the
+    # ladder, or every legitimate own-domain repair demotes to a stopgap.
+    assert "exact: rowNorm === run.norm" in src, (
+        "the name-search rows lost their exact-name verdict")
+    assert src.count("!HealLogic.sharedBase(origBase)") >= 2, (
+        "a scoring site no longer excludes shared streaming hosts - "
+        "a landlord in common outranks the station's real name again "
+        "(both the list-station heal and the preview rescue score rows)")
+
+    # rank() hands back row objects; the preview rescue auditions bare
+    # urls. The day rank changed shape, this road silently fed
+    # "[object Object]" to the player and no test went red.
+    assert "ranked.slice(0, 4).map(function(c) { return c.url; })" in src, (
+        "the preview rescue consumes rank() rows as urls again")
+
+
+def test_the_standing_order_replays_a_url_not_a_row_number():
+    """Deleting a DIFFERENT station mid-backoff shifts lastPlay to 0, and
+    the retry timer once replayed whatever station had inherited that
+    row. _replayOrder resolves the ordered URL to its CURRENT row first,
+    and when no row and no orphan copy carries it, the order retires
+    instead of guessing.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = src.split("function _replayOrder()", 1)[1].split("\n    function ", 1)[0]
+    assert ".hostname === root._currentOrigUrl" in body, (
+        "_replayOrder trusts a row number again - a list edit mid-backoff "
+        "replays the wrong station")
+    assert "_wantsPlaying = false" in body, (
+        "an order whose station left the list no longer retires - the "
+        "next network edge replays an arbitrary row")

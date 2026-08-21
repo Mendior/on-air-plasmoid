@@ -31,6 +31,11 @@ PlasmaComponents3.ItemDelegate {
     // width back to the station name. Settings can always reorder and
     // remove, so nothing becomes unreachable.
     readonly property bool rowEditing: Plasmoid.configuration.showReorderHandles !== false
+    // Three-quarter height on request (a Discuss ask, measured against the
+    // asker's own words: "about 3/4 of the current height would be enough").
+    // Most of the air in a row is padding, so the logo gives up less than
+    // the row does and stays recognisable.
+    readonly property bool compactRow: Plasmoid.configuration.compactRows === true
     readonly property bool isCurrent: lastPlay === listItem.targetIndex && (isPlaying() || root._casting)
     // Cast-only playback buffers on the device — the idle local player would
     // otherwise leave the current row on an eternal BusyIndicator.
@@ -44,7 +49,7 @@ PlasmaComponents3.ItemDelegate {
     width: ListView.view
            ? ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
            : 0
-    height: Kirigami.Units.gridUnit * 3
+    height: Kirigami.Units.gridUnit * (compactRow ? 2.25 : 3)
     padding: 0
     clip: false
     hoverEnabled: true
@@ -131,8 +136,8 @@ PlasmaComponents3.ItemDelegate {
 
         Item {
             id: leadingArea
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 2
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+            Layout.preferredWidth: Kirigami.Units.gridUnit * (listItem.compactRow ? 1.7 : 2)
+            Layout.preferredHeight: Layout.preferredWidth
             Layout.alignment: Qt.AlignVCenter
 
             Rectangle {

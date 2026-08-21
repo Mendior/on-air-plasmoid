@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heal commit gate goes back to trusting a shared streaming host as
+  the station's own domain, so a name-matched tenant of zeno.fm can
+  overwrite the user's saved station permanently.
+
+history:
+  Found in the 2026-08-20 search-and-heal review. The old gate compared
+  base domains and nothing else; on multi-tenant hosts the comparison is
+  a landlord check, not an identity check — measured from the catalog's
+  3000 most-voted stations, streamtheworld.com alone houses 171 distinct
+  stations and zeno.fm 163. A "Smooth Jazz Radio" living at the same
+  landlord as the user's dead "Jazz" scored contains+sameBase and walked
+  through the permanent-write door; the notification then claimed the
+  user's station had moved. This mutant removes the landlord refusal.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      if (sharedBase(oldBase)) return "stopgap";
+
+replace:
+      if (false) return "stopgap";
+
+expect:
+  Killed by tst_heallogic.qml
+  test_the_commit_gate_demands_identity_not_similarity: the zeno.fm
+  exact-name case must answer "stopgap". Line-neutral.

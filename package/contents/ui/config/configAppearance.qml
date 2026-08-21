@@ -38,6 +38,7 @@ KCM.SimpleKCM {
     property alias cfg_showSearchRow: searchRowCheck.checked
     property alias cfg_showDiscoveryRow: discoveryRowCheck.checked
     property alias cfg_showReorderHandles: reorderCheck.checked
+    property alias cfg_compactRows: compactRowsCheck.checked
     property alias cfg_showStationsTab: stationsTabCheck.checked
     property alias cfg_showPlayingTab: playingTabCheck.checked
     property alias cfg_rememberLastTab: rememberTabCheck.checked
@@ -131,6 +132,11 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: reorderCheck
             text: i18n("Reorder and remove controls on each row")
+        }
+        QQC2.CheckBox {
+            id: compactRowsCheck
+            Kirigami.FormData.label: i18n("Layout:")
+            text: i18n("Compact rows (three-quarter height)")
         }
 
         Item {

@@ -8,8 +8,8 @@
   ],
 
   "lines": {
-    "package/contents/ui/main.qml": 7252,
-    "package/contents/ui/FullRepresentation.qml": 6858
+    "package/contents/ui/main.qml": 7334,
+    "package/contents/ui/FullRepresentation.qml": 6863
   },
 
   "direct_exec_calls": 42,

@@ -613,6 +613,11 @@ PlasmoidItem {
         // BOTH the configured URL and the auto-bitrate resolved URL (which is what
         // playMusic.source actually holds during playback).
         const origHost = (station.hostname || "").toString();
+        // A deliberate press is a fresh mandate: release this station's
+        // 10-minute heal-lookup lock so the ladder may run again at once.
+        // The commit's stopgap branch no longer releases it (a flapping
+        // backup rode that into a notify loop) — the hand does, here.
+        if (userInitiated !== false) delete _healTried[origHost];
         const resolved = _bitrateCache[origHost] !== undefined ? _bitrateCache[origHost] : origHost;
         // While casting, playMusic is idle — compare against the origin URL of
         // what's on the device so a second click on the casting row stops it.
@@ -918,7 +923,8 @@ PlasmoidItem {
                         if (fmt === "playlist") continue;
                         var score = HealLogic.scoreRow(_healNormName(r.name), norm,
                                                        origBase !== ""
-                                                       && _baseDomain(_hostOf(cand)) === origBase);
+                                                       && _baseDomain(_hostOf(cand)) === origBase
+                                                       && !HealLogic.sharedBase(origBase));
                         if (score < 0) continue;
                         var br = parseInt(r.bitrate) || 0;
                         if (br >= 8000) br = Math.round(br / 1000);
@@ -931,7 +937,8 @@ PlasmoidItem {
             // Same audition budget as the list-station heal: the twin is
             // almost always near the top, and a preview must not spend a
             // minute chewing through a famous name's thirty entries.
-            root._previewRescueCands = ranked.slice(0, 4);
+            // rank hands back row OBJECTS; this road auditions bare urls.
+            root._previewRescueCands = ranked.slice(0, 4).map(function(c) { return c.url; });
             _previewRescueAudition(pvKey, pvName, pvIcon, pvSeq);
         });
     }
@@ -2743,7 +2750,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.33");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -2951,10 +2958,11 @@ PlasmoidItem {
     // the solo speaker kick and the sync watchdog's join kick — and each used
     // to carry its own copy of this shell. NEVER a disconnect: measured on a
     // JBL Flip 7, a software disconnect can destroy the pairing outright, so
-    // the profile is cycled instead and the previous one restored if both
-    // standard A2DP spellings refuse. Ships without a sentinel or a sequence
-    // suffix — those belong to the caller's own round-trip — and the caller
-    // must be in the C locale, because the awk reads pactl's English labels.
+    // the profile is cycled instead — the card's own A2DP profile first,
+    // the standard spellings only when it was parked outside A2DP. Ships
+    // without a sentinel or a sequence suffix — those belong to the
+    // caller's own round-trip — and the caller must be in the C locale,
+    // because the awk reads pactl's English labels.
     function btProfileBounceShell(mac) {
         // Both callers validate upstream today, but this value lands in an
         // awk pattern AND an unquoted shell word — a root-of-trust seat.
@@ -2963,13 +2971,20 @@ PlasmoidItem {
         // fragment harmless in any command position a caller splices it.
         if (!_btValidMac(mac)) return "true";
         const macU = String(mac).replace(/:/g, "_");
+        // The card's OWN A2DP profile comes back first. On a multi-codec
+        // speaker every codec is its own profile (measured on a JBL Flip
+        // 7: a2dp-sink is the AAC seat, a2dp-sink-sbc_xq its neighbour),
+        // so trying the generic name first always succeeded and silently
+        // moved the speaker to AAC — the codec whose latency the drift
+        // check cannot see through. A card parked on a non-A2DP profile
+        // (off, headset) takes the generic road as before.
         return "c=bluez_card." + macU
              + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + macU + "/{f=1}"
              + " f && /Active Profile:/{print $3; exit}');"
              + " timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
-             + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
-             + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
-             + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true";
+             + " case \"$p\" in a2dp*) timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1;; *) false;; esac"
+             + " || timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
+             + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1; true";
     }
 
     function exec(cmd) {
@@ -3707,8 +3722,8 @@ PlasmoidItem {
                 // sync watchdog dropped — measured on a real JBL Flip 7,
                 // a software disconnect can DESTROY the pairing outright.
                 // The bounce renegotiates A2DP; the link stays untouched,
-                // and the previous profile is restored if both standard
-                // names refuse, so the card is never left dead on "off".
+                // and the card's own A2DP profile comes back first, so a
+                // multi-codec speaker keeps the codec it was on.
                 executable.exec(": BT_SOLOKICK; export LC_ALL=C LANGUAGE=C; "
                     + btProfileBounceShell(mac)
                     + " # " + (++root._execSeq));
@@ -3963,13 +3978,38 @@ PlasmoidItem {
     // full road (refreshServer: fresh unwrap, fresh bitrate pass); an
     // orphaned order replays its own saved copy — automated=true, so a
     // ringing alarm's volume floor and fallback tone survive the restart.
+    // The order is about a URL, never a row number: deleting a DIFFERENT
+    // station mid-backoff shifted lastPlay to 0, and the retry replayed
+    // whatever station had inherited that row.
     function _replayOrder() {
-        if (lastPlay >= 0 && lastPlay < stationsModel.count) {
+        if (root._currentOrigUrl !== "") {
+            for (var k = 0; k < stationsModel.count; k++) {
+                if (stationsModel.get(k).hostname === root._currentOrigUrl) {
+                    if (lastPlay !== k) lastPlay = k;
+                    refreshServer(k, false);
+                    return;
+                }
+            }
+        }
+        // A row still standing at the ordered index under the SAME name
+        // is the ordered station with a hand-edited address — the edit
+        // IS the repair, take it. A row that merely inherited the index
+        // carries another name and stays refused below.
+        if (lastPlay >= 0 && lastPlay < stationsModel.count
+            && root.currentStation !== ""
+            && (stationsModel.get(lastPlay).name || "") === root.currentStation) {
             refreshServer(lastPlay, false);
             return;
         }
         var st = _orderSubject();
-        if (!st) return;
+        // _orderSubject's row branch trusts lastPlay blindly; the loop
+        // above already proved no row carries the ordered URL, so only
+        // the orphan copy (checked by URL inside _orderSubject) may play.
+        if (!st || (st.hostname || "").toString() !== root._currentOrigUrl) {
+            root._wantsPlaying = false;
+            healRetryTimer.stop();
+            return;
+        }
         root.currentStationFavicon = st.favicon || "";
         _playStation({ "name": st.name, "hostname": st.hostname,
                        "favicon": st.favicon || "", "active": true }, false, true);
@@ -3983,8 +4023,14 @@ PlasmoidItem {
         _healPendingUrl = "";
         _healOrigUrl = "";
         _healByUuid = false;
+        _healPendingExact = false;
         _healPendingFavicon = "";
     }
+
+    // Whether the auditioned name-search candidate carried the EXACT
+    // normalized saved name — the commit gate's bar for a permanent
+    // write on the station's own domain (HealLogic.commitVerdict).
+    property bool _healPendingExact: false
 
     // The favicon the byuuid heal answer carried, gated — travels with the
     // audition so a successful commit can refresh a stale logo alongside
@@ -4099,18 +4145,24 @@ PlasmoidItem {
                         if (!cand || !/^https?:\/\//i.test(cand) || cand === run.orig) continue;
                         var fmt = _streamFormat(cand);
                         if (fmt === "playlist") continue;
-                        var score = HealLogic.scoreRow(_healNormName(r.name), run.norm,
+                        var rowNorm = _healNormName(r.name);
+                        // A shared streaming host is a landlord, not a home:
+                        // its bonus would rank a stranger's exact-domain
+                        // coincidence above the station's real name match.
+                        var score = HealLogic.scoreRow(rowNorm, run.norm,
                                                        origBase !== ""
-                                                       && _baseDomain(_hostOf(cand)) === origBase);
+                                                       && _baseDomain(_hostOf(cand)) === origBase
+                                                       && !HealLogic.sharedBase(origBase));
                         if (score < 0) continue;
                         var br = parseInt(r.bitrate) || 0;
                         if (br >= 8000) br = Math.round(br / 1000);
                         rows.push({ url: cand, score: score, bitrate: br,
-                                    hls: fmt === "hls" });
+                                    hls: fmt === "hls", exact: rowNorm === run.norm });
                     }
                     var ranked = HealLogic.rank(rows);
                     for (var j = 0; j < ranked.length && run.candidates.length < 4; j++)
-                        run.candidates.push({ url: ranked[j], byUuid: false });
+                        run.candidates.push({ url: ranked[j].url, byUuid: false,
+                                              exact: ranked[j].exact === true });
                 } catch (e) {
                     console.log("[ARP] heal parse: " + e);
                 }
@@ -4146,6 +4198,7 @@ PlasmoidItem {
             root._healOrigUrl = run.orig;
             root._healPendingUrl = playUrl;
             root._healByUuid = next.byUuid === true;
+            root._healPendingExact = next.exact === true;
             root._healPendingFavicon = (next.favicon || "").toString();
             root._currentOrigUrl = run.orig;
             root._currentUnwrappedUrl = playUrl;
@@ -4191,6 +4244,7 @@ PlasmoidItem {
         var newUrl = _healPendingUrl;
         var oldUrl = _healOrigUrl;
         var byUuid = _healByUuid;
+        var exact = _healPendingExact;
         var newFav = _healPendingFavicon;
         _healClearPending();
         // The generation found its door — the ladder and the backoff die.
@@ -4198,14 +4252,16 @@ PlasmoidItem {
         root._healRetryAttempts = 0;
         healRetryTimer.stop();
         var oldBase = _baseDomain(_hostOf(oldUrl));
-        // A uuid-resolved address IS the station, by the directory's own
-        // identity — the cross-domain caution below exists only for
-        // name-guessed candidates from a publicly writable catalog.
-        if (!byUuid && (oldBase === "" || _baseDomain(_hostOf(newUrl)) !== oldBase)) {
-            // The audition WORKED — release the per-station retry lock so a
-            // stop-and-replay inside the lock window heals again right away
-            // (the saved address is still the dead one, on purpose).
-            delete _healTried[oldUrl];
+        // May this address overwrite the saved one? Identity, not
+        // similarity — HealLogic.commitVerdict holds the bar (uuid row,
+        // or the exact saved name on the station's own non-shared
+        // domain). Everything else plays as a session stopgap. The
+        // lookup lock deliberately STAYS: a stopgap that buffers and
+        // then dies used to erase it and ride the search-and-notify
+        // ring with no backoff at all — a user's own replay releases
+        // the lock in refreshServer instead.
+        if (HealLogic.commitVerdict(byUuid, oldBase,
+                                    _baseDomain(_hostOf(newUrl)), exact) !== "permanent") {
             notify(i18n("Playing from a backup address"),
                    i18n("The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."),
                    "network-connect");
@@ -4790,15 +4846,24 @@ PlasmoidItem {
         var tsOgg = tsFam === "flac" || tsFam === "ogg" || tsFam === "opus"
                  || tsSaid.indexOf("ogg") !== -1 || tsSaid.indexOf("flac") !== -1
                  || tsSaid.indexOf("opus") !== -1 || tsSaid.indexOf("vorbis") !== -1;
-        if (tsLocal && tsOgg) {
+        if (tsLocal && (tsOgg || root._relayProven[tsUrl] === true)) {
             if (timeshift.relay && timeshift.active && timeshift.streamUrl === tsUrl
                 && (playMusic.source.toString() === timeshift.relayUrl || !timeshift.serveUp)) {
                 // This very stream is already relayed, or its tap is still
                 // warming up. Tearing that down to rebuild the same thing —
                 // on every retry-ladder knock — was the churn behind "plays
                 // five seconds, goes quiet, plays again": keep drinking.
-            } else {
-                timeshift.armRelay(tsUrl, station.name || "", Date.now(), tsOgg);
+            } else if (!timeshift.armRelay(tsUrl, station.name || "", Date.now(), tsOgg)) {
+                // A refused arm (this stream's writer died at birth once
+                // already) returns BEFORE armCommon's teardown — the
+                // previous station's writer would keep copying a stream
+                // nobody plays, and a later pause would park into ITS
+                // buffer. The plain road takes over where one exists: a
+                // proven mp3 stream keeps the pause buffer it always had,
+                // an Ogg-family stream has no direct road and plays live
+                // with nothing armed.
+                if (!tsOgg) timeshift.armForStation(tsUrl, station.name || "", Date.now());
+                else timeshift.disarm();
             }
         } else if (tsLocal && root._previewUrl === "") {
             if (timeshift.active && timeshift.streamUrl === tsUrl) {
@@ -6833,6 +6898,17 @@ PlasmoidItem {
     // for StalledMedia; neither fires, and the listener gets silence with
     // a playing icon. This timer looks at the one witness that cannot lie
     // — the position — and hands the stream to the relay once.
+    // Streams the rescue below had to hand to the relay this session —
+    // the address gave no warning (no Ogg extension, no codec on file),
+    // but the freeze was real. Next start of the same stream arms the
+    // relay at once instead of replaying the six frozen seconds the
+    // rescue needs to be sure (the brief hiccup issue #11's reporter
+    // measured the day after the relay fix shipped — a version number
+    // here would be rewritten by every release bump). Session-scoped
+    // on purpose: written to the
+    // config it would outlive the backend quirk that caused it.
+    property var _relayProven: ({})
+
     Timer {
         id: relayRescue
         running: false
@@ -6850,7 +6926,13 @@ PlasmoidItem {
             if (!TimeshiftLogic.canTimeshift(src)) return;
             console.log("[ARP] position frozen at " + playMusic.position
                         + " ms with a full buffer — relaying");
-            timeshift.armRelay(src, root.currentStation, Date.now());
+            root._relayProven[src] = true;
+            // The arm road reads the CONFIGURED address; src has been
+            // through QUrl once and can differ on an exotic URL. Both
+            // spellings carry the verdict.
+            if (root._currentOrigUrl !== "") root._relayProven[root._currentOrigUrl] = true;
+            timeshift.armRelay(src, root.currentStation, Date.now(),
+                               TimeshiftLogic.relayExtension(src) === "ogg");
         }
     }
 

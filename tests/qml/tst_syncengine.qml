@@ -89,9 +89,9 @@ Item {
                      + "; p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + macU + "/{f=1}"
                      + " f && /Active Profile:/{print $3; exit}');"
                      + " timeout 5 pactl set-card-profile \"$c\" off >/dev/null 2>&1; sleep 1;"
-                     + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
-                     + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1"
-                     + " || { [ -n \"$p\" ] && timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1; }; true";
+                     + " case \"$p\" in a2dp*) timeout 5 pactl set-card-profile \"$c\" \"$p\" >/dev/null 2>&1;; *) false;; esac"
+                     + " || timeout 5 pactl set-card-profile \"$c\" a2dp-sink >/dev/null 2>&1"
+                     + " || timeout 5 pactl set-card-profile \"$c\" a2dp_sink >/dev/null 2>&1; true";
             }
             function notify(t, x, i) {
                 if (notifyThrows) throw new Error("the messenger died mid-sentence");

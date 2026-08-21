@@ -122,8 +122,23 @@ KCM.ScrollViewKCM {
         serverDialog.visible = true;
     }
 
+    property int _apiServerIdx: 0
+
+    // Every batch starts on "all" — say so to the WALK too, or a stale
+    // index from the last batch desyncs it and the first retry can land
+    // back on the very door that just timed out.
+    function _apiServerReset() {
+        _apiServerIdx = 0;
+        _apiServer = _apiServers[0];
+    }
+
     function _pickApiServer() {
-        _apiServer = _apiServers[Math.floor(Math.random() * _apiServers.length)];
+        // Walk the rungs, never draw with replacement: a draw could hand
+        // the retry the very mirror it just timed out on and eat both
+        // retries on one dead door (configSearch walks for the same
+        // reason). Index 0 is "all", matching the deterministic start.
+        _apiServerIdx = (_apiServerIdx + 1) % _apiServers.length;
+        _apiServer = _apiServers[_apiServerIdx];
     }
 
     // QML XHR ignores xhr.timeout/ontimeout entirely (Qt quirk) — the logo
@@ -203,7 +218,7 @@ KCM.ScrollViewKCM {
             return;
         }
         _logoFetching = true;
-        _apiServer = "all";
+        _apiServerReset();
         _fetchNextLogo();
     }
 
@@ -247,7 +262,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.33");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -298,7 +313,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.33");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -485,7 +500,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         var keptPrefix = "";
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.33)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.34)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
@@ -677,7 +692,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.33");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             // A "logo" that streams past 512 KiB is not a logo — cap the
@@ -740,7 +755,7 @@ KCM.ScrollViewKCM {
             return;
         }
         _logoFetching = true;
-        _apiServer = "all";
+        _apiServerReset();
         _fetchNextLogo();
     }
 
@@ -1069,7 +1084,7 @@ KCM.ScrollViewKCM {
                                 "hostname": itemObject.hostname }];
                 _resetLogoCounters();
                 _logoFetching = true;
-                _apiServer = "all";
+                _apiServerReset();
                 _fetchNextLogo();
             }
         }

@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stopgap branch goes back to erasing the 10-minute lookup lock, so
+  a backup address that buffers and then dies rides the search-and-
+  notify ring with no backoff at all.
+
+history:
+  The lock erasure was written in good faith — "the audition WORKED, let
+  a stop-and-replay heal again right away" — and the 2026-08-20 review
+  showed its other face: a flapping cross-domain backup re-entered the
+  ladder seconds after every death, each round with a fresh notification,
+  and the exponential backoff never engaged because the commit kept
+  resetting the very lock the backoff leaned on. The user's own press
+  releases the lock in refreshServer now; the commit never does. This
+  mutant puts the erasure back.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (HealLogic.commitVerdict(byUuid, oldBase,
+                                      _baseDomain(_hostOf(newUrl)), exact) !== "permanent") {
+
+replace:
+          if (HealLogic.commitVerdict(byUuid, oldBase,
+              _baseDomain(_hostOf(newUrl)), exact) !== "permanent") { delete _healTried[oldUrl];
+
+expect:
+  Killed by test_invariants.py
+  test_the_heal_commit_gate_is_the_tested_one_and_the_stopgap_keeps_the_lock:
+  "delete _healTried" reappears inside the gate's stopgap stretch.
+  Line-neutral — main.qml sits under the line ratchet, and a growing
+  mutant would be "killed" by the size lock instead of the real guard.

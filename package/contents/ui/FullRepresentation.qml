@@ -174,7 +174,7 @@ PlasmaExtras.Representation {
         return root._playingStationBitrate > 0 ? root._playingStationBitrate : 0
     }
 
-    // ── Global search: radio-browser.info catalog (~50,000 stations) ────
+    // ── Global search: radio-browser.info catalog (62,726 stations on 2026-08-20) ─
     // Type a country name ("Finland") → the country's most popular stations;
     // any other text → search by name. Results appear at the end of the list.
     property bool webSearching: false
@@ -579,6 +579,8 @@ PlasmaExtras.Representation {
                 fullRepresentation._countryMapApiFolded =
                     SearchLogic.countryMapFromApi(JSON.parse(xhr.responseText))
             } catch (e) {
+                // A 200 with a broken body retries like a failed fetch.
+                fullRepresentation._countryListAsked = false
                 console.log("[ARP] country list parse: " + e)
             }
         })
@@ -1694,8 +1696,11 @@ PlasmaExtras.Representation {
                                 // A cast preview leaves the local player idle
                                 // — the row must still show its stop state.
                                 readonly property bool isPreviewing: root._previewUrl === model.url && (isPlaying() || root._casting)
+                                // One list, one density: these rows sit in the
+                                // saved stations' own footer.
+                                readonly property bool compactRow: Plasmoid.configuration.compactRows === true
                                 width: parent.width
-                                height: Kirigami.Units.gridUnit * 3
+                                height: Kirigami.Units.gridUnit * (compactRow ? 2.25 : 3)
 
                                 // Keyboard + screen-reader access — the row is otherwise
                                 // reachable only with a pointer (TapHandler).
@@ -1780,7 +1785,7 @@ PlasmaExtras.Representation {
 
                                         Rectangle {
                                             anchors.verticalCenter: parent.verticalCenter
-                                            width: Kirigami.Units.gridUnit * 2
+                                            width: Kirigami.Units.gridUnit * (webItem.compactRow ? 1.7 : 2)
                                             height: width
                                             radius: width * 0.32
                                             color: Qt.alpha(root.accentTeal, 0.15)

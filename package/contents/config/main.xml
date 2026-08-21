@@ -309,6 +309,10 @@
             <label>Show the drag handle and the remove button on each station row in the widget (Settings can always reorder and remove)</label>
             <default>true</default>
         </entry>
+        <entry name="compactRows" type="bool">
+            <label>Station rows at three-quarter height, smaller logos included — a long list without the scroll</label>
+            <default>false</default>
+        </entry>
         <entry name="saveOnBattery" type="bool">
             <label>Go easy on the battery when the laptop is unplugged</label>
             <default>true</default>

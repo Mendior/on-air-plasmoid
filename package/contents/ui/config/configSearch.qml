@@ -20,7 +20,12 @@ import "../FaviconLogic.js" as FaviconLogic
 KCM.ScrollViewKCM {
     id: root
 
-    property var items: ["de1"]
+    // Mirror rungs the retry walk climbs. Seeded with the mirrors that
+    // answer today plus "all" — the directory's own round-robin — as the
+    // last resort, so a day when /json/servers lists a single dead name
+    // (it has listed exactly one server before) cannot strand all three
+    // retries on it. discoverServers MERGES into this, never replaces.
+    property var items: ["de2", "de1", "all"]
     property string server: "de1"
     property string cfg_servers: plasmoid.configuration.servers
 
@@ -28,7 +33,10 @@ KCM.ScrollViewKCM {
     property int offset: 0
     property string currentUrl
     property int stat: 1
-    property bool isNoSearch: false
+    // true = the DEFAULT list (or nothing yet) is on screen. Starting
+    // false left "Clear Results" enabled in the window before the first
+    // load, promising a clear with nothing to clear.
+    property bool isNoSearch: true
     property int _retryCount: 0
     property int _maxRetries: 3
     property var _activeXhr: null
@@ -119,7 +127,7 @@ KCM.ScrollViewKCM {
             _clearXhrTimeout(guard)
             const finish = () => {
                 if (items.length === 0)
-                    items = ["de1"]
+                    items = ["de2", "de1", "all"]
                 getServer()
                 getStations()
             }
@@ -135,6 +143,12 @@ KCM.ScrollViewKCM {
                             names.push(m[1])
                         }
                     }
+                    // Freshly discovered names lead, the seeds follow as
+                    // extra rungs, "all" closes the walk: the day this
+                    // list held one name and that name died, every retry
+                    // knocked on the same door while de2 answered fine.
+                    for (const known of ["de2", "de1", "all"])
+                        if (!seen[known]) { seen[known] = true; names.push(known) }
                     if (names.length > 0)
                         items = names
                 } catch(e) {}
@@ -146,7 +160,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.33")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.34")
     }
 
     function getStations(by, val) {
@@ -737,7 +751,10 @@ KCM.ScrollViewKCM {
             QQC2.Button {
                 text: i18n("Clear Results")
                 icon.name: "edit-clear-all"
-                enabled: search.text !== ""
+                // The LIST's state decides, not the dialog field: clearing
+                // the field by hand (no Enter) left results showing with
+                // this button greyed out — no road back to the default list.
+                enabled: search.text !== "" || !root.isNoSearch
                 onClicked: {
                     // The row being auditioned is about to vanish from the
                     // list — a preview nobody can see (or stop) must not
