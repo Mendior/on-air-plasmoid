@@ -25,6 +25,12 @@ test. Fix the cause, not the check.
   must match the new version (the lint gate fails the release if forgotten).
 - If UI strings changed: `scripts/dev.sh i18n` and commit the updated
   `po/` catalogs.
+- `packaging/aur/PKGBUILD` → `pkgver`, then `updpkgsums` in that directory.
+  This one is corrected by nothing else: the lint gate holds the User-Agent
+  strings to metadata.json and the package filename is derived from it, so a
+  bump fixes every other version site by itself. The PKGBUILD sat five
+  releases behind before anyone noticed. Its checksum pins the tag tarball,
+  so it has to come AFTER the tag exists — the last step, not the first.
 
 ## 3. Real-session test
 
