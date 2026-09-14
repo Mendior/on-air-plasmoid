@@ -153,6 +153,32 @@ TestCase {
 
     // ── Slice 2: subscriptions and OPML, driven through the same mock ────
 
+    function test_a_subscription_twin_over_https_is_one_show() {
+        // http/https, a default port, a trailing slash — the same feed spelled
+        // three ways used to be three subscriptions refreshing three times.
+        var e = makeEngine();
+        verify(e.addPodcastSub("Show A", "Author", "", "http://a.example/feed"));
+        verify(e.isPodcastSubscribed("https://a.example/feed/"));
+        verify(e.isPodcastSubscribed("HTTP://A.EXAMPLE:80/feed"));
+        compare(e.addPodcastSub("Show A again", "", "", "https://a.example/feed/"), false);
+        compare(JSON.parse(e.cfg.podcastSubs).length, 1);
+        e.destroy();
+    }
+
+    function test_a_twin_spelling_can_also_unsubscribe() {
+        // The star reads isPodcastSubscribed and its click hands the SAME url
+        // to removePodcastSub. While the first matched feed keys and the second
+        // raw strings, a show found under its other spelling showed a lit star
+        // whose click did nothing — no row matched, and nothing said so.
+        var e = makeEngine();
+        verify(e.addPodcastSub("Show A", "Author", "", "http://a.example/feed"));
+        verify(e.isPodcastSubscribed("https://a.example/feed/"));
+        e.removePodcastSub("https://a.example/feed/");
+        compare(e.isPodcastSubscribed("http://a.example/feed"), false);
+        compare(e.subsModel.count, 0);
+        e.destroy();
+    }
+
     function test_subscriptions_survive_a_save_load_roundtrip() {
         var e = makeEngine({ podcastSubs: "[]" });
         verify(e.addPodcastSub("Show A", "Author", "", "https://a.example/feed"));
@@ -210,11 +236,30 @@ TestCase {
 
     // ── Slice 3a: the download pipeline through the same mock ────────────
 
+    function test_a_failed_download_frees_the_slot_and_names_the_reason() {
+        // A curl that came back without __POD_OK__ used to throw on the
+        // failure branch (it read a stderr nothing declared) before the slot
+        // was cleared — one 404 and no episode downloaded again until the
+        // widget restarted. The handler must finish, free the slot and tell.
+        var e = makeEngine();
+        e.app._podUrlFile = "/run/x/url";
+        e.app._sanitizeDeviceName = function(s) { return s; };
+        e.podcastEpisodesTitle = "Show"; e.podcastEpisodesFor = "https://f.example/rss";
+        e.downloadEpisode("Ep 1", "https://h.example/e1.mp3", "g1");
+        verify(e.handleExec(": POD_URL;", "__POD_URL_OK__"));
+        verify(e._podDownloadKey !== "");
+        verify(e.handleExec(": POD_DL;", "", "curl: (22) The requested URL returned error: 404"));
+        compare(e._podDownloadKey, "");
+        compare(e._podDownloadTitle, "");
+        verify(e._podDownloadMeta === null);
+        verify(tc.notified.some(function(n) { return n.indexOf("Episode download failed") === 0; }));
+        e.destroy();
+    }
+
     function test_a_download_stages_url_then_curl_then_writes_the_ledger() {
         var e = makeEngine();
         e.app._podUrlFile = "/run/x/url";
         e.app._sanitizeDeviceName = function(s) { return s; };
-        e.app._podScanStart = function(f) { tc.execLog.push("SCAN:" + f); };
         e.podcastEpisodesTitle = "Show"; e.podcastEpisodesFor = "https://f.example/rss";
         e.downloadEpisode("Ep 1", "https://h.example/e1.mp3", "g1");
         compare(tc.execLog.length, 1);
@@ -227,7 +272,29 @@ TestCase {
         var fn = e.fileForKey(e.podcastFileName ? "" : "");  // ledger via key:
         verify(e.downloadMeta(Object.keys(e.downloads)[0]).show === "Show");
         compare(e._podDownloadKey, "");
-        verify(tc.execLog[2].indexOf("SCAN:") === 0);
+        // The landed file's silence scan is the engine's OWN call. Asserted on
+        // the command the engine emits, not on a stand-in hung off the mock:
+        // the mock used to carry a _podScanStart of its own, which is exactly
+        // what let `app._podScanStart` — a name app never had — pass here.
+        verify(tc.execLog[2].indexOf(": POD_SCAN;") === 0);
+        verify(tc.execLog[2].indexOf("Podcasts/") !== -1);
+        e.destroy();
+    }
+
+    function test_a_finished_download_lets_the_next_one_start() {
+        // The scan call sits between the finished download and the queue, so a
+        // throw there stopped the line: one episode landed and nothing after it
+        // moved until the widget restarted, with nothing on screen to say so.
+        var e = makeEngine();
+        e.app._podUrlFile = "/run/x/url";
+        e.podcastEpisodesTitle = "Show"; e.podcastEpisodesFor = "https://f.example/rss";
+        e.downloadEpisode("Ep 1", "https://h.example/e1.mp3", "g1");
+        e.downloadEpisode("Ep 2", "https://h.example/e2.mp3", "g2");
+        compare(e._podDlQueue.length, 1);           // second one waits its turn
+        verify(e.handleExec(": POD_URL;", "__POD_URL_OK__"));
+        verify(e.handleExec(": POD_DL;", "__POD_OK__"));
+        compare(e._podDlQueue.length, 0);           // …and the line moved
+        compare(e._podDownloadTitle, "Ep 2");       // …onto the waiting episode
         e.destroy();
     }
 

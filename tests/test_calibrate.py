@@ -1793,3 +1793,52 @@ def test_a_sink_whose_mute_cannot_be_read_is_left_alone(calib, monkeypatch):
                         types.SimpleNamespace(run=lambda *a, **k: _Result(),
                                               TimeoutExpired=subprocess.TimeoutExpired))
     assert calib["_mute_states"](["ghost"]) == {}
+
+
+def test_the_capability_probe_climbs_the_ladder_before_giving_up(calib):
+    """A chain that only passes the sweep at a louder rung is still a chain
+    that carries it. The probe used to ask at the quietest rung alone."""
+    heard = []
+
+    def fake_arrival(sink, wav, mic, seconds=3.2, trim=0.1):
+        heard.append(trim)
+        return 0.42 if trim >= 0.3 else None
+
+    saved = calib["_raw_arrival_ultra"]
+    calib["_raw_arrival_ultra"] = fake_arrival
+    try:
+        assert calib["_chain_carries_ultra"]("wired", "/tmp/x.wav", "mic") == 0.3
+        assert heard == [0.1, 0.3]
+        heard.clear()
+        calib["_raw_arrival_ultra"] = lambda *a, **k: None
+        assert calib["_chain_carries_ultra"]("wired", "/tmp/x.wav", "mic") is None
+    finally:
+        calib["_raw_arrival_ultra"] = saved
+
+
+def test_the_pair_measures_at_the_rung_the_probe_was_heard_at(calib):
+    """Admitting a desk and then measuring it at the wrong level is no favour.
+
+    The probe climbs until the sweep is heard, but the captures that follow
+    used to run at the quietest rung regardless. On a desk that only answers
+    from 0.3 up, every capture came back empty and the pair fell out below on
+    "fewer than two" — the refusal simply moved past the repeats the probe
+    exists to save."""
+    trims = []
+
+    def fake_arrival(sink, wav, mic, seconds=3.2, trim=0.1):
+        trims.append(trim)
+        if trim < 0.3:
+            return None
+        return 0.40 if sink == "wired" else 0.50
+
+    saved = calib["_raw_arrival_ultra"]
+    calib["_raw_arrival_ultra"] = fake_arrival
+    try:
+        lag = calib["_ultra_pair_lag"]("wired", "bt", "/tmp/x.wav", "mic")
+    finally:
+        calib["_raw_arrival_ultra"] = saved
+    assert lag is not None, "the pair gave up on a desk its own probe admitted"
+    assert round(lag) == 100
+    assert trims[:2] == [0.1, 0.3], "the probe no longer climbs"
+    assert set(trims[2:]) == {0.3}, "the captures ignored the rung that answered"

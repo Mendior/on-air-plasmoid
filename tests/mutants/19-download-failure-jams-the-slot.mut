@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The podcast engine's exec handler goes back to taking two arguments, so
+  the failure branch reads a name nothing declared and every failed
+  download throws before the slot is freed.
+
+history:
+  Found 2026-09-05 reading PodcastEngine.qml. handleExec(cmd, stdout) had
+  two parameters and its download-failure branch logged
+  (stderr || "").trim() — stderr was declared nowhere, not in the engine
+  and not on main.qml's root. In QML a bare undeclared name is a
+  ReferenceError, so a curl that came back without __POD_OK__ (a 404, a
+  dropped connection, a full disk) threw on the console.warn line and
+  never reached the lines that clear _podDownloadKey, _podDownloadTitle
+  and _podDownloadMeta. One failed transfer and no episode downloaded
+  again until the widget was restarted, with nothing on screen to say
+  why. The success path never touched stderr, which is how the tests
+  stayed green. This mutant puts the two-argument signature back.
+
+target:
+  package/contents/ui/PodcastEngine.qml
+
+find:
+      function handleExec(cmd, stdout, stderr) {
+
+replace:
+      function handleExec(cmd, stdout) {
+
+expect:
+  Killed by tests/qml/tst_podcastengine.qml
+  test_a_failed_download_frees_the_slot_and_names_the_reason: the
+  handler must return true on a failed POD_DL and leave the slot empty.
+  Line-neutral.

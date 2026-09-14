@@ -125,8 +125,13 @@ def test_every_named_expectation_exists():
     for m in _all(mod):
         for rel in re.findall(r"tests/[\w./-]+\.(?:py|qml)", m.expect):
             assert (ROOT / rel).is_file(), f"{m.name}: expect names missing {rel}"
-        for rel, fn in re.findall(r"(tests/[\w./-]+\.py)::(\w+)", m.expect):
+        for rel, fn in re.findall(r"(tests/[\w./-]+\.(?:py|qml))::(\w+)", m.expect):
             body = (ROOT / rel).read_text(encoding="utf-8")
-            assert f"def {fn}(" in body, (
+            # QML tests declare `function test_x()`, python ones `def test_x(`.
+            # The name check used to cover .py alone, so a mutant naming a QML
+            # killer had only its FILE verified — rename the test and the
+            # survivor report would point at nothing.
+            decl = f"def {fn}(" if rel.endswith(".py") else f"function {fn}("
+            assert decl in body, (
                 f"{m.name}: expect names {rel}::{fn}, which is not defined there"
             )

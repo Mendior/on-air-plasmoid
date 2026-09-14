@@ -16,6 +16,7 @@ import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
 import ".." as ARP
 import "../FaviconLogic.js" as FaviconLogic
+import "../SearchLogic.js" as SearchLogic
 
 KCM.ScrollViewKCM {
     id: root
@@ -133,24 +134,11 @@ KCM.ScrollViewKCM {
             }
             if (xhr.status === 200) {
                 try {
-                    const servers = JSON.parse(xhr.responseText)
-                    const seen = {}
-                    const names = []
-                    for (const s of servers) {
-                        const m = s.name.match(/^([a-z]+\d+)\.api\.radio-browser\.info$/)
-                        if (m && !seen[m[1]]) {
-                            seen[m[1]] = true
-                            names.push(m[1])
-                        }
-                    }
-                    // Freshly discovered names lead, the seeds follow as
-                    // extra rungs, "all" closes the walk: the day this
-                    // list held one name and that name died, every retry
-                    // knocked on the same door while de2 answered fine.
-                    for (const known of ["de2", "de1", "all"])
-                        if (!seen[known]) { seen[known] = true; names.push(known) }
-                    if (names.length > 0)
-                        items = names
+                    // Discovered names lead, the seeds follow, "all" closes
+                    // the walk — the same rungs the widget's own walk climbs
+                    // (SearchLogic.mirrorRungs carries the incident).
+                    items = SearchLogic.mirrorRungs(JSON.parse(xhr.responseText),
+                                                    ["de2", "de1"]).names
                 } catch(e) {}
             }
             finish()
@@ -160,7 +148,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35")
     }
 
     function getStations(by, val) {
@@ -320,8 +308,20 @@ KCM.ScrollViewKCM {
 
     Component.onCompleted: {
         stationsModel.clear()
-        const servers = JSON.parse(cfg_servers)
+        // A stored list that does not parse must not abort the page's own
+        // setup below it: the discovery walk and the counters still run, and
+        // the list reads as empty rather than the page as dead.
+        var servers = []
+        try { servers = JSON.parse(cfg_servers) || [] }
+        catch (e) { console.warn("[ARP] settings: stored station list is not valid JSON —", e) }
+        if (!Array.isArray(servers)) servers = []
         for (const srv of servers) {
+            // The model's role set locks on the FIRST append: a list whose
+            // first station predates saved codecs would drop the codec,
+            // bitrate and uuid of every station added from this page.
+            if (srv.codec === undefined) srv.codec = ""
+            if (srv.bitrate === undefined) srv.bitrate = 0
+            if (srv.uuid === undefined) srv.uuid = ""
             stationsModel.append(srv)
         }
         _lastSynced = cfg_servers
@@ -368,6 +368,15 @@ KCM.ScrollViewKCM {
                     const norm = (o) => {
                         const plain = JSON.parse(JSON.stringify(o))
                         delete plain.objectName
+                        // Both sides get the shape the model rows were given
+                        // on load. A station stored before codecs were saved
+                        // carries none of these three, its model row carries
+                        // all three, and comparing those two shapes made every
+                        // such row read as locally edited — so an external
+                        // deletion came back and a healed hostname was refused.
+                        if (plain.codec === undefined) plain.codec = ""
+                        if (plain.bitrate === undefined) plain.bitrate = 0
+                        if (plain.uuid === undefined) plain.uuid = ""
                         const keys = []
                         for (const k in plain)
                             if (plain[k] !== undefined) keys.push(k)
@@ -427,6 +436,7 @@ KCM.ScrollViewKCM {
             }
             QQC2.ComboBox {
                 id: by
+                Accessible.name: i18n("Search by")
                 textRole: "label"
                 valueRole: "value"
                 model: [
@@ -470,6 +480,7 @@ KCM.ScrollViewKCM {
 
             QQC2.Button {
                 icon.name: "search"
+                Accessible.name: i18n("Search")
                 enabled: search.text !== ""
                 onClicked: {
                     search.accepted()
@@ -575,6 +586,7 @@ KCM.ScrollViewKCM {
                     QQC2.ToolButton {
                         display: QQC2.AbstractButton.IconOnly
                         icon.name: "documentinfo"
+                        Accessible.name: i18n("Info")
                         QQC2.ToolTip.text: i18n("Info")
                         QQC2.ToolTip.visible: hovered
                         QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
@@ -591,6 +603,7 @@ KCM.ScrollViewKCM {
                     QQC2.ToolButton {
                         display: QQC2.AbstractButton.IconOnly
                         icon.name: listItem.model.added ? "checkbox" : "list-add"
+                        Accessible.name: i18n("Add Station")
                         // A row whose stream URL failed the http(s) gate has
                         // an empty url_resolved — there is nothing to add.
                         enabled: !listItem.model.added && listItem.model.url_resolved !== ""
@@ -605,21 +618,32 @@ KCM.ScrollViewKCM {
                             searchModel.setProperty(listItem.index,
                                                     "added", true)
                             const src = searchModel.get(listItem.index)
-                            // favicon and url_resolved were gated to http(s)
-                            // as the row entered the model (_appendRow).
-                            const itemObject = {
-                                "name": src.name,
-                                "hostname": src.url_resolved,
-                                "favicon": src.favicon || "",
-                                "country": src.country || "",
-                                "active": true
+                            // The popup's star refuses an address the list already
+                            // holds and keeps the directory's codec, bitrate and
+                            // uuid; this road appended a bare twin instead.
+                            var dupAt = -1
+                            for (var di = 0; di < stationsModel.count; di++)
+                                if (stationsModel.get(di).hostname === src.url_resolved) { dupAt = di; break }
+                            if (dupAt < 0) {
+                                // favicon and url_resolved were gated to http(s)
+                                // as the row entered the model (_appendRow).
+                                stationsModel.append({
+                                    "name": src.name,
+                                    "hostname": src.url_resolved,
+                                    "favicon": src.favicon || "",
+                                    "country": src.country || "",
+                                    "codec": String(src.codec || "").toLowerCase().substring(0, 16),
+                                    "bitrate": parseInt(src.bitrate) || 0,
+                                    "uuid": src.stationuuid || "",
+                                    "active": true
+                                })
+                                cfg_servers = JSON.stringify(getServersArray())
                             }
-                            stationsModel.append(itemObject)
-                            cfg_servers = JSON.stringify(getServersArray())
                             if (!message.visible) {
                                 message.positive = true
-                                message.text = i18n(
-                                    "Station is added. Click 'Apply' to save changes.")
+                                message.text = dupAt < 0
+                                    ? i18n("Station is added. Click 'Apply' to save changes.")
+                                    : i18n("Station is already in the list.")
                                 message.visible = true
                                 closetimer.restart()
                             }
@@ -631,6 +655,7 @@ KCM.ScrollViewKCM {
                                                             && testPlay.source == listItem.model.url_resolved
                         display: QQC2.AbstractButton.IconOnly
                         icon.name: playingThis ? "media-playback-stop" : "media-playback-start"
+                        Accessible.name: playingThis ? i18n("Stop") : i18n("Play")
                         // Per-ROW check — the old binding looked at the SELECTED
                         // row's lastcheckok, so buttons enabled/disabled wrongly.
                         // An empty url_resolved (failed the http(s) gate) is

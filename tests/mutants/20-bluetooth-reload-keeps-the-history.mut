@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A rebuild that reloads a Bluetooth loopback with unchanged lags goes back
+  to keeping the drift history and letting the first probe after it count,
+  so the transport's re-roll is filed as drift.
+
+history:
+  Seen live on the work machine 2026-08-13. The room parked at 05:35,
+  woke at 07:16:31 with the same lags it slept with, and the drift
+  bookkeeping was left untouched because the schedule had not changed.
+  The first probe after the wake read 47 ms; the settle tick 104 s later
+  read 8. The 47 was a Bluetooth buffer that had just been re-rolled by
+  the reload, and it went into the fold's history as if the room had
+  drifted. The reset was gated on blChanged since 2026-08-02 under the
+  rule "same lags out, same room after", which is true of a wired group
+  and false whenever a bluez loopback goes out. This mutant puts that
+  gate back.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          if (blChanged || btReroll) {
+
+replace:
+          if (blChanged) {
+
+expect:
+  Killed by tests/qml/tst_syncengine.qml
+  test_a_rebuild_with_a_bluetooth_member_spends_the_next_probe_even_when_nothing_changed
+  and test_the_build_itself_arms_the_spend_for_a_bluetooth_group.
+  Line-neutral.

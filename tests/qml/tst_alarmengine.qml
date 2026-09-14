@@ -104,6 +104,23 @@ TestCase {
         e.destroy(); e2.destroy();
     }
 
+    function test_a_healed_feed_moves_its_podcast_alarm() {
+        // "The newest episode of this show" names the show by feed address.
+        // When the podcast engine heals a feed to a new address, an alarm
+        // still pointing at the old one would search a feed that stopped
+        // existing and ring silence.
+        var e = makeEngine();
+        e.addAlarm("Show", "podcast:https://old.example/rss", "", 7, 30, "daily", undefined, 55, true, "");
+        e.addAlarm("Radio", "https://s.example/stream", "", 8, 0, "daily", undefined, 40, false, "");
+        verify(e.retargetPodcastFeed("https://old.example/rss", "https://new.example/rss"));
+        compare(e.alarms[0].url, "podcast:https://new.example/rss");
+        compare(e.alarms[1].url, "https://s.example/stream");
+        verify(JSON.parse(e.cfg.alarms)[0].url === "podcast:https://new.example/rss");
+        // A feed no alarm names is not a change and must not rewrite the file.
+        verify(!e.retargetPodcastFeed("https://nobody.example/rss", "https://x.example/rss"));
+        e.destroy();
+    }
+
     function test_remove_saves_and_rearms() {
         var e = makeEngine();
         e.addAlarm("Radio", "https://s.example/stream", "", 7, 30, "once", 2, 40, false, "");

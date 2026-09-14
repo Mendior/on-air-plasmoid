@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026.35
+
+- **The widget stops starting on its own.** Four separate roads could put sound
+  in an empty room, and all are closed: a plasmashell restart replayed the last
+  media-key press from before it, so a fresh session came up playing; a station
+  paused on the Ogg/FLAC road woke about an hour later when its local buffer
+  reached the end of its window, and a late failure there did the same; a pause
+  made with the widget's own button could be mistaken for a Bluetooth speaker's
+  power-off farewell and undone; and Stop in an episode's last seconds started
+  the next one. Reported on GitHub, thank you.
+- **Track titles return on Ogg and FLAC stations.** The widget remembers a
+  station that answers six polls with nothing as one that sends no titles — but
+  it filed that memory under the address the audio arrives on, and those
+  stations play through a small local relay, so it never lifted. It belongs to
+  the station now, and it expires. An artist is also read from the same block as
+  its own title, so a title-only track stops borrowing the previous name.
+- **Podcasts.** One finished download used to stall the queue until a restart,
+  and the landed episode never got the scan behind skip-silence and chapters. A
+  show met again under its other spelling — http against https, a trailing slash
+  — showed a lit star whose click did nothing, so it could not be unsubscribed.
+  An episode handed back from a cast device came home named after the widget,
+  without its show, its speed or its place in the queue.
+- **Casting reports a receiver that never started** instead of believing it.
+- **The station list keeps what other windows do to it.** With the settings
+  window open, a station stored before the widget kept codecs read as freshly
+  edited, so a star from the popup, a healed address or a deletion elsewhere was
+  discarded on Apply. Deleting a dead row while another station is recovering
+  now leaves that recovery alone; an edit made while the music plays still ends
+  the session it stopped.
+- **Speaker calibration measures at the level its own check was heard at** — a
+  desk it had just admitted used to fail a moment later anyway.
+- **"Back to live" works again** on a station whose relay had failed once; the
+  ten-minute pause on rebuilding it never expired on that road. The optional
+  title cleanup hands back to the built-in cleaner whenever the helper answers
+  with an explanation rather than a title, in any language.
+- Thirteen translations carry the new strings.
+
 ## 2026.31
 
 - **High-bitrate FLAC stations start clean now.** The first seconds used

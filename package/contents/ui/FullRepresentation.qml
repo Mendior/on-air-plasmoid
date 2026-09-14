@@ -1496,7 +1496,7 @@ PlasmaExtras.Representation {
                     icon.name: "edit-clear-history"
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     onClicked: fullRepresentation._webClearHistory()
-
+                    Accessible.name: i18n("Clear search history")
                     PlasmaComponents3.ToolTip { text: i18n("Clear search history") }
                 }
             }
@@ -2778,7 +2778,7 @@ PlasmaExtras.Representation {
                                                       root._currentUnwrappedUrl !== ""
                                                       ? root._currentUnwrappedUrl : root._previewUrl,
                                                       root.currentStationFavicon, true,
-                                                      root._previewUuid)
+                                                      root._previewUuid, root._previewCodec, root._previewBitrate)
                             } else {
                                 root.toggleFavorite(root.currentStation)
                             }
@@ -2851,7 +2851,7 @@ PlasmaExtras.Representation {
                         // !fadeOutAnimation.running: during a stop fade the stream is
                         // still "playing" — starting a REC there would outlive the stop
                         readonly property bool canRec: isPlaying() && !fadeOutAnimation.running
-                                                       && root.canRecordUrl(playMusic.source.toString())
+                                                       && root.canRecordUrl(root.upstreamSourceString())
                         Layout.alignment: Qt.AlignVCenter
                         implicitWidth: Kirigami.Units.gridUnit * 2.4
                         implicitHeight: implicitWidth
@@ -5406,6 +5406,7 @@ PlasmaExtras.Representation {
             onToggled: Plasmoid.configuration.pin = checked
             visible: !root.planar
             focusPolicy: Qt.TabFocus
+            Accessible.name: i18n("Keep open")
             PlasmaComponents3.ToolTip { text: i18n("Keep open") }
         }
 
@@ -5622,9 +5623,9 @@ PlasmaExtras.Representation {
                         // The human sentence beats the backend's growl when
                         // one is known (a preview whose whole retry ladder
                         // ran dry — offline or geo-blocked station).
-                        return root._friendlyError !== ""
-                               ? root._friendlyError
-                               : i18n("Error: %1", playMusic.errorString)
+                        return root._friendlyError !== "" ? root._friendlyError
+                             : playMusic.errorString !== "" ? i18n("Error: %1", playMusic.errorString)
+                             : i18n("The stream stopped sending data")
                     else if (fullRepresentation._streamActive) {
                         if (fullRepresentation._nowBitrate > 0)
                             return i18n("Bitrate: %1 kb/s", fullRepresentation._nowBitrate)
@@ -5922,7 +5923,7 @@ PlasmaExtras.Representation {
                             text: i18n("This computer")
                             icon.name: "computer"
                             checked: root._castTargets.length === 0 || root._castLocalPlay
-                            enabled: root._castTargets.length > 0
+                            enabled: root._castTargets.length > 0 && (root._casting || isPlaying())
                             onToggled: {
                                 root.castToggleLocal()
                                 // Toggling breaks the declared checked binding
@@ -6090,11 +6091,9 @@ PlasmaExtras.Representation {
                                 to: 900
                                 stepSize: 10
                                 value: Plasmoid.configuration.syncOffsetMs || 0
-                                // Applied on RELEASE, not per step: every
-                                // apply swaps the loopbacks, which is an
-                                // audible ~1-2 s gap on every speaker — a
-                                // drag across the scale used to stutter the
-                                // room once per notch. One drag, one gap.
+                                // Applied on RELEASE, not per step: each apply
+                                // swaps the loopbacks — quiet since the 2026-08-10
+                                // crossfade, but a drag once stuttered per notch.
                                 // The WHEEL has no press cycle at all (the
                                 // PC3 slider scrolls via its own internal
                                 // MouseArea), so wheel moves settle through

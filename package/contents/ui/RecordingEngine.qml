@@ -22,7 +22,7 @@ Item {
     id: engine
 
     // main.qml's root. Used: exec, nextSeq, notify, downloadDirPath,
-    // _mprisRunDir, _mprisId, isPlaying(), playerSourceString(),
+    // _mprisRunDir, _mprisId, isPlaying(), upstreamSourceString(),
     // currentStation, fadeStopInProgress.
     required property var app
     // Plasmoid configuration in production; a plain object in tests.
@@ -97,7 +97,10 @@ Item {
         // app.fadeStopInProgress = a stop is in progress; playbackState is
         // still Playing then, and a recording started now would survive the stop.
         if (recording || !app.isPlaying() || app.fadeStopInProgress) return;
-        var url = app.playerSourceString();
+        // The station's own address, not the player's: while the timeshift
+        // tap feeds the player the source reads 127.0.0.1, and that port has
+        // exactly one seat (traced 2026-09-03, __REC_EMPTY__ on a FLAC station).
+        var url = app.upstreamSourceString();
         if (!canRecordUrl(url)) return;
         var maxMin = Math.max(1, cfg.recordMaxMinutes || 180);
         _recStart(app.currentStation, url, maxMin * 60, false);

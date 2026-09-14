@@ -191,9 +191,14 @@ Item {
     // would loop: freeze, rescue, birth-death, live, freeze again, each
     // round audible. One death is the verdict for the session.
     property string _relayBirthDeathUrl: ""
+    // When it died. A transient failure (a wifi handover, a server that
+    // refused one connection) used to ban the station until the widget
+    // restarted; ten minutes is long enough to break the loop and short
+    // enough that the evening is not lost to one bad second.
+    property double _relayBirthDeathAt: 0
 
     function armRelay(url, name, nowMs, oggFamily) {
-        if (url === _relayBirthDeathUrl) {
+        if (url === _relayBirthDeathUrl && nowMs - _relayBirthDeathAt < 10 * 60 * 1000) {
             console.log("[ARP] timeshift: this stream's relay writer died"
                         + " at birth once already — not re-arming");
             return false;
@@ -210,6 +215,11 @@ Item {
     // burst of quiet re-arms, then the caller's heal road owns it.
     function relayPlaybackFell(nowMs) {
         if (!relay || !active) return false;
+        // A park owns the silence. The tap's own death arrives as a player
+        // error against a source that was already stopped, and rebuilding it
+        // here brought the room back up over the listener's pause — the same
+        // terminus as the window-cap re-arm, by a second entrance.
+        if (app._tsPaused) return false;
         if (_relayRestarts >= 3) {
             disarm();
             return false;
@@ -338,10 +348,15 @@ Item {
     // the next pause lands in the same, longer buffer. A relayed stream
     // has no live to go back TO (the direct socket is the thing that
     // wedges) — its catch-up is a fresh buffer at today's edge.
-    function backToLive() {
+    // nowMs is the caller's clock, like everywhere else in here. It used to
+    // hand armRelay a literal 0, and once the ten-minute birth-death window
+    // arrived that 0 made `nowMs - _relayBirthDeathAt` a large NEGATIVE
+    // number — under the window forever, so a station that lost its writer
+    // once could never be caught back up to live again.
+    function backToLive(nowMs) {
         if (!shifted && shiftPosMs < 0) return;
         if (relay) {
-            armRelay(streamUrl, stationName, 0);
+            armRelay(streamUrl, stationName, nowMs);
             return;
         }
         noteLivePlayback();
@@ -369,7 +384,7 @@ Item {
             armRelay(streamUrl, stationName, nowMs);
             return true;
         }
-        backToLive();
+        backToLive(nowMs);
         return true;
     }
 
@@ -407,7 +422,9 @@ Item {
             var pm = /__TS_SRV_UP__ port=(\d+)/.exec(stdout);
             var port = pm ? parseInt(pm[1], 10) : 0;
             if (port > 0 && port < 65536) {
-                if (relay && active && !shifted) {
+                // A park that landed while the tap was coming up must not be
+                // undone by its UP ack: tsPlayRelay clears _tsPaused and plays.
+                if (relay && active && !shifted && !app._tsPaused) {
                     relayPort = port;
                     serveUp = true;
                     app.tsPlayRelay(relayUrl);
@@ -449,11 +466,17 @@ Item {
                     console.log("[ARP] timeshift: relay writer died at birth"
                                 + " — zero bytes; returning to the direct"
                                 + " stream");
+                    // The direct stream is the one that wedged in the first
+                    // place, so a listener left with silence has to be told
+                    // why (found 2026-09-05: no word reached them at all).
+                    app.notify(i18n("The stream could not be relayed — trying it directly"),
+                               stationName, "dialog-warning");
                     var backTo = streamUrl;
                     var wasShifted = shifted;
                     reset(true);
                     active = false;
                     _relayBirthDeathUrl = backTo;
+                    _relayBirthDeathAt = nowMs;
                     // Live sound only for a room that was audibly playing:
                     // a parked or shifted listener chose silence, and a
                     // writer's death is no licence to override them.
@@ -467,7 +490,13 @@ Item {
                 // holds while the fresh tap comes up. Only a writer that
                 // lived a while earns this; one that died at birth is a dead
                 // stream, and re-arming it forever would spin.
-                if (relay && !shifted && bufStartMs > 0 && nowMs - bufStartMs >= 60000
+                // …but not over a PARK. The engine's own `shifted` only turns
+                // true on a resume, so a parked relay looks exactly like a live
+                // one from here — and the hour cap then re-armed it, brought the
+                // tap up and played the room awake with nobody asking. The park
+                // lives on the app side, so that is where the question goes.
+                if (relay && !shifted && !app._tsPaused
+                    && bufStartMs > 0 && nowMs - bufStartMs >= 60000
                     && _relayRestarts < 3) {
                     _relayRestarts++;
                     relayRestartDecay.restart();

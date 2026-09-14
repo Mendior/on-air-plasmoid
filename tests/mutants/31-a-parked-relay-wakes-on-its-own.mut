@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The relay re-arm that keeps a live listener's music going fires over a PARK
+  too, so a paused Ogg or FLAC station starts itself when its capture writer
+  reaches the window cap.
+
+history:
+  The writer carries ffmpeg's -t <window>, so it exits by itself after an hour.
+  For a live relay listener that exit is a re-arm; the player coasts while a
+  fresh tap comes up. The engine's own `shifted` turns true only on a RESUME,
+  so a parked relay looked exactly like a playing one from in there — and the
+  park lives on the app side, where nothing was asked. The UP ack then reached
+  tsPlayRelay, which clears _tsPaused and plays. Pause before lunch, music an
+  hour later with nobody in the room. Found 2026-09-14, issue #13's shape from
+  a wall clock alone.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+              if (relay && !shifted && !app._tsPaused
+
+replace:
+              if (relay && !shifted
+
+expect:
+  Killed by tests/qml/tst_timeshiftengine.qml::test_a_parked_relay_is_not_woken_by_its_own_window_cap.
+  Line-neutral.

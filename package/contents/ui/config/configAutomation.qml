@@ -24,6 +24,19 @@ KCM.SimpleKCM {
     property alias cfg_podcastContinuous: continuous.checked
     property alias cfg_podcastSkipSilence: skipSilence.checked
     property alias cfg_syncAutoCare: autoCare.checked
+    // The popup's sync switches write syncAutoCare directly; with this page
+    // open, Apply wrote its opening snapshot back over that choice. An
+    // untouched box follows the live value, a touched one keeps the edit.
+    property bool _autoCareSynced: false
+    Component.onCompleted: _autoCareSynced = cfg_syncAutoCare
+    Connections {
+        target: plasmoid.configuration
+        function onSyncAutoCareChanged() {
+            const live = plasmoid.configuration.syncAutoCare
+            if (root.cfg_syncAutoCare === root._autoCareSynced) root.cfg_syncAutoCare = live
+            root._autoCareSynced = live
+        }
+    }
     property alias cfg_timeshiftEnabled: tsEnabled.checked
     property alias cfg_timeshiftWindowMin: tsWindow.value
 

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The silence scan after a landed episode is called on app, which has no
+  such function, so a finished download throws before the queue moves and
+  nothing else downloads until the widget restarts.
+
+history:
+  _podScanStart lives on the engine; the download handler asked app for it
+  from 2026-08-09, when the pipeline followed the ledger into the engine.
+  In QML that is a TypeError, raised on the line before the queue advance,
+  so one finished episode stopped the line — and the landed file never got
+  the silence map that skip-silence reads. The engine's own tests hid it:
+  they hung a _podScanStart on the mock app, which is the one place the
+  name ever existed. Found 2026-09-08, before the release that would have
+  carried it into a fourth version.
+
+target:
+  package/contents/ui/PodcastEngine.qml
+
+find:
+              if (scanFile !== "") _podScanStart(scanFile);
+
+replace:
+              if (scanFile !== "") app._podScanStart(scanFile);
+
+expect:
+  Killed by tests/qml/tst_podcastengine.qml::test_a_finished_download_lets_the_next_one_start
+  and tests/qml/tst_podcastengine.qml::test_a_download_stages_url_then_curl_then_writes_the_ledger.
+  Line-neutral.

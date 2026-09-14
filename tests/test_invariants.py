@@ -824,6 +824,16 @@ def test_an_alarm_cannot_veto_the_speaker_check_forever():
     assert "_volumeOverrideAtMs" in body, (
         "alarmEngaged stopped bounding the override in time — a wake-up "
         "nobody dismissed vetoes every speaker measurement from then on")
+    # The bound has to be measured off a ticking property. Date.now() in a
+    # binding is a plain call, not a dependency: the expiry written on
+    # 2026-08-11 evaluated once at fire time and never again, so the veto
+    # stood all day exactly as before (found 2026-09-05).
+    assert "Date.now()" not in body, (
+        "alarmEngaged reads Date.now() inside its binding — that value is "
+        "frozen at the last dependency change and the 30-minute window never "
+        "closes; take the time from alarmVetoClock.now")
+    assert "alarmVetoClock.now" in body and "id: alarmVetoClock" in src, (
+        "alarmEngaged lost its ticking clock")
     eng = (UI / "AlarmEngine.qml").read_text(encoding="utf-8")
     assert eng.count("app._volumeOverrideAtMs = Date.now();") == 3, (
         "a fire road stopped stamping when it raised the volume — an "
@@ -1137,3 +1147,254 @@ def test_the_standing_order_replays_a_url_not_a_row_number():
     assert "_wantsPlaying = false" in body, (
         "an order whose station left the list no longer retires - the "
         "next network edge replays an arbitrary row")
+
+
+def test_the_no_titles_pin_arms_its_own_recheck():
+    """Six blank title polls pin a station as "no titles". Left alone, that pin
+    lasted the whole play — the shape behind issue #10, "Now Playing never
+    updates unless I pick another station". The pin site must arm the recheck
+    timer that lifts it again, and the timer must exist to be armed."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("root._icyEmptyCount >= 6")
+    block = src[i : i + 600]
+    assert "noIcyRecheck.restart()" in block, (
+        "the six-blank pin no longer arms noIcyRecheck — a station blank at "
+        "the first polls stays titleless for the whole play"
+    )
+    assert "id: noIcyRecheck" in src, "the recheck timer is gone"
+
+
+def test_a_stop_in_an_episodes_last_seconds_starts_nothing():
+    """A Stop is a Stop even when the file was about to end anyway.
+
+    stopWithFade leaves a short fade-out window, and onErrorOccurred already
+    refuses to act inside it — "the dying stream's last word, not a reason to
+    resurrect it". onMediaStatusChanged had no such line, so an EndOfMedia
+    arriving during that window ran the podcast advance: the up-next head, or
+    with continuous listening on by default the show's oldest unheard
+    download, began playing after the listener had pressed Stop. The sleep
+    timer and a headset's Stop reach the same fade. The asymmetry between the
+    two handlers was the whole bug; they agree now."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("What plays next, in order of the listener's own word")
+    block = src[i : i + 500]
+    assert "fadeOutAnimation.running" in block, (
+        "the podcast advance no longer stands down inside a stop's fade — "
+        "pressing Stop as an episode ends starts the next one"
+    )
+    assert block.index("fadeOutAnimation.running") < block.index("_podPlayUpNextHead"), (
+        "the fade test must come FIRST: _podPlayUpNextHead starts playback "
+        "itself, so guarding after it consumes the queue and plays anyway"
+    )
+
+
+def test_the_mpris_origin_flag_cannot_outlive_its_dispatch():
+    """The "this park came over MPRIS" mark lasts exactly one command.
+
+    A Bluetooth speaker powering off sends an AVRCP Pause as its last breath,
+    and the widget undoes such a park for the speakers still in the room. That
+    only works while the mark is honest. It was not: the dispatch has six ways
+    out and four of them — both podcast skips and both empty-list returns —
+    jumped over the single clearing line at the bottom, so the mark stayed true
+    for the rest of the session. Every later park then wore it, including one
+    pressed on the widget's own button, on the panel icon or with Space; a
+    speaker leaving within the next two minutes resumed the music over it.
+    The dispatch sits behind a try/finally now, which no future return can
+    escape, and the body must not carry the flag itself again."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    outer = _function_body(src, "_handleMprisCommand")
+    assert "_mprisCmdActive = true" in outer, "the origin mark is no longer raised"
+    assert "finally" in outer and "_mprisCmdActive = false" in outer, (
+        "the origin mark is cleared on some paths only — the leak that made a "
+        "hand-made park read as a dying speaker's breath is back"
+    )
+    inner = _function_body(src, "_mprisDispatch")
+    assert "_mprisCmdActive" not in inner, (
+        "the dispatch touches the origin mark again; it leaked precisely "
+        "because its own early returns owned the clearing"
+    )
+
+
+def test_the_mpris_start_empties_the_command_file():
+    """Whoever resets the sequence counter clears the file it counts against.
+
+    _mprisStart sets _mprisCmdSeq to 0 because a fresh daemon numbers from 1.
+    It used to only `touch` the command file, on the belief that the launcher
+    clears it. The launcher does — at line 78, behind a python dbus probe
+    (measured 49-50 ms here), an unconditional `sleep 0.3` and two orphan
+    sweeps, so about 360 ms in. The watcher's lost-wakeup cat reads at 250 ms.
+    A plasmashell that crashed or was restarted by a package upgrade never ran
+    _mprisStop, so the last media-key line was still in that file: read at
+    250 ms, its sequence beat the reset 0, and Play / PlayPause / Next /
+    Previous all start a station from a dead stop. That is a widget beginning
+    to play with nobody in the room, which is issue #13's exact complaint, and
+    media keys are on by default. Creating the file EMPTY closes the window
+    outright: there is nothing to replay by the time anything can read it."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "_mprisStart")
+    assert "_mprisCmdSeq = 0" in body, "the sequence reset is gone"
+    assert "touch '" not in body, (
+        "the command file is created without being emptied again — a line left "
+        "by a crashed session outruns the launcher's truncate and gets replayed"
+    )
+    assert ": > '" in body, (
+        "_mprisStart no longer empties the command file it is about to watch"
+    )
+
+
+def test_the_title_cleanup_verdict_does_not_lean_on_english():
+    """The optional title cleaner's answer is checked by shape, not vocabulary.
+
+    The helper is a CLI, and a CLI answers in whatever language its environment
+    steers it to. Measured 2026-09-14 on this machine, handed a station's advert
+    banner, it replied in Estonian: "Selles reas ei ole lugu - see on
+    reklaamiriba, mitte metaandmed. Vormi `Artist - Title` ei saa siit ausalt
+    taita." That string carries " - ", so the separator test passes it, and the
+    English refusal list never sees it. Only two things keep it out of the music
+    search, and both must stay: a cleaned title is never much LONGER than the
+    raw one it came from (a cleaner strips dressing, it does not explain), and
+    it has no reason to quote anything in backticks. The same run cleaned real
+    titles correctly - "Now Playing: SMILERS - JALGPALL ON PAREM KUI SEKS |
+    Radio Tallinn 101.5 FM" came back "SMILERS - Jalgpall on parem kui seks" -
+    so the feature earns its place; this is what keeps its bad days harmless."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index('if (cmd.indexOf(": AI_CLEAN;") === 0)')
+    block = src[i : i + 1600]
+    assert "_dlPendingRaw.length +" in block, (
+        "the cleaner's answer is no longer measured against the title it came "
+        "from — a refusal in any language now reaches the music search"
+    )
+    assert 'indexOf("`")' in block, (
+        "the backtick test is gone — prose that quotes the wanted format is "
+        "exactly what the helper answers with when it refuses"
+    )
+
+
+def test_the_multi_room_toggle_does_not_release_the_devices():
+    """Also-play-here must never be read as stop-playing-there.
+
+    startWithFade releases the receivers when a podcast starts locally, which
+    is right when the listener picked an episode while a station was on the
+    TV. The cast-handback branch made the multi-room toggle reach that same
+    release: ticking "This computer" during a cast episode quit every
+    receiver, left their rows ticked with _casting false, and the next untick
+    stopped the local player too — nothing playing anywhere. The toggle now
+    states its intent and the release honours it."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("if (_podStarting && _castTargets.length > 0 && _casting")
+    line = src[i : src.index("\n", i)]
+    assert "_castJoinLocal" in line, (
+        "the podcast release no longer asks whether the multi-room toggle is "
+        "what brought it here — ticking 'This computer' quits the receivers"
+    )
+    body = _function_body(src, "castToggleLocal")
+    assert "_castJoinLocal = true" in body and "_castJoinLocal = false" in body, (
+        "castToggleLocal stopped declaring (or stopped clearing) its intent — "
+        "a flag left standing would silence the release for every later start"
+    )
+
+
+def test_a_servers_write_only_retires_the_order_it_ends():
+    """The standing order outlives a write that is not about it.
+
+    Every add, remove and edit lands in onServersChanged's non-reorder branch,
+    which retired the order outright. removeStation's own head guard exists to
+    spare an order about a DIFFERENT station — and this line undid that
+    decision forty rows later: a dead row tidied out of the popup while a
+    stream was mid-recovery left the returning network nothing to resume, with
+    the widget silent until someone pressed play. The clear has to ask first;
+    an edit that moves the playing URL out of the list still earns it."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("function onServersChanged")
+    block = src[i : i + 1600]
+    clears = [ln for ln in block.splitlines() if "_wantsPlaying = false" in ln]
+    assert clears, "onServersChanged stopped retiring the order at all"
+    for ln in clears:
+        assert "if (" in ln, (
+            "onServersChanged retires the standing order unconditionally again "
+            "— deleting or starring any station kills a recovery in flight: %s"
+            % ln.strip()
+        )
+    assert "_currentOrigUrl" in block, (
+        "the guard no longer asks about the order's own station"
+    )
+    # Both halves, or the fix trades one bug for the other. Asking only "is the
+    # station still listed" lets an edit made while the music played keep its
+    # order — the road d2585ab closed, reopened here on 2026-09-14 and caught by
+    # the issue-13 check. Asking only "was it audible" throws the recovery away.
+    assert "isPlaying()" in block, (
+        "the guard stopped asking whether the listener HEARD the stop — an edit "
+        "in the settings dialog keeps its order and a later blip replays it"
+    )
+
+
+def test_the_settings_merge_compares_like_with_like():
+    """Whatever the search page injects on load, its merge has to default too.
+
+    Every model row is given a codec, bitrate and uuid at load so the model's
+    roles exist before the first append. The three-way merge then compares
+    those rows against the stored string — and a station saved before codecs
+    were kept carries none of the three. A shape mismatch reads as "edited on
+    this page, local wins", which resurrects a station deleted elsewhere and
+    refuses a healed hostname: exactly what the merge replaced."""
+    src = (UI / "config" / "configSearch.qml").read_text(encoding="utf-8")
+    load = src[src.index("Component.onCompleted") :]
+    load = load[: load.index("_lastSynced = cfg_servers")]
+    injected = [
+        f for f in ("codec", "bitrate", "uuid") if "srv.%s === undefined" % f in load
+    ]
+    assert injected, "the load path stopped defaulting the model's roles"
+    norm = src[src.index("const norm = ") :]
+    norm = norm[: norm.index("return JSON.stringify(flat)")]
+    for field in injected:
+        assert "plain.%s === undefined" % field in norm, (
+            "load defaults %s but the merge does not — every station stored "
+            "before saved codecs now reads as locally edited" % field
+        )
+
+
+def test_a_cast_episode_comes_home_named_and_with_its_show():
+    """Unticking the last device hands the episode back to this computer.
+
+    It used to arrive stripped: root.title never carries an episode name (only
+    an ICY line or the widget's own), so the episode came home called "On Air",
+    and a literal "" for the feed overwrote the show that was still standing —
+    losing the show's own playback speed and the up-next chain with it. The
+    name lives in currentStation and the show in _currentEpisodeFeed, read
+    before the call clears it."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index("function _castResumeLocally")
+    block = src[i : i + 800]
+    call = block[block.index("playPodcastEpisode(") :]
+    call = call[: call.index(";") + 1]
+    assert "root.currentStation" in call, (
+        "the handed-back episode lost its name — root.title is the widget's "
+        "own name here, not the episode's"
+    )
+    assert "root.title" not in call, "root.title is back as the episode's name"
+    assert "root._currentEpisodeFeed" in call, (
+        "the handed-back episode lost its show — an empty feed costs it the "
+        "show's speed and its up-next chain"
+    )
+
+
+def test_the_no_titles_pin_names_the_station_not_the_transport():
+    """The pin has to name the station, never the address it is heard on.
+
+    A relayed station — Ogg, FLAC, or an mp3 the rescue put behind the relay —
+    plays from a loopback, and every road that lifts the pin asks
+    _icyStreamTarget for the station behind it. Written raw, the pin was a
+    loopback address compared against a station address: the five-minute
+    recheck returned on its first line and the pin stood for the whole play,
+    on exactly the stations the same release taught to poll for titles."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "var queryUrl = _icyStreamTarget(playMusic.source)" in src, (
+        "the no-titles pin is written raw again — a relayed station's pin "
+        "will never match the roads that lift it"
+    )
+    for cmp_op in ("!==", "==="):
+        needle = f"_noIcySource {cmp_op} playMusic.source"
+        assert needle not in src, (
+            f"a pin comparison went back to the raw source ({needle}) — the "
+            "pin is stored as the station and the two can never match"
+        )

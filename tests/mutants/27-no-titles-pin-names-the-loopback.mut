@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The "no titles" pin is written as the address playback is heard on, so a
+  relayed station pins a loopback while every road that lifts the pin looks
+  for the station — and the five-minute recheck never fires.
+
+history:
+  The pin's own recheck arrived 2026-09-06 with the fix for issue #10, and
+  it was born half dead: the pin was stored raw from playMusic.source while
+  the recheck compared it through _icyStreamTarget. Those two agree only
+  when nothing relays. An Ogg or FLAC station — or an mp3 the rescue put
+  behind the relay, which the very same commit taught to poll for titles —
+  plays from 127.0.0.1, so the comparison failed on its first line and the
+  pin stood for the whole play. Found 2026-09-08, before release.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              var queryUrl = _icyStreamTarget(playMusic.source);
+
+replace:
+              var queryUrl = playMusic.source.toString();
+
+expect:
+  Killed by tests/test_invariants.py::test_the_no_titles_pin_names_the_station_not_the_transport.
+  Line-neutral, as main.qml's ratchet requires.

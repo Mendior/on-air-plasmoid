@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  relayPlaybackFell rebuilds the tap on any player error against the relay
+  source, including one that arrives after a park has already stopped the
+  player — and the rebuild's UP ack plays the room awake.
+
+history:
+  A park stops the player but leaves the source pointing at the loopback tap
+  and the engine armed. When the tap's own ffmpeg then falls over, Qt raises an
+  error against that stopped source; the road guarded only on `relay` and
+  `active`, both still true, so it re-armed and the UP ack played. The same
+  terminus as the window-cap re-arm, reached by a second door. Found 2026-09-14
+  while hunting issue #13, "randomly starts playing on its own".
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (app._tsPaused) return false;
+
+replace:
+          if (false) return false;
+
+expect:
+  Killed by tests/qml/tst_timeshiftengine.qml::test_a_parked_relay_is_not_rebuilt_by_a_late_player_error.
+  Line-neutral.

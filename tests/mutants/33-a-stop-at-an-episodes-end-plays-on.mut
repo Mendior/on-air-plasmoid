@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The podcast advance does not stand down inside a stop's fade, so pressing Stop
+  in an episode's last seconds starts the next one.
+
+history:
+  stopWithFade leaves a short fade window, and onErrorOccurred already refuses
+  to act inside it — "the dying stream's last word, not a reason to resurrect
+  it". onMediaStatusChanged carried no such line, so an EndOfMedia landing in
+  that window ran the advance: the up-next head, or with continuous listening
+  on by default the show's oldest unheard download. The sleep timer and a
+  headset's Stop reach the same fade. The asymmetry between the two handlers
+  was the whole bug. Found 2026-09-14, chasing issue #13.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                      if (!fadeOutAnimation.running && !root._podPlayUpNextHead()
+
+replace:
+                      if (!root._podPlayUpNextHead()
+
+expect:
+  Killed by tests/test_invariants.py::test_a_stop_in_an_episodes_last_seconds_starts_nothing.
+  Line-neutral.

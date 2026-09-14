@@ -171,6 +171,11 @@ Item {
             // is mid-ramp" and every level it reads afterwards is suppressed.
             r.e.handleExec(": PW_RAMP; x", "", "");
             verify(!r.e._combineRamping);
+            // The build reloaded a Bluetooth loopback, so the engine has just
+            // armed the spend for the first probe (the re-roll, not the
+            // room). Every scenario below starts from a settled room and
+            // reads the fold itself; the rebuild tests cover the transient.
+            r.e._driftSkipNext = false;
         }
 
         // ── enable: command construction ──────────────────────────────────
@@ -223,6 +228,103 @@ Item {
             var cmd = r.mock.execLog[r.mock.execLog.length - 1];
             verify(cmd.indexOf("channels=1 channel_map=front-left") !== -1);   // the L pair half
             verify(cmd.indexOf("set-sink-input-volume \"$si\" 50%") !== -1);   // the balance
+        }
+
+        function test_a_channel_change_on_a_wired_member_reaches_its_loopback() {
+            // The channel map is baked into the loopback, so a click on the
+            // L/R/M button has to swap the member. The quiet swap only
+            // admitted members whose DELAY moved, so a channel-only change
+            // returned "deferred" and the speaker kept playing full stereo
+            // until some unrelated rebuild (found 2026-09-05).
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            var before = r.mock.execLog.length;
+            r.e.setDeviceChannel(wired, "L");
+            compare(r.e._settleQuietSwap("slider", {}, true), "swapped");
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(r.mock.execLog.length > before);
+            verify(cmd.indexOf(": PW_LBSWAP") === 0);
+            verify(cmd.indexOf("sink='" + wired + "' latency_msec=") !== -1);
+            verify(cmd.indexOf("channels=1 channel_map=front-left") !== -1);
+            // The same click again is not a second swap: the built channel
+            // now matches the wanted one.
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x",
+                           "LB 301 " + wired + "\n", "");
+            var again = r.mock.execLog.length;
+            r.e._settleQuietSwap("slider", {}, true);
+            compare(r.mock.execLog.length, again);
+        }
+        function test_a_channel_change_on_a_bluetooth_member_takes_the_rebuild() {
+            // The quiet swap refuses to touch a Bluetooth loopback (the
+            // measured clatter and a re-roll), so a channel click on that
+            // member would wait for a rebuild nothing schedules. The click
+            // IS the user's word: it takes the full rebuild at once.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            var before = r.mock.execLog.length;
+            r.e.setDeviceChannel(btMac, "R");
+            verify(r.mock.execLog.length > before);
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_RELOOP") === 0);
+            verify(cmd.indexOf("sink='" + btSink + "'") !== -1);
+            verify(cmd.indexOf("channels=1 channel_map=front-right") !== -1);
+        }
+
+        function test_the_probe_goes_out_after_the_crash_sweep_has_answered() {
+            // startup() used to fire the pactl probe and the crash sweep as two
+            // shells side by side; an enable the probe triggered could load a
+            // fresh combine sink that the sweep then unloaded as a leftover.
+            var r = rig([dev(wired), dev(btSink)], {});
+            r.e.startup();
+            var probes = 0, sweeps = 0;
+            for (var i = 0; i < r.mock.execLog.length; i++) {
+                if (r.mock.execLog[i].indexOf(": PW_PROBE;") === 0) probes++;
+                if (r.mock.execLog[i].indexOf(": PW_COMBINE_CLEAN;") === 0) sweeps++;
+            }
+            compare(sweeps, 1);
+            compare(probes, 0);
+            verify(r.e.handleExec(": PW_COMBINE_CLEAN; d=x", "", ""));
+            var last = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(last.indexOf(": PW_PROBE;") === 0);
+        }
+        function test_a_missing_sink_takes_its_old_loopback_down_with_it() {
+            // A member whose sink is not registered at rebuild time is skipped
+            // (LBMISS) — and its previous loopback used to stay loaded, feeding
+            // a sink that was not there and doubling the moment the retry
+            // seated the new one.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            r.e._combineRebuildLoopbacks();
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            var at = cmd.indexOf('LBMISS ' + btSink + '"; pactl unload-module 102');
+            verify(at !== -1);
+        }
+        function test_a_rebuild_that_never_answers_frees_the_busy_flag() {
+            // One hung RELOOP shell used to wedge every rebuild for the session.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            r.e._combineRebuildLoopbacks();
+            verify(r.e._combineReloopBusy);
+            r.e._reloopGuardFire();
+            verify(!r.e._combineReloopBusy);
+            // A flag already cleared by an honest ack is left alone.
+            r.e._reloopGuardFire();
+            verify(!r.e._combineReloopBusy);
+        }
+        function test_a_rebuild_queued_behind_a_hung_one_still_runs() {
+            // Freeing the flag was only half the job. Both ack roads run a
+            // queued rebuild; the guard dropped it, so a speaker that joined
+            // or left while the shell hung stayed unaccounted for until
+            // something else happened to ask for a rebuild.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            r.e._combineRebuildLoopbacks();
+            verify(r.e._combineReloopBusy);
+            r.e._combineReloopPending = true;       // a membership change waits
+            var n = r.mock.execLog.length;
+            r.e._reloopGuardFire();
+            verify(!r.e._combineReloopPending);     // …is taken, not dropped
+            verify(r.mock.execLog.length > n);      // …and the rebuild went out
         }
 
         // ── the PW_COMBINE ack ────────────────────────────────────────────
@@ -2263,10 +2365,31 @@ Item {
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 137);
         }
 
-        function test_a_rebuild_that_changes_nothing_spends_nothing() {
-            // Same lags out, same room after: a reload with an unchanged
-            // schedule is not a correction landing, and the half-finished
-            // history is still about the room it describes.
+        function test_a_wired_only_rebuild_that_changes_nothing_spends_nothing() {
+            // Same lags out, same room after — with no Bluetooth loopback to
+            // re-roll, a reload with an unchanged schedule is not a
+            // correction landing, and the half-finished history is still
+            // about the room it describes.
+            var r = rig([dev(wired), dev(wired2)], { syncAutoCare: true });
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            verify(r.e.handleExec(": PW_COMBINE " + r.e._combineLoadSeq + ";",
+                                  "PREVDEF usb_dac\nNULL 77\nLB 101 " + wired
+                                  + "\nLB 102 " + wired2 + "\n", ""));
+            verify(!r.e._driftSkipNext);
+            r.e._driftHistory = [{}]; r.e._driftHistoryAt = [Date.now()]; r.e._driftEstHistory = [12];
+            r.e._combineRebuildLoopbacks();
+            verify(!r.e._driftSkipNext);
+            compare(r.e._driftHistory.length, 1);
+        }
+        function test_a_rebuild_with_a_bluetooth_member_spends_the_next_probe_even_when_nothing_changed() {
+            // The number on the loopback did not move; the transport under
+            // it did. Every reload of a Bluetooth loopback re-rolls its
+            // buffering — measured on the work machine 2026-08-13, a
+            // park→wake with the same lags read 47 ms at the first probe
+            // and 8 at the next, and the 47 went into the history as drift.
+            // "Same lags, same room" is only true without Bluetooth; here
+            // the half-finished history describes a room that is gone.
             var m0 = {}; m0[btMac] = 125;
             var r = rig([dev(wired), dev(btSink)],
                         { syncAutoCare: true, syncOffsetMap: JSON.stringify(m0) });
@@ -2275,8 +2398,22 @@ Item {
             r.e.handleExec(": PW_DRIFT;", p1, "");
             compare(r.e._driftHistory.length, 1);
             r.e._combineRebuildLoopbacks();
+            verify(r.e._driftSkipNext);
+            compare(r.e._driftHistory.length, 0);
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+                           "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
+            // The very next probe is spent, however sensible it reads.
+            r.e.handleExec(": PW_DRIFT;", p1, "");
             verify(!r.e._driftSkipNext);
-            compare(r.e._driftHistory.length, 1);
+            compare(r.e._driftHistory.length, 0);
+        }
+        function test_the_build_itself_arms_the_spend_for_a_bluetooth_group() {
+            // The first probe after enabling reads the fresh transport, not
+            // the room — the same reason the settle road waits 150 s.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            verify(r.e._driftSkipNext);
         }
 
         function test_a_fold_under_a_transport_shift_writes_the_map_frame() {

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A rebuild that skips a member whose sink is not registered (LBMISS) goes
+  back to leaving that member's previous loopback loaded, so the speaker is
+  fed twice once the retry seats the new one.
+
+history:
+  Found 2026-09-05 reading the loopback build shell. The existence gate is
+  right — loading a loopback for a sink that is not there attaches it to
+  the default sink and feeds the combine into itself — but the member's OLD
+  loopback from the previous build was left standing in the else branch:
+  it kept feeding a sink that was not there, WirePlumber moved it onto
+  whatever was, and the retry then seated a second loopback beside it.
+  From 2026-09-06 the branch unloads the old module. This mutant leaves it.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+                    + (oldId !== "" ? " pactl unload-module " + oldId + " 2>/dev/null;" : "") + " fi; ";
+
+replace:
+                    + (oldId !== "" ? " true " + oldId + " 2>/dev/null;" : "") + " fi; ";
+
+expect:
+  Killed by tests/qml/tst_syncengine.qml
+  test_a_missing_sink_takes_its_old_loopback_down_with_it. Line-neutral.

@@ -31,7 +31,7 @@
 - 🪪 **Every station gets a face** — a station saved without a logo looks one up in the directory and keeps the find, a broken cached logo heals on sight, and a station with no obtainable logo wears its initials on its own fixed color, in the list and on the vinyl label — initials that speak Latin, Greek, Cyrillic, Hebrew, Arabic, kana, CJK and Hangul
 - ↕️ **Reorder stations right in the list** — drag a row and it rides your finger, or use the hover arrows / Ctrl+Up/Down, in the main list and in favorites, without interrupting playback
 - 🎙️ **A full podcatcher** — search three directories at once (Apple Podcasts, fyyd, gpodder.net), browse the worldwide popular charts or paste any RSS address directly, subscribe, and either stream an episode instantly or download it for offline; every episode remembers where you stopped, with chapters, show notes, playback speed, dead-air skip and an Up-next queue. New episodes check themselves in on a schedule, the newest one downloads itself, old played files quietly make room (all switchable in Settings → Automation), OPML import/export moves your subscriptions in and out — and a wake-up alarm can play the newest episode of your favorite show
-- 🛡️ **Hardened like it faces the internet — because it does** — podcast feeds are parsed as hostile input (size caps, entity bombs, script in show notes, injected file names — all closed and tested), outbound probes refuse private-network addresses in every spelling, and a device name arriving from the LAN or Bluetooth can never render as markup; 500+ automated checks pin it all in place
+- 🛡️ **Hardened like it faces the internet — because it does** — podcast feeds are parsed as hostile input (size caps, entity bombs, script in show notes, injected file names — all closed and tested), outbound probes refuse private-network addresses in every spelling, and a device name arriving from the LAN or Bluetooth can never render as markup; 800+ automated checks pin it all in place
 - 🌐 **14 languages** — English, Finnish, Hindi, French, German, Italian, Dutch, Spanish, Brazilian Portuguese, Polish, Ukrainian, Swedish, Estonian, Catalan
 - 🔊 Auto-bitrate upgrade, scroll-wheel volume, keyboard navigation (`/`, arrows, Space, M, Esc), mini-equalizer on the panel icon
 
@@ -81,7 +81,7 @@ cd packaging/aur && makepkg -si
 
 **From the release file:**
 ```bash
-kpackagetool6 --type Plasma/Applet --install on-air-2026.31.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.35.plasmoid
 ```
 
 **From a clone:** build first, or you get an English-only widget — the
@@ -90,7 +90,7 @@ into the catalogs the package loads.
 
 ```bash
 scripts/dev.sh build
-kpackagetool6 --type Plasma/Applet --install on-air-2026.31.plasmoid
+kpackagetool6 --type Plasma/Applet --install on-air-2026.35.plasmoid
 ```
 
 ## Usage tips

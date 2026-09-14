@@ -1264,6 +1264,23 @@ ULTRA_DIRECT_SECONDS = 3.2  # capture window for a sweep aimed at a sink.
                             # shortening it to 2.0 moved the answer 17 ms.
 
 
+def _chain_carries_ultra(sink, ultra_wav, mic, seconds=ULTRA_DIRECT_SECONDS):
+    """The quietest level at which the sweep is heard through this chain,
+    or None when no rung of the ladder gets through.
+
+    The probe used to ask once, at the ladder's quietest rung, and take
+    silence as "this chain cannot carry 18 kHz" — while the per-member
+    captures that follow climb the same ladder and would have heard the
+    room at the louder rungs. A desk whose speakers only pass the sweep at
+    0.3 or 1.0 was refused calibration on the strength of the one level it
+    was never going to answer at. Climb, and stop at the first answer.
+    """
+    for level in ULTRA_LEVEL_STEPS:
+        if _raw_arrival_ultra(sink, ultra_wav, mic, seconds, trim=level) is not None:
+            return level
+    return None
+
+
 def _ultra_pair_lag(wired, bt, ultra_wav, mic, raw=None):
     """How far the Bluetooth speaker trails the wired one, in ms, measured
     with the inaudible sweep — or None when this chain cannot carry it or
@@ -1299,7 +1316,13 @@ def _ultra_pair_lag(wired, bt, ultra_wav, mic, raw=None):
     # shift whichever speaker went first against the other. It doubles as
     # the capability probe: a chain that cannot carry 18 kHz says so here,
     # before any time is spent on repeats.
-    if _raw_arrival_ultra(wired, ultra_wav, mic, ULTRA_DIRECT_SECONDS) is None:
+    # The rung the probe was heard at is the rung the captures use. Finding a
+    # desk that only answers at 0.3 and then measuring it at the quietest step
+    # anyway just moves the refusal later: every capture comes back empty and
+    # the pair falls out below on "fewer than two", after the repeats the
+    # probe exists to save.
+    level = _chain_carries_ultra(wired, ultra_wav, mic)
+    if level is None:
         return None
     got = {}
     # INTERLEAVED, and this is the opposite of what the clicks do on purpose.
@@ -1314,7 +1337,9 @@ def _ultra_pair_lag(wired, bt, ultra_wav, mic, raw=None):
     acc = {wired: [], bt: []}
     for _ in range(ULTRA_REPEATS):
         for sink in (wired, bt):
-            t = _raw_arrival_ultra(sink, ultra_wav, mic, ULTRA_DIRECT_SECONDS)
+            t = _raw_arrival_ultra(
+                sink, ultra_wav, mic, ULTRA_DIRECT_SECONDS, trim=level
+            )
             if t is not None:
                 acc[sink].append(t)
     if raw is not None:

@@ -38,6 +38,9 @@ Item {
     // testable. The fields move and clear as one unit.
     // Resume bookkeeping: the playing episode's key and the seek waiting
     // for the media to load.
+    // A subscribed show's feed was healed to a new address: whoever keys
+    // state by the old one (the alarm engine) follows it.
+    signal feedMoved(string oldFeed, string newFeed)
     property string _podPlayingKey: ""
     // The exact source URL of the tracked episode. The position-stamp and
     // played-mark act ONLY when the current source is this — otherwise a
@@ -168,7 +171,11 @@ Item {
     // The engine's half of the exec round-trips it started. Answers true
     // when the command was its own — the dispatcher's contract, shared with
     // SyncEngine.handleExec and TimeshiftEngine.handleExec.
-    function handleExec(cmd, stdout) {
+    // stderr rides along for the failure messages: the download handler read
+    // it as a bare name that nothing declared, so every failed transfer threw
+    // ReferenceError before the slot was freed and no download ran again
+    // until the widget restarted.
+    function handleExec(cmd, stdout, stderr) {
         if (cmd.indexOf(": POD_RM") === 0) {
             var rmTokM = cmd.match(/^: POD_RM (\d+);/);
             var rmName = rmTokM ? _rmByTok[rmTokM[1]] : undefined;
@@ -253,7 +260,10 @@ Item {
             var scanFile = podOk && _podDownloadMeta ? _podDownloadMeta.file : "";
             _podDownloadMeta = null;
             // The landed file gets its silence map (for skip-silence)…
-            if (scanFile !== "") app._podScanStart(scanFile);
+            // The scan lives HERE, not on app: `app._podScanStart` was undefined,
+            // and the TypeError landed before the queue moved on — one finished
+            // episode and the line stood still until the widget restarted.
+            if (scanFile !== "") _podScanStart(scanFile);
             // …and the line moves: next queued transfer starts now.
             if (_podDlQueue.length > 0) {
                 var nextJob = _podDlQueue.shift();
@@ -352,8 +362,12 @@ Item {
     }
 
     function isPodcastSubscribed(feedUrl) {
+        // By feedKey, not by string: the same show reached over http and
+        // https, or with and without a trailing slash, used to subscribe
+        // twice and refresh twice.
+        var want = PodcastLogic.feedKey(feedUrl);
         for (var i = 0; i < podcastSubsModel.count; i++)
-            if (podcastSubsModel.get(i).feedUrl === feedUrl) return true;
+            if (PodcastLogic.feedKey(podcastSubsModel.get(i).feedUrl) === want) return true;
         return false;
     }
 
@@ -377,8 +391,13 @@ Item {
     }
 
     function removePodcastSub(feedUrl) {
+        // By feedKey, like isPodcastSubscribed — the star's state and the road
+        // that clears it have to agree on what "this show" means. While one
+        // matched keys and the other raw strings, a row reached over the other
+        // spelling read as subscribed and its unsubscribe did nothing at all.
+        var want = PodcastLogic.feedKey(feedUrl);
         for (var i = 0; i < podcastSubsModel.count; i++) {
-            if (podcastSubsModel.get(i).feedUrl === feedUrl) {
+            if (PodcastLogic.feedKey(podcastSubsModel.get(i).feedUrl) === want) {
                 podcastSubsModel.remove(i);
                 saveSubs();
                 return;
@@ -551,7 +570,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -586,7 +605,7 @@ Item {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -624,7 +643,7 @@ Item {
             _podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -682,7 +701,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -750,7 +769,7 @@ Item {
         };
         xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
                         + "/podcasts/top/25/podcasts.json");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -797,7 +816,7 @@ Item {
             podcastTrendingBusy = false;
         };
         xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -832,7 +851,7 @@ Item {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -926,7 +945,7 @@ Item {
                 podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -978,11 +997,27 @@ Item {
                 }
                 break;
             }
+            // Everything else keyed by the old address moves too, or the
+            // show's speed resets, the alarm that plays "the newest episode
+            // of this show" finds no episode under the new feed, and
+            // auto-clean judges downloads by a feed that no longer exists.
+            if (_podSpeeds[deadFeed] !== undefined) {
+                var sp = {};
+                for (var sk in _podSpeeds) sp[sk] = _podSpeeds[sk];
+                sp[fresh] = sp[deadFeed]; delete sp[deadFeed];
+                _podSpeeds = sp;
+                cfg.podcastSpeeds = JSON.stringify(_podSpeeds);
+            }
+            var moved = false;
+            for (var dk in downloads)
+                if (downloads[dk] && downloads[dk].feed === deadFeed) { downloads[dk].feed = fresh; moved = true; }
+            if (moved) saveDownloads();
+            feedMoved(deadFeed, fresh);
             loadPodcastFeed(fresh, showTitle, showArt, true);
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = app._armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1153,7 +1188,7 @@ Item {
         app.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
             + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.34' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.35' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1354,7 +1389,7 @@ Item {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }

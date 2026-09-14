@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The REC button goes back to recording whatever address the player holds,
+  so a station playing through the timeshift tap records 127.0.0.1 — a port
+  with one seat, already taken — and hands back an empty file.
+
+history:
+  Traced 2026-09-03 on the home machine. The relay is armed for every
+  Ogg/Opus/FLAC station, relayserve.py seats exactly one client (the
+  player) and closes its listener, and the recorder asked
+  app.playerSourceString() for the address to fetch. canRecordUrl let the
+  loopback URL through because streamFormat() reads an extensionless path
+  as "unknown", which is neither hls nor playlist. Pressing REC on a FLAC
+  station curled the shut port with --retry 20 and the completion handler
+  reported __REC_EMPTY__. The title poller had met the same wall and
+  already carried the answer — _icyStreamTarget() maps the tap back to
+  the station — the recorder just never asked. This mutant puts the old
+  question back.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+          var url = app.upstreamSourceString();
+
+replace:
+          var url = app.playerSourceString();
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml
+  test_the_rec_button_records_the_station_not_the_timeshift_tap: the
+  REC_URL staging write must carry the station's address and never the
+  127.0.0.1 tap. Line-neutral.

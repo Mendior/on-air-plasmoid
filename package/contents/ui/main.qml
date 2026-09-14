@@ -149,7 +149,7 @@ PlasmoidItem {
         // delivered a first title and went quiet, holding the latch.
         if (view === 1 && (isPlaying() || _casting)
             && !infoTimer.running
-            && root._noIcySource !== playMusic.source.toString())
+            && root._noIcySource !== _icyStreamTarget(playMusic.source))
             getStreamInfo();
         if (Plasmoid.configuration.rememberLastTab === true
             && Plasmoid.configuration.lastTab !== view)
@@ -442,22 +442,19 @@ PlasmoidItem {
     // never be parked out from under something that still owes sound.
     readonly property bool anythingPlaying: isPlaying() || _casting || recording || _wantsPlaying
 
-    // Whether a wake-up alarm currently owns the audio state (ringing, or
-    // its one-shot volume floor still standing). The sync's automatic
-    // care must NEVER measure or correct over an alarm.
     // "An alarm is engaging the room right now" — what the sync engine asks
-    // before it measures anything. The override alone used to answer yes
-    // forever: it survives until the listener picks a station, stops, or
-    // touches the volume, and someone who simply lets the wake-up play had
-    // their speaker drift-check blocked for the rest of the day (measured
-    // in the home journal, 2026-08-11: an eight-minute hole and counting).
-    // The wake-up window is what this question is really about, so the
-    // override's answer expires with it — the LOUDNESS stays, the veto
-    // does not.
+    // before it measures anything. Ringing counts, and so does the wake-up's
+    // volume floor for its 30-minute window: the override itself stands until
+    // the listener acts, and a wake-up nobody dismissed vetoed every drift
+    // check all day (home journal, 2026-08-11). The window runs off a ticking
+    // clock — Date.now() in a binding is not a dependency, so the expiry
+    // written that day never re-ran and the veto stood all day regardless.
     readonly property bool alarmEngaged: _alarmFallbackArmed
                                          || (_volumeOverridePct >= 0
-                                             && Date.now() - _volumeOverrideAtMs < 30 * 60 * 1000)
+                                             && alarmVetoClock.now - _volumeOverrideAtMs < 30 * 60 * 1000)
     property double _volumeOverrideAtMs: 0
+    Timer { id: alarmVetoClock; interval: 60000; repeat: true; running: root._volumeOverridePct >= 0
+            property double now: 0; onTriggered: now = Date.now(); onRunningChanged: now = Date.now() }
 
     function parseFavorites(s) {
         try {
@@ -904,7 +901,7 @@ PlasmoidItem {
         }
         root._previewRescueSpent = true;
         var norm = _healNormName(pvName);
-        _rbFetch("/json/stations/search?name=" + encodeURIComponent(pvName)
+        _rbFetch("/json/stations/search?name=" + SearchLogic.uriPart(pvName)
                  + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
             if (root._previewSeq !== pvSeq || root._previewUrl !== pvKey) return;
@@ -1087,7 +1084,8 @@ PlasmoidItem {
         var safeProbeQuery = query.replace(/'/g, "'\\''");
         executable.exec(": DL_PICK; if ! command -v yt-dlp >/dev/null 2>&1; then echo '__NO_YTDLP__'; exit 0; fi; "
                         + "timeout 45 yt-dlp --simulate --no-playlist --print '%(id)s\t%(title)s' "
-                        + "'ytsearch5:" + safeProbeQuery + "' 2>/dev/null; true");
+                        + "'ytsearch5:" + safeProbeQuery + "' 2>&1 | awk '/^ERROR/{e=$0; next} {print}"
+                        + " END{if (e != \"\") print \"__DL_PICK_ERR__ \" substr(e, 8, 160)}'; true");
     }
 
     // Phase two: fetch the picked video. videoId is validated against the
@@ -2044,7 +2042,7 @@ PlasmoidItem {
         }
         var norm = HealLogic.normName(st.name);
         if (norm === "") { done(""); return; }
-        _rbFetch("/json/stations/search?name=" + encodeURIComponent(st.name)
+        _rbFetch("/json/stations/search?name=" + SearchLogic.uriPart(st.name)
                  + "&limit=10&order=votes&reverse=true", 5000, function(xhr) {
             var fav = "";
             try {
@@ -2319,6 +2317,14 @@ PlasmoidItem {
             const wasPlayingUrl = isPlaying() && root._previewUrl === ""
                                   && _icyStreamTarget(playMusic.source) === root._currentResolvedUrl
                                   ? root._currentOrigUrl : "";
+            // Row A's audition must survive deleting row B: the write stops the
+            // player cold, and only the star road used to give a preview back.
+            const foreignPreview = (isPlaying() || _casting)
+                                   && root._previewUrl !== "" && root._previewUrl !== hostname
+                                   ? { "name": root.currentStation, "url": root._previewUrl,
+                                       "icon": root.currentStationFavicon,
+                                       "uuid": root._previewUuid, "raw": root._previewRawUrl, "codec": root._previewCodec, "bitrate": root._previewBitrate }
+                                   : null;
             Plasmoid.configuration.servers = JSON.stringify(servers); // → reload (stops playback)
             Qt.callLater(function() {
                 if (wasPlayingUrl !== "" && wasPlayingUrl !== hostname) {
@@ -2331,6 +2337,11 @@ PlasmoidItem {
                     }
                 }
                 lastPlay = 0;
+                if (foreignPreview
+                    && !(root._casting && root._previewUrl === foreignPreview.url))
+                    previewStation(foreignPreview.name, foreignPreview.url,
+                                   foreignPreview.icon, foreignPreview.uuid,
+                                   foreignPreview.raw, foreignPreview.codec, foreignPreview.bitrate);
             });
         } catch (e) {
             console.log("[ARP] removeStation: " + e);
@@ -2529,7 +2540,7 @@ PlasmoidItem {
                                && root._previewUrl !== "" && root._previewUrl !== url
                                ? { "name": root.currentStation, "url": root._previewUrl,
                                    "icon": root.currentStationFavicon,
-                                   "uuid": root._previewUuid, "raw": root._previewRawUrl }
+                                   "uuid": root._previewUuid, "raw": root._previewRawUrl, "codec": root._previewCodec, "bitrate": root._previewBitrate }
                                : null;
         // The config write below stops playback (onServersChanged). If a regular
         // list station was playing, remember it so it can resume afterwards —
@@ -2614,7 +2625,7 @@ PlasmoidItem {
                     && !(root._casting && root._previewUrl === foreignPreview.url))
                     previewStation(foreignPreview.name, foreignPreview.url,
                                    foreignPreview.icon, foreignPreview.uuid,
-                                   foreignPreview.raw);
+                                   foreignPreview.raw, foreignPreview.codec, foreignPreview.bitrate);
             });
         } catch (e) {
             console.log("[ARP] addStationToList: " + e);
@@ -2656,7 +2667,7 @@ PlasmoidItem {
             return;
         }
         _rbFetch("/json/stations/search?name="
-                 + encodeURIComponent(stationName)
+                 + SearchLogic.uriPart(stationName)
                  + "&hidebroken=true&order=bitrate&reverse=true&limit=30",
                  4000, function(xhr) {
             let pickedUrl = origUrl;
@@ -2750,7 +2761,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -2805,20 +2816,11 @@ PlasmoidItem {
         _rbFetch("/json/servers", 5000, function(xhr) {
             if (!xhr || xhr.status !== 200) return;
             try {
-                var rows = JSON.parse(xhr.responseText) || [];
-                var seen = {}, fresh = [];
-                for (var i = 0; i < rows.length; i++) {
-                    var nm = String(rows[i].name || "");
-                    var mm = nm.match(/^([a-z0-9-]+)\.api\.radio-browser\.info$/);
-                    if (!mm || seen[mm[1]] || mm[1] === "all") continue;
-                    seen[mm[1]] = true;
-                    fresh.push(mm[1]);
-                }
-                // 'all' stays as the everyone-else-is-down door: it is
-                // round-robin DNS over the same healthy set.
-                if (fresh.length > 0) {
-                    fresh.push("all");
-                    root._rbMirrors = fresh;
+                // The seeds stay in the walk as rungs behind whatever was
+                // discovered — SearchLogic.mirrorRungs carries the incident.
+                var rungs = SearchLogic.mirrorRungs(JSON.parse(xhr.responseText), root._rbMirrors);
+                if (rungs.discovered > 0) {
+                    root._rbMirrors = rungs.names;
                     root._rbMirrorGood = 0;
                 }
             } catch (e) {}
@@ -2847,6 +2849,8 @@ PlasmoidItem {
     // default when the first device is picked — "send it to the TV" should
     // not keep the PC talking over it.
     property bool _castLocalPlay: false
+    // Only while the multi-room toggle re-enters what the devices already play:
+    property bool _castJoinLocal: false
     // URL last pushed to the devices — station switches push again, but a
     // local resume with the same stream must not restart the devices.
     property string _castCurrentUrl: ""
@@ -3030,6 +3034,12 @@ PlasmoidItem {
         }
     }
 
+    // A healed feed carries its alarm along: the podcast engine announces
+    // the move, the alarm engine rewrites the alarms that named the show.
+    Connections {
+        target: podcastEngine
+        function onFeedMoved(oldFeed, newFeed) { alarmEngine.retargetPodcastFeed(oldFeed, newFeed); }
+    }
     PodcastEngine {
         id: podcastEngine
         app: root
@@ -3092,6 +3102,9 @@ PlasmoidItem {
     readonly property var stationsModelRef: stationsModel
     // The engine's guard against repainting a local file's sidecar cover.
     function playerSourceString() { return playMusic.source.toString(); }
+    // The address a SECOND connection must use: the timeshift tap seats one
+    // client (relayserve.py), so a recorder aimed at it came back empty.
+    function upstreamSourceString() { return _icyStreamTarget(playMusic.source.toString()); }
     property alias albumArtUrl: artworkEngine.albumArtUrl
     property alias _albumArtKey: artworkEngine._albumArtKey
     property alias _artLookupPendingRaw: artworkEngine._artLookupPendingRaw
@@ -3144,7 +3157,8 @@ PlasmoidItem {
     function tsBufferDir() {
         var loc = String(Labs.StandardPaths.writableLocation(Labs.StandardPaths.CacheLocation));
         if (loc.indexOf("file://") === 0) loc = loc.substring(7);
-        return loc === "" ? "" : loc + "/onair-timeshift";
+        // Per instance: two widgets on one desktop used to clobber each other's capture.
+        return loc === "" ? "" : loc + "/onair-timeshift-" + Plasmoid.id;
     }
 
     function tsServeScriptPath() {
@@ -3396,7 +3410,7 @@ PlasmoidItem {
     }
 
     function timeshiftBackToLive() {
-        timeshift.backToLive();
+        timeshift.backToLive(Date.now());
     }
 
     // ── Bluetooth (paired speakers/headphones in the cast menu) ─────────────
@@ -3791,25 +3805,26 @@ PlasmoidItem {
             }
             return;
         }
-        // Capture the stream BEFORE silencing local playback — and only
-        // silence it if the device can actually take over: a local file
-        // cannot be cast, and muting it would just leave total silence.
+        // The devices are told FIRST, while the player still knows where the
+        // episode stands and which cover is up — stopping local playback ahead
+        // of _castPlay handed every receiver position 0 and no art. Local sound
+        // goes quiet only if the device can take over (a file cannot be cast).
         var url = _castStreamUrl();
-        if (targets.length === 0 && !_castLocalPlay && isPlaying() && url !== "") {
-            playMusic.stop();
-            playMusic.source = "";
-            infoTimer.stop();
-        }
+        var quiet = targets.length === 0 && !_castLocalPlay && isPlaying() && url !== "";
         targets.push(dev);
         _castTargets = targets;
         if (url !== "") {
-            if (!_casting) {
-                // Entering the casting state: devices checked earlier (while
-                // nothing was playing) must start too, not just this one.
-                _castPlay(url, root.currentStation, _castArt());
-            } else {
-                _castPlayOn(dev, url, root.currentStation, _castArt());
-            }
+            // Entering the casting state: devices checked earlier (while
+            // nothing was playing) must start too, not just this one.
+            if (!_casting) _castPlay(url, root.currentStation, _castArt());
+            else _castPlayOn(dev, url, root.currentStation, _castArt());
+        }
+        if (quiet) {
+            _stampPodPosition();
+            timeshift.disarm(); root._tsPaused = false;   // nothing to shift on a TV
+            playMusic.stop();
+            playMusic.source = "";
+            infoTimer.stop();
         }
     }
 
@@ -3824,13 +3839,20 @@ PlasmoidItem {
                 infoTimer.stop();
             }
         } else {
-            _castLocalPlay = true;
+            _castLocalPlay = true; _castJoinLocal = true;
             _castResumeLocally();
+            _castJoinLocal = false;
         }
     }
 
     // Restart the current station through the normal local pipeline.
     function _castResumeLocally() {
+        // Back as the episode, where the listener left it: its NAME lives in currentStation (root.title is the widget's own here, so it came home called "On Air"), and its show is the feed still standing — "" cost it the show's speed and its up-next chain.
+        if (root._podPlayingKey !== "" && root._podPlayingUrl !== "") {
+            playPodcastEpisode(root._podPlayingRawUrl || root._podPlayingUrl, root.currentStation,
+                               root._podPlayingKey, root._podPlayingShow, root._podPlayingArt, root._currentEpisodeFeed);
+            return;
+        }
         var resume = _currentOrigUrl;
         if (resume === "" || resume.indexOf("file://") === 0) return;
         for (var i = 0; i < stationsModel.count; i++) {
@@ -3887,7 +3909,7 @@ PlasmoidItem {
     // "This computer" only: stop all devices, resume the station locally.
     function castDisconnect() {
         if (_castTargets.length === 0) return;
-        _castStopAll();
+        if (_casting) _castStopAll();   // only what WE started
         var resume = _casting;
         _castTargets = [];
         _castLocalPlay = false;
@@ -4123,7 +4145,7 @@ PlasmoidItem {
         if (!run || run.seq !== mySeq || mySeq !== _healSeq) return;
         run.nameSearched = true;
         _rbFetch("/json/stations/search?name="
-                 + encodeURIComponent(run.name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
+                 + SearchLogic.uriPart(run.name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
             if (mySeq !== _healSeq) return;          // superseded by a newer heal
             if (isPlaying() || _orderSubject() === null) return; // user moved on / recovered
@@ -4367,7 +4389,7 @@ PlasmoidItem {
         if (_uuidFailed[orig] !== undefined && now - _uuidFailed[orig] < 86400000) return;
         var name = (entry.name || "").toString();
         if (name === "") return;
-        _rbFetch("/json/stations/search?name=" + encodeURIComponent(name) + "&limit=30",
+        _rbFetch("/json/stations/search?name=" + SearchLogic.uriPart(name) + "&limit=30",
                  5000, function(xhr) {
             if (!xhr || xhr.status !== 200) return; // all transient — retry next time
             var uuid = "";
@@ -4575,6 +4597,10 @@ PlasmoidItem {
                 // Bail out if the user clicked another station while we were
                 // waiting for the radio-browser response.
                 if (mySeq !== _resolveCallSeq) return;
+                // A different station must not wear its predecessor's title
+                // until its first ICY line: the stopped edge used to clear it,
+                // but a park or a shifted reader keeps that edge quiet on purpose.
+                if ((station.hostname || "").toString() !== root._currentOrigUrl) root.metadata = "";
                 root._currentOrigUrl = (station.hostname || "").toString();
                 root._currentUnwrappedUrl = playUrl;
                 root._currentResolvedUrl = resolvedUrl;
@@ -4627,7 +4653,9 @@ PlasmoidItem {
         connectWatchdog.stop();
         // A stop DURING a stall must retire the stall clock too — its
         // pending retry would restart the stream the user just silenced.
+        // The relay rescue is that kind of clock too — fired inside the fade it restarted the stream.
         stallTimer.stop();
+        relayRescue.stop();
         // An explicit stop cancels the standing order — every automatic
         // recovery road (retry backoff, network-back resume) dies with it.
         root._wantsPlaying = false;
@@ -4733,12 +4761,14 @@ PlasmoidItem {
         // can't be cast (the devices can't reach file://), so those still
         // play only on this computer.
         // A podcast episode takes the LOCAL player by design (the receivers
-        // get no resume, no position and no speed — see the cast notes), but
-        // "not cast" is not "leave the old cast running": the station kept
-        // playing on the TV while the episode played here, and nothing in
-        // the UI said so. The devices are released before the episode starts.
-        if (_podStarting && _castTargets.length > 0 && _casting)
+        // get no resume, position or speed — see the cast notes), but the
+        // station must not keep playing on the TV meanwhile: devices released,
+        // flags too — left standing they made the next station look cast already.
+        if (_podStarting && _castTargets.length > 0 && _casting && !_castJoinLocal) {
             _castStopAll();
+            _casting = false;
+            _castCurrentUrl = "";
+        }
         if (_castTargets.length > 0 && station.hostname && !root._podStarting
             && station.hostname.toString().indexOf("file://") !== 0) {
             var castUrl = station.hostname.toString();
@@ -4919,8 +4949,8 @@ PlasmoidItem {
         // stream has no ICY interleave to poll, the player surfaces none of
         // its comment tags (measured), and the bytes are already on disk.
         // Reading them there opens no second connection anywhere.
-        if (timeshift.relay && timeshift.active && timeshift.bufPath !== ""
-            && u === timeshift.streamUrl) {
+        if (timeshift.relay && timeshift.relayOggFamily && timeshift.active
+            && timeshift.bufPath !== "" && u === timeshift.streamUrl) {
             if (root._icyInFlight) return;
             var safeBuf = timeshift.bufPath.replace(/'/g, "'\\''");
             root._icyInFlight = true;
@@ -5078,9 +5108,9 @@ PlasmoidItem {
         var safeLauncher = launcher.replace(/'/g, "'\\''");
         var safeState = _mprisStateFile.replace(/'/g, "'\\''");
         var safeCmd = _mprisCmdFile.replace(/'/g, "'\\''");
-        // Create the cmd file BEFORE the inotify probe can arm the watcher —
-        // watching a missing file makes inotifywait exit instantly (spawn churn).
-        executable.exec("touch '" + safeCmd + "'");
+        // Create the cmd file EMPTY — a missing one makes inotifywait exit at once,
+        // and one left full by a crash beats the launcher's own truncate to the cat.
+        executable.exec(": > '" + safeCmd + "'");
         executable.exec(": MPRIS_START; bash '" + safeLauncher + "' '" + safeState + "' '" + safeCmd + "'");
         _mprisStarted = true;
         // Prefer inotify-based waiting (0 spawns while idle); the probe response
@@ -5172,8 +5202,17 @@ PlasmoidItem {
         executable.exec("sh -c 'printf %s \"$1\" > \"$2\"' _ '" + json + "' '" + safe + "'");
     }
 
+    // The origin flag must not outlive the call that raised it: four of the
+    // dispatch's six ways out left it standing, so every later park — the
+    // widget's own button included — read as MPRIS-made, and a speaker leaving
+    // within two minutes then resumed it as a dying breath.
     function _handleMprisCommand(cmd) {
         if (!cmd) return;
+        root._mprisCmdActive = true;
+        try { _mprisDispatch(cmd); } finally { root._mprisCmdActive = false; }
+    }
+
+    function _mprisDispatch(cmd) {
         // A Bluetooth speaker powering OFF sends an AVRCP Pause as its
         // dying breath — the JBL does, measured live (2026-08-11 13:2x):
         // the journal showed the park land in the same second the member
@@ -5183,7 +5222,6 @@ PlasmoidItem {
         // in either order, so both sides check: a pause inside the
         // departure window is ignored here, and a departure right after
         // a park resumes it (below, noteBtMemberLost).
-        root._mprisCmdActive = true;
         var _deathbedPause = (cmd === "Pause" || cmd === "PlayPause")
                              && syncEngine._combineActive
                              && Date.now() - root._btMemberLostAt < 4000;
@@ -5270,7 +5308,6 @@ PlasmoidItem {
                 setUserVolume(v);
             }
         }
-        root._mprisCmdActive = false;
     }
 
     onMetadataChanged: function() {
@@ -5472,6 +5509,9 @@ PlasmoidItem {
                     timeshift.armForStation(src, root.currentStation, Date.now());
                 return;
             }
+            // A relayed station's tap IS its playback road, not a timeshift
+            // extra: tearing it down under the player left the room silent.
+            if (timeshift.relay) return;
             // Flipped off mid-session: whoever is behind live goes back to
             // the broadcast first, then the writer and the buffer go — an
             // unchecked box must not leave an ffmpeg copying in the dark.
@@ -5487,8 +5527,16 @@ PlasmoidItem {
                 root._reorderKeepPlaying = false;
                 reloadStationsModel(true);
             } else {
-                playMusic.stop();
+                var wasAudible = isPlaying(); playMusic.stop();
                 reloadStationsModel();
+                // A stop is a stop when the listener HEARD it stop: an edit made
+                // while the music played takes the order with it, or a blip hours
+                // later restarts a station believed off. A write that silenced
+                // nothing leaves the order alone — a dead row tidied away beside a
+                // recovering stream must not cancel the recovery under way.
+                var listed = false;
+                for (var si = 0; si < stationsModel.count && !listed; si++) listed = stationsModel.get(si).hostname === root._currentOrigUrl;
+                if (wasAudible || !listed) root._wantsPlaying = false;
             }
             syncFavicons();
             // A just-added station may have arrived without a favicon —
@@ -5652,7 +5700,7 @@ PlasmoidItem {
             // The downloads ledger answers its own POD_RM/POD_GONE
             // round-trips inside the engine, same contract as the two
             // handleExec calls above.
-            if (podcastEngine.handleExec(cmd, stdout)) return;
+            if (podcastEngine.handleExec(cmd, stdout, stderr)) return;
             if (recordingEngine.handleExec(cmd, stdout, stderr, exitCode)) return;
             if (alarmEngine.handleExec(cmd, stdout)) return;
             // Timezone → home country, for the search page's local chips.
@@ -5732,6 +5780,8 @@ PlasmoidItem {
                         }
                     }
                     if (!updated) castDevicesModel.append(dev);
+                    // A picked device that came back on another address is reached there, not where it was ticked.
+                    var ti = castTargetIndex(dev.uuid); if (ti >= 0) { var tg = _castTargets.slice(); tg[ti] = dev; _castTargets = tg; }
                 }
                 for (var ri = castDevicesModel.count - 1; ri >= 0; ri--) {
                     var rUuid = castDevicesModel.get(ri).uuid;
@@ -6062,15 +6112,15 @@ PlasmoidItem {
             if (cmd.indexOf(": AI_CLEAN;") === 0) {
                 var cleaned = (stdout || "").split("\n")[0].trim()
                               .replace(/^["'`]+|["'`]+$/g, "");
-                // The contract is exactly "Artist - Title" — and a sane
-                // LENGTH is no proof of it: the CLI can answer with chat, an
-                // apology, or a rate-limit notice ("You've hit your session
-                // limit · resets 10:30am" is 63 perfectly plausible
-                // characters, seen live this very day), and the old check
-                // sent exactly that to the music search. No " - ", or any
-                // refusal wording, means it is not a cleaned title; the
-                // regex cleaner is the road that always works.
+                // The contract is exactly "Artist - Title", and LENGTH alone is
+                // no proof of it: the CLI can answer with chat, an apology or a
+                // rate-limit notice, and the old check sent that to the search.
+                // The refusal words below are English; the answer need not be —
+                // measured 2026-09-14, the helper explained itself in Estonian,
+                // following the environment it was started in. So the weight sits
+                // on the language-blind pair: a cleaner SHORTENS, and never quotes.
                 if (cleaned.length < 3 || cleaned.length > 120
+                    || cleaned.length > root._dlPendingRaw.length + 24 || cleaned.indexOf("`") !== -1
                     || cleaned.indexOf(" - ") === -1
                     || /session limit|sorry|cannot|unable|error|apolog/i.test(cleaned)) {
                     cleaned = _cleanQueryLocal(root._dlPendingRaw);
@@ -6155,8 +6205,13 @@ PlasmoidItem {
                     root.downloading = false;
                     var noQ = root._dlCurrentQuery;
                     root._dlCurrentQuery = "";
+                    // yt-dlp's own failure used to read as "nothing matched" and sent people rewording a fine query.
+                    var dlErr = "";
+                    for (var ce = 0; ce < candLines.length; ce++)
+                        if (candLines[ce].indexOf("__DL_PICK_ERR__ ") === 0) dlErr = candLines[ce].substring(16);
                     notify(i18n("Nothing found to download"),
-                           i18n("No track matched \"%1\" — a show or album title often has no single track to find.", noQ),
+                           dlErr !== "" ? i18n("yt-dlp could not search: %1", dlErr)
+                                        : i18n("No track matched \"%1\" — a show or album title often has no single track to find.", noQ),
                            "dialog-warning");
                     return;
                 }
@@ -6251,9 +6306,9 @@ PlasmoidItem {
             if (gm && parseInt(gm[1], 10) !== root._icyUrlGen) {
                 return; // stale result — the station has been switched
             }
-            // The current gen IS the playing source, so that is the URL this
-            // result belongs to (used below to pin a no-ICY source).
-            var queryUrl = playMusic.source.toString();
+            // The current gen IS the playing source — pinned as the STATION,
+            // not the loopback a relay plays from, like every road that lifts it.
+            var queryUrl = _icyStreamTarget(playMusic.source);
             // Strip only trailing newlines — .trim() would eat the protocol TAB
             // when the StreamUrl part is empty ("Title\t\n") and break '::' titles.
             var formattedText = (stdout || "").replace(/[\r\n]+$/, "");
@@ -6290,6 +6345,7 @@ PlasmoidItem {
                     root._noIcySource = queryUrl;
                     infoTimer.stop();
                     fastRetryTimer.stop();
+                    noIcyRecheck.restart();
                 } else {
                     fastRetryTimer.restart();
                 }
@@ -6505,7 +6561,7 @@ PlasmoidItem {
                 // NB: compare the URL, not truthiness — the bitrate fallback swaps
                 // the source without startWithFade, and the old pin must not
                 // silence the new stream forever.
-                if (!infoTimer.running && root._noIcySource !== playMusic.source.toString()) infoTimer.start();
+                if (!infoTimer.running && root._noIcySource !== _icyStreamTarget(playMusic.source)) infoTimer.start();
             }
             if (playMusic.mediaStatus === MediaPlayer.EndOfMedia
                 || playMusic.mediaStatus === MediaPlayer.InvalidMedia
@@ -6591,9 +6647,9 @@ PlasmoidItem {
                     // What plays next, in order of the listener's own word:
                     // the Up-next queue first (their explicit picks, across
                     // shows), then continuous listening — oldest unheard
-                    // DOWNLOAD of the same show, so a serial plays forward
-                    // and a one-file show simply ends.
-                    if (!root._podPlayUpNextHead()
+                    // DOWNLOAD of the same show. Nothing at all inside a stop's
+                    // fade: that end is the Stop's doing, not a cue to play on.
+                    if (!fadeOutAnimation.running && !root._podPlayUpNextHead()
                         && Plasmoid.configuration.podcastContinuous !== false
                         && endedFeed) {
                         var nextFile = PodcastLogic.nextUnplayed(
@@ -7083,7 +7139,7 @@ PlasmoidItem {
             // the Qt latch nor a no-metadata pin owns the silence, the
             // poll gets its life back here.
             if (isPlaying() && !root._qtMetaWorks
-                && root._noIcySource !== playMusic.source.toString()
+                && root._noIcySource !== _icyStreamTarget(playMusic.source)
                 && !infoTimer.running)
                 infoTimer.restart();
         }
@@ -7154,6 +7210,21 @@ PlasmoidItem {
         }
     }
 
+    // Six blank polls pin a station as "no titles"; a blank start (an ad) is no verdict for the evening — issue #10's pin. Lifted every 5 min.
+    Timer {
+        id: noIcyRecheck
+        interval: 5 * 60 * 1000
+        repeat: false
+        onTriggered: {
+            if (!isPlaying() || isError || root._qtMetaWorks) return;
+            if (root._noIcySource !== _icyStreamTarget(playMusic.source)) return;
+            root._noIcySource = "";
+            root._icyEmptyCount = 3;
+            infoTimer.start();
+            getStreamInfo(playMusic.source, root.metadata);
+        }
+    }
+
     Timer {
         id: fastRetryTimer
         interval: 2000
@@ -7180,10 +7251,10 @@ PlasmoidItem {
                 sleepTimer.stop();
                 if (sleepFadeAnimation.running) sleepFadeAnimation.stop();
                 root._volumeBeforeSleepFade = -1;
-                // Cast-only playback keeps isPlaying() false — the timer
-                // used to count to zero and leave the bedroom speaker
-                // playing all night. stopWithFade handles both sides.
-                if (isPlaying() || _casting) stopWithFade();
+                // Cast-only playback keeps isPlaying() false, and so does a
+                // stream mid-recovery — the standing order dies here either
+                // way, or the retry woke the sleeper back up. All three stop.
+                if (isPlaying() || _casting || _wantsPlaying) stopWithFade();
             } else {
                 sleepRemainingSec = remaining;
                 // Begin a 30-second linear fade so audio tapers off naturally

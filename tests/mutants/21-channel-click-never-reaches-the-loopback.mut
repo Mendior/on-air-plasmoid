@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The quiet swap goes back to admitting only members whose delay moved,
+  so a channel-only change (L/R/M) on a live wired member never reaches
+  its loopback.
+
+history:
+  Found 2026-09-05 reading setDeviceChannel: the click writes the map,
+  bumps _chanRev and restarts syncOffsetDebounce, which takes the quiet
+  swap. The swap compared wanted and deployed DELAYS and skipped every
+  member within 2 ms — a channel change moves no delay, so toSwap came
+  back empty and the swap answered "deferred". The speaker kept playing
+  full stereo until some unrelated rebuild happened to reload it, and the
+  popup showed the L it had never been given. The swap now remembers the
+  channel each loopback was built with and treats a changed one as a
+  reason to swap; this mutant forgets the channel again.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+              if (Math.abs(want - have) < 2 && chWant === chHave) continue;
+
+replace:
+              if (Math.abs(want - have) < 2) continue;
+
+expect:
+  Killed by tests/qml/tst_syncengine.qml
+  test_a_channel_change_on_a_wired_member_reaches_its_loopback: the swap
+  must answer "swapped" and issue a PW_LBSWAP carrying channel_map=front-left
+  for the wired member. Line-neutral.

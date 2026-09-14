@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Unsubscribing matches the raw feed string while the star that offers it
+  matches feed keys, so a show reached under its other spelling shows a lit
+  star whose click removes nothing and says nothing.
+
+history:
+  isPodcastSubscribed was loosened to feed keys on 2026-09-06 so that one
+  show over http and https, with and without a trailing slash, would be one
+  subscription. removePodcastSub was left on ===. Both roads are driven by
+  the same button with the same url, so the looser test lit the star and the
+  stricter one refused to clear it — a show found again through search could
+  not be unsubscribed at all. The old bug subscribed twice; this one never
+  lets go. Found 2026-09-08, before the release that introduced it.
+
+target:
+  package/contents/ui/PodcastEngine.qml
+
+find:
+              if (PodcastLogic.feedKey(podcastSubsModel.get(i).feedUrl) === want) {
+                  podcastSubsModel.remove(i);
+
+replace:
+              if (podcastSubsModel.get(i).feedUrl === feedUrl) {
+                  podcastSubsModel.remove(i);
+
+expect:
+  Killed by tests/qml/tst_podcastengine.qml::test_a_twin_spelling_can_also_unsubscribe.
+  Line-neutral.

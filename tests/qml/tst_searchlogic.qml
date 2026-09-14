@@ -396,4 +396,46 @@ TestCase {
         // country or not at all, never as Object.prototype furniture.
         compare(m["toString"], undefined)
     }
+
+    function test_uri_part_drops_a_lone_surrogate_and_keeps_whole_pairs() {
+        // A name cut mid-emoji ends in a lone high surrogate, on which
+        // encodeURIComponent throws. The half is dropped, a whole pair
+        // survives, and plain text encodes exactly as it always did.
+        var loneHigh = "Radio " + String.fromCharCode(0xD83D);
+        compare(SL.uriPart(loneHigh), "Radio%20");
+        var loneLow = String.fromCharCode(0xDE00) + "FM";
+        compare(SL.uriPart(loneLow), "FM");
+        var pair = "Jazz " + String.fromCharCode(0xD83C, 0xDFB7);
+        compare(SL.uriPart(pair), encodeURIComponent(pair));
+        compare(SL.uriPart("Raadio Elmar & Sky+"), encodeURIComponent("Raadio Elmar & Sky+"));
+        compare(SL.uriPart(null), "");
+        compare(SL.uriPart(undefined), "");
+    }
+
+    function test_mirror_rungs_lead_with_the_answer_keep_the_seeds_and_close_on_all() {
+        var rows = [
+            { name: "de1.api.radio-browser.info" },
+            { name: "fi1.api.radio-browser.info" },
+            { name: "all.api.radio-browser.info" },
+            { name: "de1.api.radio-browser.info" },
+            { name: "evil.example/../api.radio-browser.info" },
+            { name: "UPPER.api.radio-browser.info" },
+            { },
+            null
+        ];
+        var r = SL.mirrorRungs(rows, ["de2", "de1", "all"]);
+        compare(r.names, ["de1", "fi1", "de2", "all"]);
+        compare(r.discovered, 2);
+    }
+
+    function test_mirror_rungs_with_nothing_discovered_keep_the_seeds_untouched() {
+        // An empty or broken answer must not cost the walk its known-good
+        // rungs — that is the whole reason the seeds are merged, not replaced.
+        var r = SL.mirrorRungs([], ["de2", "de1", "all"]);
+        compare(r.names, ["de2", "de1", "all"]);
+        compare(r.discovered, 0);
+        var g = SL.mirrorRungs("garbage", null);
+        compare(g.names, ["all"]);
+        compare(g.discovered, 0);
+    }
 }

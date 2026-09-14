@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A podcast feed healed to a new address no longer takes its alarm along,
+  so "the newest episode of this show" searches a feed that stopped
+  existing and the morning alarm rings silence.
+
+history:
+  The heal moved the subscription and the seen map and nothing else. The
+  per-show speed, the downloads ledger's feed field and every alarm that
+  named the show by its old address were left pointing at a feed nobody
+  would ever fetch again (found 2026-09-05, fixed 2026-09-06). This mutant
+  makes the alarm engine's retarget a silent no-op.
+
+target:
+  package/contents/ui/AlarmEngine.qml
+
+find:
+          if (!changed) return false;
+
+replace:
+          if (!changed || changed) return false;
+
+expect:
+  Killed by tests/qml/tst_alarmengine.qml
+  test_a_healed_feed_moves_its_podcast_alarm. Line-neutral.

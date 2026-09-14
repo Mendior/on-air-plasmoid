@@ -48,6 +48,11 @@ Item {
             function tsServeScriptPath() { return "/opt/onair/relayserve.py"; }
             property bool playingNow: true
             function isPlaying() { return playingNow; }
+            // The park lives on the app side — the engine's own `shifted` only
+            // turns true on a RESUME, so this is the only thing that tells it a
+            // listener has pressed pause. The mock carried no such property, and
+            // an engine that never asked passed here just as happily.
+            property bool _tsPaused: false
             function tsPlayBuffer(url, pos) { played.push({ kind: "buffer", url: url, pos: pos }); }
             function tsPlayLive(url) { played.push({ kind: "live", url: url, pos: -1 }); }
             function tsPlayRelay(url) { played.push({ kind: "relay", url: url, pos: -1 }); }
@@ -505,10 +510,12 @@ Item {
         verify(r.e.bufPath.indexOf(".ogg") !== -1);
     }
 
-    function test_one_birth_death_ends_the_re_arming_for_the_session() {
+    function test_one_birth_death_ends_the_re_arming_for_ten_minutes() {
         // Freeze, rescue, birth-death, live, freeze again — each round
         // audible. A stream whose writer died at birth once already gets
-        // no second writer this session: the rescue's re-arm is refused.
+        // no second writer for ten minutes: the rescue's re-arm is refused.
+        // Not for the whole session, though — a wifi handover at the wrong
+        // second used to cost the station its relay until a restart.
         var r = rig({ timeshiftEnabled: true });
         verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
         r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
@@ -520,6 +527,94 @@ Item {
         verify(!r.e.armRelay("https://atma.fm/channel1", "Atma", 1010000));
         compare(r.mock.execLog.length, n);                  // no new writer spawned
         verify(!r.e.active);
+        // Eleven minutes on, the verdict has expired and the arm goes out.
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1004800 + 11 * 60 * 1000));
+        verify(r.mock.execLog.length > n);
+    }
+
+    function test_back_to_live_can_catch_up_once_the_ban_expires() {
+        // "Back to live" on a relayed station is a fresh capture, so it goes
+        // through armRelay — and it handed it a literal 0 for the clock. Once
+        // the ten-minute birth-death window arrived, 0 minus a real timestamp
+        // was hugely negative, which is inside any window for ever: a station
+        // that lost its writer once could never be caught back up again.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        var runCmd = "";
+        for (var i = 0; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": TS_RUN;") === 0) runCmd = r.mock.execLog[i];
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=234 bytes=0", 1004800);
+        var n = r.mock.execLog.length;
+        // Inside the window the press is still refused…
+        r.e.streamUrl = "https://atma.fm/channel1"; r.e.relay = true; r.e.shiftPosMs = 0;
+        r.e.backToLive(1010000);
+        compare(r.mock.execLog.length, n);
+        // …and eleven minutes on the same press arms a writer.
+        r.e.streamUrl = "https://atma.fm/channel1"; r.e.relay = true; r.e.shiftPosMs = 0;
+        r.e.backToLive(1004800 + 11 * 60 * 1000);
+        verify(r.mock.execLog.length > n);
+    }
+
+    function test_a_parked_relay_is_not_rebuilt_by_a_late_player_error() {
+        // The park stops the player but leaves the source pointing at the tap.
+        // When the tap's own ffmpeg then falls over, Qt raises an error against
+        // that stopped source — and the rebuild brought the room back up over
+        // the listener's pause. Same terminus as the window cap, second door.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        r.mock._tsPaused = true;
+        r.mock.playingNow = false;
+        var cmdsBefore = r.mock.execLog.length;
+        verify(!r.e.relayPlaybackFell(1200000));        // declined
+        compare(r.mock.execLog.length, cmdsBefore);      // nothing re-armed
+        // …and a live listener still gets the rebuild that keeps the music on.
+        r.mock._tsPaused = false;
+        r.mock.playingNow = true;
+        verify(r.e.relayPlaybackFell(1200000));
+        verify(r.mock.execLog.length > cmdsBefore);
+    }
+
+    function test_a_parked_relay_is_not_woken_by_its_own_window_cap() {
+        // The capture writer carries ffmpeg's -t <window>, so it exits on its
+        // own after an hour. For a LIVE relay listener that exit is a re-arm —
+        // the player coasts while a fresh tap comes up. Over a PARK it was a
+        // wake-up call: the re-arm went out, the tap's UP ack reached
+        // tsPlayRelay, and tsPlayRelay clears _tsPaused and plays. An Ogg or
+        // FLAC station paused before lunch started itself an hour later with
+        // nobody in the room — issue #13's shape, from a wall clock alone.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        var runCmd = "";
+        for (var i = 0; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": TS_RUN;") === 0) runCmd = r.mock.execLog[i];
+        verify(runCmd !== "");
+        // The listener parks it and walks away.
+        r.mock._tsPaused = true;
+        r.mock.playingNow = false;
+        var cmdsBefore = r.mock.execLog.length;
+        var playedBefore = r.mock.played.length;
+        // An hour on, the writer reaches its cap and exits cleanly.
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=0 bytes=9000000", 1000000 + 61 * 60 * 1000);
+        compare(r.mock.execLog.length, cmdsBefore);    // no re-arm went out
+        compare(r.mock.played.length, playedBefore);   // and nothing played
+    }
+
+    function test_a_live_relay_still_re_arms_when_its_writer_caps() {
+        // The positive control for the test above: without a park, the same
+        // clean exit must still re-arm, or the guard has cured the wake-up by
+        // breaking the hour-long listening it was written for.
+        var r = rig({ timeshiftEnabled: true });
+        verify(r.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+        r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], "__TS_URL_OK__", 1000000);
+        var runCmd = "";
+        for (var i = 0; i < r.mock.execLog.length; i++)
+            if (r.mock.execLog[i].indexOf(": TS_RUN;") === 0) runCmd = r.mock.execLog[i];
+        var cmdsBefore = r.mock.execLog.length;
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=0 bytes=9000000", 1000000 + 61 * 60 * 1000);
+        verify(r.mock.execLog.length > cmdsBefore);    // the re-arm went out
     }
 
     function test_a_parked_room_is_not_woken_by_a_writers_death() {

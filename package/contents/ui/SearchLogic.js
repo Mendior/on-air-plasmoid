@@ -375,3 +375,58 @@ function countryDisplayName(cc, localeName) {
     }
     return c
 }
+
+// A query part for a radio-browser URL. encodeURIComponent throws URIError
+// on a lone surrogate, and station names arrive with those: a catalogue row
+// truncated mid-emoji, or a config cap that cut a pair in half. One such
+// name used to abort the whole favicon backfill and the uuid heal for that
+// station, inside a timer handler where nothing caught it. The lone half
+// carries no meaning, so it is dropped rather than escaped.
+function uriPart(s) {
+    var t = String(s === undefined || s === null ? "" : s);
+    var out = "";
+    for (var i = 0; i < t.length; i++) {
+        var c = t.charCodeAt(i);
+        if (c >= 0xD800 && c <= 0xDBFF) {
+            var d = i + 1 < t.length ? t.charCodeAt(i + 1) : 0;
+            if (d >= 0xDC00 && d <= 0xDFFF) { out += t.substr(i, 2); i++; }
+            continue;
+        }
+        if (c >= 0xDC00 && c <= 0xDFFF) continue;
+        out += t.charAt(i);
+    }
+    return encodeURIComponent(out);
+}
+
+// radio-browser's /json/servers answer, reduced to the mirror names a retry
+// walk may climb. Discovered names lead, the seeds not among them follow,
+// "all" closes the walk — it is round-robin DNS over the same healthy set
+// and stays as the everyone-else-is-down door. Replacing the seeds outright
+// is what the settings page paid for once: the day the answer held one
+// name and that name died, every retry knocked on the same door while de2
+// answered fine. The widget's own walk kept doing that replacement until
+// 2026-09-05. Names are validated to a hostname label before they may
+// become part of a URL host.
+function mirrorRungs(rows, seeds) {
+    var seen = Object.create(null);
+    var names = [], discovered = 0;
+    seen.all = true;
+    var list = Array.isArray(rows) ? rows : [];
+    for (var i = 0; i < list.length; i++) {
+        var nm = String((list[i] && list[i].name) || "");
+        var m = nm.match(/^([a-z0-9-]+)\.api\.radio-browser\.info$/);
+        if (!m || seen[m[1]]) continue;
+        seen[m[1]] = true;
+        names.push(m[1]);
+        discovered++;
+    }
+    var s = Array.isArray(seeds) ? seeds : [];
+    for (var j = 0; j < s.length; j++) {
+        var sd = String(s[j] || "");
+        if (sd === "" || seen[sd]) continue;
+        seen[sd] = true;
+        names.push(sd);
+    }
+    names.push("all");
+    return { names: names, discovered: discovered };
+}

@@ -47,10 +47,15 @@ MouseArea {
     // Screen-reader identity — a bare MouseArea otherwise exposes nothing
     // (the default compact representation this file replaces would have)
     Accessible.role: Accessible.Button
+    // The parsed artist and title, not the dressed ICY line; a station that
+    // sends no titles is still "playing <station>", not silence.
+    readonly property string _spoken: root.trackArtist !== "" && root.trackTitle !== ""
+        ? root.trackArtist + " — " + root.trackTitle
+        : (root.trackTitle !== "" ? root.trackTitle : root.currentStation)
     Accessible.name: root.recording
         ? i18n("%1 — recording", Plasmoid.title)
-        : ((isPlaying() || root._casting) && root.title !== Plasmoid.title
-            ? i18n("%1 — playing %2", Plasmoid.title, root.title)
+        : ((isPlaying() || root._casting) && _spoken !== ""
+            ? i18n("%1 — playing %2", Plasmoid.title, _spoken)
             : Plasmoid.title)
     Accessible.description: Plasmoid.metaData.description
     Accessible.onPressAction: root.expanded = !root.expanded

@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The relayed-Ogg reader looks for the artist without the chain headers that
+  bound the newest title's comment block, so a title-only block borrows the
+  previous track's artist and a later artist-only block reaches back.
+
+history:
+  Ogg-family streams carry the track in vorbis comments, and a reconnecting
+  upstream writes a fresh block at every chain start. The first fix at this
+  spot, 2026-09-06, anchored the artist search on the PREVIOUS TITLE — which
+  separates blocks only when they spell ARTIST before TITLE. In the other
+  order the old artist sits between the two titles, inside the window, and
+  was taken for the new track: the very pairing the fix was written to end.
+  Found 2026-09-08, before release. The boundary is the identification header
+  an Ogg chain restart writes (\x03vorbis, OpusTags, \x7fFLAC and kin), and
+  the window is closed at BOTH ends so a later artist-only block cannot reach
+  back either.
+
+target:
+  package/contents/ui/reader.py
+
+find:
+          for mark in _OGG_BLOCK_MARKS:
+
+replace:
+          for mark in ():
+
+expect:
+  Killed by tests/test_reader_oggbuf.py::test_a_block_that_spells_title_before_artist_keeps_them_apart
+  and tests/test_reader_oggbuf.py::test_a_later_artist_without_a_title_cannot_reach_back.
+  Line-neutral.

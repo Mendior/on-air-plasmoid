@@ -61,6 +61,25 @@ Item {
         alarms = AlarmLogic.sanitizeAlarms(cfg.alarms);
     }
 
+    // A podcast alarm names its show by feed address. When the podcast
+    // engine heals a feed, the alarm has to follow, or "the newest episode
+    // of this show" searches a feed that stopped existing and rings silence.
+    function retargetPodcastFeed(oldFeed, newFeed) {
+        var list = [], changed = false;
+        for (var i = 0; i < alarms.length; i++) {
+            var a = alarms[i];
+            if ((a.url || "") === "podcast:" + oldFeed) {
+                var b = {}; for (var k in a) b[k] = a[k];
+                b.url = "podcast:" + newFeed; a = b; changed = true;
+            }
+            list.push(a);
+        }
+        if (!changed) return false;
+        alarms = list;
+        _saveAlarms();
+        return true;
+    }
+
     function _saveAlarms() {
         cfg.alarms = JSON.stringify(alarms);
     }

@@ -48,6 +48,22 @@ KCM.SimpleKCM {
     property string cfg_downloadFormat
     property string cfg_icon
 
+    // cfg_defaultVolume is a SNAPSHOT taken when the dialog opened. The
+    // popup's volume knob writes the real key while this page sits here, and
+    // Apply then wrote the stale copy back over it — the same trap the station
+    // list closed with its _lastSynced guard. A slider the user has not moved
+    // follows the live value; one they have moved keeps their edit.
+    property real _volumeSynced: -1
+    Component.onCompleted: _volumeSynced = cfg_defaultVolume
+    Connections {
+        target: plasmoid.configuration
+        function onDefaultVolumeChanged() {
+            const live = plasmoid.configuration.defaultVolume
+            if (root.cfg_defaultVolume === root._volumeSynced) root.cfg_defaultVolume = live
+            root._volumeSynced = live
+        }
+    }
+
 
     Kirigami.FormLayout {
         Item {
@@ -326,6 +342,12 @@ KCM.SimpleKCM {
             id: accentCheck
             Kirigami.FormData.label: i18n("Accent color:")
             text: i18n("Follow the system accent color instead of the built-in emerald")
+            // The list above is the one that speaks; a click here has to keep
+            // it in step, or the two disagreed until the dialog was reopened.
+            onToggled: {
+                root.cfg_accentMode = checked ? 1 : 0;
+                accentModeBox.currentIndex = root.cfg_accentMode;
+            }
         }
 
         QQC2.CheckBox {

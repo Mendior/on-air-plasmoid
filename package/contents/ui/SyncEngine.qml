@@ -48,7 +48,9 @@ Item {
         _loadDeviceTrims();
         _loadDeviceChannels();
         _loadSyncExcluded();
-        app.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
+        // The availability probe goes out from the sweep's ack (below): an
+        // enable it triggers must never race the sweep that unloads every
+        // onair_combined module — the two shells used to run side by side.
         // A measurement whose shell died with a previous session leaves the
         // python clicking into the room with nobody holding its leash — the
         // one phantom no UI could stop. Orphans only (reparented to init):
@@ -267,6 +269,8 @@ Item {
             || cmd.indexOf(": PW_PARKREST;") === 0
             || cmd.indexOf(": PW_CALIBKILL;") === 0 || cmd.indexOf(": PW_DRIFTKILL;") === 0
             || cmd.indexOf(": PW_ORPHANS;") === 0) {
+            if (cmd.indexOf(": PW_COMBINE_CLEAN;") === 0)
+                app.exec(": PW_PROBE; command -v pactl >/dev/null 2>&1 && echo __PACTL_YES__; true");
             return true; // fire-and-forget
         }
         // The kick-abort's own disconnect landed — only the menu wants to
@@ -578,6 +582,8 @@ Item {
             // slate is wiped — the adoption below still needs it.
             var swLags = _settleSwapLags;
             _settleSwapLags = ({});
+            var swChans = _settleSwapChans;
+            _settleSwapChans = ({});
             if (!_combineActive) {
                 _combineReloopPending = false;
                 var swUnd = "";
@@ -628,6 +634,10 @@ Item {
                 if (swLags[swSinks[sl]] !== undefined)
                     swBl[swSinks[sl]] = swLags[swSinks[sl]];
             _builtLags = swBl;
+            var swCh = {};
+            for (var sc in _builtChans) swCh[sc] = _builtChans[sc];
+            for (var scs in swChans) swCh[scs] = swChans[scs];
+            _builtChans = swCh;
             var swSh = {};
             for (var so in _builtShiftByMac) swSh[so] = _builtShiftByMac[so];
             for (var sm = 0; sm < swSinks.length; sm++) {
@@ -1980,8 +1990,16 @@ Item {
         _deviceChannels = m;
         _chanRev++;
         cfg.deviceChannels = JSON.stringify(m);
-        // The map is baked into the loopback itself — swap them live.
-        if (_combineActive) syncOffsetDebounce.restart();
+        // The map is baked into the loopback itself — swap them live. A
+        // wired member takes the quiet swap; a Bluetooth member's loopback
+        // is one the swap refuses to touch (the measured clatter and a
+        // re-roll), so its click would wait for a rebuild nothing
+        // schedules. The click IS the listener's word: rebuild now.
+        if (!_combineActive) return;
+        var btClick = false, cs = _combineRealSinks();
+        for (var ci = 0; ci < cs.length; ci++)
+            if (_trimKeyForSink(cs[ci]) === id && cs[ci].indexOf("bluez_") === 0) btClick = true;
+        if (btClick) _combineRebuildLoopbacks(); else syncOffsetDebounce.restart();
     }
 
     // One click walks the modes — a row of four buttons per speaker would
@@ -2877,6 +2895,11 @@ Item {
             bl[sinks[bj]] = lags[sinks[bj]];
         }
         _builtLags = bl;
+        var bch = {};
+        for (var bc in _builtChans) bch[bc] = _builtChans[bc];
+        for (var bci = 0; bci < sinks.length; bci++)
+            bch[sinks[bci]] = channelOf(_trimKeyForSink(sinks[bci]));
+        _builtChans = bch;
         // Accreted exactly like _builtLags above, never rebuilt from the
         // current sinks alone: a member absent for one rebuild keeps its
         // _builtLags entry, so it must keep the shift that entry was baked
@@ -2898,7 +2921,17 @@ Item {
         // not the drift. Resetting at fold time instead left the history
         // primed to re-confirm a correction that had not landed yet, and
         // one calibration mid-history had its fix folded right back out.
-        if (blChanged) {
+        // "Same lags out, same room after" held this reset to a CHANGED
+        // schedule. That is true of a wired group and false the moment a
+        // Bluetooth loopback goes out: the reload re-rolls its transport
+        // whatever the number says (measured 2026-08-13 — a park→wake with
+        // identical lags read 47 ms at the first probe and 8 at the next,
+        // and the 47 went into the history as drift). A rebuild that
+        // reloads a Bluetooth member resets the bookkeeping too.
+        var btReroll = false;
+        for (var bri = 0; bri < sinks.length; bri++)
+            if (sinks[bri].indexOf("bluez_") === 0) btReroll = true;
+        if (blChanged || btReroll) {
             _driftSkipNext = true;
             _driftHistory = [];
             _driftHistoryAt = [];
@@ -2991,7 +3024,11 @@ Item {
                 cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
                      + " pactl suspend-sink '" + s + "' 1;"
                      + " pactl suspend-sink '" + s + "' 0; }";
-            cmds += "; else echo \"LBMISS " + s + "\"; fi; ";
+            // Its previous loopback stays loaded otherwise — feeding a sink that
+            // is not there, moved by WirePlumber onto whatever is, and doubled
+            // the moment the retry seats the new one.
+            cmds += "; else echo \"LBMISS " + s + "\";"
+                  + (oldId !== "" ? " pactl unload-module " + oldId + " 2>/dev/null;" : "") + " fi; ";
         }
         // Every build re-rolls the Bluetooth transport (the birth flush
         // above is part of why), so the room the map was measured in is
@@ -3152,6 +3189,10 @@ Item {
     // correction is written; this is what the room is actually hearing, and
     // between a quiet fold and the next rebuild the two differ on purpose.
     property var _builtLags: ({})
+    // The channel each loopback was baked with ("S", "L", "R", "M"), kept
+    // beside its lag: the quiet swap has to compare both, or a channel-only
+    // click never reaches the speaker (found 2026-09-05).
+    property var _builtChans: ({})
 
     // The transport shift each Bluetooth member was BUILT with, keyed by
     // MAC. A shift can be recorded while a reloop is mid-flight, and until
@@ -3764,6 +3805,23 @@ Item {
     // live loopbacks — audible phasing, the exact artifact this feature
     // exists to prevent.
     property bool _combineReloopBusy: false
+    // A rebuild or swap whose shell dies without an ack used to leave this
+    // flag standing, and every later rebuild waited on it for the rest of
+    // the session. Thirty seconds is longer than any honest shell here.
+    Timer { id: reloopBusyGuard; interval: 30000; repeat: false; onTriggered: _reloopGuardFire() }
+    function _reloopGuardFire() {
+        if (!_combineReloopBusy) return;
+        console.log("[ARP] sync: a rebuild never answered — clearing the busy flag");
+        _combineReloopBusy = false;
+        // A rebuild queued behind the hung shell is the newest word on what
+        // the room should be — a speaker that joined or left while it hung.
+        // Both ack roads run it; dropping it here left the room in the shape
+        // it had before that change until something else happened to ask.
+        if (_combineReloopPending) {
+            _combineReloopPending = false;
+            _combineRebuildLoopbacks();
+        }
+    }
     property bool _combineReloopPending: false
 
     // A rebuild that lands mid-measurement unloads the very loopback a
@@ -3787,6 +3845,7 @@ Item {
         if (_calibrating || _verifyPending) { _rebuildHeld = true; return; }
         if (_combineReloopBusy) { _combineReloopPending = true; return; }
         _combineReloopBusy = true;
+        reloopBusyGuard.restart();
         var sinks = _combineRealSinks();
         _combineSinksSnapshot = _combineGroupSignature();
         // The unload-everything-first line is gone: each member that is
@@ -4556,6 +4615,7 @@ Item {
     // The lags the swap's delays were computed from — adopted as the new
     // as-built frame when the ack lands, discarded if it never does.
     property var _settleSwapLags: ({})
+    property var _settleSwapChans: ({})
     // Below this the room is already inside the ear's don't-care band and
     // the periodic fold owns the residue — a swap would spend a stream
     // restart to fix what nobody can hear. 10, not the 25 it launched
@@ -4830,7 +4890,9 @@ Item {
         for (var j = 0; j < sinks.length; j++) {
             var want = Math.round(_loopbackFloorMs + (maxLag - lags[sinks[j]]));
             var have = Math.round(_deployedDelayMs(sinks[j], sinks));
-            if (Math.abs(want - have) < 2) continue;
+            var chWant = channelOf(_trimKeyForSink(sinks[j]));
+            var chHave = _builtChans[sinks[j]] !== undefined ? _builtChans[sinks[j]] : chWant;
+            if (Math.abs(want - have) < 2 && chWant === chHave) continue;
             if (sinks[j].indexOf("bluez_") === 0) { btMoves = true; continue; }
             toSwap.push({ sink: sinks[j], d: want });
         }
@@ -4870,12 +4932,14 @@ Item {
         var awkSi = " '/^Sink Input #/{si=substr($3,2)}"
                   + " $1==\"Owner\" && $2==\"Module:\" && $3==m {print si; exit}'";
         var cmds = "";
+        _settleSwapChans = ({});
         for (var k = 0; k < toSwap.length; k++) {
             var s = toSwap[k].sink.replace(/'/g, "'\\''");
             var oldId = "";
             for (var mod in _combineLoopbackSinkByModule)
                 if (_combineLoopbackSinkByModule[mod] === toSwap[k].sink) oldId = mod;
             var chMode = channelOf(_trimKeyForSink(toSwap[k].sink));
+            _settleSwapChans[toSwap[k].sink] = chMode;
             var chSpec = chMode === "L" ? "channels=1 channel_map=front-left"
                        : chMode === "R" ? "channels=1 channel_map=front-right"
                        : chMode === "M" ? "channels=1 channel_map=mono"
@@ -4920,6 +4984,7 @@ Item {
         }
         _settleSwapLags = lags;
         _combineReloopBusy = true;
+        reloopBusyGuard.restart();
         app.exec(": PW_LBSWAP " + _combineLoadSeq + "; " + cmds + "true"
                  + " # " + app.nextSeq());
         return "swapped";

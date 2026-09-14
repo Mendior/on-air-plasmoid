@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-08-21 10:44+0300\n"
+"POT-Creation-Date: 2026-09-06 12:48+0300\n"
 "PO-Revision-Date: 2026-07-24 12:17+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Hindi\n"
@@ -16,8 +16,8 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/config/configAppearance.qml:93
-#: package/contents/ui/FullRepresentation.qml:5454
+#: package/contents/ui/config/configAppearance.qml:109
+#: package/contents/ui/FullRepresentation.qml:5455
 msgid "Stations"
 msgstr "स्टेशन"
 
@@ -30,6 +30,7 @@ msgid "Recording"
 msgstr "रिकॉर्डिंग"
 
 #: package/contents/config/config.qml:28
+#: package/contents/ui/config/configSearch.qml:474
 msgid "Search"
 msgstr "खोज"
 
@@ -37,38 +38,38 @@ msgstr "खोज"
 msgid "Automation"
 msgstr "स्वचालन"
 
-#: package/contents/ui/AlarmEngine.qml:122
+#: package/contents/ui/AlarmEngine.qml:141
 msgid "Wake-up alarm missed"
 msgstr "वेक-अप अलार्म छूट गया"
 
-#: package/contents/ui/AlarmEngine.qml:123
+#: package/contents/ui/AlarmEngine.qml:142
 msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 %2 के लिए सेट था — उस समय कंप्यूटर बंद या स्लीप में था।"
 
-#: package/contents/ui/AlarmEngine.qml:157
-#: package/contents/ui/AlarmEngine.qml:281
-#: package/contents/ui/AlarmEngine.qml:325
-#: package/contents/ui/AlarmEngine.qml:327
-#: package/contents/ui/AlarmEngine.qml:374
-#: package/contents/ui/AlarmEngine.qml:381
-#: package/contents/ui/AlarmEngine.qml:456
-#: package/contents/ui/AlarmEngine.qml:459
+#: package/contents/ui/AlarmEngine.qml:176
+#: package/contents/ui/AlarmEngine.qml:300
+#: package/contents/ui/AlarmEngine.qml:344
+#: package/contents/ui/AlarmEngine.qml:346
+#: package/contents/ui/AlarmEngine.qml:393
+#: package/contents/ui/AlarmEngine.qml:400
+#: package/contents/ui/AlarmEngine.qml:475
+#: package/contents/ui/AlarmEngine.qml:478
 msgid "Wake-up alarm"
 msgstr "वेक-अप अलार्म"
 
-#: package/contents/ui/AlarmEngine.qml:158
+#: package/contents/ui/AlarmEngine.qml:177
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 उसी समय के लिए निर्धारित था — इसके बजाय %2 चलाया जा रहा है।"
 
-#: package/contents/ui/AlarmEngine.qml:383
+#: package/contents/ui/AlarmEngine.qml:402
 msgid "the show"
 msgstr "शो"
 
-#: package/contents/ui/AlarmEngine.qml:382
+#: package/contents/ui/AlarmEngine.qml:401
 msgid "No downloaded episode of %1 was on disk — waking with the chime."
 msgstr "%1 का कोई डाउनलोड किया गया एपिसोड डिस्क पर नहीं था — चाइम के साथ जगाया जा रहा है।"
 
-#: package/contents/ui/AlarmEngine.qml:460
+#: package/contents/ui/AlarmEngine.qml:479
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "स्टेशन शुरू नहीं हो सका — इसके बजाय बिल्ट-इन टोन चलाई जा रही है।"
 
@@ -81,13 +82,13 @@ msgid "%1 — playing %2"
 msgstr "%1 — %2 चल रहा है"
 
 #: package/contents/ui/CompactRepresentation.qml:93
-#: package/contents/ui/config/configAppearance.qml:241
+#: package/contents/ui/config/configAppearance.qml:257
 msgid "Audio"
 msgstr "ऑडियो"
 
 #: package/contents/ui/CompactRepresentation.qml:93
 #: package/contents/ui/FullRepresentation.qml:4973
-#: package/contents/ui/FullRepresentation.qml:5904
+#: package/contents/ui/FullRepresentation.qml:5905
 msgid "Volume"
 msgstr "वॉल्यूम"
 
@@ -95,393 +96,393 @@ msgstr "वॉल्यूम"
 msgid "Muted"
 msgstr "म्यूट"
 
-#: package/contents/ui/config/configAppearance.qml:54
+#: package/contents/ui/config/configAppearance.qml:70
 msgid "Colours"
 msgstr "रंग"
 
-#: package/contents/ui/config/configAppearance.qml:63
+#: package/contents/ui/config/configAppearance.qml:79
 msgid "Accent:"
 msgstr "उभार:"
 
-#: package/contents/ui/config/configAppearance.qml:64
+#: package/contents/ui/config/configAppearance.qml:80
 msgid "On Air green"
 msgstr "ऑन एयर हरा"
 
-#: package/contents/ui/config/configAppearance.qml:64
+#: package/contents/ui/config/configAppearance.qml:80
 msgid "System accent colour"
 msgstr "सिस्टम का उभार रंग"
 
-#: package/contents/ui/config/configAppearance.qml:64
+#: package/contents/ui/config/configAppearance.qml:80
 msgid "Plain — no colour of its own"
 msgstr "सादा — अपना कोई रंग नहीं"
 
-#: package/contents/ui/config/configAppearance.qml:76
+#: package/contents/ui/config/configAppearance.qml:92
 msgid "Tabs"
 msgstr "टैब"
 
-#: package/contents/ui/config/configAppearance.qml:92
-#: package/contents/ui/config/configAppearance.qml:125
-#: package/contents/ui/config/configAppearance.qml:149
+#: package/contents/ui/config/configAppearance.qml:108
+#: package/contents/ui/config/configAppearance.qml:141
+#: package/contents/ui/config/configAppearance.qml:165
 msgid "Show:"
 msgstr "दिखाएँ:"
 
-#: package/contents/ui/config/configAppearance.qml:97
-#: package/contents/ui/FullRepresentation.qml:5476
-#: package/contents/ui/FullRepresentation.qml:5635
+#: package/contents/ui/config/configAppearance.qml:113
+#: package/contents/ui/FullRepresentation.qml:5477
+#: package/contents/ui/FullRepresentation.qml:5636
 msgid "Playing"
 msgstr "चल रहा है"
 
-#: package/contents/ui/config/configAppearance.qml:101
+#: package/contents/ui/config/configAppearance.qml:117
 #: package/contents/ui/FullRepresentation.qml:3382
-#: package/contents/ui/FullRepresentation.qml:5501
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2269
+#: package/contents/ui/FullRepresentation.qml:5502
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2267
 msgid "My Music"
 msgstr "My Music"
 
-#: package/contents/ui/config/configAppearance.qml:105
-#: package/contents/ui/config/configAutomation.qml:37
-#: package/contents/ui/FullRepresentation.qml:5526
+#: package/contents/ui/config/configAppearance.qml:121
+#: package/contents/ui/config/configAutomation.qml:50
+#: package/contents/ui/FullRepresentation.qml:5527
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "पॉडकास्ट"
 
-#: package/contents/ui/config/configAppearance.qml:109
-#: package/contents/ui/FullRepresentation.qml:5551
+#: package/contents/ui/config/configAppearance.qml:125
+#: package/contents/ui/FullRepresentation.qml:5552
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "टाइमर"
 
-#: package/contents/ui/config/configAppearance.qml:113
+#: package/contents/ui/config/configAppearance.qml:129
 msgid "Stations page"
 msgstr "स्टेशन पृष्ठ"
 
-#: package/contents/ui/config/configAppearance.qml:126
+#: package/contents/ui/config/configAppearance.qml:142
 msgid "Search field"
 msgstr "खोज फ़ील्ड"
 
-#: package/contents/ui/config/configAppearance.qml:130
+#: package/contents/ui/config/configAppearance.qml:146
 msgid "Discovery row (Trending, country, genres)"
 msgstr "खोज-पंक्ति (ट्रेंडिंग, देश, शैलियाँ)"
 
-#: package/contents/ui/config/configAppearance.qml:134
+#: package/contents/ui/config/configAppearance.qml:150
 msgid "Reorder and remove controls on each row"
 msgstr "हर पंक्ति पर क्रम बदलने और हटाने के नियंत्रण"
 
-#: package/contents/ui/config/configAppearance.qml:138
+#: package/contents/ui/config/configAppearance.qml:154
 msgid "Layout:"
 msgstr "लेआउट:"
 
-#: package/contents/ui/config/configAppearance.qml:139
+#: package/contents/ui/config/configAppearance.qml:155
 msgid "Compact rows (three-quarter height)"
 msgstr "सघन पंक्तियाँ (तीन-चौथाई ऊँचाई)"
 
-#: package/contents/ui/config/configAppearance.qml:143
+#: package/contents/ui/config/configAppearance.qml:159
 msgid "Playing page"
 msgstr "चल रहा पृष्ठ"
 
-#: package/contents/ui/config/configAppearance.qml:150
+#: package/contents/ui/config/configAppearance.qml:166
 msgid "Cover picture"
 msgstr "कवर चित्र"
 
-#: package/contents/ui/config/configAppearance.qml:154
+#: package/contents/ui/config/configAppearance.qml:170
 msgid "Bitrate badge"
 msgstr "बिटरेट बैज"
 
-#: package/contents/ui/config/configAppearance.qml:158
+#: package/contents/ui/config/configAppearance.qml:174
 msgid "On opening:"
 msgstr "खोलने पर:"
 
-#: package/contents/ui/config/configAppearance.qml:159
+#: package/contents/ui/config/configAppearance.qml:175
 msgid "Return to the tab I was last on"
 msgstr "जिस टैब पर था वहीं लौटें"
 
-#: package/contents/ui/config/configAppearance.qml:163
+#: package/contents/ui/config/configAppearance.qml:179
 msgid "While playing:"
 msgstr "चलते समय:"
 
-#: package/contents/ui/config/configAppearance.qml:164
+#: package/contents/ui/config/configAppearance.qml:180
 msgid "Jump to Playing soon after a station starts"
 msgstr "स्टेशन शुरू होने के कुछ देर बाद चल रहा पृष्ठ पर जाएँ"
 
-#: package/contents/ui/config/configAppearance.qml:168
+#: package/contents/ui/config/configAppearance.qml:184
 msgid "Everything back:"
 msgstr "सब वापस:"
 
-#: package/contents/ui/config/configAppearance.qml:170
+#: package/contents/ui/config/configAppearance.qml:186
 msgid "Show all of it again"
 msgstr "सब कुछ फिर दिखाएँ"
 
-#: package/contents/ui/config/configAppearance.qml:188
+#: package/contents/ui/config/configAppearance.qml:204
 msgid "Panel"
 msgstr "पैनल"
 
-#: package/contents/ui/config/configAppearance.qml:193
+#: package/contents/ui/config/configAppearance.qml:209
 msgid "Panel icon:"
 msgstr "पैनल आइकन:"
 
-#: package/contents/ui/config/configAppearance.qml:208
+#: package/contents/ui/config/configAppearance.qml:224
 msgid "Reset"
 msgstr "रीसेट करें"
 
-#: package/contents/ui/config/configAppearance.qml:221
+#: package/contents/ui/config/configAppearance.qml:237
 msgid "Your icon theme does not have this icon — the widget is using its own."
 msgstr "आपकी आइकन थीम में यह आइकन नहीं है — विजेट अपना आइकन उपयोग कर रहा है।"
 
-#: package/contents/ui/config/configAppearance.qml:246
+#: package/contents/ui/config/configAppearance.qml:262
 msgid "Default volume:"
 msgstr "डिफ़ॉल्ट वॉल्यूम:"
 
-#: package/contents/ui/config/configAppearance.qml:265
+#: package/contents/ui/config/configAppearance.qml:281
 msgid "Smooth fade:"
 msgstr "स्मूद फ़ेड:"
 
-#: package/contents/ui/config/configAppearance.qml:266
+#: package/contents/ui/config/configAppearance.qml:282
 msgid "Fade volume when changing stations"
 msgstr "स्टेशन बदलते समय वॉल्यूम फ़ेड करें"
 
-#: package/contents/ui/config/configAppearance.qml:271
+#: package/contents/ui/config/configAppearance.qml:287
 msgid "Fade duration (ms):"
 msgstr "फ़ेड अवधि (ms):"
 
-#: package/contents/ui/config/configAppearance.qml:280
+#: package/contents/ui/config/configAppearance.qml:296
 msgid "Stream quality:"
 msgstr "स्ट्रीम गुणवत्ता:"
 
-#: package/contents/ui/config/configAppearance.qml:281
+#: package/contents/ui/config/configAppearance.qml:297
 msgid "Automatically switch to the highest-bitrate variant of a station"
 msgstr "स्टेशन के उच्चतम बिटरेट वाले वैरिएंट पर स्वचालित रूप से स्विच करें"
 
-#: package/contents/ui/config/configAppearance.qml:284
+#: package/contents/ui/config/configAppearance.qml:300
 msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
 msgstr "radio-browser.info पर स्टेशन खोजकर सर्वोत्तम गुणवत्ता वाला स्ट्रीम URL चुनता है"
 
-#: package/contents/ui/config/configAppearance.qml:289
+#: package/contents/ui/config/configAppearance.qml:305
 msgid "Find a station's new address when its stream dies"
 msgstr "स्ट्रीम बंद हो जाने पर स्टेशन का नया पता खोजें"
 
-#: package/contents/ui/config/configAppearance.qml:292
+#: package/contents/ui/config/configAppearance.qml:308
 msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
 msgstr "स्टेशन सर्वर बदलते रहते हैं; प्लेबैक विफल होने पर स्टेशन को radio-browser.info पर खोजा जाता है और जिस पते पर वह अभी उपलब्ध है, उसे आपकी सूची में सहेज लिया जाता है"
 
-#: package/contents/ui/config/configAppearance.qml:297
+#: package/contents/ui/config/configAppearance.qml:313
 msgid "Count my listening in the worldwide station catalog"
 msgstr "मेरे सुनने को विश्वव्यापी स्टेशन कैटलॉग में गिनें"
 
-#: package/contents/ui/config/configAppearance.qml:300
+#: package/contents/ui/config/configAppearance.qml:316
 msgid "When a station starts playing, a click is reported to radio-browser.info — the request carries the station id only, no account or personal data is added; popular stations become easier to find for everyone"
 msgstr "जब कोई स्टेशन चलना शुरू होता है, तो radio-browser.info को एक क्लिक की सूचना दी जाती है — अनुरोध में केवल स्टेशन id होता है, कोई खाता या व्यक्तिगत डेटा नहीं जोड़ा जाता; लोकप्रिय स्टेशन सभी के लिए खोजने में आसान हो जाते हैं"
 
-#: package/contents/ui/config/configAppearance.qml:308
+#: package/contents/ui/config/configAppearance.qml:324
 msgid "Visuals"
 msgstr "विज़ुअल"
 
-#: package/contents/ui/config/configAppearance.qml:314
+#: package/contents/ui/config/configAppearance.qml:330
 msgid "Album art:"
 msgstr "एल्बम आर्ट:"
 
-#: package/contents/ui/config/configAppearance.qml:315
+#: package/contents/ui/config/configAppearance.qml:331
 msgid "Look up cover art online (Deezer, iTunes)"
 msgstr "कवर आर्ट ऑनलाइन खोजें (Deezer, iTunes)"
 
-#: package/contents/ui/config/configAppearance.qml:320
+#: package/contents/ui/config/configAppearance.qml:336
 msgid "Backdrop:"
 msgstr "बैकड्रॉप:"
 
-#: package/contents/ui/config/configAppearance.qml:321
+#: package/contents/ui/config/configAppearance.qml:337
 msgid "Blurred album art behind now playing"
 msgstr "नाउ प्लेइंग के पीछे धुंधला एल्बम आर्ट"
 
-#: package/contents/ui/config/configAppearance.qml:327
+#: package/contents/ui/config/configAppearance.qml:343
 msgid "Accent color:"
 msgstr "एक्सेंट रंग:"
 
-#: package/contents/ui/config/configAppearance.qml:328
+#: package/contents/ui/config/configAppearance.qml:344
 msgid "Follow the system accent color instead of the built-in emerald"
 msgstr "अंतर्निहित एमराल्ड रंग के बजाय सिस्टम का एक्सेंट रंग अपनाएँ"
 
-#: package/contents/ui/config/configAppearance.qml:333
+#: package/contents/ui/config/configAppearance.qml:355
 msgid "On battery:"
 msgstr "बैटरी पर:"
 
-#: package/contents/ui/config/configAppearance.qml:334
+#: package/contents/ui/config/configAppearance.qml:356
 msgid "Hold the animations still and check less often"
 msgstr "एनिमेशन रोकें और कम बार जाँचें"
 
-#: package/contents/ui/config/configAppearance.qml:340
+#: package/contents/ui/config/configAppearance.qml:362
 msgid "Unplugged, the record stops spinning and the equalizer bars hold still; background checks slow down. Sound and every control work exactly as before. The system's power-saver profile counts too."
 msgstr "बिजली से हटने पर रिकॉर्ड घूमना बंद कर देता है और इक्वलाइज़र की पट्टियाँ स्थिर रहती हैं; पृष्ठभूमि जाँच धीमी हो जाती है। ध्वनि और सभी नियंत्रण पहले जैसे ही काम करते हैं। सिस्टम का पावर-सेवर प्रोफ़ाइल भी गिना जाता है।"
 
-#: package/contents/ui/config/configAppearance.qml:351
+#: package/contents/ui/config/configAppearance.qml:373
 msgid "Integration"
 msgstr "एकीकरण"
 
-#: package/contents/ui/config/configAppearance.qml:357
+#: package/contents/ui/config/configAppearance.qml:379
 msgid "System integration:"
 msgstr "सिस्टम एकीकरण:"
 
-#: package/contents/ui/config/configAppearance.qml:358
+#: package/contents/ui/config/configAppearance.qml:380
 msgid "Allow control via media keys (MPRIS)"
 msgstr "मीडिया कुंजियों (MPRIS) से नियंत्रण की अनुमति दें"
 
-#: package/contents/ui/config/configAppearance.qml:366
+#: package/contents/ui/config/configAppearance.qml:388
 msgid "Downloads"
 msgstr "डाउनलोड"
 
-#: package/contents/ui/config/configAppearance.qml:372
+#: package/contents/ui/config/configAppearance.qml:394
 #: package/contents/ui/config/configRecording.qml:27
 msgid "Format:"
 msgstr "फ़ॉर्मैट:"
 
-#: package/contents/ui/config/configAppearance.qml:374
+#: package/contents/ui/config/configAppearance.qml:396
 msgid "Best quality (no re-encode)"
 msgstr "सर्वोत्तम गुणवत्ता (कोई री-एन्कोड नहीं)"
 
-#: package/contents/ui/config/configAppearance.qml:375
+#: package/contents/ui/config/configAppearance.qml:397
 msgid "MP3"
 msgstr "MP3"
 
-#: package/contents/ui/config/configAppearance.qml:376
+#: package/contents/ui/config/configAppearance.qml:398
 msgid "Opus"
 msgstr "Opus"
 
-#: package/contents/ui/config/configAppearance.qml:377
+#: package/contents/ui/config/configAppearance.qml:399
 msgid "MP4 (video)"
 msgstr "MP4 (वीडियो)"
 
-#: package/contents/ui/config/configAppearance.qml:387
+#: package/contents/ui/config/configAppearance.qml:409
 msgid "Save to folder:"
 msgstr "इस फ़ोल्डर में सहेजें:"
 
-#: package/contents/ui/config/configAppearance.qml:394
+#: package/contents/ui/config/configAppearance.qml:416
 msgid "Title cleanup:"
 msgstr "शीर्षक सफ़ाई:"
 
-#: package/contents/ui/config/configAppearance.qml:395
+#: package/contents/ui/config/configAppearance.qml:417
 msgid "Use Claude CLI to clean up messy titles before download (optional)"
 msgstr "डाउनलोड से पहले अव्यवस्थित शीर्षकों को साफ़ करने के लिए Claude CLI का उपयोग करें (वैकल्पिक)"
 
-#: package/contents/ui/config/configAppearance.qml:403
+#: package/contents/ui/config/configAppearance.qml:425
 msgid "Behavior"
 msgstr "व्यवहार"
 
-#: package/contents/ui/config/configAppearance.qml:408
+#: package/contents/ui/config/configAppearance.qml:430
 msgid "Marquee speed:"
 msgstr "मार्की गति:"
 
-#: package/contents/ui/config/configAppearance.qml:426
+#: package/contents/ui/config/configAppearance.qml:448
 msgid "Slower"
 msgstr "धीमी"
 
-#: package/contents/ui/config/configAppearance.qml:428
+#: package/contents/ui/config/configAppearance.qml:450
 msgid "Faster"
 msgstr "तेज़"
 
-#: package/contents/ui/config/configAppearance.qml:434
+#: package/contents/ui/config/configAppearance.qml:456
 msgid "Panel click:"
 msgstr "पैनल क्लिक:"
 
-#: package/contents/ui/config/configAppearance.qml:435
+#: package/contents/ui/config/configAppearance.qml:457
 msgid "Middle click to toggle last station"
 msgstr "मिडल क्लिक से पिछला स्टेशन टॉगल करें"
 
-#: package/contents/ui/config/configAppearance.qml:439
+#: package/contents/ui/config/configAppearance.qml:461
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "पिछले स्टेशन को चलाने या रोकने के लिए पैनल आइकन पर मिडल-क्लिक करें"
 
-#: package/contents/ui/config/configAutomation.qml:43
+#: package/contents/ui/config/configAutomation.qml:56
 msgid "Check the shows for new episodes:"
 msgstr "शो में नए एपिसोड की जाँच करें:"
 
-#: package/contents/ui/config/configAutomation.qml:47
+#: package/contents/ui/config/configAutomation.qml:60
 msgid "Never"
 msgstr "कभी नहीं"
 
-#: package/contents/ui/config/configAutomation.qml:48
+#: package/contents/ui/config/configAutomation.qml:61
 msgid "Every 6 hours"
 msgstr "हर 6 घंटे में"
 
-#: package/contents/ui/config/configAutomation.qml:49
+#: package/contents/ui/config/configAutomation.qml:62
 msgid "Every 12 hours"
 msgstr "हर 12 घंटे में"
 
-#: package/contents/ui/config/configAutomation.qml:50
+#: package/contents/ui/config/configAutomation.qml:63
 msgid "Once a day"
 msgstr "दिन में एक बार"
 
-#: package/contents/ui/config/configAutomation.qml:62
+#: package/contents/ui/config/configAutomation.qml:75
 msgid "New episodes:"
 msgstr "नए एपिसोड:"
 
-#: package/contents/ui/config/configAutomation.qml:63
+#: package/contents/ui/config/configAutomation.qml:76
 msgid "Download the newest one automatically"
 msgstr "सबसे नया एपिसोड स्वचालित रूप से डाउनलोड करें"
 
-#: package/contents/ui/config/configAutomation.qml:66
+#: package/contents/ui/config/configAutomation.qml:79
 msgid "When a check finds a show has something new, its newest episode is queued for download — ready before the commute, no taps needed."
 msgstr "जब जाँच में किसी शो में कुछ नया मिलता है, तो उसका सबसे नया एपिसोड डाउनलोड के लिए कतार में लग जाता है — सफ़र से पहले तैयार, किसी टैप की ज़रूरत नहीं।"
 
-#: package/contents/ui/config/configAutomation.qml:75
+#: package/contents/ui/config/configAutomation.qml:88
 msgid "Storage:"
 msgstr "स्टोरेज:"
 
-#: package/contents/ui/config/configAutomation.qml:76
+#: package/contents/ui/config/configAutomation.qml:89
 msgid "Quietly remove old played downloads"
 msgstr "पुराने सुने गए डाउनलोड चुपचाप हटाएँ"
 
-#: package/contents/ui/config/configAutomation.qml:79
+#: package/contents/ui/config/configAutomation.qml:92
 msgid "Played episodes older than three days go, and past ten files per show the oldest played go. An unheard episode is never touched."
 msgstr "तीन दिन से पुराने सुने गए एपिसोड हटा दिए जाते हैं, और प्रति शो दस फ़ाइलों से अधिक होने पर सबसे पुराने सुने गए हटाए जाते हैं। बिना सुना एपिसोड कभी नहीं छुआ जाता।"
 
-#: package/contents/ui/config/configAutomation.qml:88
+#: package/contents/ui/config/configAutomation.qml:101
 msgid "Listening:"
 msgstr "सुनना:"
 
-#: package/contents/ui/config/configAutomation.qml:89
+#: package/contents/ui/config/configAutomation.qml:102
 msgid "Continue the show when an episode ends"
 msgstr "एपिसोड समाप्त होने पर शो जारी रखें"
 
-#: package/contents/ui/config/configAutomation.qml:94
+#: package/contents/ui/config/configAutomation.qml:107
 msgid "Skip stretches of dead air in episodes"
 msgstr "एपिसोड में खाली मौन के हिस्से छोड़ें"
 
-#: package/contents/ui/config/configAutomation.qml:98
+#: package/contents/ui/config/configAutomation.qml:111
 msgid "Speaker sync"
 msgstr "स्पीकर सिंक"
 
-#: package/contents/ui/config/configAutomation.qml:104
+#: package/contents/ui/config/configAutomation.qml:117
 msgid "Auto-care:"
 msgstr "स्वतः देखभाल:"
 
-#: package/contents/ui/config/configAutomation.qml:105
-#: package/contents/ui/FullRepresentation.qml:6225
+#: package/contents/ui/config/configAutomation.qml:118
+#: package/contents/ui/FullRepresentation.qml:6224
 msgid "Keep sync tuned automatically"
 msgstr "सिंक को स्वचालित रूप से ट्यून रखें"
 
-#: package/contents/ui/config/configAutomation.qml:108
+#: package/contents/ui/config/configAutomation.qml:121
 msgid "Listens with the microphone every few minutes while music is playing and quietly re-tunes the sync when the speakers have drifted apart. The check rides on a tone too high to hear — the music keeps playing and nothing audible happens. It runs only while a Bluetooth speaker is in the group, never during a recording or an alarm, and audio never leaves this computer."
 msgstr "संगीत चलते समय हर कुछ मिनट में माइक्रोफ़ोन से सुनता है और स्पीकर आपस में खिसक जाने पर सिंक को चुपचाप फिर से साध देता है। जाँच इतनी ऊँची ध्वनि पर चलती है कि सुनाई नहीं देती — संगीत चलता रहता है और कुछ भी सुनाई नहीं देता। यह केवल तभी चलती है जब समूह में कोई Bluetooth स्पीकर हो, रिकॉर्डिंग या अलार्म के दौरान कभी नहीं, और ऑडियो कभी इस कंप्यूटर से बाहर नहीं जाता।"
 
-#: package/contents/ui/config/configAutomation.qml:116
+#: package/contents/ui/config/configAutomation.qml:129
 msgid "Live radio"
 msgstr "लाइव रेडियो"
 
-#: package/contents/ui/config/configAutomation.qml:122
+#: package/contents/ui/config/configAutomation.qml:135
 msgid "Timeshift:"
 msgstr "टाइमशिफ़्ट:"
 
-#: package/contents/ui/config/configAutomation.qml:123
+#: package/contents/ui/config/configAutomation.qml:136
 msgid "Pause live radio"
 msgstr "लाइव रेडियो रोकें"
 
-#: package/contents/ui/config/configAutomation.qml:126
+#: package/contents/ui/config/configAutomation.qml:139
 msgid "While a station plays, a rolling copy is kept on this computer. Pause parks the broadcast; play resumes exactly where you left off, behind live, and one tap on the pill catches back up. The copy is deleted when playback stops and never leaves this machine."
 msgstr "जब कोई स्टेशन चल रहा होता है, तो इस कंप्यूटर पर एक चलती हुई प्रति रखी जाती है। रोकने पर प्रसारण वहीं रुक जाता है; चलाने पर ठीक वहीं से जारी होता है जहाँ आपने छोड़ा था — लाइव से पीछे, जब तक आप पकड़ न लें, और गोली पर एक टैप आपको वापस लाइव पर ले आता है। प्लेबैक रुकने पर प्रति हटा दी जाती है और यह कभी इस मशीन से बाहर नहीं जाती।"
 
-#: package/contents/ui/config/configAutomation.qml:135
+#: package/contents/ui/config/configAutomation.qml:148
 msgid "Buffer up to:"
 msgstr "बफ़र अधिकतम:"
 
-#: package/contents/ui/config/configAutomation.qml:140
+#: package/contents/ui/config/configAutomation.qml:153
 #: package/contents/ui/config/configRecording.qml:53
 #: package/contents/ui/FullRepresentation.qml:4521
 #: package/contents/ui/FullRepresentation.qml:4773
@@ -506,101 +507,112 @@ msgstr "लोगो प्राप्त करना पूर्ण: %1 / %2
 msgid "No stations to refresh."
 msgstr "रीफ़्रेश करने के लिए कोई स्टेशन नहीं।"
 
-#: package/contents/ui/config/configGeneral.qml:885
+#: package/contents/ui/config/configGeneral.qml:890
 msgid "Edit"
 msgstr "संपादित करें"
 
-#: package/contents/ui/config/configGeneral.qml:893
+#: package/contents/ui/config/configGeneral.qml:898
 msgid "Hide"
 msgstr "छिपाएँ"
 
-#: package/contents/ui/config/configGeneral.qml:893
+#: package/contents/ui/config/configGeneral.qml:898
 msgid "Show"
 msgstr "दिखाएँ"
 
-#: package/contents/ui/config/configGeneral.qml:903
+#: package/contents/ui/config/configGeneral.qml:908
 msgid "Remove"
 msgstr "हटाएँ"
 
-#: package/contents/ui/config/configGeneral.qml:1028
+#: package/contents/ui/config/configGeneral.qml:1033
 #: package/contents/ui/config/configSearch.qml:597
+#: package/contents/ui/config/configSearch.qml:601
 msgid "Add Station"
 msgstr "स्टेशन जोड़ें"
 
-#: package/contents/ui/config/configGeneral.qml:1028
+#: package/contents/ui/config/configGeneral.qml:1033
 msgid "Edit station"
 msgstr "स्टेशन संपादित करें"
 
-#: package/contents/ui/config/configGeneral.qml:1097
-#: package/contents/ui/config/configSearch.qml:783
+#: package/contents/ui/config/configGeneral.qml:1102
+#: package/contents/ui/config/configSearch.qml:799
 msgid "Name:"
 msgstr "नाम:"
 
-#: package/contents/ui/config/configGeneral.qml:1103
+#: package/contents/ui/config/configGeneral.qml:1108
 msgid "URL:"
 msgstr "URL:"
 
-#: package/contents/ui/config/configGeneral.qml:1110
+#: package/contents/ui/config/configGeneral.qml:1115
 msgid "Logo URL:"
 msgstr "लोगो URL:"
 
-#: package/contents/ui/config/configGeneral.qml:1111
+#: package/contents/ui/config/configGeneral.qml:1116
 msgid "e.g. https://example.com/logo.png"
 msgstr "उदा. https://example.com/logo.png"
 
-#: package/contents/ui/config/configGeneral.qml:1119
+#: package/contents/ui/config/configGeneral.qml:1124
 msgid "Active"
 msgstr "सक्रिय"
 
-#: package/contents/ui/config/configGeneral.qml:1229
+#: package/contents/ui/config/configGeneral.qml:1140
+#: package/contents/ui/config/configGeneral.qml:1151
+msgid "On Air stations backup (*.arp)"
+msgstr "On Air स्टेशन बैकअप (*.arp)"
+
+#: package/contents/ui/config/configGeneral.qml:1140
+#: package/contents/ui/FullRepresentation.qml:3829
+msgid "All files (*)"
+msgstr "सभी फ़ाइलें (*)"
+
+#: package/contents/ui/config/configGeneral.qml:1234
 msgid "Configuration has been loaded. Click 'Apply' to save changes."
 msgstr "कॉन्फ़िगरेशन लोड हो गया है। परिवर्तन सहेजने के लिए 'Apply' पर क्लिक करें।"
 
-#: package/contents/ui/config/configGeneral.qml:1231
+#: package/contents/ui/config/configGeneral.qml:1236
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "कॉन्फ़िगरेशन लोड करने में त्रुटि। कोई दूसरी फ़ाइल चुनकर देखें।"
 
-#: package/contents/ui/config/configGeneral.qml:1235
+#: package/contents/ui/config/configGeneral.qml:1240
 msgid "Your configuration was saved successfully."
 msgstr "आपका कॉन्फ़िगरेशन सफलतापूर्वक सहेजा गया।"
 
-#: package/contents/ui/config/configGeneral.qml:1237
+#: package/contents/ui/config/configGeneral.qml:1242
 msgid "Error, make sure the selected directory is writable!"
 msgstr "त्रुटि, सुनिश्चित करें कि चयनित डायरेक्टरी में लिखने की अनुमति है!"
 
-#: package/contents/ui/config/configGeneral.qml:1297
+#: package/contents/ui/config/configGeneral.qml:1302
 msgid "Add…"
 msgstr "जोड़ें…"
 
-#: package/contents/ui/config/configGeneral.qml:1306
+#: package/contents/ui/config/configGeneral.qml:1311
 msgid "Fetching… %1 / %2"
 msgstr "प्राप्त किया जा रहा है… %1 / %2"
 
-#: package/contents/ui/config/configGeneral.qml:1307
+#: package/contents/ui/config/configGeneral.qml:1312
 msgid "Fetch missing logos"
 msgstr "अनुपस्थित लोगो प्राप्त करें"
 
-#: package/contents/ui/config/configGeneral.qml:1316
+#: package/contents/ui/config/configGeneral.qml:1321
 msgid "Re-fetch all"
 msgstr "सभी दोबारा प्राप्त करें"
 
-#: package/contents/ui/config/configGeneral.qml:1321
+#: package/contents/ui/config/configGeneral.qml:1326
 msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
 msgstr "सभी स्टेशनों के लिए नए लोगो प्राप्त करें; यदि बेहतर कुछ नहीं मिलता तो मौजूदा लोगो बने रहते हैं"
 
-#: package/contents/ui/config/configGeneral.qml:1336
+#: package/contents/ui/config/configGeneral.qml:1341
 msgid "Import…"
 msgstr "आयात करें…"
 
-#: package/contents/ui/config/configGeneral.qml:1342
+#: package/contents/ui/config/configGeneral.qml:1347
 msgid "Export…"
 msgstr "निर्यात करें…"
 
-#: package/contents/ui/config/configGeneral.qml:1358
+#: package/contents/ui/config/configGeneral.qml:1363
 msgid "Report an issue"
 msgstr "समस्या की रिपोर्ट करें"
 
-#: package/contents/ui/config/configGeneral.qml:1364
+#: package/contents/ui/config/configGeneral.qml:1369
 msgid "Suggest a feature"
 msgstr "फ़ीचर का सुझाव दें"
 
@@ -645,9 +657,9 @@ msgstr "शेड्यूल विजेट में ही प्रबं�
 msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
 msgstr "रिकॉर्डिंग आपके संगीत फ़ोल्डर में सहेजी जाती हैं और केवल व्यक्तिगत उपयोग के लिए हैं — इन्हें पुनर्वितरित न करें।"
 
-#: package/contents/ui/config/configSearch.qml:177
-#: package/contents/ui/config/configSearch.qml:230
-#: package/contents/ui/config/configSearch.qml:696
+#: package/contents/ui/config/configSearch.qml:165
+#: package/contents/ui/config/configSearch.qml:218
+#: package/contents/ui/config/configSearch.qml:712
 msgid ""
 "Get list of stations\n"
 "Please wait…"
@@ -655,7 +667,7 @@ msgstr ""
 "स्टेशनों की सूची प्राप्त की जा रही है\n"
 "कृपया प्रतीक्षा करें…"
 
-#: package/contents/ui/config/configSearch.qml:229
+#: package/contents/ui/config/configSearch.qml:217
 msgid ""
 "Nothing found\n"
 "Try changing your query"
@@ -663,8 +675,8 @@ msgstr ""
 "कुछ नहीं मिला\n"
 "अपनी खोज बदलकर देखें"
 
-#: package/contents/ui/config/configSearch.qml:242
-#: package/contents/ui/config/configSearch.qml:255
+#: package/contents/ui/config/configSearch.qml:230
+#: package/contents/ui/config/configSearch.qml:243
 msgid "Error: Could not connect to API servers"
 msgstr "त्रुटि: API सर्वर से कनेक्ट नहीं हो सका"
 
@@ -673,111 +685,119 @@ msgid "Search Station"
 msgstr "स्टेशन खोजें"
 
 #: package/contents/ui/config/configSearch.qml:426
+#: package/contents/ui/config/configSearch.qml:430
 msgid "Search by"
 msgstr "खोज का आधार"
 
-#: package/contents/ui/config/configSearch.qml:433
+#: package/contents/ui/config/configSearch.qml:434
 msgid "name"
 msgstr "नाम"
 
-#: package/contents/ui/config/configSearch.qml:434
+#: package/contents/ui/config/configSearch.qml:435
 msgid "country"
 msgstr "देश"
 
-#: package/contents/ui/config/configSearch.qml:435
+#: package/contents/ui/config/configSearch.qml:436
 msgid "language"
 msgstr "भाषा"
 
-#: package/contents/ui/config/configSearch.qml:436
+#: package/contents/ui/config/configSearch.qml:437
 msgid "tags"
 msgstr "टैग"
 
-#: package/contents/ui/config/configSearch.qml:565
-#: package/contents/ui/config/configSearch.qml:889
+#: package/contents/ui/config/configSearch.qml:567
+#: package/contents/ui/config/configSearch.qml:905
 msgid "%1 kBit/s"
 msgstr "%1 kBit/s"
 
-#: package/contents/ui/config/configSearch.qml:578
+#: package/contents/ui/config/configSearch.qml:580
+#: package/contents/ui/config/configSearch.qml:581
 msgid "Info"
 msgstr "जानकारी"
 
-#: package/contents/ui/config/configSearch.qml:622
+#: package/contents/ui/config/configSearch.qml:636
 msgid "Station is added. Click 'Apply' to save changes."
 msgstr "स्टेशन जोड़ दिया गया है। परिवर्तन सहेजने के लिए 'Apply' पर क्लिक करें।"
 
-#: package/contents/ui/config/configSearch.qml:639
+#: package/contents/ui/config/configSearch.qml:637
+msgid "Station is already in the list."
+msgstr "स्टेशन पहले से सूची में है।"
+
+#: package/contents/ui/config/configSearch.qml:649
+#: package/contents/ui/config/configSearch.qml:655
 #: package/contents/ui/EpisodeListItem.qml:370
 #: package/contents/ui/FullRepresentation.qml:2547
-#: package/contents/ui/FullRepresentation.qml:6390
+#: package/contents/ui/FullRepresentation.qml:6389
 msgid "Stop"
 msgstr "रोकें"
 
-#: package/contents/ui/config/configSearch.qml:639
+#: package/contents/ui/config/configSearch.qml:649
+#: package/contents/ui/config/configSearch.qml:655
 #: package/contents/ui/FullRepresentation.qml:2548
 msgid "Play"
 msgstr "चलाएँ"
 
-#: package/contents/ui/config/configSearch.qml:742
+#: package/contents/ui/config/configSearch.qml:758
 msgid "Search…"
 msgstr "खोजें…"
 
-#: package/contents/ui/config/configSearch.qml:752
+#: package/contents/ui/config/configSearch.qml:768
 msgid "Clear Results"
 msgstr "परिणाम साफ़ करें"
 
-#: package/contents/ui/config/configSearch.qml:777
+#: package/contents/ui/config/configSearch.qml:793
 msgid "Station Info"
 msgstr "स्टेशन जानकारी"
 
-#: package/contents/ui/config/configSearch.qml:795
+#: package/contents/ui/config/configSearch.qml:811
 msgid "Favicon:"
 msgstr "फ़ेविकॉन:"
 
-#: package/contents/ui/config/configSearch.qml:807
+#: package/contents/ui/config/configSearch.qml:823
 msgid "Homepage:"
 msgstr "होमपेज:"
 
-#: package/contents/ui/config/configSearch.qml:817
+#: package/contents/ui/config/configSearch.qml:833
 msgid "Stream URL:"
 msgstr "स्ट्रीम URL:"
 
-#: package/contents/ui/config/configSearch.qml:831
+#: package/contents/ui/config/configSearch.qml:847
 msgid "OK"
 msgstr "ठीक"
 
-#: package/contents/ui/config/configSearch.qml:833
+#: package/contents/ui/config/configSearch.qml:849
 msgid "Error"
 msgstr "त्रुटि"
 
-#: package/contents/ui/config/configSearch.qml:840
+#: package/contents/ui/config/configSearch.qml:856
 msgid "Server status:"
 msgstr "सर्वर स्थिति:"
 
-#: package/contents/ui/config/configSearch.qml:851
+#: package/contents/ui/config/configSearch.qml:867
 msgid "%1 (last check: %2)"
 msgstr "%1 (अंतिम जाँच: %2)"
 
-#: package/contents/ui/config/configSearch.qml:872
+#: package/contents/ui/config/configSearch.qml:888
 msgid "Codec:"
 msgstr "कोडेक:"
 
-#: package/contents/ui/config/configSearch.qml:883
+#: package/contents/ui/config/configSearch.qml:899
 msgid "Bitrate:"
 msgstr "बिटरेट:"
 
-#: package/contents/ui/config/configSearch.qml:901
+#: package/contents/ui/config/configSearch.qml:917
 msgid "Country:"
 msgstr "देश:"
 
-#: package/contents/ui/config/configSearch.qml:910
+#: package/contents/ui/config/configSearch.qml:926
 msgid "Language:"
 msgstr "भाषा:"
 
-#: package/contents/ui/config/configSearch.qml:919
+#: package/contents/ui/config/configSearch.qml:935
 msgid "Tags:"
 msgstr "टैग:"
 
-#: package/contents/ui/config/configSearch.qml:958
+#: package/contents/ui/config/configSearch.qml:974
 #: package/contents/ui/FullRepresentation.qml:5627
 msgid "Error: %1"
 msgstr "त्रुटि: %1"
@@ -893,6 +913,7 @@ msgstr "%1 में लोकप्रिय"
 msgid "Search again — right-click removes this entry"
 msgstr "फिर से खोजें — राइट-क्लिक से यह प्रविष्टि हट जाएगी"
 
+#: package/contents/ui/FullRepresentation.qml:1499
 #: package/contents/ui/FullRepresentation.qml:1500
 msgid "Clear search history"
 msgstr "खोज इतिहास साफ़ करें"
@@ -1075,7 +1096,7 @@ msgid "Vote for this station in the worldwide catalog"
 msgstr "विश्वव्यापी कैटलॉग में इस स्टेशन के लिए वोट करें"
 
 #: package/contents/ui/FullRepresentation.qml:2844
-#: package/contents/ui/FullRepresentation.qml:5609
+#: package/contents/ui/FullRepresentation.qml:5610
 #: package/contents/ui/MediaListItem.qml:568
 msgid "Downloading…"
 msgstr "डाउनलोड हो रहा है…"
@@ -1220,10 +1241,6 @@ msgstr "सदस्यताएँ आयात करें"
 msgid "OPML files (*.opml *.xml)"
 msgstr "OPML फ़ाइलें (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:3829
-msgid "All files (*)"
-msgstr "सभी फ़ाइलें (*)"
-
 #: package/contents/ui/FullRepresentation.qml:3835
 #: package/contents/ui/FullRepresentation.qml:4057
 msgid "Episodes"
@@ -1359,7 +1376,7 @@ msgid "Sleep timer"
 msgstr "स्लीप टाइमर"
 
 #: package/contents/ui/FullRepresentation.qml:4759
-#: package/contents/ui/FullRepresentation.qml:5606
+#: package/contents/ui/FullRepresentation.qml:5607
 msgid "Sleeping in %1"
 msgstr "%1 में स्लीप"
 
@@ -1544,453 +1561,462 @@ msgid "Recordings are for personal use only."
 msgstr "रिकॉर्डिंग केवल व्यक्तिगत उपयोग के लिए हैं।"
 
 #: package/contents/ui/FullRepresentation.qml:5409
+#: package/contents/ui/FullRepresentation.qml:5410
 msgid "Keep open"
 msgstr "खुला रखें"
 
-#: package/contents/ui/FullRepresentation.qml:5612
+#: package/contents/ui/FullRepresentation.qml:5613
 #: package/contents/ui/main.qml:235
 msgid "Casting to %1"
 msgstr "%1 पर कास्ट हो रहा है"
 
-#: package/contents/ui/FullRepresentation.qml:5618
+#: package/contents/ui/FullRepresentation.qml:5619
 msgid "Paused — the station keeps recording"
 msgstr "रोका गया — स्टेशन रिकॉर्ड होता रहता है"
 
-#: package/contents/ui/FullRepresentation.qml:5620
+#: package/contents/ui/FullRepresentation.qml:5621
 msgid "Check internet connection…"
 msgstr "इंटरनेट कनेक्शन जाँचें…"
 
-#: package/contents/ui/FullRepresentation.qml:5630
+#: package/contents/ui/FullRepresentation.qml:5628
+msgid "The stream stopped sending data"
+msgstr "स्ट्रीम ने डेटा भेजना बंद कर दिया"
+
+#: package/contents/ui/FullRepresentation.qml:5631
 msgid "Bitrate: %1 kb/s"
 msgstr "बिटरेट: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:5635
-#: package/contents/ui/FullRepresentation.qml:5638
+#: package/contents/ui/FullRepresentation.qml:5636
+#: package/contents/ui/FullRepresentation.qml:5639
 msgid "Connecting…"
 msgstr "कनेक्ट हो रहा है…"
 
-#: package/contents/ui/FullRepresentation.qml:5640
+#: package/contents/ui/FullRepresentation.qml:5641
 msgid "Choose station and enjoy…"
 msgstr "स्टेशन चुनें और आनंद लें…"
 
-#: package/contents/ui/FullRepresentation.qml:5670
+#: package/contents/ui/FullRepresentation.qml:5671
 msgid "Casting to %1 — click to choose or stop"
 msgstr "%1 पर कास्ट हो रहा है — चुनने या रोकने के लिए क्लिक करें"
 
-#: package/contents/ui/FullRepresentation.qml:5672
+#: package/contents/ui/FullRepresentation.qml:5673
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "वॉल्यूम, आउटपुट और डिवाइस (Chromecast, TV, स्पीकर)"
 
-#: package/contents/ui/FullRepresentation.qml:5673
+#: package/contents/ui/FullRepresentation.qml:5674
 msgid "Volume and audio output"
 msgstr "वॉल्यूम और ऑडियो आउटपुट"
 
-#: package/contents/ui/FullRepresentation.qml:5837
+#: package/contents/ui/FullRepresentation.qml:5838
 msgid "Play on"
 msgstr "इस पर चलाएँ"
 
-#: package/contents/ui/FullRepresentation.qml:5884
+#: package/contents/ui/FullRepresentation.qml:5885
 msgid "Unmute"
 msgstr "अनम्यूट करें"
 
-#: package/contents/ui/FullRepresentation.qml:5884
+#: package/contents/ui/FullRepresentation.qml:5885
 msgid "Mute"
 msgstr "म्यूट करें"
 
-#: package/contents/ui/FullRepresentation.qml:5922
+#: package/contents/ui/FullRepresentation.qml:5923
 msgid "This computer"
 msgstr "यह कंप्यूटर"
 
-#: package/contents/ui/FullRepresentation.qml:5946
+#: package/contents/ui/FullRepresentation.qml:5947
 msgid "System default output"
 msgstr "सिस्टम डिफ़ॉल्ट आउटपुट"
 
-#: package/contents/ui/FullRepresentation.qml:5973
+#: package/contents/ui/FullRepresentation.qml:5974
 msgid "All local outputs, in sync"
 msgstr "सभी लोकल आउटपुट, सिंक में"
 
-#: package/contents/ui/FullRepresentation.qml:6022
+#: package/contents/ui/FullRepresentation.qml:6023
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "हर कनेक्टेड स्पीकर पर एक साथ चलता है — वायर्ड आउटपुट को Bluetooth के साथ ताल में रखने के लिए विलंबित किया जाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6038
+#: package/contents/ui/FullRepresentation.qml:6039
 msgid "Keep it in tune by itself"
 msgstr "इसे स्वयं ही सुर में रखें"
 
-#: package/contents/ui/FullRepresentation.qml:6053
+#: package/contents/ui/FullRepresentation.qml:6054
 msgid "Listens now and then while music plays and puts the speakers back in step on its own. Nothing is audible and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you."
 msgstr "संगीत चलते समय बीच-बीच में सुनता है और स्पीकरों को खुद ही फिर एक लय में ले आता है। कुछ भी सुनाई नहीं देता और संगीत कभी नहीं रुकता — अगर कभी वह अंतर खुद ठीक न कर सके, तो बता देता है और मापना आप पर छोड़ देता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6069
-#: package/contents/ui/FullRepresentation.qml:6086
+#: package/contents/ui/FullRepresentation.qml:6070
+#: package/contents/ui/FullRepresentation.qml:6087
 msgid "Sync fine-tune"
 msgstr "सिंक फ़ाइन-ट्यून"
 
-#: package/contents/ui/FullRepresentation.qml:6079
+#: package/contents/ui/FullRepresentation.qml:6080
 msgid "How far behind the Bluetooth speaker runs — the other outputs are held back by this much to match it. The automatic check below reports something else: how far apart they still land."
 msgstr "ब्लूटूथ स्पीकर कितना पीछे चलता है — बाकी आउटपुट उतना ही रोके जाते हैं। नीचे की स्वतः जाँच कुछ और बताती है: अब भी कितना अंतर बचा है।"
 
-#: package/contents/ui/FullRepresentation.qml:6120
+#: package/contents/ui/FullRepresentation.qml:6119
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "यदि Bluetooth स्पीकर अब भी वायर्ड स्पीकरों से पीछे रहता है, तो इसे तब तक बढ़ाएँ जब तक वे एक साथ न बजें।"
 
-#: package/contents/ui/FullRepresentation.qml:6132
+#: package/contents/ui/FullRepresentation.qml:6131
 msgid "Sync delay in milliseconds"
 msgstr "मिलीसेकंड में सिंक विलंब"
 
-#: package/contents/ui/FullRepresentation.qml:6154
+#: package/contents/ui/FullRepresentation.qml:6153
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "मिलीसेकंड में सटीक विलंब लिखें — स्लाइडर दस-दस के चरणों में चलता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6158
+#: package/contents/ui/FullRepresentation.qml:6157
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:6173
+#: package/contents/ui/FullRepresentation.qml:6172
 msgid "Calibrate with the microphone"
 msgstr "माइक्रोफ़ोन से कैलिब्रेट करें"
 
-#: package/contents/ui/FullRepresentation.qml:6185
+#: package/contents/ui/FullRepresentation.qml:6184
 msgid "Measures with a tone too high to hear how far the Bluetooth speaker trails, and sets the delay automatically. Speaker balance is left as it is — matching loudness needs a sound you would hear."
 msgstr "अश्रव्य ध्वनि से मापता है कि ब्लूटूथ स्पीकर कितना पीछे है, और देरी अपने आप सेट करता है। स्पीकर संतुलन वैसा ही रहता है — ध्वनि-स्तर मिलाने के लिए सुनाई देने वाली ध्वनि चाहिए।"
 
-#: package/contents/ui/FullRepresentation.qml:6186
+#: package/contents/ui/FullRepresentation.qml:6185
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "हर स्पीकर से कुछ तेज़ क्लिक बजाता है और माइक्रोफ़ोन से मापता है कि Bluetooth स्पीकर कितना पीछे है — विलंब अपने आप सेट हो जाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6199
+#: package/contents/ui/FullRepresentation.qml:6198
 msgid "Calibration needs a Bluetooth speaker in the group — connect one and the button wakes up."
 msgstr "कैलिब्रेशन के लिए समूह में एक Bluetooth स्पीकर चाहिए — एक कनेक्ट करें और बटन सक्रिय हो जाएगा।"
 
-#: package/contents/ui/FullRepresentation.qml:6228
+#: package/contents/ui/FullRepresentation.qml:6227
 msgid "Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "हर कुछ मिनट में हर स्पीकर से इतनी ऊँची ध्वनि बजाता है कि सुनाई न दे, और स्पीकर अलग खिसकने पर सिंक दोबारा जाँचता है। ऑडियो केवल इसी कंप्यूटर पर संसाधित होता है — न कभी सहेजा जाता है, न कहीं भेजा जाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6269
+#: package/contents/ui/FullRepresentation.qml:6268
 msgid "Tuned automatically — %1"
 msgstr "अपने आप ट्यून किया गया — %1"
 
-#: package/contents/ui/FullRepresentation.qml:6294
+#: package/contents/ui/FullRepresentation.qml:6293
 msgid "Set the delay by ear (no microphone)"
 msgstr "देरी कान से सेट करें (माइक्रोफ़ोन के बिना)"
 
-#: package/contents/ui/FullRepresentation.qml:6297
+#: package/contents/ui/FullRepresentation.qml:6296
 msgid "Hides the microphone measurement and the automatic checks, and never listens to the room. Use the fine-tune slider above until the speakers sound together."
 msgstr "माइक्रोफ़ोन से माप और स्वचालित जाँच छिपा देता है, और कमरे को कभी नहीं सुनता। ऊपर दिए फ़ाइन-ट्यून स्लाइडर का उपयोग करें जब तक स्पीकर एक साथ न सुनाई दें।"
 
-#: package/contents/ui/FullRepresentation.qml:6313
+#: package/contents/ui/FullRepresentation.qml:6312
 msgid "Measure with a tone too high to hear"
 msgstr "सुनाई न देने वाली ऊँची ध्वनि से मापें"
 
-#: package/contents/ui/FullRepresentation.qml:6316
+#: package/contents/ui/FullRepresentation.qml:6315
 msgid "Measures with an 18–19 kHz sweep, which most adults cannot hear and music does not reach, so the room can stay noisy. Younger ears often can hear it, and dogs and cats certainly do — turn it off and measurement uses a short audible click instead, which needs a quiet room."
 msgstr "18–19 kHz की स्वीप से मापता है, जो अधिकांश वयस्कों को सुनाई नहीं देती और जहाँ तक संगीत नहीं पहुँचता — इसलिए कमरा शोरगुल वाला भी चल जाता है। कम उम्र के कान इसे अक्सर सुन लेते हैं, और कुत्ते–बिल्लियाँ तो ज़रूर। बंद करने पर माप एक छोटी सुनाई देने वाली क्लिक से होता है, जिसके लिए शांत कमरा चाहिए।"
 
-#: package/contents/ui/FullRepresentation.qml:6345
+#: package/contents/ui/FullRepresentation.qml:6344
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "सिंक के लिए %1 याद रखा गया है — इसे कनेक्ट करें और यह अपने आप फिर से जुड़ जाएगा।"
 
-#: package/contents/ui/FullRepresentation.qml:6370
+#: package/contents/ui/FullRepresentation.qml:6369
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "2 में से राउंड 1 — हर स्पीकर से क्लिक बज रहे हैं…"
 
-#: package/contents/ui/FullRepresentation.qml:6371
+#: package/contents/ui/FullRepresentation.qml:6370
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "2 में से राउंड 2 — शांत, परिणाम जाँचा जा रहा है…"
 
-#: package/contents/ui/FullRepresentation.qml:6393
+#: package/contents/ui/FullRepresentation.qml:6392
 msgid "Stops the measurement, unmutes every speaker and gives the music back."
 msgstr "माप रोकता है, हर स्पीकर को अनम्यूट करता है और संगीत वापस लौटाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6422
+#: package/contents/ui/FullRepresentation.qml:6421
 msgid "%1 plays in the group"
 msgstr "%1 समूह में बजता है"
 
-#: package/contents/ui/FullRepresentation.qml:6435
+#: package/contents/ui/FullRepresentation.qml:6434
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "यह स्पीकर समूह में बजेगा या नहीं — डिस्कनेक्ट किए बिना बाहर रखने के लिए टिक हटाएँ। डिवाइस के लिए याद रखा जाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6444
+#: package/contents/ui/FullRepresentation.qml:6443
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (कुछ भी प्लग नहीं है)"
 
-#: package/contents/ui/FullRepresentation.qml:6458
+#: package/contents/ui/FullRepresentation.qml:6457
 msgid "Balance of %1"
 msgstr "%1 का बैलेंस"
 
-#: package/contents/ui/FullRepresentation.qml:6467
+#: package/contents/ui/FullRepresentation.qml:6466
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "वॉल्यूम में इस स्पीकर का हिस्सा — बैलेंस मास्टर वॉल्यूम के हर बदलाव के साथ चलता है और डिवाइस के लिए याद रखा जाता है। यह केवल वही स्केल करता है जो यह विजेट बजाता है; सिस्टम की ऑडियो सेटिंग्स में प्रति-डिवाइस वॉल्यूम एक अलग, अछूती परत है — इसीलिए वे संख्याएँ इन स्लाइडरों से भिन्न दिखती हैं।"
 
-#: package/contents/ui/FullRepresentation.qml:6484
+#: package/contents/ui/FullRepresentation.qml:6483
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:6485
+#: package/contents/ui/FullRepresentation.qml:6484
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:6486
+#: package/contents/ui/FullRepresentation.qml:6485
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:6487
+#: package/contents/ui/FullRepresentation.qml:6486
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:6492
+#: package/contents/ui/FullRepresentation.qml:6491
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "यह स्पीकर कौन-से चैनल बजाता है: स्टीरियो, केवल बायाँ, केवल दायाँ, या दोनों का मोनो मिक्स। सच्चे स्टीरियो जोड़े के लिए एक स्पीकर को L और दूसरे को R पर सेट करें — डिवाइस के लिए याद रखा जाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6523
+#: package/contents/ui/FullRepresentation.qml:6522
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:6538
+#: package/contents/ui/FullRepresentation.qml:6537
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "Bluetooth बंद है या कोई अडैप्टर उपलब्ध नहीं — सिस्टम सेटिंग्स जाँचें।"
 
-#: package/contents/ui/FullRepresentation.qml:6549
+#: package/contents/ui/FullRepresentation.qml:6548
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "कोई पेयर किया हुआ Bluetooth ऑडियो डिवाइस नहीं — नीचे \"नया स्पीकर पेयर करें…\" का उपयोग करें, या सिस्टम सेटिंग्स में एक बार पेयर करें।"
 
-#: package/contents/ui/FullRepresentation.qml:6591
+#: package/contents/ui/FullRepresentation.qml:6590
 msgid "Tap again to forget — pairing again is the only way back"
 msgstr "भूलने के लिए फिर से टैप करें — वापसी का एकमात्र रास्ता दोबारा पेयर करना है"
 
-#: package/contents/ui/FullRepresentation.qml:6592
+#: package/contents/ui/FullRepresentation.qml:6591
 msgid "Forget this device (unpair)"
 msgstr "इस डिवाइस को भूलें (अनपेयर)"
 
-#: package/contents/ui/FullRepresentation.qml:6623
+#: package/contents/ui/FullRepresentation.qml:6622
 msgid "%1 — connecting…"
 msgstr "%1 — कनेक्ट हो रहा है…"
 
-#: package/contents/ui/FullRepresentation.qml:6625
+#: package/contents/ui/FullRepresentation.qml:6624
 msgid "%1 — linked, no sound yet"
 msgstr "%1 — जुड़ा है, ध्वनि अभी नहीं"
 
-#: package/contents/ui/FullRepresentation.qml:6657
+#: package/contents/ui/FullRepresentation.qml:6656
 msgid "%1 — pairing…"
 msgstr "%1 — पेयर हो रहा है…"
 
-#: package/contents/ui/FullRepresentation.qml:6658
+#: package/contents/ui/FullRepresentation.qml:6657
 msgid "%1 — new, click to pair"
 msgstr "%1 — नया, पेयर करने के लिए क्लिक करें"
 
-#: package/contents/ui/FullRepresentation.qml:6668
+#: package/contents/ui/FullRepresentation.qml:6667
 msgid "Pair a new speaker…"
 msgstr "नया स्पीकर पेयर करें…"
 
-#: package/contents/ui/FullRepresentation.qml:6684
+#: package/contents/ui/FullRepresentation.qml:6683
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "खोज जारी — स्पीकर को पेयरिंग मोड में रखें…"
 
-#: package/contents/ui/FullRepresentation.qml:6705
+#: package/contents/ui/FullRepresentation.qml:6704
 msgid "WiFi & network"
 msgstr "WiFi और नेटवर्क"
 
-#: package/contents/ui/FullRepresentation.qml:6737
+#: package/contents/ui/FullRepresentation.qml:6736
 msgid "%1 (speaker group)"
 msgstr "%1 (स्पीकर समूह)"
 
-#: package/contents/ui/FullRepresentation.qml:6765
+#: package/contents/ui/FullRepresentation.qml:6764
 msgid "Balance"
 msgstr "बैलेंस"
 
-#: package/contents/ui/FullRepresentation.qml:6779
+#: package/contents/ui/FullRepresentation.qml:6778
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "वॉल्यूम में इस डिवाइस का हिस्सा — बैलेंस मास्टर वॉल्यूम के हर बदलाव के साथ चलता है और डिवाइस के लिए याद रखा जाता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6801
+#: package/contents/ui/FullRepresentation.qml:6800
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "हर डिवाइस अपना अलग बफ़र रखता है, इसलिए कमरों में कुछ सेकंड का अंतर आ सकता है। पूरी तरह सिंक स्पीकरों के लिए उन्हें Google Home ऐप में समूहित करें — समूह यहाँ एक ही डिवाइस के रूप में दिखाई देता है।"
 
-#: package/contents/ui/FullRepresentation.qml:6811
+#: package/contents/ui/FullRepresentation.qml:6810
 msgid "Stop casting everywhere"
 msgstr "हर जगह कास्टिंग रोकें"
 
-#: package/contents/ui/FullRepresentation.qml:6829
+#: package/contents/ui/FullRepresentation.qml:6828
 msgid "Searching for devices…"
 msgstr "डिवाइस खोजे जा रहे हैं…"
 
-#: package/contents/ui/FullRepresentation.qml:6838
+#: package/contents/ui/FullRepresentation.qml:6837
 msgid "No devices found on your network"
 msgstr "आपके नेटवर्क पर कोई डिवाइस नहीं मिला"
 
-#: package/contents/ui/main.qml:543
+#: package/contents/ui/main.qml:540
 msgid "Station list could not be read"
 msgstr "स्टेशन सूची पढ़ी नहीं जा सकी"
 
-#: package/contents/ui/main.qml:544
+#: package/contents/ui/main.qml:541
 msgid "The saved station configuration is malformed. Your data was not changed; fix the servers entry or use Settings → Import."
 msgstr "सहेजी गई स्टेशन कॉन्फ़िगरेशन विकृत है। आपका डेटा बदला नहीं गया; servers प्रविष्टि ठीक करें या सेटिंग्स → आयात का उपयोग करें।"
 
-#: package/contents/ui/main.qml:956
+#: package/contents/ui/main.qml:953
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "स्टेशन ने जवाब नहीं दिया — यह ऑफ़लाइन हो सकता है या आपके देश में उपलब्ध नहीं हो सकता। कोई दूसरा परिणाम आज़माएँ।"
 
-#: package/contents/ui/main.qml:1029
+#: package/contents/ui/main.qml:1026
 msgid "Download gave no answer"
 msgstr "डाउनलोड से कोई जवाब नहीं मिला"
 
-#: package/contents/ui/main.qml:1030
+#: package/contents/ui/main.qml:1027
 msgid "Nothing came back from the downloader — try again."
 msgstr "डाउनलोडर से कुछ वापस नहीं आया — फिर से कोशिश करें।"
 
-#: package/contents/ui/main.qml:2855
+#: package/contents/ui/main.qml:2857
 msgid "%1 devices"
 msgstr "%1 डिवाइस"
 
-#: package/contents/ui/main.qml:3735
+#: package/contents/ui/main.qml:3740
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth स्पीकर"
 
-#: package/contents/ui/main.qml:3734
+#: package/contents/ui/main.qml:3739
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 कनेक्ट है, लेकिन उसकी आवाज़ कभी नहीं पहुँची"
 
-#: package/contents/ui/main.qml:3736
+#: package/contents/ui/main.qml:3741
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "स्पीकर को बंद करके फिर से चालू करें, फिर उसे दोबारा कनेक्ट करें।"
 
-#: package/contents/ui/main.qml:4188
+#: package/contents/ui/main.qml:4200
 msgid "Station seems to be off the air"
 msgstr "स्टेशन ऑफ़-एयर लगता है"
 
-#: package/contents/ui/main.qml:4189
+#: package/contents/ui/main.qml:4201
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 डायरेक्टरी के ज्ञात किसी भी पते पर जवाब नहीं दे रहा है। यह आपकी सूची में बना रहेगा — पृष्ठभूमि में फिर से कोशिश की जा रही है।"
 
-#: package/contents/ui/main.qml:4265
+#: package/contents/ui/main.qml:4277
 msgid "Playing from a backup address"
 msgstr "बैकअप पते से चलाया जा रहा है"
 
-#: package/contents/ui/main.qml:4266
+#: package/contents/ui/main.qml:4278
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "स्टेशन का सहेजा गया पता जवाब नहीं दे रहा है — फ़िलहाल डायरेक्टरी का निकटतम मिलान चलाया जा रहा है। आपका सहेजा गया पता बरकरार रखा गया।"
 
-#: package/contents/ui/main.qml:4306
+#: package/contents/ui/main.qml:4318
 msgid "Station found at a new address"
 msgstr "स्टेशन नए पते पर मिला"
 
-#: package/contents/ui/main.qml:4307
+#: package/contents/ui/main.qml:4319
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 स्थानांतरित हो गया — नया पता आपकी सूची में सहेज लिया गया।"
 
-#: package/contents/ui/main.qml:5753
+#: package/contents/ui/main.qml:5778
 msgid "Casting needs pychromecast"
 msgstr "कास्टिंग के लिए pychromecast चाहिए"
 
-#: package/contents/ui/main.qml:5754
+#: package/contents/ui/main.qml:5779
 msgid "Install the pychromecast library to cast to your devices."
 msgstr "अपने डिवाइस पर कास्ट करने के लिए pychromecast लाइब्रेरी इंस्टॉल करें।"
 
-#: package/contents/ui/main.qml:5775
+#: package/contents/ui/main.qml:5800
 msgid "the device"
 msgstr "डिवाइस"
 
-#: package/contents/ui/main.qml:5775
+#: package/contents/ui/main.qml:5800
 msgid "Could not cast to %1"
 msgstr "%1 पर कास्ट नहीं किया जा सका"
 
-#: package/contents/ui/main.qml:5776
+#: package/contents/ui/main.qml:5801
 msgid "The device could not play this station."
 msgstr "डिवाइस यह स्टेशन नहीं चला सका।"
 
-#: package/contents/ui/main.qml:5822
+#: package/contents/ui/main.qml:5847
 msgid "Casting"
 msgstr "कास्टिंग"
 
-#: package/contents/ui/main.qml:5823
+#: package/contents/ui/main.qml:5848
 msgid "The device did not stop — it may still be playing."
 msgstr "डिवाइस रुका नहीं — हो सकता है वह अभी भी चल रहा हो।"
 
-#: package/contents/ui/main.qml:5901
+#: package/contents/ui/main.qml:5926
 msgid "Bluetooth is switched off"
 msgstr "Bluetooth बंद है"
 
-#: package/contents/ui/main.qml:5902
+#: package/contents/ui/main.qml:5927
 msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
 msgstr "अडैप्टर चालू नहीं हुआ — सिस्टम ट्रे का Bluetooth स्विच या सिस्टम सेटिंग्स जाँचें।"
 
-#: package/contents/ui/main.qml:5921 package/contents/ui/main.qml:6039
+#: package/contents/ui/main.qml:5946 package/contents/ui/main.qml:6064
 msgid "the Bluetooth device"
 msgstr "Bluetooth डिवाइस"
 
-#: package/contents/ui/main.qml:5920
+#: package/contents/ui/main.qml:5945
 msgid "Could not connect to %1"
 msgstr "%1 से कनेक्ट नहीं हो सका"
 
-#: package/contents/ui/main.qml:5922
+#: package/contents/ui/main.qml:5947
 msgid "Make sure the speaker is switched on and in range."
 msgstr "सुनिश्चित करें कि स्पीकर चालू है और रेंज में है।"
 
-#: package/contents/ui/main.qml:6038
+#: package/contents/ui/main.qml:6063
 msgid "Could not pair with %1"
 msgstr "%1 के साथ पेयर नहीं हो सका"
 
-#: package/contents/ui/main.qml:6040
+#: package/contents/ui/main.qml:6065
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "स्पीकर को पेयरिंग मोड में डालें (उसका Bluetooth बटन दबाए रखें) और फिर से कोशिश करें।"
 
-#: package/contents/ui/main.qml:6138 package/contents/ui/main.qml:6207
+#: package/contents/ui/main.qml:6163 package/contents/ui/main.qml:6238
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp इंस्टॉल नहीं है"
 
-#: package/contents/ui/main.qml:6139 package/contents/ui/main.qml:6208
+#: package/contents/ui/main.qml:6164 package/contents/ui/main.qml:6239
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "ट्रैक डाउनलोड करने के लिए yt-dlp (और ffmpeg) इंस्टॉल करें।"
 
-#: package/contents/ui/main.qml:6158 package/contents/ui/main.qml:6227
+#: package/contents/ui/main.qml:6188 package/contents/ui/main.qml:6258
 msgid "Nothing found to download"
 msgstr "डाउनलोड के लिए कुछ नहीं मिला"
 
-#: package/contents/ui/main.qml:6159 package/contents/ui/main.qml:6228
+#: package/contents/ui/main.qml:6189
+msgid "yt-dlp could not search: %1"
+msgstr "yt-dlp खोज नहीं सका: %1"
+
+#: package/contents/ui/main.qml:6190 package/contents/ui/main.qml:6259
 msgid "No track matched \"%1\" — a show or album title often has no single track to find."
 msgstr "\"%1\" से कोई ट्रैक मेल नहीं खाया — शो या एल्बम के नाम के पीछे अक्सर कोई एक ट्रैक नहीं होता।"
 
-#: package/contents/ui/main.qml:6171
+#: package/contents/ui/main.qml:6202
 msgid "Found only a different show — skipped"
 msgstr "केवल एक अलग शो मिला — छोड़ दिया गया"
 
-#: package/contents/ui/main.qml:6172
+#: package/contents/ui/main.qml:6203
 msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
 msgstr "\"%1\" के लिए सबसे अच्छा मेल \"%2\" था। गलत वाला डाउनलोड नहीं होगा।"
 
-#: package/contents/ui/main.qml:6194
+#: package/contents/ui/main.qml:6225
 msgid "Downloading again without the cover"
 msgstr "कवर के बिना फिर से डाउनलोड किया जा रहा है"
 
-#: package/contents/ui/main.qml:6195
+#: package/contents/ui/main.qml:6226
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "टैग एम्बेड करने के लिए python-mutagen पैकेज चाहिए — अपनी फ़ाइलों में कवर पाने के लिए इसे इंस्टॉल करें।"
 
-#: package/contents/ui/main.qml:6223
+#: package/contents/ui/main.qml:6254
 msgid "Track downloaded ✓"
 msgstr "ट्रैक डाउनलोड हुआ ✓"
 
-#: package/contents/ui/main.qml:6224
+#: package/contents/ui/main.qml:6255
 msgid "Saved as \"%1\" — newest first in My Music"
 msgstr "\"%1\" नाम से सहेजा गया — मेरा संगीत में सबसे ऊपर"
 
-#: package/contents/ui/main.qml:6232
+#: package/contents/ui/main.qml:6263
 msgid "Download failed"
 msgstr "डाउनलोड विफल हुआ"
 
-#: package/contents/ui/main.qml:6233
+#: package/contents/ui/main.qml:6264
 msgid "Unknown error"
 msgstr "अज्ञात त्रुटि"
 
-#: package/contents/ui/main.qml:6697
+#: package/contents/ui/main.qml:6729
 msgid "Audio output changed"
 msgstr "ऑडियो आउटपुट बदल गया"
 
-#: package/contents/ui/main.qml:6698
+#: package/contents/ui/main.qml:6730
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "चुना गया आउटपुट डिवाइस गायब हो गया — इसके बजाय सिस्टम डिफ़ॉल्ट का उपयोग किया जा रहा है।"
 
@@ -2006,144 +2032,144 @@ msgstr "सूची से स्टेशन हटाएँ"
 msgid "Waiting for track info…"
 msgstr "ट्रैक जानकारी की प्रतीक्षा में…"
 
-#: package/contents/ui/PodcastEngine.qml:202
+#: package/contents/ui/PodcastEngine.qml:209
 msgid "Subscriptions exported"
 msgstr "सब्सक्रिप्शन निर्यात किए गए"
 
-#: package/contents/ui/PodcastEngine.qml:204
+#: package/contents/ui/PodcastEngine.qml:211
 msgid "Export failed"
 msgstr "निर्यात विफल"
 
-#: package/contents/ui/PodcastEngine.qml:205
+#: package/contents/ui/PodcastEngine.qml:212
 msgid "Could not write the subscriptions file."
 msgstr "सब्सक्रिप्शन फ़ाइल लिखी नहीं जा सकी।"
 
-#: package/contents/ui/PodcastEngine.qml:244
+#: package/contents/ui/PodcastEngine.qml:251
 msgid "Episode downloaded"
 msgstr "एपिसोड डाउनलोड हुआ"
 
-#: package/contents/ui/PodcastEngine.qml:249
-#: package/contents/ui/PodcastEngine.qml:1123
+#: package/contents/ui/PodcastEngine.qml:256
+#: package/contents/ui/PodcastEngine.qml:1150
 msgid "Episode download failed"
 msgstr "एपिसोड डाउनलोड विफल"
 
-#: package/contents/ui/PodcastEngine.qml:396
+#: package/contents/ui/PodcastEngine.qml:407
 msgid "Nothing to export"
 msgstr "निर्यात करने के लिए कुछ नहीं"
 
-#: package/contents/ui/PodcastEngine.qml:396
+#: package/contents/ui/PodcastEngine.qml:407
 msgid "Subscribe to a show first."
 msgstr "पहले किसी शो को सब्सक्राइब करें।"
 
-#: package/contents/ui/PodcastEngine.qml:428
+#: package/contents/ui/PodcastEngine.qml:439
 msgid "Subscriptions imported"
 msgstr "सब्सक्रिप्शन आयात किए गए"
 
-#: package/contents/ui/PodcastEngine.qml:429
+#: package/contents/ui/PodcastEngine.qml:440
 msgid "%1 show added"
 msgid_plural "%1 shows added"
 msgstr[0] "%1 शो जोड़ा गया"
 msgstr[1] "%1 शो जोड़े गए"
 
-#: package/contents/ui/PodcastEngine.qml:431
+#: package/contents/ui/PodcastEngine.qml:442
 msgid "Nothing imported"
 msgstr "कुछ भी आयात नहीं हुआ"
 
-#: package/contents/ui/PodcastEngine.qml:432
+#: package/contents/ui/PodcastEngine.qml:443
 msgid "No new podcast feeds were found in that file."
 msgstr "उस फ़ाइल में कोई नई पॉडकास्ट फ़ीड नहीं मिली।"
 
-#: package/contents/ui/PodcastEngine.qml:842
-#: package/contents/ui/PodcastEngine.qml:884
+#: package/contents/ui/PodcastEngine.qml:853
+#: package/contents/ui/PodcastEngine.qml:895
 msgid "This feed address is not allowed."
 msgstr "इस फ़ीड पते की अनुमति नहीं है।"
 
-#: package/contents/ui/PodcastEngine.qml:911
-#: package/contents/ui/PodcastEngine.qml:960
+#: package/contents/ui/PodcastEngine.qml:922
+#: package/contents/ui/PodcastEngine.qml:971
 msgid "The feed could not be reached — check the connection and try again."
 msgstr "फ़ीड तक नहीं पहुंच सके — कनेक्शन जांचें और फिर से कोशिश करें।"
 
-#: package/contents/ui/PodcastEngine.qml:913
-#: package/contents/ui/PodcastEngine.qml:962
+#: package/contents/ui/PodcastEngine.qml:924
+#: package/contents/ui/PodcastEngine.qml:973
 msgid "The feed did not answer (error %1)."
 msgstr "फ़ीड ने जवाब नहीं दिया (त्रुटि %1)।"
 
-#: package/contents/ui/PodcastEngine.qml:914
-#: package/contents/ui/PodcastEngine.qml:963
+#: package/contents/ui/PodcastEngine.qml:925
+#: package/contents/ui/PodcastEngine.qml:974
 msgid "This address is not a podcast feed."
 msgstr "यह पता पॉडकास्ट फ़ीड नहीं है।"
 
-#: package/contents/ui/PodcastEngine.qml:926
+#: package/contents/ui/PodcastEngine.qml:937
 msgid "No playable episodes in this feed."
 msgstr "इस फ़ीड में चलाने योग्य कोई एपिसोड नहीं है।"
 
-#: package/contents/ui/PodcastEngine.qml:1309
+#: package/contents/ui/PodcastEngine.qml:1336
 msgid "%1 — the newest episodes are downloading."
 msgstr "%1 — सबसे नए एपिसोड डाउनलोड हो रहे हैं।"
 
-#: package/contents/ui/PodcastEngine.qml:1311
+#: package/contents/ui/PodcastEngine.qml:1338
 msgid "New podcast episodes"
 msgstr "नए पॉडकास्ट एपिसोड"
 
-#: package/contents/ui/RecordingEngine.qml:232
-#: package/contents/ui/RecordingEngine.qml:506
-#: package/contents/ui/RecordingEngine.qml:576
+#: package/contents/ui/RecordingEngine.qml:235
+#: package/contents/ui/RecordingEngine.qml:509
+#: package/contents/ui/RecordingEngine.qml:579
 msgid "Recording failed"
 msgstr "रिकॉर्डिंग विफल हुई"
 
-#: package/contents/ui/RecordingEngine.qml:410
+#: package/contents/ui/RecordingEngine.qml:413
 msgid "Scheduled recording missed"
 msgstr "निर्धारित रिकॉर्डिंग छूट गई"
 
-#: package/contents/ui/RecordingEngine.qml:416
+#: package/contents/ui/RecordingEngine.qml:419
 msgid "Scheduled recording skipped"
 msgstr "निर्धारित रिकॉर्डिंग छोड़ी गई"
 
-#: package/contents/ui/RecordingEngine.qml:417
+#: package/contents/ui/RecordingEngine.qml:420
 msgid "%1 — another recording is already running."
 msgstr "%1 — एक और रिकॉर्डिंग पहले से चल रही है।"
 
-#: package/contents/ui/RecordingEngine.qml:512
+#: package/contents/ui/RecordingEngine.qml:515
 msgid "Scheduled recording started"
 msgstr "निर्धारित रिकॉर्डिंग शुरू हुई"
 
-#: package/contents/ui/RecordingEngine.qml:552
+#: package/contents/ui/RecordingEngine.qml:555
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg इंस्टॉल नहीं है"
 
-#: package/contents/ui/RecordingEngine.qml:553
+#: package/contents/ui/RecordingEngine.qml:556
 msgid "Install ffmpeg to record radio."
 msgstr "रेडियो रिकॉर्ड करने के लिए ffmpeg इंस्टॉल करें।"
 
-#: package/contents/ui/RecordingEngine.qml:558
+#: package/contents/ui/RecordingEngine.qml:561
 msgid "curl is not installed"
 msgstr "curl इंस्टॉल नहीं है"
 
-#: package/contents/ui/RecordingEngine.qml:559
+#: package/contents/ui/RecordingEngine.qml:562
 msgid "Install curl to record radio."
 msgstr "रेडियो रिकॉर्ड करने के लिए curl इंस्टॉल करें।"
 
-#: package/contents/ui/RecordingEngine.qml:562
+#: package/contents/ui/RecordingEngine.qml:565
 msgid "Not enough disk space for this recording"
 msgstr "इस रिकॉर्डिंग के लिए डिस्क में पर्याप्त जगह नहीं है"
 
-#: package/contents/ui/RecordingEngine.qml:563
+#: package/contents/ui/RecordingEngine.qml:566
 msgid "Free some space in %1 and try again."
 msgstr "%1 में कुछ जगह खाली करें और फिर से कोशिश करें।"
 
-#: package/contents/ui/RecordingEngine.qml:566
+#: package/contents/ui/RecordingEngine.qml:569
 msgid "Recording saved ✓ (%1)"
 msgstr "रिकॉर्डिंग सहेजी गई ✓ (%1)"
 
-#: package/contents/ui/RecordingEngine.qml:570
+#: package/contents/ui/RecordingEngine.qml:573
 msgid "Recording interrupted (%1 captured)"
 msgstr "रिकॉर्डिंग बाधित हुई (%1 कैप्चर हुआ)"
 
-#: package/contents/ui/RecordingEngine.qml:572
+#: package/contents/ui/RecordingEngine.qml:575
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — फ़ाइल अपेक्षा से बहुत छोटी है।"
 
-#: package/contents/ui/RecordingEngine.qml:577
+#: package/contents/ui/RecordingEngine.qml:580
 msgid "The stream could not be captured."
 msgstr "स्ट्रीम कैप्चर नहीं की जा सकी।"
 
@@ -2155,301 +2181,305 @@ msgstr "आउटपुट संयोजित नहीं किए जा �
 msgid "pactl refused to create the combined output."
 msgstr "pactl ने संयुक्त आउटपुट बनाने से इनकार कर दिया।"
 
-#: package/contents/ui/SyncEngine.qml:645
+#: package/contents/ui/SyncEngine.qml:651
 msgid "Auto-check %1: room put back in step"
 msgstr "स्वतः-जाँच %1: कमरा फिर सिंक में"
 
-#: package/contents/ui/SyncEngine.qml:914
+#: package/contents/ui/SyncEngine.qml:920
 msgid "The Bluetooth speaker trails by %1 ms, and every speaker's loudness was matched at the microphone — all set and remembered."
 msgstr "Bluetooth स्पीकर %1 ms पीछे चलता है, और हर स्पीकर की ध्वनि-तीव्रता माइक्रोफ़ोन पर मिलाई गई — सब सेट हो गया और याद रखा गया।"
 
-#: package/contents/ui/SyncEngine.qml:915
+#: package/contents/ui/SyncEngine.qml:921
 msgid "The Bluetooth speaker trails by %1 ms — the delay is set and remembered for this device."
 msgstr "Bluetooth स्पीकर %1 ms पीछे चलता है — इस डिवाइस के लिए विलंब सेट हो गया और याद रखा गया।"
 
-#: package/contents/ui/SyncEngine.qml:917
+#: package/contents/ui/SyncEngine.qml:923
 msgid "Balance levels set earlier were replaced by the measured ones."
 msgstr "पहले सेट किए गए बैलेंस स्तर मापे गए स्तरों से बदल दिए गए।"
 
-#: package/contents/ui/SyncEngine.qml:923
+#: package/contents/ui/SyncEngine.qml:929
 msgid "The speakers were matched to the quietest one and the group's volume was raised by %1% to make up for it."
 msgstr "स्पीकर सबसे धीमे वाले के स्तर पर लाए गए और इसकी भरपाई के लिए समूह की आवाज़ %1% बढ़ाई गई।"
 
-#: package/contents/ui/SyncEngine.qml:924
+#: package/contents/ui/SyncEngine.qml:930
 msgid "The speakers were matched to the quietest one, so the room is quieter than before — turn the volume up if you want it back."
 msgstr "स्पीकर सबसे धीमे वाले के स्तर पर लाए गए, इसलिए कमरा पहले से धीमा है — वापस चाहिए तो आवाज़ बढ़ा दें।"
 
-#: package/contents/ui/SyncEngine.qml:933
+#: package/contents/ui/SyncEngine.qml:939
 msgid "The microphone clipped on %1 — that balance was left unchanged; lower the speaker's volume and calibrate again."
 msgstr "%1 पर माइक्रोफ़ोन क्लिप हुआ — वह बैलेंस अपरिवर्तित छोड़ा गया; स्पीकर का वॉल्यूम कम करें और फिर से कैलिब्रेट करें।"
 
-#: package/contents/ui/SyncEngine.qml:946
+#: package/contents/ui/SyncEngine.qml:952
 msgid "Measured with %1 — the default microphone stayed silent."
 msgstr "%1 से मापा गया — डिफ़ॉल्ट माइक्रोफ़ोन मौन रहा।"
 
-#: package/contents/ui/SyncEngine.qml:947
+#: package/contents/ui/SyncEngine.qml:953
 msgid "Speakers calibrated"
 msgstr "स्पीकर कैलिब्रेट हुए"
 
-#: package/contents/ui/SyncEngine.qml:960
-#: package/contents/ui/SyncEngine.qml:968
-#: package/contents/ui/SyncEngine.qml:1029
-#: package/contents/ui/SyncEngine.qml:1037
-#: package/contents/ui/SyncEngine.qml:1041
+#: package/contents/ui/SyncEngine.qml:966
+#: package/contents/ui/SyncEngine.qml:974
+#: package/contents/ui/SyncEngine.qml:1035
+#: package/contents/ui/SyncEngine.qml:1043
+#: package/contents/ui/SyncEngine.qml:1047
 msgid "Calibration did not succeed"
 msgstr "कैलिब्रेशन सफल नहीं हुआ"
 
-#: package/contents/ui/SyncEngine.qml:961
+#: package/contents/ui/SyncEngine.qml:967
 msgid "The inaudible tone did not reach the microphone from these speakers. Move the microphone closer, or turn off \"Measure with a tone too high to hear\" to measure with the audible clicks."
 msgstr "इन स्पीकर से अश्रव्य ध्वनि माइक्रोफ़ोन तक नहीं पहुँची। माइक्रोफ़ोन को पास लाएँ, या सुनाई देने वाली क्लिक से मापने के लिए «इतनी ऊँची ध्वनि से मापें कि सुनाई न दे» बंद करें।"
 
-#: package/contents/ui/SyncEngine.qml:969
-#: package/contents/ui/SyncEngine.qml:1401
+#: package/contents/ui/SyncEngine.qml:975
+#: package/contents/ui/SyncEngine.qml:1407
 msgid "Every microphone delivered pure silence. A mic's own mute button is invisible to the system — check the light on the microphone itself, or set a working microphone as the default."
 msgstr "हर माइक्रोफ़ोन से केवल सन्नाटा मिला। माइक का अपना म्यूट बटन सिस्टम को दिखाई नहीं देता — माइक्रोफ़ोन पर लगी लाइट स्वयं जाँचें, या किसी चालू माइक्रोफ़ोन को डिफ़ॉल्ट के रूप में सेट करें।"
 
-#: package/contents/ui/SyncEngine.qml:1001
+#: package/contents/ui/SyncEngine.qml:1007
 msgid "Calibration"
 msgstr "कैलिब्रेशन"
 
-#: package/contents/ui/SyncEngine.qml:1003
+#: package/contents/ui/SyncEngine.qml:1009
 msgid "The inaudible reading would not settle at this level — trying once more, louder."
 msgstr "अश्रव्य रीडिंग इस स्तर पर स्थिर नहीं हुई — एक बार फिर, और तेज़ आवाज़ में प्रयास हो रहा है।"
 
-#: package/contents/ui/SyncEngine.qml:1004
+#: package/contents/ui/SyncEngine.qml:1010
 msgid "The clicks were too quiet for this room — trying once more, louder."
 msgstr "इस कमरे के लिए क्लिक बहुत धीमे थे — एक बार फिर, और तेज़ आवाज़ में कोशिश की जा रही है।"
 
-#: package/contents/ui/SyncEngine.qml:1030
+#: package/contents/ui/SyncEngine.qml:1036
 msgid "The two speakers timed impossibly far apart, so nothing was changed. A speaker that has just reconnected usually needs a minute to settle — try again shortly."
 msgstr "दोनों स्पीकर असंभव रूप से दूर मापे गए, इसलिए कुछ भी बदला नहीं गया। अभी-अभी दोबारा जुड़े स्पीकर को स्थिर होने में प्रायः एक मिनट लगता है — थोड़ी देर में फिर प्रयास करें।"
 
-#: package/contents/ui/SyncEngine.qml:1038
+#: package/contents/ui/SyncEngine.qml:1044
 msgid "The reading would not settle even with the speakers turned up — nothing was changed. Trying again usually does it."
 msgstr "स्पीकर तेज़ करने पर भी रीडिंग स्थिर नहीं हुई — कुछ भी बदला नहीं गया। दोबारा प्रयास करने से प्रायः काम बन जाता है।"
 
-#: package/contents/ui/SyncEngine.qml:1042
+#: package/contents/ui/SyncEngine.qml:1048
 msgid "Make sure the microphone is not covered and both speakers can be heard, then try again."
 msgstr "सुनिश्चित करें कि माइक्रोफ़ोन ढका नहीं है और दोनों स्पीकर सुनाई देते हैं, फिर दोबारा कोशिश करें।"
 
-#: package/contents/ui/SyncEngine.qml:1076
-#: package/contents/ui/SyncEngine.qml:1124
-#: package/contents/ui/SyncEngine.qml:1159
-#: package/contents/ui/SyncEngine.qml:1312
-#: package/contents/ui/SyncEngine.qml:1345
-#: package/contents/ui/SyncEngine.qml:1368
+#: package/contents/ui/SyncEngine.qml:1082
+#: package/contents/ui/SyncEngine.qml:1130
+#: package/contents/ui/SyncEngine.qml:1165
+#: package/contents/ui/SyncEngine.qml:1318
+#: package/contents/ui/SyncEngine.qml:1351
 #: package/contents/ui/SyncEngine.qml:1374
-#: package/contents/ui/SyncEngine.qml:1400
-#: package/contents/ui/SyncEngine.qml:1415
-#: package/contents/ui/SyncEngine.qml:1461
-#: package/contents/ui/SyncEngine.qml:1466
-#: package/contents/ui/SyncEngine.qml:1473
-#: package/contents/ui/SyncEngine.qml:1486
+#: package/contents/ui/SyncEngine.qml:1380
+#: package/contents/ui/SyncEngine.qml:1406
+#: package/contents/ui/SyncEngine.qml:1421
+#: package/contents/ui/SyncEngine.qml:1467
+#: package/contents/ui/SyncEngine.qml:1472
+#: package/contents/ui/SyncEngine.qml:1479
+#: package/contents/ui/SyncEngine.qml:1492
 msgid "Sync check"
 msgstr "सिंक जाँच"
 
-#: package/contents/ui/SyncEngine.qml:1077
+#: package/contents/ui/SyncEngine.qml:1083
 msgid "%1 is muted, so the check skipped it. Unmute it and check again to include it."
 msgstr "%1 म्यूट है, इसलिए जाँच ने उसे छोड़ दिया। म्यूट हटाएँ और उसे शामिल करने के लिए फिर से जाँचें।"
 
-#: package/contents/ui/SyncEngine.qml:1125
+#: package/contents/ui/SyncEngine.qml:1131
 msgid "The speakers were %1 ms apart — measuring once more to confirm."
 msgstr "स्पीकर %1 मि.से. के अंतर पर थे — पुष्टि के लिए एक बार फिर माप रहे हैं।"
 
-#: package/contents/ui/SyncEngine.qml:1160
+#: package/contents/ui/SyncEngine.qml:1166
 msgid "Two measurements disagreed about the room, so nothing was changed. If the speakers sound apart, press Calibrate."
 msgstr "दो मापों में कमरे को लेकर मेल नहीं हुआ, इसलिए कुछ भी बदला नहीं गया। यदि स्पीकर अलग-अलग सुनाई दें, तो कैलिब्रेट दबाएँ।"
 
-#: package/contents/ui/SyncEngine.qml:1313
+#: package/contents/ui/SyncEngine.qml:1319
 msgid "The room still reads %1 ms apart, but the difference sits on the wired speaker's road, which does not drift by itself — nothing was changed. If the speakers sound apart, press Calibrate."
 msgstr "कमरा अब भी %1 मि.से. का अंतर दिखाता है, पर यह अंतर तार वाले स्पीकर के मार्ग पर है, जो अपने आप नहीं खिसकता — कुछ भी बदला नहीं गया। यदि स्पीकर अलग-अलग सुनाई दें, तो कैलिब्रेट दबाएँ।"
 
-#: package/contents/ui/SyncEngine.qml:1317
+#: package/contents/ui/SyncEngine.qml:1323
 msgid "The speakers were %1 ms apart — adjusted from the measurement, checking once more."
 msgstr "स्पीकर %1 ms के अंतर पर थे — माप के अनुसार समायोजित किया गया, एक बार फिर जाँच हो रही है।"
 
-#: package/contents/ui/SyncEngine.qml:1335
+#: package/contents/ui/SyncEngine.qml:1341
 msgid "A speaker's route was stuck %1 ms behind — flushed it, checking once more."
 msgstr "एक स्पीकर का मार्ग %1 ms पीछे अटका था — उसे फ़्लश किया गया, एक बार फिर जाँच हो रही है।"
 
-#: package/contents/ui/SyncEngine.qml:1369
+#: package/contents/ui/SyncEngine.qml:1375
 msgid "The check compares speakers, and too many are muted to compare. Unmute them and check again."
 msgstr "जाँच स्पीकरों की तुलना करती है, और तुलना के लिए बहुत सारे म्यूट हैं। म्यूट हटाएँ और फिर से जाँचें।"
 
-#: package/contents/ui/SyncEngine.qml:1375
+#: package/contents/ui/SyncEngine.qml:1381
 msgid "This speaker does not carry the inaudible test tone, so the check needed the audible one — and the room was too noisy for it. Pause other audio and try again."
 msgstr "यह स्पीकर अश्रव्य परीक्षण ध्वनि नहीं भेजता, इसलिए जाँच को सुनाई देने वाली ध्वनि चाहिए थी — और उसके लिए कमरा बहुत शोरगुल वाला था। बाकी ऑडियो रोककर फिर कोशिश करें।"
 
-#: package/contents/ui/SyncEngine.qml:1393
+#: package/contents/ui/SyncEngine.qml:1399
 msgid "Sync check skipped"
 msgstr "सिंक जाँच छोड़ी गई"
 
-#: package/contents/ui/SyncEngine.qml:1394
+#: package/contents/ui/SyncEngine.qml:1400
 msgid "The speakers here do not carry the inaudible tone to the microphone. Move the microphone closer, or turn off \"Measure with a tone too high to hear\" to use the audible clicks."
 msgstr "यहाँ के स्पीकर अश्रव्य ध्वनि को माइक्रोफ़ोन तक नहीं पहुँचाते। माइक्रोफ़ोन को पास लाएँ, या सुनाई देने वाली क्लिक इस्तेमाल करने के लिए «इतनी ऊँची ध्वनि से मापें कि सुनाई न दे» बंद करें।"
 
-#: package/contents/ui/SyncEngine.qml:1396
+#: package/contents/ui/SyncEngine.qml:1402
 msgid "Auto-check: cannot measure without a sound you would hear"
 msgstr "स्वतः जाँच: सुनाई देने वाली ध्वनि के बिना मापा नहीं जा सकता"
 
-#: package/contents/ui/SyncEngine.qml:1416
+#: package/contents/ui/SyncEngine.qml:1422
 msgid "The reading from %1 would not settle, so nothing was changed. Trying again usually does it."
 msgstr "%1 की रीडिंग स्थिर नहीं हुई, इसलिए कुछ भी बदला नहीं गया। दोबारा प्रयास करने से प्रायः काम बन जाता है।"
 
-#: package/contents/ui/SyncEngine.qml:1462
+#: package/contents/ui/SyncEngine.qml:1468
 msgid "%1 stayed silent through both rounds — it was left out of the group. Tick it back in the speaker list any time."
 msgstr "%1 दोनों दौर में मौन रहा — उसे समूह से बाहर रखा गया। स्पीकर सूची में उसे कभी भी फिर से टिक कर सकते हैं।"
 
-#: package/contents/ui/SyncEngine.qml:1467
+#: package/contents/ui/SyncEngine.qml:1473
 msgid "%1 made no sound the microphone could hear. If it stays silent on the next calibration too, it will be left out of the group."
 msgstr "%1 से ऐसी कोई आवाज़ नहीं आई जिसे माइक्रोफ़ोन सुन पाता। अगर अगले कैलिब्रेशन में भी यह मौन रहा, तो इसे समूह से बाहर रखा जाएगा।"
 
-#: package/contents/ui/SyncEngine.qml:1474
+#: package/contents/ui/SyncEngine.qml:1480
 msgid "Could not hear %1 during the check — the speaker may be muted or off. The calibration was kept."
 msgstr "जाँच के दौरान %1 सुनाई नहीं दिया — स्पीकर म्यूट या बंद हो सकता है। कैलिब्रेशन बरकरार रखा गया।"
 
-#: package/contents/ui/SyncEngine.qml:1482
+#: package/contents/ui/SyncEngine.qml:1488
 msgid "Sync verified"
 msgstr "सिंक सत्यापित हुआ"
 
-#: package/contents/ui/SyncEngine.qml:1483
+#: package/contents/ui/SyncEngine.qml:1489
 msgid "Every speaker arrives within %1 ms at the microphone — in step to the ear."
 msgstr "हर स्पीकर की आवाज़ माइक्रोफ़ोन तक %1 ms के भीतर पहुँचती है — कान के लिए एक साथ।"
 
-#: package/contents/ui/SyncEngine.qml:1487
+#: package/contents/ui/SyncEngine.qml:1493
 msgid "The speakers still arrive %1 ms apart. Calibrate once more, or nudge the delay slider."
 msgstr "स्पीकर अब भी %1 ms के अंतर से पहुँचते हैं। एक बार फिर कैलिब्रेट करें, या विलंब स्लाइडर को थोड़ा खिसकाएँ।"
 
-#: package/contents/ui/SyncEngine.qml:1529
+#: package/contents/ui/SyncEngine.qml:1535
 msgid "Auto-check %1: skipped, something else was using the speakers"
 msgstr "स्वतः जाँच %1: छोड़ी गई, स्पीकर किसी और काम में थे"
 
-#: package/contents/ui/SyncEngine.qml:1555
-#: package/contents/ui/SyncEngine.qml:1651
+#: package/contents/ui/SyncEngine.qml:1561
+#: package/contents/ui/SyncEngine.qml:1657
 msgid "Auto-check %1: settling after the adjustment"
 msgstr "स्वचालित जाँच %1: समायोजन के बाद स्थिर हो रहा है"
 
-#: package/contents/ui/SyncEngine.qml:1582
+#: package/contents/ui/SyncEngine.qml:1588
 msgid "Auto-check %1: reading would not settle — the microphone may be too far from the speakers"
 msgstr "स्वतः जाँच %1: पाठ स्थिर नहीं हुआ — माइक्रोफ़ोन शायद स्पीकर से बहुत दूर है"
 
-#: package/contents/ui/SyncEngine.qml:1588
+#: package/contents/ui/SyncEngine.qml:1594
 msgid "Auto-check %1: too quiet to tell"
 msgstr "स्वतः-जाँच %1: बताने के लिए बहुत शांत"
 
-#: package/contents/ui/SyncEngine.qml:1703
+#: package/contents/ui/SyncEngine.qml:1709
 msgid "Auto-check %1: in sync — measured %2 ms"
 msgstr "स्वचालित जाँच %1: सिंक में — मापा गया %2 मि.से."
 
-#: package/contents/ui/SyncEngine.qml:1704
+#: package/contents/ui/SyncEngine.qml:1710
 msgid "Auto-check %1: in sync"
 msgstr "स्वतः-जाँच %1: सिंक में"
 
-#: package/contents/ui/SyncEngine.qml:1714
+#: package/contents/ui/SyncEngine.qml:1720
 msgid "Auto-check %1: %2 ms apart — measured %3 ms"
 msgstr "स्वचालित जाँच %1: %2 मि.से. का अंतर — मापा गया %3 मि.से."
 
-#: package/contents/ui/SyncEngine.qml:1715
+#: package/contents/ui/SyncEngine.qml:1721
 msgid "Auto-check %1: still %2 ms apart (0 = in step)"
 msgstr "स्वतः जाँच %1: अब भी %2 ms का अंतर (0 = मिलान)"
 
-#: package/contents/ui/SyncEngine.qml:1752
+#: package/contents/ui/SyncEngine.qml:1758
 msgid "Sync has drifted"
 msgstr "सिंक खिसक गया है"
 
-#: package/contents/ui/SyncEngine.qml:1753
+#: package/contents/ui/SyncEngine.qml:1759
 msgid "The speakers are audibly apart again — run Calibrate when convenient."
 msgstr "स्पीकर फिर से सुनाई देने लायक अंतर पर हैं — सुविधा होने पर कैलिब्रेट चलाएँ।"
 
-#: package/contents/ui/SyncEngine.qml:1862
+#: package/contents/ui/SyncEngine.qml:1868
 msgid "Speaker timing drifted"
 msgstr "स्पीकर की टाइमिंग खिसक गई"
 
-#: package/contents/ui/SyncEngine.qml:1863
+#: package/contents/ui/SyncEngine.qml:1869
 msgid "A Bluetooth speaker came back noticeably off its calibration — the sync compensated automatically. Recalibrate when convenient for exact ears."
 msgstr "एक Bluetooth स्पीकर अपने कैलिब्रेशन से स्पष्ट रूप से हटकर लौटा — सिंक ने स्वतः क्षतिपूर्ति कर दी। सटीक सुनवाई के लिए सुविधा होने पर फिर से कैलिब्रेट करें।"
 
-#: package/contents/ui/SyncEngine.qml:2483
-#: package/contents/ui/SyncEngine.qml:2718
+#: package/contents/ui/SyncEngine.qml:2497
+#: package/contents/ui/SyncEngine.qml:2732
 msgid "Auto-check: listening…"
 msgstr "स्वतः जाँच: सुन रहे हैं…"
 
-#: package/contents/ui/SyncEngine.qml:2689
+#: package/contents/ui/SyncEngine.qml:2703
 msgid "Auto-check %1: only one speaker can hear the inaudible tone — nothing to compare"
 msgstr "स्वतः जाँच %1: अश्रव्य ध्वनि केवल एक स्पीकर सुनता है — तुलना के लिए कुछ नहीं"
 
-#: package/contents/ui/SyncEngine.qml:2748
+#: package/contents/ui/SyncEngine.qml:2762
 msgid "Auto-check %1: no answer came back"
 msgstr "स्वतः जाँच %1: कोई उत्तर नहीं आया"
 
-#: package/contents/ui/SyncEngine.qml:2796
+#: package/contents/ui/SyncEngine.qml:2810
 msgid "%1: %2 ms"
 msgstr "%1: %2 ms"
 
 #. i18n() is given at runtime and the translation is
 #. silently skipped in every language.
-#: package/contents/ui/SyncEngine.qml:3341
+#: package/contents/ui/SyncEngine.qml:3374
 msgid "Sync measurement"
 msgstr "सिंक माप"
 
-#: package/contents/ui/SyncEngine.qml:3342
+#: package/contents/ui/SyncEngine.qml:3375
 msgid "A recording is running. The measurement plays test tones and quiets the speakers, so it waits until the recording is done."
 msgstr "रिकॉर्डिंग चल रही है। माप परीक्षण ध्वनियाँ बजाता है और स्पीकर धीमे कर देता है, इसलिए वह रिकॉर्डिंग खत्म होने का इंतज़ार करता है।"
 
-#: package/contents/ui/SyncEngine.qml:3519
+#: package/contents/ui/SyncEngine.qml:3552
 msgid "Measuring with a tone too high to hear — about two minutes in total. The music stays silent until the check finishes."
 msgstr "सुनाई न देने वाले ऊँचे स्वर से माप हो रही है — कुल लगभग दो मिनट। जाँच पूरी होने तक संगीत मौन रहेगा।"
 
-#: package/contents/ui/SyncEngine.qml:3520
+#: package/contents/ui/SyncEngine.qml:3553
 msgid "Two rounds of clicks with a quiet check between them — about two minutes in total. The music stays silent until the check finishes."
 msgstr "क्लिक के दो दौर और बीच में एक शांत जाँच — कुल मिलाकर लगभग दो मिनट। जाँच पूरी होने तक संगीत मौन रहेगा।"
 
-#: package/contents/ui/SyncEngine.qml:3522
+#: package/contents/ui/SyncEngine.qml:3555
 msgid "Skipped (empty jack): %1."
 msgstr "छोड़ा गया (खाली जैक): %1।"
 
-#: package/contents/ui/SyncEngine.qml:3523
+#: package/contents/ui/SyncEngine.qml:3556
 msgid "Calibration started"
 msgstr "कैलिब्रेशन शुरू हुआ"
 
-#: package/contents/ui/SyncEngine.qml:3590
+#: package/contents/ui/SyncEngine.qml:3623
 msgid "All local outputs (On Air)"
 msgstr "सभी स्थानीय आउटपुट (On Air)"
 
-#: package/contents/ui/SyncEngine.qml:4514
+#: package/contents/ui/SyncEngine.qml:4547
 msgid "Auto-check: measured %1 ms — takes effect the next time the music pauses"
 msgstr "स्वचालित जाँच: %1 मि.से. मापा गया — अगली बार संगीत रुकने पर लागू होगा"
 
-#: package/contents/ui/SyncEngine.qml:4515
+#: package/contents/ui/SyncEngine.qml:4548
 msgid "Auto-check: adjusted — takes effect the next time the music pauses"
 msgstr "स्वचालित जाँच: समायोजित — अगली बार संगीत रुकने पर लागू होगा"
 
-#: package/contents/ui/SyncEngine.qml:4703
+#: package/contents/ui/SyncEngine.qml:4737
 msgid "Auto-check %1: confirming the room after the rebuild…"
 msgstr "स्वतः-जाँच %1: पुनर्निर्माण के बाद कमरे की पुष्टि हो रही है…"
 
-#: package/contents/ui/SyncEngine.qml:4770
+#: package/contents/ui/SyncEngine.qml:4804
 msgid "Auto-check %1: in step after the rebuild"
 msgstr "स्वतः-जाँच %1: पुनर्निर्माण के बाद सिंक में"
 
-#: package/contents/ui/SyncEngine.qml:4820
-#: package/contents/ui/SyncEngine.qml:4858
+#: package/contents/ui/SyncEngine.qml:4854
+#: package/contents/ui/SyncEngine.qml:4894
 msgid "Auto-check %1: adjusted — takes effect the next time the music pauses"
 msgstr "स्वतः-जाँच %1: समायोजित — अगली बार संगीत रुकने पर लागू होगा"
 
-#: package/contents/ui/SyncEngine.qml:5434
+#: package/contents/ui/SyncEngine.qml:5472
 msgid "%1 did not join the sync"
 msgstr "%1 सिंक में शामिल नहीं हुआ"
 
-#: package/contents/ui/SyncEngine.qml:5436
+#: package/contents/ui/SyncEngine.qml:5474
 msgid "The speaker is connected but could not be pulled into the group — switch the sync off and on to rebuild it."
 msgstr "स्पीकर कनेक्ट है लेकिन उसे समूह में नहीं लाया जा सका — समूह को फिर से बनाने के लिए सिंक बंद करके दोबारा चालू करें।"
 
-#: package/contents/ui/SyncEngine.qml:5437
+#: package/contents/ui/SyncEngine.qml:5475
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "स्पीकर कनेक्ट है लेकिन उसका ऑडियो आउटपुट कभी प्रकट नहीं हुआ — स्पीकर बंद करके दोबारा चालू करें, फिर उसे फिर से कनेक्ट करें।"
 
-#: package/contents/ui/TimeshiftEngine.qml:489
+#: package/contents/ui/TimeshiftEngine.qml:460
+msgid "The stream could not be relayed — trying it directly"
+msgstr "स्ट्रीम को रिले नहीं किया जा सका — सीधे प्रयास किया जा रहा है"
+
+#: package/contents/ui/TimeshiftEngine.qml:500
 msgid "Not enough free disk space"
 msgstr "डिस्क पर पर्याप्त खाली जगह नहीं है"
 

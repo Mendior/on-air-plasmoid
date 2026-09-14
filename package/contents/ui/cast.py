@@ -142,6 +142,24 @@ def _disconnect(cast):
         _dbg("disconnect", exc)
 
 
+def _media_session_open(mc):
+    """Has the receiver actually opened a media session?
+
+    Not `mc.is_active` — that one is inherited from BaseController and answers
+    a different question: whether the media namespace is among the running
+    app's namespaces. The default media receiver has that namespace up before
+    (and after) it holds any session, so a device that silently refused the
+    stream still reads as active. block_until_active waits on
+    session_active_event, and this is the same event read back, so the verdict
+    matches what the wait was for. Older pychromecast without the event falls
+    back to the session id the status carries.
+    """
+    event = getattr(mc, "session_active_event", None)
+    if event is not None:
+        return bool(event.is_set())
+    return bool(getattr(getattr(mc, "status", None), "media_session_id", None))
+
+
 def _discover_cast(seconds):
     found = {}
     try:
@@ -246,6 +264,15 @@ def cmd_play(host, port, uuid, model, url, ctype, title, art, start_at=None):
             **kw,
         )
         mc.block_until_active(timeout=CONNECT_TIMEOUT)
+        # block_until_active returns on timeout without raising, and OK used
+        # to follow regardless: a receiver that never opened a media session
+        # was reported as casting. One more wait for the slow ones, then the
+        # truth — the widget can retry a FAIL, it cannot see a phantom OK.
+        if not _media_session_open(mc):
+            mc.block_until_active(timeout=CONNECT_TIMEOUT)
+        if not _media_session_open(mc):
+            _out("%s no media session after %.0fs" % (FAIL, 2 * CONNECT_TIMEOUT))
+            return
         _out(OK)
     except Exception as exc:
         _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))

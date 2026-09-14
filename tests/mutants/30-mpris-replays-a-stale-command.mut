@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  _mprisStart only touches the command file it is about to watch, so a line a
+  crashed session left there is replayed against the reset sequence counter and
+  starts a station nobody asked for.
+
+history:
+  The widget resets _mprisCmdSeq to 0 on every start, because a fresh daemon
+  numbers its commands from 1. It trusted the launcher to clear the file — and
+  the launcher does, at its line 78, behind a python dbus probe (measured 49-50
+  ms), an unconditional sleep 0.3 and two orphan sweeps: about 360 ms in. The
+  watcher's lost-wakeup cat reads at 250 ms. A plasmashell that crashed or was
+  restarted by a package upgrade never ran _mprisStop, so the last media-key
+  line was still there to be read, and Play, PlayPause, Next and Previous all
+  start a station from a dead stop. Media keys are on by default. Found
+  2026-09-14 while hunting issue #13, "randomly starts playing on its own".
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          executable.exec(": > '" + safeCmd + "'");
+
+replace:
+          executable.exec("touch '" + safeCmd + "'");
+
+expect:
+  Killed by tests/test_invariants.py::test_the_mpris_start_empties_the_command_file.
+  Line-neutral.

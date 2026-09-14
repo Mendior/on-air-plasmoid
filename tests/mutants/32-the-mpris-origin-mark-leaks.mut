@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The "this park came over MPRIS" mark is cleared at the bottom of the dispatch
+  instead of unconditionally, so four of six early returns leave it standing and
+  every later park wears it.
+
+history:
+  A Bluetooth speaker powering off sends an AVRCP Pause as its last breath, and
+  the widget undoes such a park for the speakers still in the room — right, but
+  only while the mark is honest. Both podcast skips and both empty-list returns
+  jumped over the single clearing line, so after one media-key pause the mark
+  stood for the session. A park made on the widget's own button, the panel icon
+  or with Space then read as a dying speaker's breath, and a member leaving
+  within two minutes resumed the music over it. The dispatch moved behind a
+  try/finally that no return can escape. Found 2026-09-14, chasing issue #13.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          try { _mprisDispatch(cmd); } finally { root._mprisCmdActive = false; }
+
+replace:
+          _mprisDispatch(cmd); root._mprisCmdActive = false;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_mpris_origin_flag_cannot_outlive_its_dispatch.
+  Line-neutral.

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Six blank title polls pin a station as "no titles" and nothing lifts the
+  pin again, so a station that was between songs at its first polls shows
+  no title for the whole play.
+
+history:
+  This is the shape behind issue #10 ("Now Playing does not update track
+  info unless you pick another station"), open since 2026-08-08. The pin
+  is right for a server that carries no ICY metadata at all, and it was
+  applied just the same to a server that answered six polls with an empty
+  StreamTitle — an ad break, a jingle, a talk segment. From 2026-09-06 the
+  pin arms a five-minute recheck that lifts it for a short burst of polls;
+  a station still blank pins itself again. This mutant forgets to arm it.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                      fastRetryTimer.stop();
+                      noIcyRecheck.restart();
+
+replace:
+                      fastRetryTimer.stop();
+                      fastRetryTimer.stop();
+
+expect:
+  Killed by tests/test_invariants.py::test_the_no_titles_pin_arms_its_own_recheck.
+  Line-neutral, as main.qml's ratchet requires.

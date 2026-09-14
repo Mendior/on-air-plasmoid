@@ -262,7 +262,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -313,7 +313,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -500,7 +500,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         var keptPrefix = "";
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.34)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.35)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
@@ -692,7 +692,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.34");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             // A "logo" that streams past 512 KiB is not a logo — cap the
@@ -765,7 +765,12 @@ KCM.ScrollViewKCM {
 
     Component.onCompleted: {
         stationsModel.clear();
-        var servers = JSON.parse(cfg_servers);
+        // Same guard as configSearch: a stored list that does not parse
+        // leaves the page empty and alive, not dead on its first line.
+        var servers = [];
+        try { servers = JSON.parse(cfg_servers) || []; }
+        catch (e) { console.warn("[ARP] settings: stored station list is not valid JSON —", e); }
+        if (!Array.isArray(servers)) servers = [];
         for (const server of servers) {
             stationsModel.append(server);
         }
@@ -1132,7 +1137,7 @@ KCM.ScrollViewKCM {
         // suffix was enforced (and files a listener renamed by hand) are
         // still perfectly good JSON, and the import path validates the
         // content anyway — a filter that hides them helps nobody.
-        nameFilters: ["ARP Stations Backup (*.arp)", "All files (*)"]
+        nameFilters: [i18n("On Air stations backup (*.arp)"), i18n("All files (*)")]
         fileMode: Labs.FileDialog.OpenFile
         folder: Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation)
         onAccepted: {
@@ -1143,7 +1148,7 @@ KCM.ScrollViewKCM {
     Labs.FileDialog {
         id: saveFileDialog
 
-        nameFilters: ["ARP Stations Backup (*.arp)"]
+        nameFilters: [i18n("On Air stations backup (*.arp)")]
         // A backup saved as "minu jaamad" — no extension, because the name
         // field is free text — was then INVISIBLE to the import dialog,
         // whose filter shows *.arp only: the file existed and the listener

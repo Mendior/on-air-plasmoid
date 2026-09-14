@@ -25,7 +25,7 @@ TestCase {
 
     Component { id: engineComp; RecordingEngine {} }
 
-    function makeEngine(cfgOverrides) {
+    function makeEngine(cfgOverrides, appOverrides) {
         tc.execLog = []; tc.notified = []; tc.seq = 0;
         var cfg = { recSchedules: "[]", recordFormat: "original", recordMaxMinutes: 120,
                     schedTzOffset: 0 };
@@ -39,9 +39,11 @@ TestCase {
             _mprisId: "42",
             isPlaying: function() { return true; },
             playerSourceString: function() { return "https://s.example/stream"; },
+            upstreamSourceString: function() { return "https://s.example/stream"; },
             currentStation: "Test Radio",
             fadeStopInProgress: false
         };
+        for (var a in (appOverrides || {})) app[a] = appOverrides[a];
         return engineComp.createObject(tc, { app: app, cfg: cfg });
     }
 
@@ -67,6 +69,25 @@ TestCase {
         verify(_lastExec().indexOf("ffmpeg") !== -1);
         // The secret token rides only inside the quoted config write, never bare.
         verify(_lastExec().indexOf("SECRET") === -1);
+        e.destroy();
+    }
+
+    function test_the_rec_button_records_the_station_not_the_timeshift_tap() {
+        // While the timeshift tap feeds the player, the player's source reads
+        // 127.0.0.1 — a port with exactly one seat, already taken. Pressing
+        // REC there used to curl that closed port for twenty retries and hand
+        // back __REC_EMPTY__ (traced 2026-09-03 on a FLAC station). The
+        // recorder has to ask for the station's own address instead.
+        var e = makeEngine({}, {
+            playerSourceString: function() { return "http://127.0.0.1:41234/"; },
+            upstreamSourceString: function() { return "https://s.example/live.flac"; }
+        });
+        e.recStartCurrent();
+        verify(e.recording);
+        compare(tc.execLog.length, 1);
+        verify(_lastExec().indexOf(": REC_URL;") === 0);
+        verify(_lastExec().indexOf("s.example/live.flac") !== -1);
+        verify(_lastExec().indexOf("127.0.0.1") === -1);
         e.destroy();
     }
 

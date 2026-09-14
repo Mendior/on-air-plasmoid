@@ -13,6 +13,11 @@ import sys
 import time
 import urllib.parse
 
+# An Ogg chain restart writes one of these identification headers before its
+# fresh comment block, so they — not a neighbouring title — are where one
+# track's fields end and the next track's begin.
+_OGG_BLOCK_MARKS = (b"\x03vorbis", b"OpusTags", b"OpusHead", b"\x01vorbis", b"\x7fFLAC")
+
 
 def _ogg_buffer_title(path: str) -> str:
     """Current track of a relayed Ogg station, read from its buffer file.
@@ -33,9 +38,9 @@ def _ogg_buffer_title(path: str) -> str:
     except OSError:
         return ""
 
-    def last_field(key: bytes) -> str:
-        pos = blob.rfind(key)
-        if pos < 4:
+    def last_field(key: bytes, not_before: int = 0, not_after: int = -1) -> str:
+        pos = blob.rfind(key, 0, len(blob) if not_after < 0 else not_after)
+        if pos < 4 or pos < not_before:
             return ""
         # Each field rides as <u32le length><KEY=value>; a match whose
         # length disagrees is stream data that happened to spell the key.
@@ -49,7 +54,33 @@ def _ogg_buffer_title(path: str) -> str:
             return ""
 
     title = last_field(b"TITLE=") or last_field(b"title=")
-    artist = last_field(b"ARTIST=") or last_field(b"artist=")
+    # The artist has to come from the SAME comment block as the title: a
+    # newer block carrying a title and no artist used to be paired with the
+    # previous track's artist.
+    #
+    # A block's real boundary is the identification header an Ogg chain
+    # restart writes before its comments, not a neighbouring title. Anchoring
+    # on the previous TITLE only held for blocks that spell ARTIST before
+    # TITLE; in the other order the old artist sat between the two titles and
+    # was taken for the new one. The window is bounded at BOTH ends, so a
+    # later block carrying an artist and no title cannot reach back either.
+    tpos = max(blob.rfind(b"TITLE="), blob.rfind(b"title="))
+    floor, ceil = 0, len(blob)
+    if tpos >= 0:
+        for mark in _OGG_BLOCK_MARKS:
+            before = blob.rfind(mark, 0, tpos)
+            if before > floor:
+                floor = before
+            after = blob.find(mark, tpos)
+            if after != -1 and after < ceil:
+                ceil = after
+        if floor == 0:
+            # No header inside the window — the 4 MB tail cut it off. Fall
+            # back to the previous title, which still separates blocks when
+            # ARTIST leads and is no worse than what it replaced.
+            prev = max(blob.rfind(b"TITLE=", 0, tpos), blob.rfind(b"title=", 0, tpos))
+            floor = prev + 1 if prev >= 0 else 0
+    artist = last_field(b"ARTIST=", floor, ceil) or last_field(b"artist=", floor, ceil)
     if title and artist:
         return f"{artist} - {title}"
     return title
