@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The retry budget applies to a wake-up too, so an alarm whose station dies
+  gives up three knocks later and the sleeper stays asleep.
+
+history:
+  The budget was added because a station that has gone away should not be
+  knocked at for an hour — issue #13, 2026-09. It is the second refusal on
+  this road, after the switch of 2026.37, and it arrives with exactly the
+  trap the switch did: a new reason to stop that quietly forgets the one
+  order that must never stop. An alarm hands the later death of its station
+  to the heal road, so an exemption dropped here means 7:00 becomes silence
+  at 7:03 — and nobody would connect an alarm failing to a setting about
+  ordinary listening. The exemption is tested ahead of the switch on
+  purpose: it has to win over both.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+    if (exempt === true) return true;
+
+replace:
+    if (exempt === false) return true;
+
+expect:
+  Killed by tests/qml/tst_retrylogic.qml::test_an_alarm_is_bound_by_neither_the_switch_nor_the_budget.
+  Also by tests/qml/tst_alarmengine.qml::test_a_firing_alarm_outlives_a_spent_retry_budget,
+  which fires a real alarm and feeds its own flag to the real decision.
+  Line-neutral.

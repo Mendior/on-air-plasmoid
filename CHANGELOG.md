@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026.38
+
+- **A station that has gone away is left alone.** The last version added a
+  switch for the retries, and on-or-off turned out to be the wrong shape for
+  the question. The widget cannot tell a stream that dropped from a station
+  that has shut down for good — most stream deaths arrive with no error at
+  all, the sound simply ends — but it does not have to. Something that really
+  dropped answers again within a minute or two; something that has gone never
+  answers. So the retries now have a limit: three tries over roughly three and
+  a half minutes, and after that the station is left in peace. If you preferred
+  it knocking indefinitely, set `autoRetryKnocks` to 0 in the widget's
+  configuration.
+
+- **Giving up also drops the play order, and that is the half that mattered.**
+  The resume that follows your connection coming back reads that order and
+  nothing else, so an order outliving its retries could put a station that died
+  at three in the morning back on at seven, the moment the network flickered.
+  That was the original report behind all of this, and it was still there with
+  the retries switched off.
+
+- **An alarm is bound by none of it.** A wake-up whose station has died
+  overnight keeps trying, because a missed alarm is a worse failure than a
+  song nobody asked for.
+
+- **"Station seems to be off the air" tells the truth now.** It promised
+  retries in the background whatever your settings said, including when you
+  had turned them off.
+
 ## 2026.37
 
 - **You can tell the widget to stop knocking.** When a station goes quiet, the

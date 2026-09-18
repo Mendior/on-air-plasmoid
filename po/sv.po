@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-09-18 19:32+0300\n"
+"POT-Creation-Date: 2026-09-18 20:47+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Swedish\n"
@@ -47,13 +47,13 @@ msgid "%1 was set for %2 — the computer was off or asleep at that time."
 msgstr "%1 var inställt på %2 — datorn var avstängd eller i viloläge då."
 
 #: package/contents/ui/AlarmEngine.qml:176
-#: package/contents/ui/AlarmEngine.qml:300
-#: package/contents/ui/AlarmEngine.qml:344
-#: package/contents/ui/AlarmEngine.qml:346
-#: package/contents/ui/AlarmEngine.qml:393
-#: package/contents/ui/AlarmEngine.qml:400
-#: package/contents/ui/AlarmEngine.qml:475
-#: package/contents/ui/AlarmEngine.qml:478
+#: package/contents/ui/AlarmEngine.qml:301
+#: package/contents/ui/AlarmEngine.qml:352
+#: package/contents/ui/AlarmEngine.qml:354
+#: package/contents/ui/AlarmEngine.qml:401
+#: package/contents/ui/AlarmEngine.qml:408
+#: package/contents/ui/AlarmEngine.qml:483
+#: package/contents/ui/AlarmEngine.qml:486
 msgid "Wake-up alarm"
 msgstr "Väckarlarm"
 
@@ -61,15 +61,15 @@ msgstr "Väckarlarm"
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 skulle gå av samtidigt — %2 spelas i stället."
 
-#: package/contents/ui/AlarmEngine.qml:402
+#: package/contents/ui/AlarmEngine.qml:410
 msgid "the show"
 msgstr "programmet"
 
-#: package/contents/ui/AlarmEngine.qml:401
+#: package/contents/ui/AlarmEngine.qml:409
 msgid "No downloaded episode of %1 was on disk — waking with the chime."
 msgstr "Inget nedladdat avsnitt av %1 fanns på disken — väcker med signalen."
 
-#: package/contents/ui/AlarmEngine.qml:479
+#: package/contents/ui/AlarmEngine.qml:487
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "Stationen kunde inte starta — den inbyggda väckningstonen spelas i stället."
 
@@ -135,7 +135,7 @@ msgstr "Spelar"
 #: package/contents/ui/config/configAppearance.qml:117
 #: package/contents/ui/FullRepresentation.qml:3382
 #: package/contents/ui/FullRepresentation.qml:5502
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2271
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2272
 msgid "My Music"
 msgstr "Min musik"
 
@@ -471,11 +471,11 @@ msgid "When a stream dies:"
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:137
-msgid "Keep trying until it comes back"
+msgid "Try to get it back"
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:140
-msgid "A station that goes quiet is tried again at widening intervals — half a minute, then a minute, then longer, up to ten — until it returns or you press Stop. Turn this off and a dead stream simply stops, the way most players behave. A connection that drops and comes back is a separate road and resumes either way, on systems that report one."
+msgid "A station that goes quiet is tried again at widening intervals — half a minute, then a minute, then two — and if it is still silent after that, it is left alone. A stream that really dropped is back well inside that; one that is still being knocked at an hour later is a station that has gone away. Turn this off and a dead stream simply stops, the way most players behave. A connection that drops and comes back is a separate road and resumes either way, on systems that report one. An alarm is never bound by this — a wake-up keeps trying."
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:149
@@ -1578,7 +1578,7 @@ msgid "Keep open"
 msgstr "Håll öppen"
 
 #: package/contents/ui/FullRepresentation.qml:5613
-#: package/contents/ui/main.qml:235
+#: package/contents/ui/main.qml:236
 msgid "Casting to %1"
 msgstr "Castar till %1"
 
@@ -1856,179 +1856,189 @@ msgstr "Söker efter enheter…"
 msgid "No devices found on your network"
 msgstr "Inga enheter hittades i ditt nätverk"
 
-#: package/contents/ui/main.qml:540
+#: package/contents/ui/main.qml:541
 msgid "Station list could not be read"
 msgstr "Stationslistan kunde inte läsas"
 
-#: package/contents/ui/main.qml:541
+#: package/contents/ui/main.qml:542
 msgid "The saved station configuration is malformed. Your data was not changed; fix the servers entry or use Settings → Import."
 msgstr "Den sparade stationskonfigurationen är felaktig. Dina data ändrades inte; rätta servers-posten eller använd Inställningar → Importera."
 
-#: package/contents/ui/main.qml:957
+#: package/contents/ui/main.qml:958
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "Stationen svarade inte — den kan vara nere eller inte tillgänglig i ditt land. Prova ett annat resultat."
 
-#: package/contents/ui/main.qml:1030
+#: package/contents/ui/main.qml:1031
 msgid "Download gave no answer"
 msgstr "Nedladdningen gav inget svar"
 
-#: package/contents/ui/main.qml:1031
+#: package/contents/ui/main.qml:1032
 msgid "Nothing came back from the downloader — try again."
 msgstr "Inget kom tillbaka från nedladdaren — försök igen."
 
-#: package/contents/ui/main.qml:2863
+#: package/contents/ui/main.qml:2864
 msgid "%1 devices"
 msgstr "%1 enheter"
 
-#: package/contents/ui/main.qml:3770
+#: package/contents/ui/main.qml:3772
 msgid "The Bluetooth speaker"
 msgstr "Bluetooth-högtalaren"
 
-#: package/contents/ui/main.qml:3769
+#: package/contents/ui/main.qml:3771
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 är ansluten, men ljudet kom aldrig fram"
 
-#: package/contents/ui/main.qml:3771
+#: package/contents/ui/main.qml:3773
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Stäng av och sätt på högtalaren igen och anslut den sedan på nytt."
 
-#: package/contents/ui/main.qml:4241
+#: package/contents/ui/main.qml:4260
 msgid "Station seems to be off the air"
 msgstr "Stationen verkar inte sända"
 
-#: package/contents/ui/main.qml:4242
+#: package/contents/ui/main.qml:4262
+#, fuzzy
+msgid "%1 is not answering at any address the directory knows. It stays in your list."
+msgstr "%1 svarar inte på någon adress katalogen känner till. Den ligger kvar i din lista — nya försök görs i bakgrunden."
+
+#: package/contents/ui/main.qml:4264
+#, fuzzy
+msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again for a few minutes, then leaving it be."
+msgstr "%1 svarar inte på någon adress katalogen känner till. Den ligger kvar i din lista — nya försök görs i bakgrunden."
+
+#: package/contents/ui/main.qml:4265
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 svarar inte på någon adress katalogen känner till. Den ligger kvar i din lista — nya försök görs i bakgrunden."
 
-#: package/contents/ui/main.qml:4322
+#: package/contents/ui/main.qml:4360
 msgid "Playing from a backup address"
 msgstr "Spelar från en reservadress"
 
-#: package/contents/ui/main.qml:4323
+#: package/contents/ui/main.qml:4361
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Stationens sparade adress svarar inte — spelar tills vidare närmaste träff från katalogen. Din sparade adress behölls."
 
-#: package/contents/ui/main.qml:4363
+#: package/contents/ui/main.qml:4401
 msgid "Station found at a new address"
 msgstr "Stationen hittad på en ny adress"
 
-#: package/contents/ui/main.qml:4364
+#: package/contents/ui/main.qml:4402
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 har flyttat — den nya adressen sparades i din lista."
 
-#: package/contents/ui/main.qml:5838
+#: package/contents/ui/main.qml:5876
 msgid "Casting needs pychromecast"
 msgstr "Casting kräver pychromecast"
 
-#: package/contents/ui/main.qml:5839
+#: package/contents/ui/main.qml:5877
 msgid "Install the pychromecast library to cast to your devices."
 msgstr "Installera biblioteket pychromecast för att casta till dina enheter."
 
-#: package/contents/ui/main.qml:5860
+#: package/contents/ui/main.qml:5898
 msgid "the device"
 msgstr "enheten"
 
-#: package/contents/ui/main.qml:5860
+#: package/contents/ui/main.qml:5898
 msgid "Could not cast to %1"
 msgstr "Kunde inte casta till %1"
 
-#: package/contents/ui/main.qml:5861
+#: package/contents/ui/main.qml:5899
 msgid "The device could not play this station."
 msgstr "Enheten kunde inte spela den här stationen."
 
-#: package/contents/ui/main.qml:5907
+#: package/contents/ui/main.qml:5945
 msgid "Casting"
 msgstr "Strömning"
 
-#: package/contents/ui/main.qml:5908
+#: package/contents/ui/main.qml:5946
 msgid "The device did not stop — it may still be playing."
 msgstr "Enheten stoppade inte — den kan fortfarande spela."
 
-#: package/contents/ui/main.qml:5986
+#: package/contents/ui/main.qml:6024
 msgid "Bluetooth is switched off"
 msgstr "Bluetooth är avstängt"
 
-#: package/contents/ui/main.qml:5987
+#: package/contents/ui/main.qml:6025
 msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
 msgstr "Adaptern ville inte slås på — kontrollera Bluetooth-knappen i systembrickan eller Systeminställningar."
 
-#: package/contents/ui/main.qml:6006 package/contents/ui/main.qml:6124
+#: package/contents/ui/main.qml:6044 package/contents/ui/main.qml:6162
 msgid "the Bluetooth device"
 msgstr "Bluetooth-enheten"
 
-#: package/contents/ui/main.qml:6005
+#: package/contents/ui/main.qml:6043
 msgid "Could not connect to %1"
 msgstr "Kunde inte ansluta till %1"
 
-#: package/contents/ui/main.qml:6007
+#: package/contents/ui/main.qml:6045
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Kontrollera att högtalaren är på och inom räckhåll."
 
-#: package/contents/ui/main.qml:6123
+#: package/contents/ui/main.qml:6161
 msgid "Could not pair with %1"
 msgstr "Kunde inte parkoppla med %1"
 
-#: package/contents/ui/main.qml:6125
+#: package/contents/ui/main.qml:6163
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Sätt högtalaren i parkopplingsläge (håll in Bluetooth-knappen) och försök igen."
 
-#: package/contents/ui/main.qml:6223 package/contents/ui/main.qml:6297
+#: package/contents/ui/main.qml:6261 package/contents/ui/main.qml:6335
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp är inte installerat"
 
-#: package/contents/ui/main.qml:6224 package/contents/ui/main.qml:6298
+#: package/contents/ui/main.qml:6262 package/contents/ui/main.qml:6336
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Installera yt-dlp (och ffmpeg) för att ladda ner spår."
 
-#: package/contents/ui/main.qml:6247 package/contents/ui/main.qml:6317
+#: package/contents/ui/main.qml:6285 package/contents/ui/main.qml:6355
 msgid "Nothing found to download"
 msgstr "Inget att ladda ner hittades"
 
-#: package/contents/ui/main.qml:6248
+#: package/contents/ui/main.qml:6286
 msgid "yt-dlp could not search: %1"
 msgstr "yt-dlp kunde inte söka: %1"
 
-#: package/contents/ui/main.qml:6249 package/contents/ui/main.qml:6318
+#: package/contents/ui/main.qml:6287 package/contents/ui/main.qml:6356
 msgid "No track matched \"%1\" — a show or album title often has no single track to find."
 msgstr "Inget spår matchade \"%1\" — bakom ett program- eller albumnamn finns ofta inget enskilt spår."
 
-#: package/contents/ui/main.qml:6261
+#: package/contents/ui/main.qml:6299
 msgid "Found only a different show — skipped"
 msgstr "Hittade bara ett annat program — hoppades över"
 
-#: package/contents/ui/main.qml:6262
+#: package/contents/ui/main.qml:6300
 msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
 msgstr "Bästa träffen för \"%1\" var \"%2\". Fel program laddas inte ner."
 
-#: package/contents/ui/main.qml:6284
+#: package/contents/ui/main.qml:6322
 msgid "Downloading again without the cover"
 msgstr "Laddar ner igen utan omslag"
 
-#: package/contents/ui/main.qml:6285
+#: package/contents/ui/main.qml:6323
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Inbäddning av taggar kräver paketet python-mutagen — installera det för att få omslag i dina filer."
 
-#: package/contents/ui/main.qml:6313
+#: package/contents/ui/main.qml:6351
 msgid "Track downloaded ✓"
 msgstr "Spår nedladdat ✓"
 
-#: package/contents/ui/main.qml:6314
+#: package/contents/ui/main.qml:6352
 msgid "Saved as \"%1\" — newest first in My Music"
 msgstr "Sparad som \"%1\" — nyast först i Min musik"
 
-#: package/contents/ui/main.qml:6322
+#: package/contents/ui/main.qml:6360
 msgid "Download failed"
 msgstr "Nedladdningen misslyckades"
 
-#: package/contents/ui/main.qml:6323
+#: package/contents/ui/main.qml:6361
 msgid "Unknown error"
 msgstr "Okänt fel"
 
-#: package/contents/ui/main.qml:6788
+#: package/contents/ui/main.qml:6826
 msgid "Audio output changed"
 msgstr "Ljudutgång ändrad"
 
-#: package/contents/ui/main.qml:6789
+#: package/contents/ui/main.qml:6827
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Den valda utgångsenheten försvann — systemets standard används i stället."
 

@@ -264,6 +264,7 @@ Item {
         // during the alarm window can only ever restart the alarm's own url,
         // never resurrect whatever played last evening.
         app._wantsPlaying = true;
+        _alarmStandingOrder = true;
         app._healRetryAttempts = 0;
         app.lastPlay = -1;
         app.healRetryTimerRef.stop();
@@ -305,6 +306,13 @@ Item {
     // takes over. An alarm that fails must fail LOUDLY. Disarmed by an
     // explicit stop or a manual station pick — either one means "I'm up".
     property bool _alarmFallbackArmed: false
+
+    // The wake-up's standing order, and the one flag that outlives the tone's
+    // 25 s window: an alarm raised _wantsPlaying and the sleeper has not yet
+    // answered. The retry switch is a listener's choice about a station they
+    // picked; a wake-up they SET is a different promise and keeps its road
+    // back either way. Cleared by the same "I'm up" as the chime.
+    property bool _alarmStandingOrder: false
 
     // Set by the CAST_PLAY dispatcher on a device's __CAST_OK__ — the only
     // evidence that "casting" is more than an optimistic flag. Reset by
@@ -489,6 +497,7 @@ Item {
     // local track chosen while no alarm is the caller) says "I'm up" here.
     function standDown() {
         _alarmFallbackArmed = false;
+        _alarmStandingOrder = false;
         alarmFallbackTimer.stop();
     }
 

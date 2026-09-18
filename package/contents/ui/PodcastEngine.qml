@@ -570,7 +570,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -605,7 +605,7 @@ Item {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -643,7 +643,7 @@ Item {
             _podSearchSettle(seq);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -701,7 +701,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -769,7 +769,7 @@ Item {
         };
         xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
                         + "/podcasts/top/25/podcasts.json");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -816,7 +816,7 @@ Item {
             podcastTrendingBusy = false;
         };
         xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -851,7 +851,7 @@ Item {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -945,7 +945,7 @@ Item {
                 podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1017,7 +1017,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = app._armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1188,7 +1188,7 @@ Item {
         app.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
             + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.37' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.38' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1389,7 +1389,7 @@ Item {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }

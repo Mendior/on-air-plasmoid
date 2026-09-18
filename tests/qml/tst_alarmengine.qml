@@ -9,6 +9,7 @@
 import QtQuick
 import QtTest
 import "../../package/contents/ui"
+import "../../package/contents/ui/RetryLogic.js" as RL
 
 TestCase {
     id: tc
@@ -251,6 +252,31 @@ TestCase {
         compare(e.app._wantsPlaying, false);            // standing order ended
         verify(tc.timerLog.indexOf("heal.stop") !== -1);
         verify(tc.timerLog.indexOf("watchdog.stop") !== -1);
+        e.destroy();
+    }
+
+    function test_a_firing_alarm_outlives_a_spent_retry_budget() {
+        // The hard constraint, driven end to end rather than grepped: a real
+        // alarm fires through the engine, and ITS flag — not a literal — is
+        // what the retry decision reads. The budget added for issue #13 stops
+        // ordinary listening after three tries; a wake-up whose station dies
+        // at 07:00 must still be knocking at 07:30, with the switch off and
+        // the budget long spent. Anything else is an alarm that does not ring.
+        var e = makeEngine();
+        _fireStation(e);
+        verify(e._alarmStandingOrder);                  // the alarm raised it
+        compare(e.app._wantsPlaying, true);
+
+        // Every refusal the ladder owns, asked with the alarm's own flag.
+        verify(RL.shouldKnock(false, e._alarmStandingOrder, 0, 3));
+        verify(RL.shouldKnock(true, e._alarmStandingOrder, 99, 3));
+        verify(RL.shouldKnock(false, e._alarmStandingOrder, 99, 1));
+
+        // And once the sleeper says "I'm up", the exemption goes with it —
+        // the flag must not outlive the order it qualifies.
+        e.standDown();
+        verify(!e._alarmStandingOrder);
+        verify(!RL.shouldKnock(false, e._alarmStandingOrder, 99, 3));
         e.destroy();
     }
 

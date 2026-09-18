@@ -1,6 +1,6 @@
 {
   "_what": "The mutants expected to SURVIVE today, each a documented blind spot with the test that will one day kill it. `scripts/mutants.py --check-baseline` stays green while the survivor set is a subset of this list; a mutant that WAS being killed and now survives is a real regression (a guard lost its teeth) and goes red. A mutant listed here that gets killed is good news — tighten this file in the same commit that added the test.",
-  "_measured_at": "2026-09-18: the corpus is 43 mutants (ls tests/mutants/*.mut | wc -l). 41 and 42 guard the retry switch from both sides — one removes it, the other extends it over the network-back resume it must never touch. 02 is still the one documented survivor.",
+  "_measured_at": "2026-09-18: the corpus is 47 mutants (ls tests/mutants/*.mut | wc -l). 45 and 46 guard the retry budget: 45 is the budget applying to a wake-up, 46 is every budget reading as unlimited so the setting is decoration. Both live in RetryLogic.js and die on tst_retrylogic.qml. 41 and 43 were re-anchored the same day — the switch moved behind the shared _mayKnock predicate, which is why a third road can no longer skip it. Survivors below are unchanged.",
   "_how_to_remeasure": "python3 scripts/mutants.py   (full run; budget ~4 min per mutant, so ~172 min at 43 mutants — the nightly cap is 180. A kill only counts against a gate that was GREEN first.)",
   "expected_survivors": {
     "02-icy-inflight-never-cleared": "needs a two-title-query behavioural test, which wants the same metadata engine extraction first"

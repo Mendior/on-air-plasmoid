@@ -25,6 +25,7 @@ import "NameGuard.js" as NameGuard
 import "OpmlLogic.js" as OpmlLogic
 import "PodcastLogic.js" as PodcastLogic
 import "RecLogic.js" as RecLogic
+import "RetryLogic.js" as RetryLogic
 import "PlaylistLogic.js" as PlaylistLogic
 import "PathLogic.js" as PathLogic
 import "SearchLogic.js" as SearchLogic
@@ -2765,7 +2766,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -3095,6 +3096,7 @@ PlasmoidItem {
     readonly property alias _alarmFallbackArmed: alarmEngine._alarmFallbackArmed
     readonly property alias _alarmToneUrl: alarmEngine._alarmToneUrl
     readonly property alias _alarmFiring: alarmEngine._alarmFiring
+    readonly property alias _alarmStandingOrder: alarmEngine._alarmStandingOrder
     // The fire half's levers, named for the engine (and its mocks): a
     // property cannot carry its own id's name, hence the Ref suffix.
     readonly property var healRetryTimerRef: healRetryTimer
@@ -4128,6 +4130,15 @@ PlasmoidItem {
             return;
         }
         _healTried[orig] = now;
+        // The switch covers the whole road back, not only the ladder. Someone
+        // who turned it off asked for a dead stream to stop, and a directory
+        // lookup that finds the station's new address and starts playing is
+        // precisely the resume they declined. The stamp above is already
+        // taken, so this bails out once and then stays quiet for ten minutes.
+        // A wake-up keeps its road: that promise was made in advance, and
+        // it is the one order the budget below never applies to.
+        if (!_mayKnock(root._healRetryAttempts))
+            return;
         var name = (st.name || "").toString();
         var norm = _healNormName(name);
         if (norm === "") { _healArmRetry(); return; }
@@ -4237,10 +4248,23 @@ PlasmoidItem {
             // First give-up gets the toast; the backoff retries stay quiet
             // (a station that is down for an hour would otherwise nag five
             // times about the same outage).
-            if (root._healRetryAttempts === 0)
+            if (root._healRetryAttempts === 0) {
+                // The wording follows what the widget is about to do. It
+                // used to promise background retries unconditionally — with
+                // the switch off that was simply untrue, and with a budget
+                // it would leave the listener waiting for music that stops
+                // coming without a word.
+                var knocking = _mayKnock(0);
+                var bounded = root._alarmStandingOrder !== true
+                        && RetryLogic.budgetMs(Plasmoid.configuration.autoRetryKnocks) > 0;
                 notify(i18n("Station seems to be off the air"),
-                       i18n("%1 is not answering at any address the directory knows. It stays in your list — trying again in the background.", run.name),
+                       !knocking
+                       ? i18n("%1 is not answering at any address the directory knows. It stays in your list.", run.name)
+                       : bounded
+                       ? i18n("%1 is not answering at any address the directory knows. It stays in your list — trying again for a few minutes, then leaving it be.", run.name)
+                       : i18n("%1 is not answering at any address the directory knows. It stays in your list — trying again in the background.", run.name),
                        "network-disconnect");
+            }
             _healArmRetry();
             return;
         }
@@ -4279,15 +4303,43 @@ PlasmoidItem {
         }
     }
 
+    // One question, asked from three places: may this standing order knock
+    // again? Together, because the three used to be able to disagree — the
+    // switch added in 2026.37 was read at the ladder and not at the
+    // directory lookup, so with address healing on it promised a dead
+    // stream would stop and it kept playing.
+    function _mayKnock(attempts) {
+        return RetryLogic.shouldKnock(Plasmoid.configuration.autoRetry === true,
+                                      root._alarmStandingOrder === true, attempts,
+                                      Plasmoid.configuration.autoRetryKnocks);
+    }
+
     function _healArmRetry() {
         if (!_wantsPlaying) return;
-        // The listener can switch the knocking off. This is the only place the
-        // ladder arms, so it is the only place that asks — and it deliberately
-        // leaves the network-back resume alone, which has its own road.
-        if (Plasmoid.configuration.autoRetry !== true) return;
-        var n = Math.min(5, _healRetryAttempts);
-        _healRetryAttempts++;
-        healRetryTimer.interval = Math.min(600000, 30000 * Math.pow(2, n));
+        // The listener can switch the knocking off, and the budget ends it
+        // on its own for everyone else. This is the only place the ladder
+        // arms, so it is the only place that asks — and it deliberately
+        // leaves the network-back resume alone, which has its own road. An
+        // alarm carries no budget: a wake-up must not end in silence over a
+        // setting about ordinary listening.
+        if (!_mayKnock(root._healRetryAttempts)) {
+            // The budget is spent, or the listener switched the knocking off.
+            // Either way the order is over, and it has to be TAKEN DOWN
+            // rather than just left unattended: netResumeTimer resumes on
+            // _wantsPlaying alone, so an order that outlives its ladder puts
+            // a long-dead station on at the next flicker of the network —
+            // issue #13's own complaint arriving four hours late, and the
+            // opposite of what the settings text promises. Same teardown an
+            // explicit stop uses, for the same reason. An alarm never lands
+            // here: _mayKnock hands a wake-up through ahead of both refusals.
+            root._wantsPlaying = false;
+            root._orphanOrder = null;
+            root._healRetryAttempts = 0;
+            healRetryTimer.stop();
+            return;
+        }
+        healRetryTimer.interval = RetryLogic.nextRetryMs(root._healRetryAttempts);
+        root._healRetryAttempts++;
         healRetryTimer.restart();
     }
 

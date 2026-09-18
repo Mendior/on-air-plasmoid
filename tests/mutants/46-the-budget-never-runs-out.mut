@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Every budget reads as unlimited, so the ladder knocks at a dead station
+  forever and the setting is decoration.
+
+history:
+  0 means "keep trying until it comes back" and had to stay reachable — the
+  behaviour everyone had before the budget existed. That branch sits in
+  front of the comparison that does the real work, which makes it the one
+  line that can swallow the whole feature while every knock still looks
+  correct: the intervals widen, the toast appears, the station is retried.
+  The only visible difference is an hour later, which is precisely the
+  complaint the budget was written to answer, so it would ship unnoticed.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+    if (c <= 0) return true;
+
+replace:
+    if (c >= 0) return true;
+
+expect:
+  Killed by tests/qml/tst_retrylogic.qml::test_the_budget_ends_the_knocking_after_its_last_round.
+  Line-neutral.

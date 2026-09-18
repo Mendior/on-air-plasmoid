@@ -13,14 +13,18 @@ history:
   in the settings page, still saves, and does nothing at all, which is the
   worst shape this kind of bug takes.
 
+  The guard moved behind _mayKnock on 2026-09-18 when the budget went in;
+  the anchor follows it, and the switch is now unreadable outside that
+  one predicate so a third road cannot quietly skip it.
+
 target:
   package/contents/ui/main.qml
 
 find:
-          if (Plasmoid.configuration.autoRetry !== true) return;
+          if (!_mayKnock(root._healRetryAttempts)) {
 
 replace:
-          if (false) return;
+          if (false) {
 
 expect:
   Killed by tests/test_invariants.py::test_the_retry_switch_gates_the_ladder_and_not_the_network.

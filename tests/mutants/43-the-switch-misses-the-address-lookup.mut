@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The retry switch guards the ladder but not the directory lookup.
+
+history:
+  This is the bug 2026.37 actually shipped, found the day after. The switch
+  was read in the one place the ladder arms, which looked like enough. It was
+  not: a station that dies still reaches _tryHealStation, which asks the
+  directory for its new address and starts playing it. Address healing is on
+  by default, so the switch promised "a dead stream simply stops" and the
+  stream came back anyway — the setting appearing to work while a different
+  road undoes it is worse than no setting.
+
+  Re-anchored 2026-09-18: both refusals now ask the shared _mayKnock,
+  which is the structural answer to this bug rather than a second copy
+  of the same condition.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          // it is the one order the budget below never applies to.
+          if (!_mayKnock(root._healRetryAttempts))
+              return;
+
+replace:
+          // it is the one order the budget below never applies to.
+          if (false)
+              return;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_retry_switch_also_covers_the_address_lookup.
+  Line-neutral.

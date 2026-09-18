@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A wake-up stops raising its standing order, so the retry switch can silence it.
+
+history:
+  An alarm hands the later death of its station to the heal road — the
+  bundled chime only guards the first 25 seconds, and a stream that played
+  and then died is explicitly the heal road's case. Both refusals the retry
+  switch owns therefore exempt the alarm, and the exemption is only as real
+  as the flag it reads. Drop the flag and an alarm set for 7:00 goes quiet at
+  7:10 with the sleeper still asleep, on a setting about ordinary listening
+  that nobody would connect to their alarm.
+
+target:
+  package/contents/ui/AlarmEngine.qml
+
+find:
+          app._wantsPlaying = true;
+          _alarmStandingOrder = true;
+
+replace:
+          app._wantsPlaying = true;
+          _alarmStandingOrder = false;
+
+expect:
+  Killed by tests/test_invariants.py::test_a_wake_up_keeps_its_road_back_whatever_the_switch_says.
+  Also by tests/qml/tst_alarmengine.qml::test_a_firing_alarm_outlives_a_spent_retry_budget,
+  which fires a real alarm and feeds its own flag to the real decision.
+  Line-neutral.

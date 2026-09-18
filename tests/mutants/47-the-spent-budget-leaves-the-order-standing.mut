@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The budget stops the ladder but leaves the standing order up, so the next
+  flicker of the network puts a station that died hours ago back on.
+
+history:
+  Caught while the budget itself was being built, 2026-09-18, and it is the
+  more dangerous half of the two. Stopping the knocking is visible in a log;
+  an order left standing is invisible until the day it fires. netResumeTimer
+  resumes on _wantsPlaying alone — deliberately, because the connection
+  coming back is the one recovery people want kept — so an order that
+  outlives its ladder is armed indefinitely. A station that died at three in
+  the morning then starts playing at seven, which is issue #13's complaint
+  word for word, and it would ship under a settings text that has just
+  promised the station is left alone. The hole predates the budget: the
+  2026.37 switch had it too, with the knocking off and the order still up.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              // here: _mayKnock hands a wake-up through ahead of both refusals.
+              root._wantsPlaying = false;
+
+replace:
+              // here: _mayKnock hands a wake-up through ahead of both refusals.
+              root._wantsPlaying = true;
+
+expect:
+  Killed by tests/test_invariants.py::test_a_spent_budget_takes_the_standing_order_down_with_it.
+  Line-neutral.

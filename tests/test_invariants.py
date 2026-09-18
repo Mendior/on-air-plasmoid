@@ -614,6 +614,13 @@ def test_a_heal_generation_is_claimed_fresh_and_abandoned_whole():
             "commit." % (fn, got, want))
 
 
+def _code_only(src):
+    """Drop // comments. A prose mention must never satisfy a code check —
+    the retry guards below were briefly passing on a comment that named the
+    very function whose call had been removed."""
+    return "\n".join(re.sub(r"//.*$", "", ln) for ln in src.split("\n"))
+
+
 def test_the_retry_switch_gates_the_ladder_and_not_the_network():
     """The listener's retry switch must reach the ladder and stop there.
 
@@ -624,16 +631,32 @@ def test_the_retry_switch_gates_the_ladder_and_not_the_network():
     them. Those are separate roads (onIsConnectedChanged -> netResumeTimer),
     and this pins them apart so a later tidy-up cannot merge them.
 
-    Alarms and scheduled recordings are deliberately untouched: the alarm has
-    its own window and falls back to the bundled chime, and a recording runs
-    its own ffmpeg with its own relaunch. Neither leans on this ladder.
+    Alarms are the one exemption and it is deliberate. A wake-up raises the
+    standing order itself and hands the later death of its station to this
+    very ladder — the chime only covers the first 25 seconds — so a setting
+    about ordinary listening must never be able to silence one. Scheduled
+    recordings genuinely do not lean on this road: they run their own ffmpeg
+    with their own relaunch.
     """
     src = (UI / "main.qml").read_text(encoding="utf-8")
 
-    arm = _function_body(src, "_healArmRetry")
-    assert "autoRetry" in arm, (
-        "_healArmRetry no longer asks the retry switch — a listener who turned "
-        "it off is knocked at anyway")
+    arm = _code_only(_function_body(src, "_healArmRetry"))
+    assert "_mayKnock(" in arm, (
+        "_healArmRetry no longer asks whether it may knock — a listener who "
+        "turned the switch off, or whose budget ran out, is knocked at anyway")
+
+    # The single predicate the three sites share. It has to read all three
+    # inputs, or one of them silently stops counting.
+    knock = _code_only(_function_body(src, "_mayKnock"))
+    for needed in ("autoRetry", "_alarmStandingOrder", "autoRetryKnocks"):
+        assert needed in knock, (
+            "_mayKnock stopped reading %s, so that input no longer decides "
+            "anything at any of its call sites" % needed)
+
+    # The ladder's spacing belongs to the library that is tested for it.
+    assert "RetryLogic.nextRetryMs" in arm, (
+        "the retry interval is computed in main.qml again — the arithmetic "
+        "has a behavioural test only where it lives, in RetryLogic.js")
 
     # One arming point is what makes one guard enough.
     starts = len(re.findall(r"healRetryTimer\.(?:re)?start\(\)", src))
@@ -647,6 +670,124 @@ def test_the_retry_switch_gates_the_ladder_and_not_the_network():
     assert "autoRetry" not in net, (
         "the network-back resume is gated by the retry switch — that is the "
         "one recovery a listener asked to KEEP")
+
+
+def test_the_retry_switch_also_covers_the_address_lookup():
+    """Switched off, the whole road back stops — not only the ladder.
+
+    Shipped half-wired in 2026.37 and measured the next day. The switch was
+    read where the ladder arms and nowhere else, so _tryHealStation still ran
+    its directory lookup, found the station's new address and started playing
+    it. The setting promises that a dead stream simply stops; with address
+    healing on, which is the default, it did not. Both roads ask now.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    heal = _code_only(_function_body(src, "_tryHealStation"))
+    assert "_mayKnock(" in heal, (
+        "_tryHealStation no longer asks whether it may knock — someone who "
+        "turned the switch off, or whose budget ran out, still gets the "
+        "station started from the directory lookup")
+
+
+def test_a_wake_up_keeps_its_road_back_whatever_the_switch_says():
+    """An alarm must never end in silence because of the retry setting.
+
+    The alarm raises the standing order itself and hands the later death of
+    its station to the heal road; the bundled chime only guards the first 25
+    seconds. So every place the switch may refuse has to let a wake-up
+    through, or an alarm set for 7:00 goes quiet at 7:10 with the sleeper
+    still asleep. The flag lives exactly as long as the standing order it
+    qualifies: raised with it, cleared by the same "I'm up".
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    # Every road that may refuse to knock goes through the one predicate,
+    # and that predicate hands the alarm through ahead of both refusals.
+    refusals = re.findall(r"if \(!_mayKnock\([^\n]*", _code_only(src))
+    assert len(refusals) >= 2, (
+        "expected the refusal on both the ladder and the address lookup, "
+        "found %d — a road that decides for itself can forget the alarm"
+        % len(refusals))
+    assert not re.search(r"autoRetry !== true|configuration\.autoRetry ===",
+                         src.replace(_function_body(src, "_mayKnock"), "")), (
+        "the retry switch is read outside _mayKnock; that is how 2026.37 "
+        "shipped with the address lookup unguarded")
+
+    logic = (UI / "RetryLogic.js").read_text(encoding="utf-8")
+    exempt = logic.index("if (exempt === true) return true;")
+    for later in ("if (enabled !== true)", "return (attempts | 0) < c;"):
+        assert logic.index(later) > exempt, (
+            "the alarm's exemption no longer comes before %r, so a wake-up "
+            "can be refused by it" % later)
+
+    alarm = (UI / "AlarmEngine.qml").read_text(encoding="utf-8")
+    assert "_alarmStandingOrder = true" in alarm, (
+        "the alarm no longer raises its standing order, so the exemptions "
+        "guarding it can never be true")
+    stand_down = _function_body(alarm, "standDown")
+    assert "_alarmStandingOrder = false" in stand_down, (
+        "the alarm's standing order outlives the sleeper saying 'I'm up'")
+
+
+def test_a_spent_budget_takes_the_standing_order_down_with_it():
+    """Stopping the knocking is not enough — the order has to end too.
+
+    netResumeTimer resumes on _wantsPlaying alone, and that is deliberate:
+    the connection coming back is the one recovery people asked to keep. The
+    cost is that an order which outlives its ladder stays armed forever, so
+    a station that died at three in the morning gets put on at seven by an
+    unrelated network flicker. That is issue #13 word for word, and by now
+    the settings text has promised out loud that the station is left alone.
+    Measured 2026-09-18 while the budget went in; the same hole was open
+    under the 2026.37 switch, with the knocking off and the order still up.
+
+    An alarm never reaches this branch — _mayKnock hands a wake-up through
+    ahead of both refusals — which is what keeps the wake-up promise whole.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    arm = _code_only(_function_body(src, "_healArmRetry"))
+    i = arm.index("if (!_mayKnock(")
+    refusal = arm[i:arm.index("healRetryTimer.interval", i)]
+    assert "_wantsPlaying = false" in refusal, (
+        "the ladder gives up without ending the standing order, so the "
+        "network-back resume will start the dead station later")
+    assert "healRetryTimer.stop()" in refusal, (
+        "a rung left armed outlives the budget that just refused it")
+
+    # The teardown has to match what an explicit stop does, or a later
+    # recovery road finds half an order lying about.
+    for leftover in ("_orphanOrder = null", "_healRetryAttempts = 0"):
+        assert leftover in refusal, (
+            "the give-up leaves %s behind; an explicit stop clears it and "
+            "this is the same end of the same order" % leftover)
+
+
+def test_the_off_the_air_message_says_what_will_actually_happen():
+    """One word per outage, and it has to be true.
+
+    The give-up toast promised "trying again in the background" whatever the
+    settings said. With the switch off nothing was going to be tried at all,
+    and with a budget the knocking now stops on its own — so a listener was
+    told to wait for music that had already stopped coming. Found while the
+    budget went in, 2026-09-18; it had been wrong since the switch shipped.
+    The toast asks the same predicate the ladder does, so the two cannot
+    tell the listener different stories.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    i = src.index('i18n("Station seems to be off the air")')
+    # Back up to the enclosing guard, forward past the notify call.
+    head = src.rindex("if (root._healRetryAttempts === 0)", 0, i)
+    block = _code_only(src[head:src.index('"network-disconnect");', i)])
+    assert "_mayKnock(" in block, (
+        "the off-the-air message no longer asks whether anything will be "
+        "retried, so it can promise a road that is switched off")
+    assert "RetryLogic.budgetMs" in block, (
+        "the message no longer distinguishes a bounded run from an endless "
+        "one, so it cannot tell the listener the knocking will stop")
+
+    # And it stays one message per outage: the backoff rounds are quiet.
+    assert src.count('i18n("Station seems to be off the air")') == 1, (
+        "the off-the-air toast fires from more than one place; an outage "
+        "would nag once per rung of the ladder")
 
 
 def test_a_park_inherits_the_stops_teardown():
