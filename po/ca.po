@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-09-18 20:47+0300\n"
+"POT-Creation-Date: 2026-09-18 21:45+0300\n"
 "PO-Revision-Date: 2026-08-05 07:40+0300\n"
 "Last-Translator: J0anJosep\n"
 "Language-Team: Catalan\n"
@@ -476,7 +476,7 @@ msgid "Try to get it back"
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:140
-msgid "A station that goes quiet is tried again at widening intervals — half a minute, then a minute, then two — and if it is still silent after that, it is left alone. A stream that really dropped is back well inside that; one that is still being knocked at an hour later is a station that has gone away. Turn this off and a dead stream simply stops, the way most players behave. A connection that drops and comes back is a separate road and resumes either way, on systems that report one. An alarm is never bound by this — a wake-up keeps trying."
+msgid "A station that goes quiet is tried again at widening intervals: half a minute, then a minute, then two. A stream that really dropped is back well inside that. If it is still silent afterwards the widget lets it go and stays quiet — it will not put the station on again by itself when your connection returns later, and that part is the whole point. Turn this off and a dead stream stops at once, the way most players behave. An alarm is bound by none of it: a wake-up keeps trying."
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:149
@@ -1893,153 +1893,153 @@ msgstr "%1 està connectat, però el seu so no s'ha detectat."
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Apagueu i torneu a engegar l'altaveu. Després, torneu-lo a connectar."
 
-#: package/contents/ui/main.qml:4260
+#: package/contents/ui/main.qml:4262
 msgid "Station seems to be off the air"
 msgstr "Sembla que l'emissora no emet."
 
-#: package/contents/ui/main.qml:4262
+#: package/contents/ui/main.qml:4264
 #, fuzzy
 msgid "%1 is not answering at any address the directory knows. It stays in your list."
 msgstr "%1 no respon en cap adreça coneguda pel directori. Es mantindrà a la llista i se seguirà intentant en segon pla."
 
-#: package/contents/ui/main.qml:4264
+#: package/contents/ui/main.qml:4266
 #, fuzzy
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again for a few minutes, then leaving it be."
 msgstr "%1 no respon en cap adreça coneguda pel directori. Es mantindrà a la llista i se seguirà intentant en segon pla."
 
-#: package/contents/ui/main.qml:4265
+#: package/contents/ui/main.qml:4267
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 no respon en cap adreça coneguda pel directori. Es mantindrà a la llista i se seguirà intentant en segon pla."
 
-#: package/contents/ui/main.qml:4360
+#: package/contents/ui/main.qml:4380
 msgid "Playing from a backup address"
 msgstr "Es reprodueix des d'una adreça alternativa."
 
-#: package/contents/ui/main.qml:4361
+#: package/contents/ui/main.qml:4381
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "L'adreça desada de l'emissora no respon. Es reprodueix des de la coincidència més propera del directori. Tot i això, es manté l'adreça original."
 
-#: package/contents/ui/main.qml:4401
+#: package/contents/ui/main.qml:4421
 msgid "Station found at a new address"
 msgstr "L'emissora s'ha trobat en una adreça nova."
 
-#: package/contents/ui/main.qml:4402
+#: package/contents/ui/main.qml:4422
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 ha canviat d'adreça. Es canvia l'adreça vella per la nova i es desa a la vostra llista."
 
-#: package/contents/ui/main.qml:5876
+#: package/contents/ui/main.qml:5896
 msgid "Casting needs pychromecast"
 msgstr "La retransmissió necessita pychromecast."
 
-#: package/contents/ui/main.qml:5877
+#: package/contents/ui/main.qml:5897
 msgid "Install the pychromecast library to cast to your devices."
 msgstr "Instal·leu la biblioteca pychromecast per a retransmetre als vostres dispositius."
 
-#: package/contents/ui/main.qml:5898
+#: package/contents/ui/main.qml:5918
 msgid "the device"
 msgstr "el dispositiu"
 
-#: package/contents/ui/main.qml:5898
+#: package/contents/ui/main.qml:5918
 msgid "Could not cast to %1"
 msgstr "No s'ha pogut transmetre a %1."
 
-#: package/contents/ui/main.qml:5899
+#: package/contents/ui/main.qml:5919
 msgid "The device could not play this station."
 msgstr "El dispositiu no ha pogut reproduir aquesta emissora."
 
-#: package/contents/ui/main.qml:5945
+#: package/contents/ui/main.qml:5965
 msgid "Casting"
 msgstr "Es transmet"
 
-#: package/contents/ui/main.qml:5946
+#: package/contents/ui/main.qml:5966
 msgid "The device did not stop — it may still be playing."
 msgstr "El dispositiu no ha parat. Potser encara reprodueix."
 
-#: package/contents/ui/main.qml:6024
+#: package/contents/ui/main.qml:6044
 msgid "Bluetooth is switched off"
 msgstr "S'ha apagat el Bluetooth"
 
-#: package/contents/ui/main.qml:6025
+#: package/contents/ui/main.qml:6045
 msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
 msgstr "L'adaptador no s'engega. Comproveu l'interruptor de Bluetooth de la safata del sistema o des de les preferències del sistema."
 
-#: package/contents/ui/main.qml:6044 package/contents/ui/main.qml:6162
+#: package/contents/ui/main.qml:6064 package/contents/ui/main.qml:6182
 msgid "the Bluetooth device"
 msgstr "el dispositiu Bluetooth"
 
-#: package/contents/ui/main.qml:6043
+#: package/contents/ui/main.qml:6063
 msgid "Could not connect to %1"
 msgstr "No s'ha pogut connectar amb %1."
 
-#: package/contents/ui/main.qml:6045
+#: package/contents/ui/main.qml:6065
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Assegureu-vos que l'altaveu està engegat i dins de l'abast."
 
-#: package/contents/ui/main.qml:6161
+#: package/contents/ui/main.qml:6181
 msgid "Could not pair with %1"
 msgstr "No s'ha pogut emparellar amb %1."
 
-#: package/contents/ui/main.qml:6163
+#: package/contents/ui/main.qml:6183
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Poseu l'altaveu en mode d'aparellament (mantingueu premut el seu botó Bluetooth) i intenteu-ho de nou."
 
-#: package/contents/ui/main.qml:6261 package/contents/ui/main.qml:6335
+#: package/contents/ui/main.qml:6281 package/contents/ui/main.qml:6355
 msgid "yt-dlp is not installed"
 msgstr "L'yt-dlp no està instal·lat."
 
-#: package/contents/ui/main.qml:6262 package/contents/ui/main.qml:6336
+#: package/contents/ui/main.qml:6282 package/contents/ui/main.qml:6356
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Instal·leu l'yt-dlp (i l'ffmpeg) per a descarregar peces."
 
-#: package/contents/ui/main.qml:6285 package/contents/ui/main.qml:6355
+#: package/contents/ui/main.qml:6305 package/contents/ui/main.qml:6375
 msgid "Nothing found to download"
 msgstr "No s'ha trobat res per a descarregar."
 
-#: package/contents/ui/main.qml:6286
+#: package/contents/ui/main.qml:6306
 msgid "yt-dlp could not search: %1"
 msgstr "yt-dlp no ha pogut cercar: %1"
 
-#: package/contents/ui/main.qml:6287 package/contents/ui/main.qml:6356
+#: package/contents/ui/main.qml:6307 package/contents/ui/main.qml:6376
 msgid "No track matched \"%1\" — a show or album title often has no single track to find."
 msgstr "Cap peça ha coincidit amb «%1». Normalment, un programa o el títol d'un àlbum no tenen només un tema o episodi."
 
-#: package/contents/ui/main.qml:6299
+#: package/contents/ui/main.qml:6319
 msgid "Found only a different show — skipped"
 msgstr "Només s'ha trobat un programa diferent. S'omet."
 
-#: package/contents/ui/main.qml:6300
+#: package/contents/ui/main.qml:6320
 msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
 msgstr "La millor coincidència per a «%1» ha estat «%2». L'equivocada no es descarrega."
 
-#: package/contents/ui/main.qml:6322
+#: package/contents/ui/main.qml:6342
 msgid "Downloading again without the cover"
 msgstr "Es torna a descarregar sense la caràtula"
 
-#: package/contents/ui/main.qml:6323
+#: package/contents/ui/main.qml:6343
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Per a incrustar etiquetes fa falta el paquet python-mutagen. Instal·leu-lo per a afegir les caràtules als vostres fitxers."
 
-#: package/contents/ui/main.qml:6351
+#: package/contents/ui/main.qml:6371
 msgid "Track downloaded ✓"
 msgstr "Peça descarregada ✓"
 
-#: package/contents/ui/main.qml:6352
+#: package/contents/ui/main.qml:6372
 msgid "Saved as \"%1\" — newest first in My Music"
 msgstr "Desat com a «%1». El més nou, primer, a «La meva música»."
 
-#: package/contents/ui/main.qml:6360
+#: package/contents/ui/main.qml:6380
 msgid "Download failed"
 msgstr "La descàrrega ha fallat."
 
-#: package/contents/ui/main.qml:6361
+#: package/contents/ui/main.qml:6381
 msgid "Unknown error"
 msgstr "Error desconegut"
 
-#: package/contents/ui/main.qml:6826
+#: package/contents/ui/main.qml:6846
 msgid "Audio output changed"
 msgstr "La sortida de so ha canviat."
 
-#: package/contents/ui/main.qml:6827
+#: package/contents/ui/main.qml:6847
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "El dispositiu de sortida triat ha desaparegut. Es fa servir el dispositiu per defecte del sistema."
 

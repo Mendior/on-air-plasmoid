@@ -729,36 +729,41 @@ def test_a_wake_up_keeps_its_road_back_whatever_the_switch_says():
 
 
 def test_a_spent_budget_takes_the_standing_order_down_with_it():
-    """Stopping the knocking is not enough — the order has to end too.
+    """Stopping the knocking is not enough — the order has to end too, on
+    BOTH roads that may refuse it.
 
     netResumeTimer resumes on _wantsPlaying alone, and that is deliberate:
     the connection coming back is the one recovery people asked to keep. The
-    cost is that an order which outlives its ladder stays armed forever, so
-    a station that died at three in the morning gets put on at seven by an
-    unrelated network flicker. That is issue #13 word for word, and by now
-    the settings text has promised out loud that the station is left alone.
-    Measured 2026-09-18 while the budget went in; the same hole was open
-    under the 2026.37 switch, with the knocking off and the order still up.
+    cost is that an order which outlives its ladder stays armed forever, so a
+    station that died at three in the morning gets put on at seven by an
+    unrelated network flicker. That is issue #13 word for word.
 
-    An alarm never reaches this branch — _mayKnock hands a wake-up through
-    ahead of both refusals — which is what keeps the wake-up promise whole.
+    The first version of this fix, 2026-09-18, reached only _healArmRetry and
+    left _tryHealStation's refusal a bare return — and that bare return is
+    the one the DEFAULT configuration takes: with address healing on, a
+    listener who unticks the retry switch never reaches the ladder at all.
+    So the teardown lives in one function and both refusal lines call it.
+
+    An alarm reaches neither branch: _mayKnock hands a wake-up through ahead
+    of both refusals, which is what keeps the wake-up promise whole.
     """
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    arm = _code_only(_function_body(src, "_healArmRetry"))
-    i = arm.index("if (!_mayKnock(")
-    refusal = arm[i:arm.index("healRetryTimer.interval", i)]
-    assert "_wantsPlaying = false" in refusal, (
-        "the ladder gives up without ending the standing order, so the "
-        "network-back resume will start the dead station later")
-    assert "healRetryTimer.stop()" in refusal, (
-        "a rung left armed outlives the budget that just refused it")
 
-    # The teardown has to match what an explicit stop does, or a later
-    # recovery road finds half an order lying about.
-    for leftover in ("_orphanOrder = null", "_healRetryAttempts = 0"):
-        assert leftover in refusal, (
-            "the give-up leaves %s behind; an explicit stop clears it and "
-            "this is the same end of the same order" % leftover)
+    spent = _code_only(_function_body(src, "_orderSpent"))
+    for needed in ("_wantsPlaying = false", "_orphanOrder = null",
+                   "_healRetryAttempts = 0", "healRetryTimer.stop()"):
+        assert needed in spent, (
+            "_orderSpent no longer does %s; an explicit stop clears it and "
+            "this is the same end of the same order" % needed)
+
+    for fn in ("_healArmRetry", "_tryHealStation"):
+        body = _code_only(_function_body(src, fn))
+        i = body.index("if (!_mayKnock(")
+        line = body[i:body.index("\n", i)]
+        assert "_orderSpent()" in line, (
+            "%s refuses to knock without ending the standing order (%r). A "
+            "bare return leaves it armed, and the network-back resume will "
+            "start the dead station hours later." % (fn, line.strip()))
 
 
 def test_the_off_the_air_message_says_what_will_actually_happen():

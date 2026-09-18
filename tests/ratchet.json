@@ -1,13 +1,13 @@
 {
   "_what": "Ceilings that may only ever go DOWN. Raising one is allowed exactly once per deliberate decision, in its own commit, with the reason in the message.",
-  "_measured_at": "2026-09-18: 7454 -> 7496, deliberately and once. A quiet station was knocked at for as long as playback stood, which is right for a stream that dropped and wrong for one that has gone away. The widget cannot tell those apart, so the ladder got a budget instead of a diagnosis: three tries over about three and a half minutes, then it stops (issue #13). The lines went on four things. The ladder's arithmetic moved to RetryLogic.js and is called rather than inlined. The switch and the budget collapsed into one _mayKnock asked from every road that may refuse, because 2026.37 shipped with the switch read at one of two roads. The give-up now ENDS the standing order instead of only silencing the ladder — netResumeTimer resumes on that order alone, so an order outliving its ladder put a dead station on hours later, which was the original report and was still open with retries switched off. And the off-the-air message says which of the three things is about to happen instead of promising background retries a switched-off road was never going to make. Ceiling = wc -l package/contents/ui/main.qml",
+  "_measured_at": "2026-09-18: 7496 -> 7502, deliberately and once, hours after the previous raise and for the half it missed. 2026.38 gave the retry ladder a budget and ended the standing order when the budget refused — but only at the ladder. _tryHealStation asks the same question one guard earlier and answered it with a bare return, and THAT is the branch the default configuration takes: address healing is on out of the box, so a listener who unticks the retry switch never reaches the ladder. The order stayed up with no timer under it and the next reachability edge handed a long-dead station to netResumeTimer — issue #13 verbatim, under the setting offered as its cure. The teardown now lives in one _orderSpent() that both refusals call, which is the same medicine _mayKnock was for the switch. Ceiling = wc -l package/contents/ui/main.qml",
   "_how_to_remeasure": [
     "lines:            wc -l package/contents/ui/main.qml package/contents/ui/FullRepresentation.qml",
     "direct_exec:      grep -rhoE 'executable\\.exec\\(' package --include='*.qml' | wc -l   (then subtract the facade's own body — tests/test_ratchet.py does that part)",
     "connectsource:    grep -rn 'connectSource(\"' package --include='*.qml' | wc -l"
   ],
   "lines": {
-    "package/contents/ui/main.qml": 7496,
+    "package/contents/ui/main.qml": 7502,
     "package/contents/ui/FullRepresentation.qml": 6863
   },
   "direct_exec_calls": 42,

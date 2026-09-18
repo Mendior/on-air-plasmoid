@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-09-18 20:47+0300\n"
+"POT-Creation-Date: 2026-09-18 21:45+0300\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Polish\n"
@@ -475,7 +475,7 @@ msgid "Try to get it back"
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:140
-msgid "A station that goes quiet is tried again at widening intervals — half a minute, then a minute, then two — and if it is still silent after that, it is left alone. A stream that really dropped is back well inside that; one that is still being knocked at an hour later is a station that has gone away. Turn this off and a dead stream simply stops, the way most players behave. A connection that drops and comes back is a separate road and resumes either way, on systems that report one. An alarm is never bound by this — a wake-up keeps trying."
+msgid "A station that goes quiet is tried again at widening intervals: half a minute, then a minute, then two. A stream that really dropped is back well inside that. If it is still silent afterwards the widget lets it go and stays quiet — it will not put the station on again by itself when your connection returns later, and that part is the whole point. Turn this off and a dead stream stops at once, the way most players behave. An alarm is bound by none of it: a wake-up keeps trying."
 msgstr ""
 
 #: package/contents/ui/config/configAutomation.qml:149
@@ -1892,153 +1892,153 @@ msgstr "%1 jest połączony, ale jego dźwięk nigdy nie dotarł"
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Wyłącz i włącz głośnik, a następnie połącz go ponownie."
 
-#: package/contents/ui/main.qml:4260
+#: package/contents/ui/main.qml:4262
 msgid "Station seems to be off the air"
 msgstr "Stacja wygląda na wyłączoną z anteny"
 
-#: package/contents/ui/main.qml:4262
+#: package/contents/ui/main.qml:4264
 #, fuzzy
 msgid "%1 is not answering at any address the directory knows. It stays in your list."
 msgstr "%1 nie odpowiada pod żadnym adresem znanym katalogowi. Pozostaje na twojej liście — próby trwają w tle."
 
-#: package/contents/ui/main.qml:4264
+#: package/contents/ui/main.qml:4266
 #, fuzzy
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again for a few minutes, then leaving it be."
 msgstr "%1 nie odpowiada pod żadnym adresem znanym katalogowi. Pozostaje na twojej liście — próby trwają w tle."
 
-#: package/contents/ui/main.qml:4265
+#: package/contents/ui/main.qml:4267
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 nie odpowiada pod żadnym adresem znanym katalogowi. Pozostaje na twojej liście — próby trwają w tle."
 
-#: package/contents/ui/main.qml:4360
+#: package/contents/ui/main.qml:4380
 msgid "Playing from a backup address"
 msgstr "Odtwarzanie z adresu zapasowego"
 
-#: package/contents/ui/main.qml:4361
+#: package/contents/ui/main.qml:4381
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "Zapisany adres stacji nie odpowiada — na razie gra najbliższe dopasowanie z katalogu. Zapisany adres został zachowany."
 
-#: package/contents/ui/main.qml:4401
+#: package/contents/ui/main.qml:4421
 msgid "Station found at a new address"
 msgstr "Stacja znaleziona pod nowym adresem"
 
-#: package/contents/ui/main.qml:4402
+#: package/contents/ui/main.qml:4422
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 się przeniosła — nowy adres zapisano na twojej liście."
 
-#: package/contents/ui/main.qml:5876
+#: package/contents/ui/main.qml:5896
 msgid "Casting needs pychromecast"
 msgstr "Przesyłanie wymaga pychromecast"
 
-#: package/contents/ui/main.qml:5877
+#: package/contents/ui/main.qml:5897
 msgid "Install the pychromecast library to cast to your devices."
 msgstr "Zainstaluj bibliotekę pychromecast, aby przesyłać do swoich urządzeń."
 
-#: package/contents/ui/main.qml:5898
+#: package/contents/ui/main.qml:5918
 msgid "the device"
 msgstr "urządzenie"
 
-#: package/contents/ui/main.qml:5898
+#: package/contents/ui/main.qml:5918
 msgid "Could not cast to %1"
 msgstr "Nie można przesłać do %1"
 
-#: package/contents/ui/main.qml:5899
+#: package/contents/ui/main.qml:5919
 msgid "The device could not play this station."
 msgstr "Urządzenie nie mogło odtworzyć tej stacji."
 
-#: package/contents/ui/main.qml:5945
+#: package/contents/ui/main.qml:5965
 msgid "Casting"
 msgstr "Przesyłanie"
 
-#: package/contents/ui/main.qml:5946
+#: package/contents/ui/main.qml:5966
 msgid "The device did not stop — it may still be playing."
 msgstr "Urządzenie się nie zatrzymało — może nadal odtwarzać."
 
-#: package/contents/ui/main.qml:6024
+#: package/contents/ui/main.qml:6044
 msgid "Bluetooth is switched off"
 msgstr "Bluetooth jest wyłączony"
 
-#: package/contents/ui/main.qml:6025
+#: package/contents/ui/main.qml:6045
 msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
 msgstr "Adapter się nie włączył — sprawdź przełącznik Bluetooth w zasobniku systemowym lub Ustawienia systemowe."
 
-#: package/contents/ui/main.qml:6044 package/contents/ui/main.qml:6162
+#: package/contents/ui/main.qml:6064 package/contents/ui/main.qml:6182
 msgid "the Bluetooth device"
 msgstr "urządzeniem Bluetooth"
 
-#: package/contents/ui/main.qml:6043
+#: package/contents/ui/main.qml:6063
 msgid "Could not connect to %1"
 msgstr "Nie udało się połączyć z %1"
 
-#: package/contents/ui/main.qml:6045
+#: package/contents/ui/main.qml:6065
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Upewnij się, że głośnik jest włączony i w zasięgu."
 
-#: package/contents/ui/main.qml:6161
+#: package/contents/ui/main.qml:6181
 msgid "Could not pair with %1"
 msgstr "Nie udało się sparować z %1"
 
-#: package/contents/ui/main.qml:6163
+#: package/contents/ui/main.qml:6183
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Przełącz głośnik w tryb parowania (przytrzymaj przycisk Bluetooth) i spróbuj ponownie."
 
-#: package/contents/ui/main.qml:6261 package/contents/ui/main.qml:6335
+#: package/contents/ui/main.qml:6281 package/contents/ui/main.qml:6355
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp nie jest zainstalowany"
 
-#: package/contents/ui/main.qml:6262 package/contents/ui/main.qml:6336
+#: package/contents/ui/main.qml:6282 package/contents/ui/main.qml:6356
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Zainstaluj yt-dlp (i ffmpeg), aby pobierać utwory."
 
-#: package/contents/ui/main.qml:6285 package/contents/ui/main.qml:6355
+#: package/contents/ui/main.qml:6305 package/contents/ui/main.qml:6375
 msgid "Nothing found to download"
 msgstr "Nie znaleziono niczego do pobrania"
 
-#: package/contents/ui/main.qml:6286
+#: package/contents/ui/main.qml:6306
 msgid "yt-dlp could not search: %1"
 msgstr "yt-dlp nie mógł wyszukać: %1"
 
-#: package/contents/ui/main.qml:6287 package/contents/ui/main.qml:6356
+#: package/contents/ui/main.qml:6307 package/contents/ui/main.qml:6376
 msgid "No track matched \"%1\" — a show or album title often has no single track to find."
 msgstr "Żaden utwór nie pasował do \"%1\" — za nazwą audycji lub albumu często nie stoi pojedynczy utwór."
 
-#: package/contents/ui/main.qml:6299
+#: package/contents/ui/main.qml:6319
 msgid "Found only a different show — skipped"
 msgstr "Znaleziono tylko inną audycję — pominięto"
 
-#: package/contents/ui/main.qml:6300
+#: package/contents/ui/main.qml:6320
 msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
 msgstr "Najlepszym trafieniem dla \"%1\" było \"%2\". Złej nie pobieramy."
 
-#: package/contents/ui/main.qml:6322
+#: package/contents/ui/main.qml:6342
 msgid "Downloading again without the cover"
 msgstr "Pobieranie ponownie bez okładki"
 
-#: package/contents/ui/main.qml:6323
+#: package/contents/ui/main.qml:6343
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Do osadzania znaczników potrzebny jest pakiet python-mutagen — zainstaluj go, aby mieć okładki w plikach."
 
-#: package/contents/ui/main.qml:6351
+#: package/contents/ui/main.qml:6371
 msgid "Track downloaded ✓"
 msgstr "Utwór pobrany ✓"
 
-#: package/contents/ui/main.qml:6352
+#: package/contents/ui/main.qml:6372
 msgid "Saved as \"%1\" — newest first in My Music"
 msgstr "Zapisano jako \"%1\" — najnowsze na górze w Mojej muzyce"
 
-#: package/contents/ui/main.qml:6360
+#: package/contents/ui/main.qml:6380
 msgid "Download failed"
 msgstr "Pobieranie nie powiodło się"
 
-#: package/contents/ui/main.qml:6361
+#: package/contents/ui/main.qml:6381
 msgid "Unknown error"
 msgstr "Nieznany błąd"
 
-#: package/contents/ui/main.qml:6826
+#: package/contents/ui/main.qml:6846
 msgid "Audio output changed"
 msgstr "Wyjście dźwięku zmienione"
 
-#: package/contents/ui/main.qml:6827
+#: package/contents/ui/main.qml:6847
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "Wybrane urządzenie wyjściowe zniknęło — używane jest domyślne wyjście systemowe."
 

@@ -162,7 +162,7 @@
             <default>true</default>
         </entry>
         <entry name="autoRetry" type="bool">
-            <label>When a station goes quiet, retry it at widening intervals. Off: a dead stream simply stops. The resume that follows a connection coming back is a separate road and is not affected by this</label>
+            <label>When a station goes quiet, retry it at widening intervals for a short while. Off: a dead stream stops at once. Either way, once the widget has given up it does not put the station on again by itself. An alarm is never bound by this</label>
             <default>true</default>
         </entry>
         <entry name="autoRetryKnocks" type="Int">

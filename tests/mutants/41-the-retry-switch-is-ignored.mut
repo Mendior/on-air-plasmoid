@@ -21,10 +21,14 @@ target:
   package/contents/ui/main.qml
 
 find:
-          if (!_mayKnock(root._healRetryAttempts)) {
+          // An alarm never lands here: _mayKnock hands a wake-up through ahead
+          // of both refusals.
+          if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
 
 replace:
-          if (false) {
+          // An alarm never lands here: _mayKnock hands a wake-up through ahead
+          // of both refusals.
+          if (false) { _orderSpent(); return; }
 
 expect:
   Killed by tests/test_invariants.py::test_the_retry_switch_gates_the_ladder_and_not_the_network.

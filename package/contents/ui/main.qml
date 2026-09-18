@@ -2766,7 +2766,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.38");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4136,9 +4136,11 @@ PlasmoidItem {
         // precisely the resume they declined. The stamp above is already
         // taken, so this bails out once and then stays quiet for ten minutes.
         // A wake-up keeps its road: that promise was made in advance, and
-        // it is the one order the budget below never applies to.
-        if (!_mayKnock(root._healRetryAttempts))
-            return;
+        // it is the one order the budget below never applies to. Everyone
+        // else ends here for good — a bare return would leave the order
+        // standing with no ladder under it, and the network-back resume
+        // would put this dead station on hours later.
+        if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
         var name = (st.name || "").toString();
         var norm = _healNormName(name);
         if (norm === "") { _healArmRetry(); return; }
@@ -4303,6 +4305,23 @@ PlasmoidItem {
         }
     }
 
+    // The order is over. Whatever refused it — the switch, a spent budget —
+    // every automatic recovery road has to go down WITH it, not merely stop
+    // being fed. netResumeTimer resumes on _wantsPlaying alone, deliberately,
+    // because a connection coming back is the recovery people want kept; so
+    // an order left standing after the ladder quit puts a long-dead station
+    // on at the next flicker of the network, which is issue #13 arriving
+    // hours late. Same teardown an explicit stop performs. It lives in one
+    // place because the first version of this fix reached only the ladder and
+    // left the directory lookup's refusal a bare return — the identical
+    // split that made the 2026.37 switch miss half its road.
+    function _orderSpent() {
+        root._wantsPlaying = false;
+        root._orphanOrder = null;
+        root._healRetryAttempts = 0;
+        healRetryTimer.stop();
+    }
+
     // One question, asked from three places: may this standing order knock
     // again? Together, because the three used to be able to disagree — the
     // switch added in 2026.37 was read at the ladder and not at the
@@ -4322,22 +4341,9 @@ PlasmoidItem {
         // leaves the network-back resume alone, which has its own road. An
         // alarm carries no budget: a wake-up must not end in silence over a
         // setting about ordinary listening.
-        if (!_mayKnock(root._healRetryAttempts)) {
-            // The budget is spent, or the listener switched the knocking off.
-            // Either way the order is over, and it has to be TAKEN DOWN
-            // rather than just left unattended: netResumeTimer resumes on
-            // _wantsPlaying alone, so an order that outlives its ladder puts
-            // a long-dead station on at the next flicker of the network —
-            // issue #13's own complaint arriving four hours late, and the
-            // opposite of what the settings text promises. Same teardown an
-            // explicit stop uses, for the same reason. An alarm never lands
-            // here: _mayKnock hands a wake-up through ahead of both refusals.
-            root._wantsPlaying = false;
-            root._orphanOrder = null;
-            root._healRetryAttempts = 0;
-            healRetryTimer.stop();
-            return;
-        }
+        // An alarm never lands here: _mayKnock hands a wake-up through ahead
+        // of both refusals.
+        if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
         healRetryTimer.interval = RetryLogic.nextRetryMs(root._healRetryAttempts);
         root._healRetryAttempts++;
         healRetryTimer.restart();

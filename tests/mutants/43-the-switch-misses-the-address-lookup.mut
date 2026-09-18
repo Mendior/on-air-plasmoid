@@ -21,14 +21,12 @@ target:
   package/contents/ui/main.qml
 
 find:
-          // it is the one order the budget below never applies to.
-          if (!_mayKnock(root._healRetryAttempts))
-              return;
+          // would put this dead station on hours later.
+          if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
 
 replace:
-          // it is the one order the budget below never applies to.
-          if (false)
-              return;
+          // would put this dead station on hours later.
+          if (false) { _orderSpent(); return; }
 
 expect:
   Killed by tests/test_invariants.py::test_the_retry_switch_also_covers_the_address_lookup.

@@ -21,12 +21,12 @@ target:
   package/contents/ui/main.qml
 
 find:
-              // here: _mayKnock hands a wake-up through ahead of both refusals.
-              root._wantsPlaying = false;
+          // of both refusals.
+          if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
 
 replace:
-              // here: _mayKnock hands a wake-up through ahead of both refusals.
-              root._wantsPlaying = true;
+          // of both refusals.
+          if (!_mayKnock(root._healRetryAttempts)) { return; }
 
 expect:
   Killed by tests/test_invariants.py::test_a_spent_budget_takes_the_standing_order_down_with_it.

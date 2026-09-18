@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026.39
+
+- **The fix in 2026.38 reached only half the road.** Giving up on a station that
+  has gone away was meant to end the play order as well, so that nothing could
+  put the station back on hours later. It did — but only once the retries had
+  actually been running. If you had turned the retries off, the widget bailed
+  out one step earlier and left the order standing. That is the out-of-the-box
+  setup, since following a station to its new address is on by default, so the
+  very setting offered as the cure could still let a station that died in the
+  night start again at the next flicker of the connection. Both roads end the
+  order now.
+
+- **The settings text no longer promises more than it delivers.** It said that a
+  connection dropping and coming back resumes either way. Once the widget has
+  given up on a station that is no longer true — and it should not be, because
+  staying quiet afterwards is the entire point.
+
 ## 2026.38
 
 - **A station that has gone away is left alone.** The last version added a

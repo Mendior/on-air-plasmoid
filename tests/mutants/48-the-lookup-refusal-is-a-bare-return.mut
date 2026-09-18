@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The directory lookup refuses to knock with a bare return, leaving the
+  standing order armed with no ladder under it.
+
+history:
+  This is the half the first fix missed, found the same evening by re-reading
+  the change rather than the intention behind it. _healArmRetry got the
+  teardown; _tryHealStation kept a bare return one guard earlier — and that
+  is the branch the DEFAULT configuration takes. Address healing is on out of
+  the box, so a listener who unticks the retry switch reaches line 4143 and
+  never reaches the ladder at all: the order stays up, no timer is armed, no
+  word is shown, and the next reachability edge hands a station that died
+  hours ago to netResumeTimer. Issue #13 verbatim, under the very setting
+  offered as its cure. The function's own comment, six lines above, states
+  the contract the bare return broke: every early return past that point
+  still owes the standing order a heartbeat.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          // would put this dead station on hours later.
+          if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
+
+replace:
+          // would put this dead station on hours later.
+          if (!_mayKnock(root._healRetryAttempts)) { return; }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_spent_budget_takes_the_standing_order_down_with_it.
+  Line-neutral.
