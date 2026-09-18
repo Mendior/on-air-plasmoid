@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A park leaves the heal clock running, so the recovery road keeps working on a
+  station the listener has already silenced.
+
+history:
+  The root of the whole family. A full stop silences thirteen things; a park
+  silenced three, and every way a parked room woke up ran on one of the ten
+  left behind — the heal ladder on its own timers, the search preview on a
+  directory reply already on the wire, the bitrate fallback on a pending 600 ms
+  retry. Each was found and closed one at a time over two releases, which is
+  exactly how a list like that grows. The park now inherits the stop's
+  teardown, and the invariant compares the two sides rather than naming roads,
+  so a timer added to one and forgotten on the other fails the gate instead of
+  a listener's evening.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          healTimer.stop();
+          healRetryTimer.stop();
+
+replace:
+          healRetryTimer.stop();
+          healRetryTimer.stop();
+
+expect:
+  Killed by tests/test_invariants.py::test_a_park_inherits_the_stops_teardown.
+  Line-neutral.

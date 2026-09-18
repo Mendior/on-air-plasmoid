@@ -260,7 +260,15 @@ function parseFeed(xml, maxItems) {
         out.episodes.push({
             title: title,
             url: url,
-            guid: guid !== "" ? guid : url,
+            // Left empty when the feed gives none — episodeKey() already
+            // falls back to the url, so substituting here only threw away the
+            // one fact the seen-key needs: whether this show HAS stable ids.
+            // A token-carrying feed rotates its url every fetch, so the
+            // substituted "guid" changed each cycle and every poll announced
+            // the same episode as new. The guid-less branch that was meant to
+            // catch exactly that could never run, because nothing was ever
+            // guid-less once this line had spoken.
+            guid: guid,
             pubMs: isNaN(when) ? 0 : when,
             durationSec: parseDuration(_tagBody(item, "itunes:duration")),
             sizeBytes: parseInt(_attr(encTag[0], "length"), 10) || 0,

@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heal ladder guards on isPlaying() instead of the listener's intent, so a
+  parked station is healed back into playing with nobody asking.
+
+history:
+  2026.35 closed the engine side of this: a parked relay no longer re-arms at
+  its window cap, and a late player error no longer rebuilds over a park. But
+  the guard lives where the ENGINE declines, and main.qml reads that decline as
+  "not a relay fall — try healing instead". The heal road then asked isPlaying()
+  at four sites. A parked station is not playing, so all four let it through,
+  the directory lookup ran, and startWithFade brought the room back. Reported by
+  OdinVex on #13 as "pause, and it resumes anywhere from a few minutes to an
+  hour later, repeatedly" — the second half of the same complaint, still open
+  after 2026.35. Measured 2026-09-18 by tracing pause -> tap death -> error ->
+  healTimer -> _tryHealStation -> _orderSubject -> _healAdvance -> audio, with
+  no intent check anywhere on the path.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+      function _recoveryWanted() {
+          return root._wantsPlaying && !root._tsPaused && !root._casting;
+
+replace:
+      function _recoveryWanted() {
+          return root._wantsPlaying && !root._casting;
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_recovery_road_asks_the_intent_not_the_state.
+  Line-neutral.

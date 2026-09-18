@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  parseFeed hands a guid-less episode the enclosure URL as its guid, so no feed
+  is ever guid-less and the branch that handles rotating addresses is dead code.
+
+history:
+  episodeKey() already falls back to the url when the guid is empty, so the
+  substitution in the parser bought nothing and cost the one fact the seen-key
+  road asks for: does this show have stable ids. A feed whose media URLs carry
+  a rotating token then changed its "guid" on every fetch, the newest-episode
+  key changed with it, and each poll announced the same episode as new — one
+  extra download per cycle. The guid-less branch in PodcastEngine
+  (seenKeyOf -> legacy title name) was written for exactly this and could never
+  run. Found 2026-09-18 while re-checking a round-5 refutation that had closed
+  only half the claim.
+
+target:
+  package/contents/ui/PodcastLogic.js
+
+find:
+      guid: guid,
+
+replace:
+      guid: guid !== "" ? guid : url,
+
+expect:
+  Killed by tests/qml/tst_podcastlogic.qml::test_a_feed_without_guids_says_so
+  (and test_realistic_feed_parses_the_survivors). Line-neutral.

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The noise floor behind the microphone score is read across the burst instead
+  of before it, so every candidate is judged against its own click.
+
+history:
+  peak_of returns seconds from the start of the FILE — its own line folds the
+  analysis skip into the result. _hearing_score added that skip a second time
+  when turning the answer back into a sample index, which put the click 0.4 s
+  late and slid the "quiet" window right over the burst. Measured 2026-09-15:
+  a click at sample 48000 was read as 67200, and the window [19200, 66240)
+  swallowed it. Every microphone still scored something, and the ratios still
+  ordered roughly right in a quiet room, which is why it survived a refutation
+  round: the comparison test moved both ears by the same amount. It matters in
+  a room with a noisy tail, where the better ear loses.
+
+target:
+  package/contents/ui/calibrate.py
+
+find:
+      click_i = int(hit[0] * rate)
+
+replace:
+      click_i = start + int(hit[0] * rate)
+
+expect:
+  Killed by tests/test_calibrate.py::test_the_quiet_window_stops_before_the_click.
+  Line-neutral.

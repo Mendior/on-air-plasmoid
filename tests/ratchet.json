@@ -1,13 +1,13 @@
 {
   "_what": "Ceilings that may only ever go DOWN. Raising one is allowed exactly once per deliberate decision, in its own commit, with the reason in the message.",
-  "_measured_at": "2026-09-08: 7389 -> 7405, deliberately and once, for four roads found in the pre-release checks. (0) The MPRIS origin flag outlived its own dispatch through four of six early returns, so a park made on the widget's own button was later read as a departing speaker's breath and resumed; the dispatch moved behind a try/finally wrapper that cannot leak again. (1) Ticking \"This computer\" while an episode was casting released every receiver — the handback branch reaches startWithFade's podcast release, which the toggle was never meant to trip; it now says so with a flag. (2) onServersChanged retired the standing order on EVERY add/remove/edit, undoing removeStation's own head guard and leaving a recovering stream with nothing to resume; the road now asks whether the order's station is still listed, which does not fit on the line it replaced. e4d9eb1 + NameGuard extraction, 2026-08-09; connectsource added same day at 967306c",
+  "_measured_at": "2026-09-18: 7405 -> 7439, deliberately and once, for issue #13's second half. The park now inherits the stop's teardown (it inherited 5 of 13), every recovery road asks _recoveryWanted() instead of isPlaying(), and the preview ladder and stall timer carry the park on their own rung guards. Re-measure: wc -l package/contents/ui/main.qml",
   "_how_to_remeasure": [
     "lines:            wc -l package/contents/ui/main.qml package/contents/ui/FullRepresentation.qml",
     "direct_exec:      grep -rhoE 'executable\\.exec\\(' package --include='*.qml' | wc -l   (then subtract the facade's own body — tests/test_ratchet.py does that part)",
     "connectsource:    grep -rn 'connectSource(\"' package --include='*.qml' | wc -l"
   ],
   "lines": {
-    "package/contents/ui/main.qml": 7405,
+    "package/contents/ui/main.qml": 7440,
     "package/contents/ui/FullRepresentation.qml": 6863
   },
   "direct_exec_calls": 42,

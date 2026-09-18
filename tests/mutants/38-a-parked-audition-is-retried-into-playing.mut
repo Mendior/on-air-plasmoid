@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The search preview's retry ladder ignores a park, so a parked audition is
+  played again by a late directory reply.
+
+history:
+  The same shape as 37, one subsystem over. A relay-backed audition CAN be
+  parked — that is the whole point of the FLAC listener's pause — but the
+  preview ladder runs on its own identity (_previewSeq / _previewUrl) rather
+  than on the standing order, because an audition never raises _wantsPlaying.
+  So the shared recovery gate does not apply here and the park had nowhere to
+  live: every rung passed its identity check and played. The rung guard is
+  where it belongs, since all three rungs already go through it. Found
+  2026-09-18 while closing 37: the same complaint on #13 had a second road
+  through the search results, and closing one without the other would have
+  meant answering the reporter too early.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              return root._previewSeq === pvSeq && root._previewUrl === pvKey
+                     && !root._tsPaused;
+
+replace:
+              return root._previewSeq === pvSeq && root._previewUrl === pvKey;
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_recovery_road_asks_the_intent_not_the_state.
+  Line-neutral.

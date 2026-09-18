@@ -1,9 +1,42 @@
 # Changelog
 
+## 2026.36
+
+- **A paused station stays paused.** 2026.35 stopped the buffer behind Ogg and
+  FLAC stations from waking the room when its recording window filled, but the
+  same window death could still reach the player as an error — and the road that
+  looks up a station's new address treated that as a dead stream worth chasing.
+  It looked at whether sound was coming out rather than at whether you had asked
+  for any, and a parked station answers no to the first question. Pause before
+  lunch and the music could come back minutes or an hour later, again and again.
+  Every automatic recovery road now asks the one question that matters: do you
+  still want this playing. Thank you to the listener on GitHub who kept saying it
+  was a bug after the first fix went out — it was, and the second half of it is
+  closed now.
+
+- **Podcast shows with rotating addresses stop re-downloading the same episode.**
+  Some feeds put a changing token in every media link. Episodes from those shows
+  carry no stable id of their own, and the widget was quietly using the link as
+  one — so each poll saw a new address, called it a new episode, and fetched it
+  again. Such a show is now recognised for what it is and tracked by its episode
+  titles instead.
+
+- **Microphone choice during speaker calibration is measured honestly.** The
+  noise floor each microphone is judged against was being read from a window
+  that included the test click itself, so a room with a noisy moment right after
+  the click could hand the job to the worse ear.
+
+Why the first attempt was not enough, for anyone curious: pressing Stop had
+always shut down every clock the widget keeps waiting on a station — the retry
+backoff, the address lookup, the stall recovery. Pausing shut down three of
+them and left the rest running, and each one left running was its own way back
+to sound. Pause and Stop now put the same things to rest.
+
 ## 2026.35
 
 - **The widget stops starting on its own.** Four separate roads could put sound
-  in an empty room, and all are closed: a plasmashell restart replayed the last
+  in an empty room, and these are closed (a fifth was found afterwards and is
+  fixed in 2026.36): a plasmashell restart replayed the last
   media-key press from before it, so a fresh session came up playing; a station
   paused on the Ogg/FLAC road woke about an hour later when its local buffer
   reached the end of its window, and a late failure there did the same; a pause
@@ -527,7 +560,7 @@ Reliability release: recordings now tell the truth, scheduled recordings survive
 
 ## 2026.4
 
-Widget resizing fixed (#1), four dead default stations replaced, and a stability/accessibility round across the whole codebase.
+Widget resizing fixed (#1), four dead default stations replaced, plus stability and accessibility fixes throughout.
 
 ### Fixed — widget resizing (issue #1)
 - **The widget can now actually be resized — and it stays resized.** A hardcoded maximum size (~576×648 px) silently clamped every enlarge attempt back, which looked exactly like "it always returns to its original size". Thanks to @Driglu4it for the report. The only limit now is your screen.
@@ -568,7 +601,7 @@ Widget resizing fixed (#1), four dead default stations replaced, and a stability
 
 ## 2026.3
 
-The recording release — plus 24 bug fixes from a second pass over the code.
+The recording release, and 24 bug fixes alongside it.
 
 ### New: Stream recording ⏺
 - **One-click REC** on the Now Playing page captures the live stream to `~/Music/OnAir` as a **bit-exact copy** (`ffmpeg -c copy`, no re-encoding — original quality). The file appears in My Music immediately.
@@ -612,7 +645,7 @@ The recording release — plus 24 bug fixes from a second pass over the code.
 
 ## 2026.2
 
-Hardening and polish release, after a pass over the whole codebase looking for what could break or be abused.
+Hardening and polish release: the places this widget could break or be abused, closed.
 
 ### Security
 - **Track-title AI cleanup is now sandboxed.** The untrusted ICY stream title is passed to the optional `claude` CLI via stdin with `--allowedTools "" --strict-mcp-config`, so a malicious station name can no longer trigger any tool/command execution.

@@ -62,10 +62,16 @@ TestCase {
         compare(f.episodes[1].url, "https://cdn.example.com/ep11.m4a")
         compare(f.episodes[1].durationSec, 3723)
 
-        // Untitled episode: title stays "" (the delegate names it), guid
-        // falls back to the enclosure URL, namespaceless duration matches.
+        // Untitled episode: title stays "" (the delegate names it), the guid
+        // stays EMPTY because the feed gave none, namespaceless duration
+        // matches. This line used to expect the enclosure URL here — that
+        // substitution is what made every feed look guid-bearing, so the
+        // rotating-token road could never be recognised.
         compare(f.episodes[2].title, "")
-        compare(f.episodes[2].guid, "https://cdn.example.com/untitled.ogg")
+        compare(f.episodes[2].guid, "")
+        compare(PL.episodeKey(f.episodes[2].guid, f.episodes[2].url),
+                "https://cdn.example.com/untitled.ogg",
+                "the stored identity is unchanged: episodeKey still falls back")
         compare(f.episodes[2].durationSec, 45)
     }
 
@@ -343,6 +349,38 @@ TestCase {
     function test_episode_key_prefers_the_guid() {
         compare(PL.episodeKey("g1", "u1"), "g1")
         compare(PL.episodeKey("", "u1"), "u1")
+    }
+
+    // A feed that gives no <guid> must SAY so, because the seen-key road
+    // asks. parseFeed used to substitute the url, and then nothing was ever
+    // guid-less: the branch meant to catch a rotating address could not run,
+    // and a token feed announced the same episode as new on every poll.
+    // episodeKey still falls back to the url, so stored keys are unchanged —
+    // that equivalence is asserted here so the compatibility cannot be lost.
+    function test_a_feed_without_guids_says_so() {
+        var withGuid = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<item><title>EP</title><guid>g-7</guid>'
+            + '<enclosure url="http://x/a.mp3"/></item></channel></rss>', 50)
+        compare(withGuid.episodes[0].guid, "g-7")
+
+        var noGuid = PL.parseFeed('<rss><channel><title>T</title>'
+            + '<item><title>EP</title>'
+            + '<enclosure url="http://x/a.mp3?token=AAA"/></item></channel></rss>', 50)
+        compare(noGuid.episodes[0].guid, "",
+                "a guid-less episode must carry an empty guid, not the url")
+
+        // Stored identities survive: the key is the url either way.
+        compare(PL.episodeKey(noGuid.episodes[0].guid, noGuid.episodes[0].url),
+                PL.episodeKey(noGuid.episodes[0].url, noGuid.episodes[0].url))
+    }
+
+    // The fallback identity for such a feed must not move when the address
+    // does — that is the whole point of having one.
+    function test_a_rotating_token_keeps_one_identity() {
+        var a = PL.legacyEpisodeFileName("My Episode", "http://x/a.mp3?token=AAA")
+        var b = PL.legacyEpisodeFileName("My Episode", "http://x/a.mp3?token=BBB")
+        compare(a, b, "the legacy name must depend on the title, not the token")
+        verify(a.indexOf("token") === -1)
     }
 
     // A faithful POSIX single-quote reader: outside quotes it stops at the

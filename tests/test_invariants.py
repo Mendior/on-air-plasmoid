@@ -614,6 +614,101 @@ def test_a_heal_generation_is_claimed_fresh_and_abandoned_whole():
             "commit." % (fn, got, want))
 
 
+def test_a_park_inherits_the_stops_teardown():
+    """Whatever a full stop silences, a park must silence too.
+
+    This is the root of issue #13's second half. stopWithFade stopped
+    thirteen things; timeshiftPause stopped three, and every road that woke a
+    parked room ran on one of the ten left behind — the heal ladder on its
+    timers, the search preview on an in-flight directory reply, the bitrate
+    fallback on a pending 600 ms retry. Guarding each road one at a time is
+    how the list got long in the first place, so the parity is the invariant:
+    a new timer added to the stop road fails here until the park road has it
+    too (measured 2026-09-18, five of thirteen inherited).
+
+    fadeInAnimation is the one allowed difference: it is the visual crossfade,
+    not a road to audio, and a park keeps its own fade behaviour.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+
+    def body(name):
+        return _function_body(src, name)
+
+    def silenced(text):
+        return (set(re.findall(r"(\w+)\.stop\(\)", text))
+                | set(re.findall(r"(_\w+Seq)\+\+", text)))
+
+    stop = silenced(body("stopWithFade"))
+    park = silenced(body("timeshiftPause"))
+    allowed = {"fadeInAnimation", "fadeOutAnimation", "playMusic"}
+
+    missing = sorted((stop - park) - allowed)
+    assert not missing, (
+        "a park no longer inherits the stop's teardown — %s still run(s) "
+        "while the listener believes the radio is paused. Either stop it in "
+        "timeshiftPause too, or add it to `allowed` with the reason why it "
+        "cannot reach audio." % ", ".join(missing))
+
+
+def test_every_automatic_recovery_road_asks_the_intent_not_the_state():
+    """A road that restarts audio by itself must ask _recoveryWanted().
+
+    isPlaying() answers "is sound coming out right now". A parked station
+    answers no to that while the listener's standing order is already down,
+    so a guard written on the state lets a recovery road run over a park.
+    That is issue #13's second half: the retry ladder guarded on the intent
+    from the start, the heal ladder guarded on the state at four sites, and
+    the relay tap dying at its window cap walked all four — pause before
+    lunch, music an hour later (measured 2026-09-18, HEAD b959c81).
+
+    The fix is one shared gate rather than four repeated answers, so this
+    invariant pins the gate's definition AND its use. A new recovery road
+    that forgets it fails here instead of in somebody's living room.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+
+    gate = _function_body(src, "_recoveryWanted")
+    for flag in ("_wantsPlaying", "_tsPaused", "_casting"):
+        assert flag in gate, (
+            "_recoveryWanted no longer reads %s — the gate must answer "
+            "'does the listener still want music', and a park (_tsPaused) "
+            "is exactly the case isPlaying() cannot see" % flag)
+
+    # Every heal rung, entry and reply side alike. The reply sides matter
+    # most: they run after a network round-trip, which is precisely when a
+    # park can have landed in the meantime.
+    for fn in ("_tryHealStation", "_healNameSearch", "_healAdvance"):
+        body = _function_body(src, fn)
+        assert "_recoveryWanted()" in body, (
+            "%s does not ask _recoveryWanted() — it can run over a parked "
+            "station and start playing with nobody asking" % fn)
+
+    # The ladder that was already right must stay right.
+    for fn in ("_healArmRetry",):
+        body = _function_body(src, fn)
+        assert "_wantsPlaying" in body, (
+            "%s stopped checking the standing order" % fn)
+
+    # The preview ladder is the exception that proves the rule: an audition
+    # never raises the standing order, so the shared gate would switch it off
+    # entirely. It carries its own identity check (_previewSeq/_previewUrl)
+    # that every rung passes through, and the park rides along there.
+    prev = _function_body(src, "_previewRetryByIdentity")
+    assert "_tsPaused" in prev, (
+        "_previewRetryByIdentity no longer checks the park — a parked "
+        "audition can be retried into playing by a late directory reply")
+
+    # The stall timer is the third road and the least obvious: a relay tap
+    # dying under a park reaches the player as StalledMedia, and the timer's
+    # own answer to a stall is playMusic.play(). It backs off 15 s to 5 min,
+    # which is exactly the window the report described.
+    stall = src[src.index("id: stallTimer"):]
+    stall = stall[:stall.index("\n        }")]
+    assert "_tsPaused" in stall, (
+        "the stall timer no longer checks the park — a parked station whose "
+        "tap died is read as a stall and played again, every backoff round")
+
+
 def test_every_qml_file_imports_the_js_library_it_calls():
     """A missing .js import is a silent ReferenceError, not a load error.
 

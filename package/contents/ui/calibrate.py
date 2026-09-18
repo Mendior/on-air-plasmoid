@@ -950,7 +950,13 @@ def _hearing_score(path, tpl):
     # silently returned zero for every microphone whenever those two crossed,
     # and then the pick fell back to the desktop default without a word.
     start = int(ANALYSIS_SKIP * rate)
-    click_i = start + int(hit[0] * rate)
+    # peak_of already counts from the start of the FILE — its return is
+    # (start + pos) / rate, with the skip folded in. Adding the skip again
+    # here put the click 0.4 s late, which pushed the "quiet" window right
+    # over the burst it is supposed to measure against: measured 2026-09-15,
+    # a click at sample 48000 was read as 67200 and the window [19200, 66240)
+    # swallowed it whole.
+    click_i = int(hit[0] * rate)
     quiet_end = max(start, click_i - int(0.02 * rate))
     if quiet_end - start >= int(0.05 * rate):
         quiet = samples[start:quiet_end]

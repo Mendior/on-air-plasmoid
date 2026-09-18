@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A parked station whose relay tap dies is read as a stall, and the stall
+  timer's answer to a stall is to play again.
+
+history:
+  The third road to the same complaint on #13, and the quietest. The stall
+  timer exists so a station that goes silent mid-song comes back without the
+  listener noticing, and it backs off 15 s, 30 s, 1, 2, 4 minutes up to five.
+  A relay tap dying under a park reaches the player as StalledMedia, which is
+  indistinguishable from a real stall in there — so the timer restarted the
+  source and called play(), once per backoff round, for as long as the session
+  lasted. That is the "repeatedly" in the report. Found 2026-09-18 after the
+  heal and preview roads were closed, by asking which OTHER timer can end in
+  audio.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (root._tsPaused) return;
+
+replace:
+              if (false) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_recovery_road_asks_the_intent_not_the_state.
+  Line-neutral.

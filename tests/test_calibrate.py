@@ -393,6 +393,42 @@ def test_hearing_score_prefers_the_ear_with_the_better_ratio(calib, tmp_path):
     assert calib["_hearing_score"](str(empty), tpl) == 0.0
 
 
+def test_the_quiet_window_stops_before_the_click(calib, tmp_path):
+    """The noise floor must be read from BEFORE the burst, never across it.
+
+    peak_of returns seconds from the start of the file, with ANALYSIS_SKIP
+    already folded in. Adding the skip a second time in _hearing_score put the
+    click 0.4 s late and the "quiet" window ran straight over the burst, so
+    every microphone was judged against its own click. Measured 2026-09-15: a
+    click at sample 48000 read as 67200. This capture is silent before the
+    burst and loud after it, so the two windows cannot score alike.
+    """
+    import random
+    tpl = calib["click_template"]()
+    rate = calib["RATE"]
+
+    rnd = random.Random(11)
+    lead = int(rate * 1.0)                      # a full second of near-silence
+    s = [int(rnd.uniform(-8, 8)) for _ in range(lead)]
+    s += [int(6000 * v) for v in tpl]           # the burst
+    s += [int(rnd.uniform(-5000, 5000))         # a loud tail the window must miss
+          for _ in range(int(rate * 0.5))]
+
+    path = tmp_path / "quiet-then-loud.wav"
+    write_wav(str(path), s, rate)
+
+    score = calib["_hearing_score"](str(path), tpl)
+    assert score > 0.0, "the click must be found at all"
+
+    # The same capture measured against its own tail instead of its run-up
+    # scores an order of magnitude worse — that gap is what the offset bug
+    # silently cost. A window that walked past the burst cannot clear this.
+    noisy_floor = math.sqrt(sum(float(v) * v for v in s[lead:]) / len(s[lead:]))
+    assert score > 6000.0 / (noisy_floor + 1.0) * 4, (
+        "the quiet window is reading across the burst or its tail — "
+        "peak_of already counts from the file start")
+
+
 # ── The inaudible stimulus ──────────────────────────────────────────────
 # The sweep the calibration plays instead of a click: nobody hears it, and
 # the band it lives in is acoustically empty, so it is EASIER to find than

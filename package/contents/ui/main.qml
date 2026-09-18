@@ -830,8 +830,12 @@ PlasmoidItem {
         // hijack either with yesterday's answer.
         var pvKey = root._previewUrl;
         var pvSeq = root._previewSeq;
+        // A parked audition is the listener's too. This ladder runs on its own
+        // identity, not the standing order (a preview never raises
+        // _wantsPlaying), so the park check belongs on the rung guard.
         var live = function() {
-            return root._previewSeq === pvSeq && root._previewUrl === pvKey;
+            return root._previewSeq === pvSeq && root._previewUrl === pvKey
+                   && !root._tsPaused;
         };
         // The retry rungs play a FRESH address via startWithFade, which does
         // not touch the resolved-URL trio (only _playStation/heal do). Left
@@ -2761,7 +2765,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.35");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.36");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -3348,6 +3352,23 @@ PlasmoidItem {
         infoTimer.stop();
         connectWatchdog.stop();
         stallTimer.stop();
+        // A park inherits the stop's teardown. It used to inherit three items
+        // out of thirteen, and every road that woke a parked room ran on one
+        // of the ten left behind: the heal ladder on its timers, the search
+        // preview on an in-flight directory reply, the bitrate fallback on a
+        // pending 600 ms retry. Silencing the clocks AND ageing the
+        // generations means a reply already on the wire lands on a stale
+        // number instead of on the listener's quiet room.
+        healTimer.stop();
+        healRetryTimer.stop();
+        netResumeTimer.stop();
+        relayRescue.stop();
+        bitrateFallbackTimer.stop();
+        bitrateFallbackTimer.fallbackUrl = "";
+        root._healSeq++;
+        _healClearPending();
+        root._previewSeq++;
+        root._resolveCallSeq++;
         root._wantsPlaying = false;
         fadeOutAnimation.stop();
         _abortSleepFade();
@@ -3982,6 +4003,16 @@ PlasmoidItem {
     // (stop, a station pick, a preview, a local file).
     property var _orphanOrder: null
 
+    // The one question every automatic recovery road must ask: does the
+    // listener still WANT music. isPlaying() answers a different one — is
+    // sound coming out right now — and a parked station answers no to that
+    // with the standing order already down, so the heal ladder healed parks
+    // back into playing (reported on #13, measured 2026-09-18). The retry
+    // ladder always asked this; the heal ladder read the state instead.
+    function _recoveryWanted() {
+        return root._wantsPlaying && !root._tsPaused && !root._casting;
+    }
+
     // The subject of the recovery roads: the live list row while lastPlay
     // still points at one, else the orphan copy — but only while the
     // standing order holds AND the orphan still matches what is actually
@@ -4070,7 +4101,7 @@ PlasmoidItem {
     }
 
     function _tryHealStation() {
-        if (isPlaying() || _casting) return;
+        if (!_recoveryWanted() || isPlaying()) return;
         if (root._previewUrl !== "") return;
         var st = _orderSubject();
         if (st === null) return;
@@ -4117,7 +4148,7 @@ PlasmoidItem {
             // self-heal — a hand-edited uuid stays a path SEGMENT.
             _rbFetch("/json/stations/byuuid/" + encodeURIComponent(stUuid), 5000, function(uxhr) {
                 if (mySeq !== _healSeq) return;
-                if (isPlaying() || _orderSubject() === null) return;
+                if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return;
                 var cand = "", ok = false;
                 try {
                     var row = (JSON.parse(uxhr.responseText) || [])[0] || {};
@@ -4148,7 +4179,7 @@ PlasmoidItem {
                  + SearchLogic.uriPart(run.name) + "&hidebroken=true&order=votes&reverse=true&limit=30",
                  5000, function(xhr) {
             if (mySeq !== _healSeq) return;          // superseded by a newer heal
-            if (isPlaying() || _orderSubject() === null) return; // user moved on / recovered
+            if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return; // user moved on / recovered
             if (xhr && xhr.status === 200) {
                 try {
                     var results = JSON.parse(xhr.responseText) || [];
@@ -4199,7 +4230,7 @@ PlasmoidItem {
     function _healAdvance() {
         var run = root._healRun;
         if (!run || run.seq !== _healSeq) return;
-        if (isPlaying() || _orderSubject() === null) return;
+        if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return;
         if (run.candidates.length === 0) {
             if (!run.nameSearched) { _healNameSearch(run.seq); return; }
             root._healRun = null;
@@ -7000,6 +7031,10 @@ PlasmoidItem {
         // Counter is reset to 0 in onMediaStatusChanged once playback buffers.
         interval: Math.min(300000, 15000 * Math.pow(2, root._stallAttempts))
         onTriggered: {
+            // A parked station is not stalling, it is waiting for the listener
+            // — and a relay tap dying under a park looks exactly like a stall
+            // from in here, so this fired and played the room awake.
+            if (root._tsPaused) return;
             // A stalled PODCAST stream is not a dying station: remember the
             // needle, restart the same episode AT the bookmark, and never
             // walk the station-heal road on its behalf. Source-exact, like
