@@ -19,6 +19,7 @@ KCM.SimpleKCM {
     // A plain property, not an alias: currentValue is read-only, and the
     // dialog host must be able to SET the stored value on load.
     property int cfg_podcastAutoRefreshHours: 12
+    property alias cfg_autoRetry: autoRetryCheck.checked
     property alias cfg_podcastAutoDownload: autoDownload.checked
     property alias cfg_podcastAutoClean: autoClean.checked
     property alias cfg_podcastContinuous: continuous.checked
@@ -128,6 +129,19 @@ KCM.SimpleKCM {
         Kirigami.Separator {
             Kirigami.FormData.label: i18n("Live radio")
             Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: autoRetryCheck
+            Kirigami.FormData.label: i18n("When a stream dies:")
+            text: i18n("Keep trying until it comes back")
+        }
+        QQC2.Label {
+            text: i18n("A station that goes quiet is tried again at widening intervals — half a minute, then a minute, then longer, up to ten — until it returns or you press Stop. Turn this off and a dead stream simply stops, the way most players behave. A connection that drops and comes back is a separate road and resumes either way, on systems that report one.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
         }
 
         QQC2.CheckBox {

@@ -2765,7 +2765,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.36");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.37");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -4281,6 +4281,10 @@ PlasmoidItem {
 
     function _healArmRetry() {
         if (!_wantsPlaying) return;
+        // The listener can switch the knocking off. This is the only place the
+        // ladder arms, so it is the only place that asks — and it deliberately
+        // leaves the network-back resume alone, which has its own road.
+        if (Plasmoid.configuration.autoRetry !== true) return;
         var n = Math.min(5, _healRetryAttempts);
         _healRetryAttempts++;
         healRetryTimer.interval = Math.min(600000, 30000 * Math.pow(2, n));

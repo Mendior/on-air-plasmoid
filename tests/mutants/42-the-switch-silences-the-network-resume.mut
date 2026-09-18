@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The retry switch also gates the resume that follows the network coming back,
+  which is the one recovery the listener asked to keep.
+
+history:
+  The distinction is the whole point of the setting. "Disable all resume unless
+  an actual network connection was dropped" — a stream dying while the link is
+  fine is the unwanted case; a link that went away and came back is the
+  expected one. The widget can tell them apart because they arrive on
+  different roads: the ladder from a playback failure, the resume from
+  QNetworkInformation's reachability edge. Gating both would be easy to do by
+  accident while tidying, and would quietly take away the half that was never
+  in question.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (!root._wantsPlaying || isPlaying() || root._casting) return;
+              if (_orderSubject() === null) return;
+              console.log("[ARP] network is back — resuming the standing order");
+
+replace:
+              if (!root._wantsPlaying || isPlaying() || root._casting) return;
+              if (Plasmoid.configuration.autoRetry !== true) return;
+              console.log("[ARP] network is back — resuming the standing order");
+
+expect:
+  Killed by tests/test_invariants.py::test_the_retry_switch_gates_the_ladder_and_not_the_network.
+  Line-neutral.

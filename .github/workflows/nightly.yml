@@ -4,7 +4,7 @@
 
 # The mutation suite, run by the clock instead of by memory. Each mutant is a
 # bug this project has already shipped once, reduced to a single text swap; the
-# gate must go red for the ones we expect to catch. All but one of the 41
+# gate must go red for the ones we expect to catch. All but one of the 43
 # do today and 02 survives by design (tests/mutants_baseline.json says why). This
 # job is green while that holds and red the night a guard quietly loses its
 # teeth — the exact regression no push-time check would ever run long enough
@@ -14,7 +14,7 @@
 # well over an hour has no place on every push, and the fast gate must not
 # learn to wait for it. The cap below has to grow with the corpus: it sat at
 # 60 while the bench took ~70 at eighteen mutants, and from 2026-08-22 the job
-# died cancelled every single night with nobody the wiser. 41 mutants at
+# died cancelled every single night with nobody the wiser. 43 mutants at
 # the measured ~4 minutes each need a good two hours, so the cap sits well
 # clear of the run rather than a few minutes above it.
 name: nightly

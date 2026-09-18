@@ -1,13 +1,13 @@
 {
   "_what": "Ceilings that may only ever go DOWN. Raising one is allowed exactly once per deliberate decision, in its own commit, with the reason in the message.",
-  "_measured_at": "2026-09-18: 7405 -> 7439, deliberately and once, for issue #13's second half. The park now inherits the stop's teardown (it inherited 5 of 13), every recovery road asks _recoveryWanted() instead of isPlaying(), and the preview ladder and stall timer carry the park on their own rung guards. Re-measure: wc -l package/contents/ui/main.qml",
+  "_measured_at": "2026-09-18: 7440 -> 7444, deliberately and once, for the retry switch a listener asked for on issue #13. The ladder arms in exactly one function, so the setting is asked in exactly one place; the network-back resume keeps its own road and is not gated. Re-measure: wc -l package/contents/ui/main.qml",
   "_how_to_remeasure": [
     "lines:            wc -l package/contents/ui/main.qml package/contents/ui/FullRepresentation.qml",
     "direct_exec:      grep -rhoE 'executable\\.exec\\(' package --include='*.qml' | wc -l   (then subtract the facade's own body — tests/test_ratchet.py does that part)",
     "connectsource:    grep -rn 'connectSource(\"' package --include='*.qml' | wc -l"
   ],
   "lines": {
-    "package/contents/ui/main.qml": 7440,
+    "package/contents/ui/main.qml": 7444,
     "package/contents/ui/FullRepresentation.qml": 6863
   },
   "direct_exec_calls": 42,

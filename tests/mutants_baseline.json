@@ -1,7 +1,7 @@
 {
   "_what": "The mutants expected to SURVIVE today, each a documented blind spot with the test that will one day kill it. `scripts/mutants.py --check-baseline` stays green while the survivor set is a subset of this list; a mutant that WAS being killed and now survives is a real regression (a guard lost its teeth) and goes red. A mutant listed here that gets killed is good news — tighten this file in the same commit that added the test.",
-  "_measured_at": "2026-09-18: the corpus is 41 mutants (ls tests/mutants/*.mut | wc -l). Six joined this round, five of them one family: a park that did not inherit the stop's teardown, and the four roads that ran on what it left behind (heal ladder, search preview, stall timer, and the shared recovery gate itself). The sixth is the quiet window walking over the click. Three re-opened claims an earlier round had closed or half-closed, which is why the number in prose is worth less than the command beside it. 02 is still the one documented survivor.",
-  "_how_to_remeasure": "python3 scripts/mutants.py   (full run; budget ~4 min per mutant, so ~164 min at 41 mutants — the nightly cap is 180. --quick for a weaker fast look. A kill only counts against a gate that was GREEN first; the runner refuses otherwise and says so.)",
+  "_measured_at": "2026-09-18: the corpus is 43 mutants (ls tests/mutants/*.mut | wc -l). 41 and 42 guard the retry switch from both sides — one removes it, the other extends it over the network-back resume it must never touch. 02 is still the one documented survivor.",
+  "_how_to_remeasure": "python3 scripts/mutants.py   (full run; budget ~4 min per mutant, so ~172 min at 43 mutants — the nightly cap is 180. A kill only counts against a gate that was GREEN first.)",
   "expected_survivors": {
     "02-icy-inflight-never-cleared": "needs a two-title-query behavioural test, which wants the same metadata engine extraction first"
   }

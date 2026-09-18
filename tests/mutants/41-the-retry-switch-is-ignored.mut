@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The retry ladder arms whether or not the listener switched it off.
+
+history:
+  A listener on issue #13 asked to be able to stop the widget knocking at a
+  station that had gone quiet, keeping only the resume that follows the
+  network coming back. Those are separate roads already, which is what made
+  the switch a small change: the ladder arms in exactly one function, so one
+  guard covers it. The mutant removes that guard — the setting still appears
+  in the settings page, still saves, and does nothing at all, which is the
+  worst shape this kind of bug takes.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (Plasmoid.configuration.autoRetry !== true) return;
+
+replace:
+          if (false) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_retry_switch_gates_the_ladder_and_not_the_network.
+  Line-neutral.

@@ -614,6 +614,41 @@ def test_a_heal_generation_is_claimed_fresh_and_abandoned_whole():
             "commit." % (fn, got, want))
 
 
+def test_the_retry_switch_gates_the_ladder_and_not_the_network():
+    """The listener's retry switch must reach the ladder and stop there.
+
+    Asked for on issue #13: a station that dies while the connection is fine
+    was retried forever, and there was no way to say no. The switch belongs on
+    the ladder's single arming point — and NOT on the resume that follows the
+    network coming back, which is the one case people expect to be handled for
+    them. Those are separate roads (onIsConnectedChanged -> netResumeTimer),
+    and this pins them apart so a later tidy-up cannot merge them.
+
+    Alarms and scheduled recordings are deliberately untouched: the alarm has
+    its own window and falls back to the bundled chime, and a recording runs
+    its own ffmpeg with its own relaunch. Neither leans on this ladder.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+
+    arm = _function_body(src, "_healArmRetry")
+    assert "autoRetry" in arm, (
+        "_healArmRetry no longer asks the retry switch — a listener who turned "
+        "it off is knocked at anyway")
+
+    # One arming point is what makes one guard enough.
+    starts = len(re.findall(r"healRetryTimer\.(?:re)?start\(\)", src))
+    assert starts == 1, (
+        "the retry ladder now arms in %d places; the switch guards one of them, "
+        "so a second site is a hole. Route it through _healArmRetry." % starts)
+
+    # The network-back road must stay open regardless of the switch.
+    i = src.index("id: netResumeTimer")
+    net = src[i:src.index("\n        }", i)]
+    assert "autoRetry" not in net, (
+        "the network-back resume is gated by the retry switch — that is the "
+        "one recovery a listener asked to KEEP")
+
+
 def test_a_park_inherits_the_stops_teardown():
     """Whatever a full stop silences, a park must silence too.
 

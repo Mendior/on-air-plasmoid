@@ -161,6 +161,10 @@
             <label>When a saved station's stream dies, look up its current address on radio-browser.info and follow it</label>
             <default>true</default>
         </entry>
+        <entry name="autoRetry" type="bool">
+            <label>When a station goes quiet, keep retrying it at widening intervals until it comes back or playback is stopped. Off: a dead stream simply stops. The resume that follows a connection coming back is a separate road and is not affected by this</label>
+            <default>true</default>
+        </entry>
         <entry name="downloadFormat" type="String">
             <label>Download format: best (max quality, no re-encode), mp3, opus, mp4 (video)</label>
             <default>best</default>

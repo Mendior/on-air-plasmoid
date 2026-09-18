@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026.37
+
+- **You can tell the widget to stop knocking.** When a station goes quiet, the
+  widget has always kept trying to bring it back — half a minute later, then a
+  minute, then longer, for as long as the session lasts. That is right for a
+  train tunnel and wrong for a station that simply died, and until now there
+  was no way to say which you wanted. Settings → Automation → Live radio now
+  has a switch for it. Left on, nothing changes. Turned off, a dead stream
+  simply stops, the way most players behave.
+
+  A connection that drops and comes back is a separate road and still resumes
+  on its own, on systems that report the change. Alarms and scheduled
+  recordings are not affected either: an alarm that cannot reach its station
+  still rings its own chime, and a recording runs its own capture.
+
+  Asked for on GitHub, and it was a fair thing to ask for.
+
 ## 2026.36
 
 - **A paused station stays paused.** 2026.35 stopped the buffer behind Ogg and
