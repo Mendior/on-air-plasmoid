@@ -2,6 +2,16 @@
 
 ## 2026.39
 
+- **A podcast speed you choose now survives a restart.** Tapping 1.25x worked
+  and kept working for the rest of the session, so nothing looked wrong — but
+  the setting was never written down, and every show was back at 1x the next
+  time you logged in.
+
+- **A tab you switch off stays off.** Hiding the Stations tab still handed you
+  the Stations page at every login, with nothing highlighted in the tab bar
+  because the button it would have highlighted was hidden. Hiding Stations or
+  Playing while you were standing on that page did nothing at all.
+
 - **The fix in 2026.38 reached only half the road.** Giving up on a station that
   has gone away was meant to end the play order as well, so that nothing could
   put the station back on hours later. It did — but only once the retries had

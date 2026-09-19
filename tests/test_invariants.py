@@ -728,6 +728,131 @@ def test_a_wake_up_keeps_its_road_back_whatever_the_switch_says():
         "the alarm's standing order outlives the sleeper saying 'I'm up'")
 
 
+def test_every_minute_dial_stops_on_its_own_grid():
+    """A five-minute stepper whose ceiling is 59 steps off its own grid.
+
+    Found by driving the widget, 2026-09-18: one press down from :00 on the
+    wake-up dial gave :59, not :55. From there the box walks 54, 49, 44 and
+    never returns to a round minute — two disjoint cycles on one control.
+    Nobody sets an alarm for :59 on a five-minute dial; they land there by
+    accident and cannot get back. The ceiling has to be a multiple of the
+    step, so 55.
+    """
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    for name in ("alarmMM", "schedMM", "podAlarmMM"):
+        i = src.index("id: %s" % name)
+        # Strip comments FIRST, then take the window: a long comment above
+        # the properties used to push stepSize out of a fixed-size slice, and
+        # the check then read the default step of 1 and passed on anything.
+        blk = _code_only(src[i:i + 2500])
+        nxt = blk.find("QQC2.SpinBox")
+        if nxt > 0:
+            blk = blk[:nxt]
+        top = re.search(r"to:\s*(\d+)", blk)
+        step = re.search(r"stepSize:\s*(\d+)", blk)
+        assert top and step, (
+            "%s lost its range or its step; this check cannot speak for a "
+            "dial whose grid it cannot see" % name)
+        s_, t_ = int(step.group(1)), int(top.group(1))
+        assert t_ % s_ == 0, (
+            "%s steps by %d but stops at %d — the last step leaves the grid "
+            "every other step lands on" % (name, s_, t_))
+
+
+def test_the_chosen_podcast_speed_reaches_the_config():
+    """A readonly binding cannot be assigned, and the throw eats the save.
+
+    main.qml holds _podSpeeds as a readonly binding to the engine's map, so
+    the in-place mutations above work but the prune — which returns a NEW
+    object — must land on the engine. It landed here instead and threw, and
+    the config write on the very next line never ran. The speed applied and
+    held for the session, so nothing looked wrong until the next start put
+    every show back at 1.0x. Found by a hunt, 2026-09-19, and confirmed
+    against the declaration.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "setPodcastRate"))
+    assert not re.search(r"(?<![.\w])_podSpeeds\s*=", body), (
+        "setPodcastRate assigns to main.qml's own _podSpeeds, which is a "
+        "readonly binding — that throws and the config write below it never "
+        "runs. Assign to podcastEngine._podSpeeds instead.")
+    assert "podcastEngine._podSpeeds =" in body, (
+        "nothing writes the pruned map back to the engine, so the prune is "
+        "thrown away and the map grows without limit")
+    assert "Plasmoid.configuration.podcastSpeeds" in body, (
+        "the chosen speed is never persisted")
+
+
+def test_every_tab_switch_is_watched_and_the_guard_runs_at_startup():
+    """Hiding a tab must never leave the listener standing on it.
+
+    Two halves, both measured 2026-09-19. The Connections block watched
+    three of the five tab switches, so hiding Stations or Playing while
+    standing on that page moved nothing and left a page on screen whose
+    button was gone. And the guard was only ever reached from onViewChanged
+    — a view that starts at 0 emits no change, so at startup it never ran at
+    all: hide the Stations tab and every login handed it back, with no tab
+    highlighted because its own button is hidden.
+
+    The key list is read from main.xml so a sixth tab cannot be added
+    without this noticing.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    cfg = (UI.parent / "config" / "main.xml").read_text(encoding="utf-8")
+    keys = re.findall(r'<entry name="(show\w*Tab)"', cfg)
+    assert len(keys) >= 5, "expected the tab switches in main.xml, found %r" % keys
+
+    i = src.index("function onShowMusicTabChanged")
+    block = _code_only(src[src.rindex("Connections", 0, i):i + 600])
+    for k in keys:
+        handler = "on" + k[0].upper() + k[1:] + "Changed"
+        assert handler in block, (
+            "%s has no %s — switching that tab off while standing on its page "
+            "leaves the listener there with no button to leave by" % (k, handler))
+
+    started = _code_only(_function_body(src, "Component.onCompleted")
+                         if "function Component.onCompleted" in src
+                         else src[src.index("Component.onCompleted"):
+                                  src.index("Component.onCompleted") + 2000])
+    assert "_ensureViewVisible()" in started, (
+        "the visible-view guard is never asked at startup, so a hidden tab "
+        "can still be the page the popup opens on")
+
+
+def test_starring_a_web_result_holds_its_references_before_it_removes_the_row():
+    """A delegate cannot reach its own scope after it has been destroyed.
+
+    Found by running the widget and clicking the star, 2026-09-18:
+    "ReferenceError: fullRepresentation is not defined". starThisRow ran
+    inside the row's own delegate and called webResultsModel.remove() in the
+    middle — which destroys that delegate. Everything after the remove was
+    executing in a torn-down context, so the file-scope id no longer
+    resolved, the result cap never shrank, and keyboard focus never landed.
+    Nothing looked wrong at the time, because the station HAD been added:
+    the damage shows up later as "Show more" going missing over a page the
+    directory still has more of.
+
+    The rule this pins: take the references you need after the removal
+    BEFORE performing it. A grep, because the failure is a runtime scope
+    teardown that neither qmllint nor the offscreen smoke test can see.
+    """
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "starThisRow")
+    code = _code_only(body)
+    cut = code.index(".remove(")
+    after = code[cut:]
+    for name in ("fullRepresentation.", "webRepeater.", "webResultsModel."):
+        assert name not in after, (
+            "starThisRow touches %s after webResultsModel.remove() destroyed "
+            "the delegate — that lookup runs in a dead scope and throws. "
+            "Hold the reference in a local before the remove." % name)
+    before = code[:cut]
+    assert ("= fullRepresentation" in before and "= webRepeater" in before
+            and "= webResultsModel" in before), (
+        "starThisRow no longer captures its references before the removal; "
+        "the next edit that needs one of them will reintroduce the throw")
+
+
 def test_a_spent_budget_takes_the_standing_order_down_with_it():
     """Stopping the knocking is not enough — the order has to end too, on
     BOTH roads that may refuse it.

@@ -1745,13 +1745,20 @@ PlasmaExtras.Representation {
                                 // over a page the directory still has more of.
                                 function starThisRow() {
                                     var wasIndex = webItem.index
+                                    // remove() destroys this delegate and the scope these names live
+                                    // in, so hold them first. Measured 2026-09-18: the star threw on
+                                    // the next line, the cap never shrank, and "Show more" went
+                                    // missing over a page the directory still had more of.
+                                    var rep = fullRepresentation
+                                    var rows = webRepeater
+                                    var rowModel = webResultsModel
                                     root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid, webItem.model.codec, webItem.model.bitrate)
-                                    webResultsModel.remove(wasIndex)
-                                    fullRepresentation.webResultCap =
-                                        Math.max(webResultsModel.count, fullRepresentation.webResultCap - 1)
+                                    rowModel.remove(wasIndex)
+                                    rep.webResultCap =
+                                        Math.max(rowModel.count, rep.webResultCap - 1)
                                     // Keyboard flow: the focused row just vanished — land on
                                     // the row that took its place, or the last one left.
-                                    var land = webRepeater.itemAt(Math.min(wasIndex, webResultsModel.count - 1))
+                                    var land = rows.itemAt(Math.min(wasIndex, rowModel.count - 1))
                                     if (land) land.forceActiveFocus()
                                 }
 
@@ -3893,7 +3900,8 @@ PlasmaExtras.Representation {
                             PlasmaComponents3.Label { text: ":" }
                             QQC2.SpinBox {
                                 id: podAlarmMM
-                                from: 0; to: 59; value: 0; stepSize: 5
+                                // Five-minute grid, so 55 — 59 leaves the grid it steps on.
+                                from: 0; to: 55; value: 0; stepSize: 5
                                 textFromValue: function(v) { return ("0" + v).slice(-2) }
                                 Accessible.name: i18n("Minute")
                             }
@@ -4926,7 +4934,10 @@ PlasmaExtras.Representation {
                             PlasmaComponents3.Label { text: ":" }
                             QQC2.SpinBox {
                                 id: alarmMM
-                                from: 0; to: 59
+                                // 55, because the step is five and the ceiling must be a multiple
+                                // of it. At 59 one press down from :00 gave :59, and the dial then
+                                // walked 54, 49, 44 with no way back (measured 2026-09-18).
+                                from: 0; to: 55
                                 stepSize: 5
                                 value: 0
                                 textFromValue: function(v) { return root._pad2(v) }
@@ -5137,7 +5148,8 @@ PlasmaExtras.Representation {
                             PlasmaComponents3.Label { text: ":" }
                             QQC2.SpinBox {
                                 id: schedMM
-                                from: 0; to: 59
+                                // Same five-minute grid as the wake-up dial, same ceiling, same reason.
+                                from: 0; to: 55
                                 stepSize: 5
                                 value: 0
                                 textFromValue: function(v) { return root._pad2(v) }

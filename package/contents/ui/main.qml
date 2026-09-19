@@ -161,6 +161,8 @@ PlasmoidItem {
     // page whose tab just disappeared (measured on the bench).
     Connections {
         target: Plasmoid.configuration
+        function onShowStationsTabChanged() { root._ensureViewVisible() }
+        function onShowPlayingTabChanged() { root._ensureViewVisible() }
         function onShowMusicTabChanged() { root._ensureViewVisible() }
         function onShowPodcastsTabChanged() { root._ensureViewVisible() }
         function onShowTimersTabChanged() { root._ensureViewVisible() }
@@ -1693,8 +1695,11 @@ PlasmoidItem {
         // Bounded like the resume map: a listener who tries hundreds of shows
         // must not grow this map without limit. A no-op below the cap; the
         // global "" and the just-set feed are always kept.
-        _podSpeeds = PodcastLogic.prunePodSpeeds(_podSpeeds, 300);
-        Plasmoid.configuration.podcastSpeeds = JSON.stringify(_podSpeeds);
+        // The prune returns a NEW object and this file's _podSpeeds is a readonly
+        // binding to the engine's — landing it here threw and killed the config
+        // write below, so a chosen speed never survived a restart (2026-09-19).
+        podcastEngine._podSpeeds = PodcastLogic.prunePodSpeeds(_podSpeeds, 300);
+        Plasmoid.configuration.podcastSpeeds = JSON.stringify(podcastEngine._podSpeeds);
         // The desk's media controls show Rate — tell them it moved.
         _mprisQueueWrite();
     }
@@ -5506,6 +5511,9 @@ PlasmoidItem {
         // Load marker asserted by the dev.sh check smoke test — keep the text
         // in sync with LOAD_MARKER there.
         console.log("[ARP] widget loaded");
+        // A view that starts at 0 emits no change, so this guard never ran at
+        // startup: someone who switched the Stations tab off got it every login.
+        _ensureViewVisible();
         // Seed the Bluetooth-arrival watcher with the world as it already
         // is — a speaker mid-song through a widget restart is not "new".
         _btCapNewArrivals();
