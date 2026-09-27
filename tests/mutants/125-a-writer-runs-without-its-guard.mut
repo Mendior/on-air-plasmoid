@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The buffer writer starts without the guard that stops it when its host dies.
+
+history:
+  Measured on the bench 2026-09-23: the viewer killed while a FLAC preview
+  played through the relay, and the writer's shell went to systemd --user
+  with the whole chain still copying the station at ~128 KiB/s, for nobody,
+  until its hour cap. The guard beside every writer is what ends that within
+  a few seconds of the host going.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+          + (o.guardPath ? "bash " + q(o.guardPath) + " watch \"$$\" \"$PPID\" \"$pid\" >/dev/null 2>&1 & " : "")
+
+replace:
+          + ""
+
+expect:
+  Killed by tests/qml/tst_timeshiftlogic.qml::test_every_writer_starts_its_guard_and_names_its_owner
+  and tests/qml/tst_timeshiftengine.qml::test_every_run_command_starts_the_writers_guard.
+  Line-neutral.

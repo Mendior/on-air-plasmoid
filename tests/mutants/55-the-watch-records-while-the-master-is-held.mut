@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The level watch files its answer although a measurement or the ramp took
+  hold of the master inside the shell's round-trip.
+
+history:
+  Measured 2026-09-20: the config held 30 while the listener had kept the
+  room at 40 with the volume keys all evening. The only writer of the level
+  was the disable's ack, and a panel restart or a reboot destroys the engine
+  before that ack lands, so the next enable ramped back to a room close to
+  inaudible. The level is now read every half minute while the room is
+  alive — which makes the answer's guards the whole of its safety: a verify
+  parks the master at 100, the ramp climbs through levels nobody chose, and
+  a new generation starts at a polite 20.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+              if (wM && _combineActive && !_masterHeld()
+
+replace:
+              if (wM && _combineActive && !false
+
+expect:
+  Killed by tst_syncengine::test_the_watch_stays_silent_while_the_master_is_held.
+  Line-neutral.

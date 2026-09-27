@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The settings page's station list is asked for without an order.
+
+history:
+  Unordered, the directory answers by raw name: the list opened on names
+  that begin with a tab or a space and the stations people know sat hundreds
+  of rows down. Both of the page's requests are built in one place now, by
+  votes; this takes the order out of that place.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+          + "?hidebroken=true&order=votes&reverse=true&limit=" + n + "&offset=" + o;
+
+replace:
+          + "?hidebroken=true&limit=" + n + "&offset=" + o;
+
+expect:
+  Killed by tst_searchlogic::test_the_settings_list_is_asked_by_votes_a_page_at_a_time.
+  Line-neutral.

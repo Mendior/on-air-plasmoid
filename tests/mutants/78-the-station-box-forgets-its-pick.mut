@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The alarm's station box falls back to the first station after every reload.
+
+history:
+  The shared station list reloads by clear-and-append. A plain combo went
+  empty there; one that only refuses to be empty would quietly move every
+  half-made alarm to the first station in the list.
+
+target:
+  package/contents/ui/StationPicker.qml
+
+find:
+          if (i >= 0) currentIndex = i
+
+replace:
+          if (i >= 0) currentIndex = 0
+
+expect:
+  Killed by tst_stationpicker::test_the_listeners_pick_survives_a_reload.
+  Line-neutral.

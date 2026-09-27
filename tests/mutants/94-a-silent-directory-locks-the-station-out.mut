@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A directory nobody could reach takes the ten-minute lookup lock anyway.
+
+history:
+  Every mirror down handed the callbacks null and both rungs read it as
+  "the directory knows nothing". The lock was taken on a question nobody
+  heard, and with the default three knocks all falling inside ten minutes
+  a play pressed before the Wi-Fi was up never got a second chance.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      if (answered === true) return null;
+
+replace:
+      if (answered !== true) return null;
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_an_unreachable_directory_gives_the_lock_back_and_says_so.
+  Line-neutral.

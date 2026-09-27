@@ -18,8 +18,11 @@ SPEC = importlib.util.spec_from_file_location(
     "calibrate",
     pathlib.Path(__file__).resolve().parent.parent
     / "package" / "contents" / "ui" / "calibrate.py")
+assert SPEC is not None and SPEC.loader is not None and SPEC.origin is not None, "calibrate.py is not loadable"
 calibrate = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(calibrate)
+# Narrowed here once: an assert at module level does not narrow inside a function.
+SPEC_ORIGIN = SPEC.origin
 
 RATE = 8000  # a lighter rate keeps the synthetic arrays small; the
              # estimator only cares about ms, not the sample rate itself
@@ -145,7 +148,7 @@ def test_drift_runs_under_the_sigterm_conversion_with_a_sentinel_net():
     # microphone open. The conversion must be installed BEFORE the drift
     # dispatch, and a crash inside it must print a sentinel, not a
     # traceback — the caller reads sentinels only.
-    src = pathlib.Path(SPEC.origin).read_text()
+    src = pathlib.Path(SPEC_ORIGIN).read_text()
     main_body = src.split("def main():", 1)[1]
     assert main_body.index("signal.signal(signal.SIGTERM") \
         < main_body.index('== "drift"')

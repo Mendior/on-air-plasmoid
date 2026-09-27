@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A loopback built by the enable or a rebuild is left open to whatever level
+  the session manager remembered under its name.
+
+history:
+  WirePlumber files a stream's level under "loopback-<pid>-<n> output" and
+  restores it onto the next stream of that name. The counter cycles and a
+  lingering login reuses the pid, so names repeat — and a handover fades its
+  old loopback to zero before cutting it, which is the level that stays on
+  disk. Measured 2026-09-20 with 0.0 stored under loopback-1322-15: a fresh
+  loopback came up at -inf dB, unmuted and running. With the property the
+  same name came up at full level and nothing set on it was written back.
+  The two load sites are separate strings, so each needs its own watch.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+                   + " sink='" + s + "' latency_msec=" + d + " " + chSpec + _lbNoRestore
+                   + ") && echo \"LB $id " + s + "\"";
+
+replace:
+                   + " sink='" + s + "' latency_msec=" + d + " " + chSpec
+                   + ") && echo \"LB $id " + s + "\"";
+
+expect:
+  Killed by tst_syncengine::test_no_loopback_is_born_at_a_level_the_session_manager_remembered.
+  Line-neutral.

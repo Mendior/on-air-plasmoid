@@ -20,6 +20,7 @@ KCM.SimpleKCM {
     // dialog host must be able to SET the stored value on load.
     property int cfg_podcastAutoRefreshHours: 12
     property alias cfg_autoRetry: autoRetryCheck.checked
+    property alias cfg_autoRetryKnocks: autoRetryKnocks.value
     property alias cfg_podcastAutoDownload: autoDownload.checked
     property alias cfg_podcastAutoClean: autoClean.checked
     property alias cfg_podcastContinuous: continuous.checked
@@ -142,6 +143,35 @@ KCM.SimpleKCM {
             opacity: 0.7
             wrapMode: Text.WordWrap
             Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
+        // The count the text above describes. It was a setting with no control:
+        // the release notes told people to set autoRetryKnocks to 0 "in the
+        // widget's configuration", and there was nowhere to do it.
+        QQC2.SpinBox {
+            id: autoRetryKnocks
+            Kirigami.FormData.label: i18n("Tries:")
+            enabled: autoRetryCheck.checked
+            from: 0
+            to: 10
+            textFromValue: function(v) { return v === 0 ? i18n("Until it answers") : String(v) }
+            valueFromText: function(t) { var n = parseInt(t, 10); return n > 0 ? Math.min(10, n) : 0 }
+            Accessible.name: i18n("How many times a quiet station is tried again")
+            // As wide as its widest value, always. Sized by its own text it
+            // measured 148 px at "Until it answers" and 120 px at "1", so the
+            // arrows moved out from under the pointer: seven clicks on "up"
+            // from 0 gave 1, the other six went into the text.
+            Layout.preferredWidth: Math.max(implicitWidth, triesWidest.implicitWidth)
+        }
+        // Never shown. The style decides how wide a spin box is, and the
+        // only honest measure of "wide enough for Until it answers" is a
+        // spin box saying it.
+        QQC2.SpinBox {
+            id: triesWidest
+            visible: false
+            from: autoRetryKnocks.from
+            to: autoRetryKnocks.to
+            value: 0
+            textFromValue: function(v, locale) { return autoRetryKnocks.textFromValue(v, locale) }
         }
 
         QQC2.CheckBox {

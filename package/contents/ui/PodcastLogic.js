@@ -646,3 +646,20 @@ function upNextAdd(list, entry, cap) {
     while (a.length > lim) a.shift()
     return a
 }
+
+// What one podcast directory said to a search: its rows (field names the
+// list inside the JSON body, "" when the body is the list), or null when
+// the directory said nothing that counts as an answer.
+// A search that nobody answered used to end on "No shows found", which tells
+// the listener the show does not exist. Nothing counts that is not a 2xx
+// with a JSON body: no network and the timeout's abort arrive as status 0,
+// a rate limit as 403 or 429, and a captive portal as 200 with its own page.
+// An empty list is an answer, and so is a reply that simply has no list.
+function directoryAnswer(status, text, field) {
+    if (!(status >= 200 && status < 300)) return null
+    var body
+    try { body = JSON.parse(String(text === undefined || text === null ? "" : text)) }
+    catch (e) { return null }
+    var list = field ? (body && typeof body === "object" ? body[field] : undefined) : body
+    return Array.isArray(list) ? list : []
+}

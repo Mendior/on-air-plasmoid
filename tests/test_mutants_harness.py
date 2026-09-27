@@ -23,6 +23,7 @@ def _harness():
     spec = importlib.util.spec_from_file_location(
         "mutants", ROOT / "scripts" / "mutants.py"
     )
+    assert spec is not None and spec.loader is not None, "mutants.py is not loadable"
     mod = importlib.util.module_from_spec(spec)
     # dataclass introspection needs the module registered before exec.
     sys.modules["mutants"] = mod
@@ -135,3 +136,38 @@ def test_every_named_expectation_exists():
             assert decl in body, (
                 f"{m.name}: expect names {rel}::{fn}, which is not defined there"
             )
+
+
+def test_the_shards_cover_the_corpus_once_and_only_once():
+    """The nightly run is split across jobs. A mutant in no shard is a guard
+    nobody checks any more, and nothing would say so."""
+    mutants = _harness()
+    names = [p.name for p in sorted(MUTANTS_DIR.glob("*.mut"))]
+    for n in (1, 2, 3):
+        parts = [mutants.shard_of(names, "%d/%d" % (k, n)) for k in range(1, n + 1)]
+        flat = [x for part in parts for x in part]
+        assert sorted(flat) == names, "shards of %d lose or repeat a mutant" % n
+        assert max(len(p) for p in parts) - min(len(p) for p in parts) <= 1
+    assert mutants.shard_of(["a", "b", "c", "d", "e"], "2/2") == ["b", "d"]
+
+
+def test_a_shard_spec_that_makes_no_sense_is_refused():
+    import pytest
+
+    mutants = _harness()
+    for bad in ("0/2", "3/2", "2", "a/b", "1/0", "", "1/2/3", "-1/2"):
+        with pytest.raises(SystemExit):
+            mutants.shard_of(["a", "b"], bad)
+
+
+def test_a_shard_is_not_blamed_for_survivors_it_never_ran(capsys):
+    """The documented survivors live in one shard or the other. A shard that
+    did not run one of them must not announce it as newly covered."""
+    mutants = _harness()
+    expected = json.loads((mutants.REPO / "tests" / "mutants_baseline.json")
+                          .read_text(encoding="utf-8"))["expected_survivors"]
+    assert expected, "this test needs at least one documented survivor"
+    rc = mutants._baseline_verdict(set(), set(), ran={"some-other-mutant"})
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Good news" not in out

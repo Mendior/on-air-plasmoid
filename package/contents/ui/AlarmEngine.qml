@@ -80,6 +80,30 @@ Item {
         return true;
     }
 
+    // A station alarm carries its own copy of the address. When the heal road
+    // finds the station at a new one and saves it to the list, the alarm has
+    // to follow — or every morning starts at the dead address and has to win
+    // the whole heal ladder again before the fallback tone's 25 s are up.
+    // Contract: every alarm whose url IS oldUrl gets newUrl, podcast and tone
+    // alarms are left alone, true only when something was rewritten.
+    function retargetStation(oldUrl, newUrl) {
+        if (!oldUrl || !newUrl || oldUrl === newUrl) return false;
+        var list = [], changed = false;
+        for (var i = 0; i < alarms.length; i++) {
+            var a = alarms[i];
+            if ((a.url || "") === oldUrl) {
+                var b = {}; for (var k in a) b[k] = a[k];
+                b.url = newUrl; a = b; changed = true;
+            }
+            list.push(a);
+        }
+        if (changed) {
+            alarms = list;
+            _saveAlarms();
+        }
+        return changed;
+    }
+
     function _saveAlarms() {
         cfg.alarms = JSON.stringify(alarms);
     }

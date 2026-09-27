@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The sync engine undoes a park when a Bluetooth speaker leaves the group.
+
+history:
+  This is the exception that was taken out on 2026-09-21. A speaker powering
+  off says goodbye with an AVRCP pause, and with other speakers still in the
+  room that pause was treated as the speaker's: a park up to two minutes old
+  was resumed when the member left. It could not tell a speaker from a
+  person — a keyboard's media key arrives over MPRIS too — and on the desk a
+  pause sent over MPRIS was undone five seconds after the speaker's link
+  dropped. "Left the group" also fires when nothing left (a profile switch
+  recreated the node the same morning), so a pause and a hiccup a minute
+  later was enough. The engine measures and routes; it has no road to sound.
+  This number used to guard the origin mark that exception depended on.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+              _btJoinWatchArm(known, lastName);
+          }
+      }
+
+replace:
+              _btJoinWatchArm(known, lastName); if (app.timeshiftResume) app.timeshiftResume();
+          }
+      }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_pause_is_a_pause_whoever_leaves_the_room.
+  Line-neutral.

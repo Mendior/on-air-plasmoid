@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The second look at a shelved speaker leaves its stamp, so every later
+  check sweeps the deaf speaker again.
+
+history:
+  Seen 2026-09-20: a Bluetooth speaker shelved as deaf at 22:10 was healthy
+  at 22:14, and the shelf kept every corrector silent for the rest of the
+  evening. The shelf now allows one later look per Bluetooth speaker per
+  session. The bounds are the point: sweeping a deaf speaker on every check
+  is where the beeping under the radio came from, and a wired member's relay
+  clicks on every sweep.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+              sTried[sMac] = 2;
+
+replace:
+              sTried[sMac] = sAt;
+
+expect:
+  Killed by tst_syncengine::test_a_shelved_bluetooth_speaker_gets_one_more_look_and_only_one.
+  Line-neutral.

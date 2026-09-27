@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A country pinned while the chip rail is switched off fences every later search.
+
+history:
+  The country chip and the ✕ that releases it live on the discovery rail,
+  and Appearance can take the rail away. "jazz in uk" then pinned Britain
+  unseen and "raadio elmar" found nothing, with no way to see why. A hidden
+  rail hands the search no fence; this takes that sentence out.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      if (s.countryRole || s.railShown === false) return "";
+
+replace:
+      if (s.countryRole) return "";
+
+expect:
+  Killed by tst_searchlogic::test_a_hidden_rail_never_fences_a_later_search.
+  Line-neutral.

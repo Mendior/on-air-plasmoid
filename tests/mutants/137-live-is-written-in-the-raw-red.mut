@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  LIVE is written in the theme's raw red again.
+
+history:
+  The raw negative red on its own pill measured 3.03:1 on Breeze Light and
+  2.83:1 on Breeze Dark on the bench, where body text wants 4.5:1. The
+  letters come from ColorLogic.pillText now; this puts the raw red back.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                                  font.letterSpacing: 1.2
+                                  color: ColorLogic.pillText(Kirigami.Theme.negativeTextColor, Kirigami.Theme.backgroundColor)
+
+replace:
+                                  font.letterSpacing: 1.2
+                                  color: Kirigami.Theme.negativeTextColor
+
+expect:
+  Killed by tests/test_invariants.py::test_live_is_written_in_a_red_measured_against_its_own_pill.
+  Line-neutral.

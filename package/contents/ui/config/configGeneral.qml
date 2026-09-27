@@ -1,5 +1,8 @@
 import ".." as ARP
+import "../FaviconLogic.js" as FaviconLogic
+import "../HealLogic.js" as HealLogic
 import "../HostGuard.js" as HostGuard
+import "../ReorderLogic.js" as ReorderLogic
 import "../StreamLogic.js" as StreamLogic
 import Qt.labs.platform as Labs
 /*
@@ -21,7 +24,35 @@ import org.kde.plasma.plasmoid
 KCM.ScrollViewKCM {
     id: root
 
-    property string cfg_servers: plasmoid.configuration.servers
+    // The list as this page would save it. It is deliberately not a cfg_
+    // property: plasmoidviewer's settings dialog marks a page changed on
+    // every cfg_ change signal, whatever the value (the Plasma 6.7 desktop
+    // dialog compares the values first), so taking over a list the popup had
+    // just given logos lit Apply and asked "Apply Settings?" on the way out
+    // with nothing changed here. An edit says so with configurationChanged(),
+    // and saveConfig() does the writing, which both kinds of dialog call.
+    property string _servers: ""
+    signal configurationChanged()
+
+    // Every edit on this page ends here.
+    function _edited() {
+        const s = JSON.stringify(getServersArray());
+        if (s === _servers)
+            return;
+        _servers = s;
+        configurationChanged();
+    }
+
+    // A page with no edits writes nothing: what it shows is what the popup
+    // last wrote, and writing that back is at best nothing and at worst the
+    // older copy.
+    function saveConfig() {
+        if (_servers === _lastSynced || _servers === plasmoid.configuration.servers)
+            return;
+        plasmoid.configuration.servers = _servers;
+        _lastSynced = _servers;
+        plasmoid.configuration.writeConfig();
+    }
 
     property int dialogMode: -1
 
@@ -96,11 +127,7 @@ KCM.ScrollViewKCM {
     }
 
     function getServersArray() {
-        var serversArray = [];
-        for (var i = 0; i < stationsModel.count; i++) {
-            serversArray.push(stationsModel.get(i));
-        }
-        return serversArray;
+        return ReorderLogic.savedRows(stationsModel);
     }
 
     function addServer() {
@@ -225,7 +252,7 @@ KCM.ScrollViewKCM {
     function _fetchNextLogo() {
         if (_logoQueue.length === 0) {
             _logoFetching = false;
-            cfg_servers = JSON.stringify(getServersArray());
+            _edited();
             // An upgrade job that found nothing better KEPT its working
             // logo — counting it "could not be found" would report a
             // healthy station as a failure.
@@ -262,7 +289,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -270,12 +297,12 @@ KCM.ScrollViewKCM {
             _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
-            let fav = "";
-            let home = "";
-            let ok = false;
+            var fav = "";
+            var home = "";
+            var ok = false;
             if (xhr.status === 200) {
                 try {
-                    const row = (JSON.parse(xhr.responseText) || [])[0] || {};
+                    var row = (JSON.parse(xhr.responseText) || [])[0] || {};
                     ok = true;
                     fav = _extUrlOrEmpty(row.favicon);
                     home = _extUrlOrEmpty(row.homepage);
@@ -293,10 +320,10 @@ KCM.ScrollViewKCM {
             if (home !== "") {
                 _scrapeHomepageAndProbe(job, fav, home);
             } else {
-                const candidates = [fav];
-                for (const u of _hostnameStdCandidates(job.hostname))
+                var candidates = [fav];
+                for (var u of _hostnameStdCandidates(job.hostname))
                     if (candidates.indexOf(u) === -1) candidates.push(u);
-                for (const u of _googleFaviconCandidates(job.hostname))
+                for (var u of _googleFaviconCandidates(job.hostname))
                     if (candidates.indexOf(u) === -1) candidates.push(u);
                 _probeNextCandidate(job, candidates, 0);
             }
@@ -309,11 +336,11 @@ KCM.ScrollViewKCM {
         // search?name=... endpoint is robust against '/' and special chars (unlike byname/<path>)
         const url = "https://" + _apiServer + ".api.radio-browser.info/json/stations/search"
                   + "?name=" + encodeURIComponent(cleanName)
-                  + "&limit=20&hidebroken=true&order=votes&reverse=true";
+                  + "&limit=30&order=votes&reverse=true";
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -321,45 +348,34 @@ KCM.ScrollViewKCM {
             _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
-            let parseOk = false;
-            let pickedFavicon = "";
-            let pickedHomepage = "";
+            var parseOk = false;
+            var pickedFavicon = "";
+            var pickedHomepage = "";
             if (xhr.status === 200) {
-                const txt = xhr.responseText || "";
+                var txt = xhr.responseText || "";
                 if (txt.trim() !== "") {
                     try {
-                        const results = JSON.parse(txt) || [];
+                        var results = JSON.parse(txt) || [];
                         parseOk = true;
-                        const want = cleanName.toLowerCase();
-                        let exactFav = "";
-                        let exactHome = "";
-                        let firstWithIcon = "";
-                        let firstHome = "";
-                        for (const r of results) {
-                            const rn = (r.name || "").replace(/\s+/g, " ").trim().toLowerCase();
+                        // Whose logo, and whose homepage to look for one
+                        // on, is FaviconLogic.donorRows' call (tests/qml).
+                        // This loop used to settle for the first row with
+                        // any icon at all, exact name or not, and the first
+                        // homepage likewise. On the answer "Kiss FM" gave on
+                        // 2026-09-21 that is a Ukrainian logo for a Spanish
+                        // station.
+                        var donors = FaviconLogic.donorRows(results, HealLogic.normName(cleanName),
+                                                            HealLogic.normName, job.hostname, 30);
+                        for (var d = 0; d < donors.length; d++) {
                             // Catalogue data is untrusted: only plain web
-                            // URLs may become favicon sources or homepage
-                            // scrape targets (same rule the popup search
-                            // applies to stream URLs) — a file:// or data:
-                            // entry from the publicly writable directory
-                            // must never reach an Image or an XHR.
-                            const fav = _extUrlOrEmpty(r.favicon);
-                            const home = _extUrlOrEmpty(r.homepage);
-                            if (firstHome === "" && home !== "")
-                                firstHome = home;
-                            if (firstWithIcon === "" && fav !== "")
-                                firstWithIcon = fav;
-                            if (rn === want) {
-                                if (fav !== "" && exactFav === "")
-                                    exactFav = fav;
-                                if (home !== "" && exactHome === "")
-                                    exactHome = home;
-                            }
-                            if (exactFav !== "" && exactHome !== "")
-                                break;
+                            // URLs on public hosts may become a favicon
+                            // source or a homepage to scrape, never a
+                            // file:// or data: entry somebody typed in.
+                            if (pickedFavicon === "")
+                                pickedFavicon = _extUrlOrEmpty(donors[d].favicon);
+                            if (pickedHomepage === "")
+                                pickedHomepage = _extUrlOrEmpty(donors[d].homepage);
                         }
-                        pickedFavicon = exactFav !== "" ? exactFav : firstWithIcon;
-                        pickedHomepage = exactHome !== "" ? exactHome : firstHome;
                     } catch (e) {
                         parseOk = false;
                     }
@@ -381,13 +397,13 @@ KCM.ScrollViewKCM {
                 _scrapeHomepageAndProbe(job, pickedFavicon, pickedHomepage);
             } else {
                 // No homepage: build candidates from API favicon + hostname origin + Google fallback
-                const candidates = [];
+                var candidates = [];
                 if (pickedFavicon !== "")
                     candidates.push(pickedFavicon);
-                for (const u of _hostnameStdCandidates(job.hostname))
+                for (var u of _hostnameStdCandidates(job.hostname))
                     if (candidates.indexOf(u) === -1)
                         candidates.push(u);
-                for (const u of _googleFaviconCandidates(job.hostname))
+                for (var u of _googleFaviconCandidates(job.hostname))
                     if (candidates.indexOf(u) === -1)
                         candidates.push(u);
                 _probeNextCandidate(job, candidates, 0);
@@ -500,12 +516,12 @@ KCM.ScrollViewKCM {
         var guard = null;
         var keptPrefix = "";
         xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.39)");
+        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.40)");
         xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         _activeLogoXhr = xhr;
         const stdCandidates = () => {
-            const out = [];
-            const origin = _originOf(homepage);
+            var out = [];
+            var origin = _originOf(homepage);
             if (origin !== "") {
                 out.push(
                     origin + "/apple-touch-icon.png",
@@ -520,10 +536,10 @@ KCM.ScrollViewKCM {
             return out;
         };
         const fallback = () => {
-            const candidates = [];
+            var candidates = [];
             if (apiFavicon !== "")
                 candidates.push(apiFavicon);
-            for (const u of stdCandidates()) {
+            for (var u of stdCandidates()) {
                 if (candidates.indexOf(u) === -1)
                     candidates.push(u);
             }
@@ -553,33 +569,33 @@ KCM.ScrollViewKCM {
                 fallback();
                 return;
             }
-            const candidates = [];
+            var candidates = [];
             if (apiFavicon !== "")
                 candidates.push(apiFavicon);
             // IMPORTANT: many SPAs/React sites (e.g. pleier.ee uses react-helmet) return 404
             // for unknown paths but the response body still contains the full HTML with icon
             // <link> tags. So scrape whenever the body looks like HTML, regardless of status.
-            const body = xhr.responseText || keptPrefix;
-            const respLen = body.length;
-            const bodyLooksHtml = respLen > 200 && body.indexOf("<") !== -1;
+            var body = xhr.responseText || keptPrefix;
+            var respLen = body.length;
+            var bodyLooksHtml = respLen > 200 && body.indexOf("<") !== -1;
             if (bodyLooksHtml) {
-                const html = body.substring(0, 98304);
-                const finalUrl = xhr.responseURL || homepage;
-                const scraped = _extractIconLinks(html, finalUrl);
-                for (const u of scraped) {
+                var html = body.substring(0, 98304);
+                var finalUrl = xhr.responseURL || homepage;
+                var scraped = _extractIconLinks(html, finalUrl);
+                for (var u of scraped) {
                     if (candidates.indexOf(u) === -1)
                         candidates.push(u);
                 }
             }
-            for (const u of stdCandidates()) {
+            for (var u of stdCandidates()) {
                 if (candidates.indexOf(u) === -1)
                     candidates.push(u);
             }
             // Final fallbacks: hostname origin std paths + Google s2/favicons
-            for (const u of _hostnameStdCandidates(job.hostname))
+            for (var u of _hostnameStdCandidates(job.hostname))
                 if (candidates.indexOf(u) === -1)
                     candidates.push(u);
-            for (const u of _googleFaviconCandidates(job.hostname, homepage))
+            for (var u of _googleFaviconCandidates(job.hostname, homepage))
                 if (candidates.indexOf(u) === -1)
                     candidates.push(u);
             _probeNextCandidate(job, candidates, 0);
@@ -591,6 +607,11 @@ KCM.ScrollViewKCM {
     function _hostnameStdCandidates(hostname) {
         const origin = _originOf(hostname);
         if (origin === "")
+            return [];
+        // A landlord's own icon is nobody's logo: on a tenant's row zeno.fm's
+        // favicon is as wrong as a namesake's (the icon service answers for
+        // zeno.fm with a 746-byte image, measured 2026-09-21).
+        if (HealLogic.sharedBase(_baseDomain(_hostDomainOnly(hostname))))
             return [];
         return [
             origin + "/apple-touch-icon.png",
@@ -617,7 +638,7 @@ KCM.ScrollViewKCM {
         const seen = {};
         const out = [];
         const addDomain = (dom) => {
-            if (!dom || seen[dom])
+            if (!dom || seen[dom] || HealLogic.sharedBase(_baseDomain(dom)))
                 return;
             seen[dom] = true;
             out.push("https://www.google.com/s2/favicons?domain=" + encodeURIComponent(dom) + "&sz=128");
@@ -692,7 +713,7 @@ KCM.ScrollViewKCM {
         var guard = null;
         xhr.open("GET", url);
         xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             // A "logo" that streams past 512 KiB is not a logo — cap the
@@ -710,7 +731,7 @@ KCM.ScrollViewKCM {
             _clearXhrTimeout(guard);
             if (_activeLogoXhr === xhr)
                 _activeLogoXhr = null;
-            let ok = false;
+            var ok = false;
             // The candidate's host was judged before the request, but Qt
             // follows redirects inside the network layer — a station page
             // answering "302 → http://192.168.1.1/x.png" would otherwise
@@ -719,7 +740,7 @@ KCM.ScrollViewKCM {
             if (xhr.status >= 200 && xhr.status < 400 && xhr.response
                 && HostGuard.answerFromPublicHost(xhr)) {
                 try {
-                    const buf = new Uint8Array(xhr.response);
+                    var buf = new Uint8Array(xhr.response);
                     ok = _looksLikeImageBytes(buf);
                 } catch (e) {
                     ok = false;
@@ -767,34 +788,36 @@ KCM.ScrollViewKCM {
         stationsModel.clear();
         // Same guard as configSearch: a stored list that does not parse
         // leaves the page empty and alive, not dead on its first line.
+        _servers = plasmoid.configuration.servers;
         var servers = [];
-        try { servers = JSON.parse(cfg_servers) || []; }
+        try { servers = JSON.parse(_servers) || []; }
         catch (e) { console.warn("[ARP] settings: stored station list is not valid JSON —", e); }
         if (!Array.isArray(servers)) servers = [];
         for (const server of servers) {
             stationsModel.append(server);
         }
-        _lastSynced = cfg_servers;
+        _lastSynced = _servers;
     }
 
-    // The dialog's cfg_servers is a SNAPSHOT: without this, adding a station
-    // from the popup (⭐) while the settings window is open would be silently
+    // The page's list is a SNAPSHOT: without this, adding a station from the
+    // popup (⭐) while the settings window is open would be silently
     // overwritten by the next Apply.
     Connections {
         target: plasmoid.configuration
         function onServersChanged() {
             const external = plasmoid.configuration.servers;
-            if (external === root.cfg_servers) {
+            if (external === root._servers) {
                 root._lastSynced = external;
                 return;
             }
-            if (root.cfg_servers === root._lastSynced) {
-                // No unsaved edits on this page — take the external state over.
+            if (root._servers === root._lastSynced) {
+                // No unsaved edits on this page — take the external state
+                // over, quietly: nothing here changed, so nothing is announced.
                 try {
                     const servers = JSON.parse(external);
                     stationsModel.clear();
                     for (const server of servers) stationsModel.append(server);
-                    root.cfg_servers = external;
+                    root._servers = external;
                     root._lastSynced = external;
                 } catch (e) {}
             } else {
@@ -851,7 +874,8 @@ KCM.ScrollViewKCM {
                     for (const srv of ext) {
                         if (!have[srv.hostname]) { stationsModel.append(srv); changed = true; }
                     }
-                    if (changed) root.cfg_servers = JSON.stringify(getServersArray());
+                    // The page already has edits of its own and has said so.
+                    if (changed) root._servers = JSON.stringify(getServersArray());
                     // The base advances to the state just merged — otherwise
                     // an adopted row reads as a local edit next time and a
                     // later external deletion would resurrect it.
@@ -900,7 +924,7 @@ KCM.ScrollViewKCM {
                         checkable: true
                         onTriggered: {
                             listItem.model.active = checked;
-                            cfg_servers = JSON.stringify(getServersArray());
+                            _edited();
                         }
                     },
                     Kirigami.Action {
@@ -908,7 +932,7 @@ KCM.ScrollViewKCM {
                         text: i18n("Remove")
                         onTriggered: {
                             stationsModel.remove(listItem.index);
-                            cfg_servers = JSON.stringify(getServersArray());
+                            _edited();
                         }
                     }
                 ]
@@ -932,7 +956,7 @@ KCM.ScrollViewKCM {
                         listView: listItem.ListView.view
                         onMoveRequested: {
                             stationsModel.move(oldIndex, newIndex, 1);
-                            cfg_servers = JSON.stringify(getServersArray());
+                            _edited();
                         }
                     }
 
@@ -1076,9 +1100,17 @@ KCM.ScrollViewKCM {
                 itemObject.hostname = hostClean;
                 itemObject.favicon = faviconClean;
                 itemObject.active = serverActive.checked;
+                // A row pointed at another station must let go of the first
+                // one's directory uuid. It used to ride along, and the heal
+                // then asked byuuid where "this" station lives, was handed
+                // the OLD station's address and saved it over the edit for
+                // good; logos and votes went the same way.
+                if (existing.uuid && !HealLogic.editKeepsIdentity(existing.name, existing.hostname,
+                                                                   itemObject.name, itemObject.hostname))
+                    itemObject.uuid = "";
                 stationsModel.set(dialogMode, itemObject);
             }
-            cfg_servers = JSON.stringify(getServersArray());
+            _edited();
             // A station saved without a logo gets one looked up right away —
             // the same ladder as "Fetch missing logos", one row only. The
             // user is present (they just pressed OK), so the deep road
@@ -1141,7 +1173,7 @@ KCM.ScrollViewKCM {
         fileMode: Labs.FileDialog.OpenFile
         folder: Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation)
         onAccepted: {
-            fileUtils(currentFile, cfg_servers, 0);
+            fileUtils(currentFile, _servers, 0);
         }
     }
 
@@ -1167,7 +1199,7 @@ KCM.ScrollViewKCM {
                               + "/stations.arp";
             }
         }
-        onAccepted: fileUtils(currentFile, cfg_servers, 1)
+        onAccepted: fileUtils(currentFile, _servers, 1)
     }
 
     P5Support.DataSource {
@@ -1230,13 +1262,13 @@ KCM.ScrollViewKCM {
                             row.uuid = clip(srv.uuid);
                         stationsModel.append(row);
                     }
-                    cfg_servers = JSON.stringify(getServersArray());
+                    _edited();
                     showMessage(true, i18n("Configuration has been loaded. Click 'Apply' to save changes."));
                 } catch (e) {
                     showMessage(false, i18n("Error loading configuration. Try choosing a different file."));
                 }
             } else {
-                if (formattedText === cfg_servers)
+                if (formattedText === _servers)
                     showMessage(true, i18n("Your configuration was saved successfully."));
                 else
                     showMessage(false, i18n("Error, make sure the selected directory is writable!"));

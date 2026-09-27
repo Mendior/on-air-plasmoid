@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The order's deadline is computed so that no order is ever past it.
+
+history:
+  Issue #13, read against the code a third time on 2026-09-21. The knock
+  budget is counted on QML timers, and those stand still while the machine
+  sleeps: a station that goes quiet at eleven with the lid closed a minute
+  later still has knocks left at eight the next morning, and the network
+  coming back replays it — nine hours late, under the release whose notes
+  said nothing could put it back on. The relay road can leave the order
+  standing with no ladder at all. Both arrive through _replayOrder, which now
+  asks the wall clock before it plays.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+      return nowMs - sinceMs > budgetMs(c) * 2 + 300000;
+
+replace:
+      return nowMs - sinceMs < 0;
+
+expect:
+  Killed by tst_retrylogic::test_an_order_that_slept_through_the_night_is_over.
+  Line-neutral.

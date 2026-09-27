@@ -4,12 +4,15 @@
  *  SPDX-License-Identifier: LGPL-2.0-or-later
  */
 // Pure logic for station logos: the one http(s)-or-empty gate every road
-// that persists a favicon must pass, the directory-row favicon picker the
-// runtime backfill uses, and the monogram (initials + deterministic hue)
+// that persists a favicon must pass, the rule for whose logo a name search
+// may lend a saved station (the runtime backfill and the settings page both
+// ask it), and the monogram (initials + deterministic hue)
 // that stands in when no logo can be obtained at all. No QML types, no
 // I/O — everything here runs under qmltestrunner (tests/qml/).
 .pragma library
 .import "HostGuard.js" as HostGuard
+.import "StreamLogic.js" as StreamLogic
+.import "HealLogic.js" as HealLogic
 
 // The single gate between untrusted favicon strings (publicly writable
 // catalog rows, hand edits, .arp imports) and Image.source / the shell:
@@ -30,21 +33,80 @@ function webUrlOrEmpty(v) {
     return (host !== "" && !HostGuard.isPrivateHost(host)) ? s : "";
 }
 
-// First usable favicon from a radio-browser result array. With wantNorm
-// given, only rows whose normalized name is an EXACT match may donate —
-// the catalog is publicly writable, and a famous near-namesake must not
-// put its logo on the user's station. normFn is HealLogic.normName,
-// passed in so this library stays dependency-free.
-function pickFavicon(rows, wantNorm, normFn) {
-    if (!rows || !rows.length) return "";
+// Two spellings of one address: the scheme, a trailing slash and letter
+// case are noise. The edit dialog's identity question and the bitrate
+// upgrade fold a saved address the same way.
+function _addrKey(u) {
+    return (u === undefined || u === null ? "" : String(u)).trim()
+           .replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
+}
+
+// The rows of a name search that may speak for a saved station: lend it a
+// logo, or a homepage to look for one on. Best first.
+// A name is not an identity, and what is taken here is SAVED to the list.
+// "Rock FM" answered with four exact-name rows in its ten most voted, from
+// three countries (RU 58 976 votes, ES, EE, ES; measured 2026-09-21), and
+// the first of them put the Russian station's logo on a Spanish listener's
+// row for good. "Radio Nova" had five from four countries.
+//   rows      the directory's answer, votes order, publicly writable
+//   wantNorm  the saved name through normFn (HealLogic.normName)
+//   savedUrl  the saved stream address, "" when there is none to compare
+//   asked     the limit the question carried; 0 or nothing when unknown
+// Three roads, in this order:
+//   1. the station's own record: a row whose address IS the saved one. Its
+//      name may differ, the listener can have renamed the station;
+//   2. the exact name under the saved address's own base domain, unless
+//      that domain is a landlord (HealLogic.sharedBase);
+//   3. the exact name alone, and only while the name means one station in
+//      this answer: a single row, or every row on one non-shared base
+//      domain, or every row in one country. Rows WITHOUT a logo vote too:
+//      "Kiss FM" had two Spanish rows with none and a Ukrainian row with
+//      one, and counting logos alone would have called that unanimous. The
+//      own record votes even under another name, and a row without a
+//      country agrees with nobody.
+// A full page closes the third road. The ten most voted "Kiss FM" rows held
+// one exact name, the thirty most voted held four from three countries, so
+// one row on a full page says nothing about how many there are.
+// Anything else is no donor at all, and the row keeps its initials.
+function donorRows(rows, wantNorm, normFn, savedUrl, asked) {
+    var out = [];
+    if (!rows || !rows.length || !wantNorm || !normFn) return out;
+    var want = _addrKey(savedUrl);
+    var home = StreamLogic.baseDomain(StreamLogic.hostOf(want === "" ? "" : String(savedUrl).trim()));
+    if (HealLogic.sharedBase(home)) home = "";
+    var own = [], roof = [], named = [], votes = [];
     for (var i = 0; i < rows.length; i++) {
-        var r = rows[i] || {};
-        var fav = webUrlOrEmpty(r.favicon);
-        if (fav === "") continue;
-        if (wantNorm) {
-            if (!normFn || normFn((r.name || "").toString()) !== wantNorm) continue;
-        }
-        return fav;
+        var r = rows[i];
+        if (!r) continue;
+        var mine = want !== "" && (_addrKey(r.url) === want || _addrKey(r.url_resolved) === want);
+        if (!mine && normFn((r.name || "").toString()) !== wantNorm) continue;
+        var base = StreamLogic.baseDomain(StreamLogic.hostOf((r.url_resolved || r.url || "").toString()));
+        var cc = (r.countrycode || "").toString().toUpperCase();
+        votes.push({ base: HealLogic.sharedBase(base) ? "" : base,
+                     cc: /^[A-Z]{2}$/.test(cc) ? cc : "" });
+        if (mine) own.push(r);
+        else if (home !== "" && base === home) roof.push(r);
+        else named.push(r);
+    }
+    out = own.concat(roof);
+    if (asked > 0 && rows.length >= asked) return out;
+    var oneBase = true, oneCc = true;
+    for (var v = 0; v < votes.length; v++) {
+        if (votes[v].base === "" || votes[v].base !== votes[0].base) oneBase = false;
+        if (votes[v].cc === "" || votes[v].cc !== votes[0].cc) oneCc = false;
+    }
+    return (votes.length === 1 || oneBase || oneCc) ? out.concat(named) : out;
+}
+
+// First usable favicon for a saved station from a radio-browser answer.
+// With wantNorm given only donorRows may donate; without it (no caller in
+// the widget asks that way) the first gated favicon of any row.
+function pickFavicon(rows, wantNorm, normFn, savedUrl, asked) {
+    if (!rows || !rows.length) return "";
+    var from = wantNorm ? donorRows(rows, wantNorm, normFn, savedUrl, asked) : rows;
+    for (var i = 0; i < from.length; i++) {
+        var fav = webUrlOrEmpty((from[i] || {}).favicon);
+        if (fav !== "") return fav;
     }
     return "";
 }

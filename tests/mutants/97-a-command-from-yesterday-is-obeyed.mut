@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A command left in the file by a crashed session is obeyed on the next start.
+
+history:
+  The command file outlives the session that wrote it, and the widget's only
+  guard was "a number I have not seen" — after a restart it has seen none.
+  A stop from yesterday then counted as new. The number is a moment, and an
+  old moment is refused whatever it says.
+
+target:
+  package/contents/ui/MprisCommandGate.qml
+
+find:
+              if (isNaN(seq) || seq <= lastSeq || nowMs - seq > 10000) continue;
+
+replace:
+              if (isNaN(seq) || seq <= lastSeq) continue;
+
+expect:
+  Killed by test_invariants::test_a_command_older_than_ten_seconds_is_never_obeyed
+  and by tests/qml/tst_mpriscommandgate.qml::test_a_line_older_than_ten_seconds_is_never_obeyed.
+  Line-neutral.

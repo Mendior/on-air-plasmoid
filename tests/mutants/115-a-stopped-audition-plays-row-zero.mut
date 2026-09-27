@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A Play after a stopped search result puts the first station of the list on.
+
+history:
+  Seen on the bench on 2026-09-23: Radio Swiss Jazz auditioned and stopped,
+  then the Playing tab's Play started MANGORADIO, and Space did the same. An
+  audition leaves lastPlay at -1 and every bare Play fell back to row 0.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      if (hasAudition === true) return { "what": "audition", "index": -1 };
+
+replace:
+      if (false) return { "what": "audition", "index": -1 };
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_stopped_audition_is_what_play_brings_back.
+  Line-neutral.

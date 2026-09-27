@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A quiet station waiting for its next knock offers nothing to stop.
+
+history:
+  The footer says Reconnecting and the big button has flipped to Play, so
+  without this term there is no way to call off the ladder — the half of
+  issue #13 the knock budget never covered.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      var held = audible || (wantsPlaying === true) || (tsPaused === true) || (tsShifted === true);
+
+replace:
+      var held = audible || (false) || (tsPaused === true) || (tsShifted === true);
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_the_wait_between_two_knocks_offers_a_stop.
+  Line-neutral.

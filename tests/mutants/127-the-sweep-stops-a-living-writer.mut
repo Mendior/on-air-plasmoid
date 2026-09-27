@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The startup sweep stops every writer it finds, living widget or not.
+
+history:
+  The sweep runs beside the session's first arm, and a writer whose shell
+  still sits under the host that started it belongs to a widget that is
+  alive: this session's own station, or a second widget sharing the
+  directory. Stopping it cuts live radio at the next start.
+
+target:
+  package/contents/ui/tsguard.sh
+
+find:
+              if still_home "$sh" "$host"; then
+
+replace:
+              if false; then
+
+expect:
+  Killed by tests/test_tsguard.py::test_the_sweep_leaves_a_living_writer_alone.
+  Line-neutral.

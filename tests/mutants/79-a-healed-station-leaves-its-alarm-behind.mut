@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station's saved new address never reaches the alarm set on it.
+
+history:
+  The heal road saved a moved station's new address to the list while the
+  alarm on that station kept its own copy of the dead one: every morning
+  started at the dead address and had to win the whole heal ladder again
+  inside the fallback tone's 25 seconds. Found by reading the heal road
+  end to end on 2026-09-21; this takes the call away again.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          alarmEngine.retargetStation(oldUrl, newUrl);
+
+replace:
+          void 0;
+
+expect:
+  Killed by test_invariants::test_a_saved_new_address_reaches_the_alarm_and_the_scheduled_recording.
+  Line-neutral.

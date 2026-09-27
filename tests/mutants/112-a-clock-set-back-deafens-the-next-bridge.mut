@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The mark survives a bridge restart even when it is ahead of the clock, so
+  after the clock is set back every media key is dropped until it catches up.
+
+history:
+  The mark is kept across a restart so an obeyed key is never obeyed again,
+  and a fresh daemon's first number is the clock. When the clock has gone
+  back in between (a dual-boot machine whose clock is corrected after login
+  goes back by the whole timezone), every new number sits below the mark and
+  the keys stay dead for as long as the clock went back, hours in that case.
+  That is the silent drop ef3be71 was written to end.
+
+target:
+  package/contents/ui/MprisCommandGate.qml
+
+find:
+          if (lastSeq > nowMs)
+
+replace:
+          if (false)
+
+expect:
+  Killed by tests/qml/tst_mpriscommandgate.qml::test_a_clock_set_back_cannot_deafen_the_next_bridge.
+  Line-neutral.

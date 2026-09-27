@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install gettext, pytest and ruff
+      - name: Install gettext, pytest, ruff and pyright
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gettext python3-pytest
@@ -39,7 +39,7 @@ jobs:
           # first, triage whatever it finds, then raise the number here.
           # This is the only job that checks Python; the Arch job below says
           # out loud that it did not.
-          python3 -m pip install --break-system-packages --user ruff==0.16.2
+          python3 -m pip install --break-system-packages --user ruff==0.16.2 pyright==1.1.412
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Lint without QML
         # LINT_PYTEST_MARK='' clears lint's local 'not slow' filter: the

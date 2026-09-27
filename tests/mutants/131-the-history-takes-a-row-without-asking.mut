@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The history takes every title without asking the rules, slogans and the
+  station's own name included.
+
+history:
+  Before the rules moved into TrackLogic the history compared a new title
+  with the newest row and nothing else. Dance Wave! takes turns between two
+  slogans, so on 2026-09-23 all thirty rows were slogans seven minutes in.
+  main.qml cannot be unit-tested; the invariant pins that it asks.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (!TrackLogic.historyTakes(historyModel, artist, trackName, station)) return;
+
+replace:
+          if (!trackName) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_history_asks_the_tested_rules_before_it_takes_a_row.
+  Line-neutral.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Moving a station rewrites every alarm whose address merely contains the old one.
+
+history:
+  A podcast alarm names its show as "podcast:" plus the feed address, and
+  has its own retarget. A station move that matches by substring would turn
+  such an alarm into a plain stream alarm on an address that is no feed.
+
+target:
+  package/contents/ui/AlarmEngine.qml
+
+find:
+              if ((a.url || "") === oldUrl) {
+
+replace:
+              if ((a.url || "").indexOf(oldUrl) !== -1) {
+
+expect:
+  Killed by tst_alarmengine::test_a_healed_station_moves_its_alarms.
+  Line-neutral.

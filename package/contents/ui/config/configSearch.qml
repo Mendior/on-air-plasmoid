@@ -16,6 +16,7 @@ import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
 import ".." as ARP
 import "../FaviconLogic.js" as FaviconLogic
+import "../ReorderLogic.js" as ReorderLogic
 import "../SearchLogic.js" as SearchLogic
 
 KCM.ScrollViewKCM {
@@ -28,9 +29,35 @@ KCM.ScrollViewKCM {
     // retries on it. discoverServers MERGES into this, never replaces.
     property var items: ["de2", "de1", "all"]
     property string server: "de1"
-    property string cfg_servers: plasmoid.configuration.servers
+    // The list as this page would save it, and not a cfg_ property for the
+    // reason configGeneral gives: a dialog that marks a page changed on every
+    // cfg_ change signal (plasmoidviewer's does) read a list taken over from
+    // the popup as an edit. An added station says so with
+    // configurationChanged(); saveConfig() writes it.
+    property string _servers: ""
+    signal configurationChanged()
+    function _edited() {
+        const s = JSON.stringify(getServersArray())
+        if (s === _servers)
+            return
+        _servers = s
+        configurationChanged()
+    }
+    function saveConfig() {
+        if (_servers === _lastSynced || _servers === plasmoid.configuration.servers)
+            return
+        plasmoid.configuration.servers = _servers
+        _lastSynced = _servers
+        plasmoid.configuration.writeConfig()
+    }
 
-    property int limit: 500
+    // One page of the list. The scroll trigger asks for the next one two
+    // screens before the end, so a page has to be taller than any window.
+    property int limit: 100
+    // Rows already on screen, by uuid. A list ordered by votes moves while it
+    // is paged: one vote between two requests carries a row over the page edge
+    // and the next page would open with a station already listed.
+    property var _seen: ({})
     property int offset: 0
     property string currentUrl
     property int stat: 1
@@ -55,7 +82,11 @@ KCM.ScrollViewKCM {
     }
 
     function _appendRow(srv) {
-        srv.name = (srv.name || "").replace(/\n/g, ' ').trim()
+        if (!srv || !SearchLogic.firstSight(_seen, srv.stationuuid))
+            return
+        // Tabs, line breaks and runs of spaces fold to one line and the
+        // length is capped: this is the name the station list will keep.
+        srv.name = SearchLogic.rowName(srv.name)
         // The logo goes through the shared gate, which judges the HOST as
         // well as the scheme: an Image.source fetches by itself, with no
         // click, so a crafted catalogue row pointed one at the user's own
@@ -126,7 +157,7 @@ KCM.ScrollViewKCM {
             if (xhr.readyState !== xhr.DONE)
                 return
             _clearXhrTimeout(guard)
-            const finish = () => {
+            var finish = () => {
                 if (items.length === 0)
                     items = ["de2", "de1", "all"]
                 getServer()
@@ -148,13 +179,16 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40")
     }
 
     function getStations(by, val) {
         isNoSearch = !(typeof by !== "undefined" && by !== null)
         offset = 0
         _retryCount = 0
+        // The last list's page retry must not land in this one.
+        pageRetryTimer.stop()
+        _pageFailures = 0
         _doGetStations(by, val)
     }
 
@@ -182,9 +216,12 @@ KCM.ScrollViewKCM {
             try { oldLm.abort() } catch(e) {}
         }
 
-        const cleanVal = (val || "").toString().trim()
-        const byVal = isNoSearch ? "" : `/${by}/${encodeURIComponent(cleanVal)}`
-        const url = `https://${server}.api.radio-browser.info/json/stations${byVal}?hidebroken=true&limit=${limit}&offset=${offset}`
+        // Order and page size are SearchLogic's to say, for this request and
+        // for loadMore alike: by votes, most first. Unordered, the directory
+        // answers by raw name and the list opened on names that start with a
+        // tab or a space, the stations people know hundreds of rows down.
+        const base = SearchLogic.directoryBase(server, isNoSearch ? null : by, val)
+        const url = SearchLogic.directoryPage(base, limit, offset)
 
         const xhr = new XMLHttpRequest
         var guard = null
@@ -206,8 +243,9 @@ KCM.ScrollViewKCM {
                     var servers = JSON.parse(xhr.responseText)
                     // Reset the retry counter only AFTER a successful parse.
                     _retryCount = 0
-                    currentUrl = url.split("?")[0]
+                    currentUrl = base
                     searchModel.clear()
+                    _seen = ({})
                     for (var i = 0; i < servers.length; i++)
                         _appendRow(servers[i])
                     busy.running = false
@@ -260,12 +298,11 @@ KCM.ScrollViewKCM {
         }
         const xhr = new XMLHttpRequest
         var guard = null
-        const baseUrl = currentUrl.split("?")[0]
         // The cursor advances only on a successfully parsed page — the old
         // scroll-time increment skipped a failed page forever: one timeout
         // and rows 500-999 simply never existed for that session.
         const nextOffset = offset + limit
-        const url = `${baseUrl}?hidebroken=true&limit=${limit}&offset=${nextOffset}`
+        const url = SearchLogic.directoryPage(currentUrl, limit, nextOffset)
         xhr.open("GET", url)
         setHeaders(xhr)
         _activeLoadMoreXhr = xhr
@@ -278,27 +315,45 @@ KCM.ScrollViewKCM {
             _activeLoadMoreXhr = null
             if (xhr.status === 200) {
                 try {
-                    const servers = JSON.parse(xhr.responseText)
-                    // Update currentUrl and the cursor only after a
-                    // successful parse.
-                    currentUrl = url
+                    var servers = JSON.parse(xhr.responseText)
+                    // The cursor moves only after a successful parse.
                     offset = nextOffset
+                    _pageFailures = 0
                     if (servers.length > 0) {
-                        for (const srv of servers)
+                        for (var srv of servers)
                             _appendRow(srv)
                         stat = 1
                     }
                 } catch (e) {
-                    // Restore stat so the scroll trigger can try again.
-                    stat = 1
+                    _pageFailed()
                 }
             } else {
-                // Failed/timed-out page load — let scrolling retry it.
-                stat = 1
+                _pageFailed()
             }
         }
         guard = _armXhrTimeout(xhr, _httpTimeout)
         xhr.send()
+    }
+
+    // A later page that failed (no answer, a timeout, an error page) is asked
+    // again by itself, at the next mirror. Scrolling was its only trigger,
+    // and a list that already sits at its end does not scroll.
+    property int _pageFailures: 0
+    Timer {
+        id: pageRetryTimer
+        repeat: false
+        onTriggered: if (root.stat === 1) root.loadMore()
+    }
+    function _pageFailed() {
+        stat = 1
+        _pageFailures++
+        const wait = SearchLogic.pageRetryDelay(_pageFailures)
+        if (wait < 0)
+            return
+        getServer()
+        currentUrl = SearchLogic.rehost(currentUrl, server)
+        pageRetryTimer.interval = wait
+        pageRetryTimer.restart()
     }
 
     // Snapshot of the last state synced with plasmoid.configuration.servers —
@@ -311,8 +366,9 @@ KCM.ScrollViewKCM {
         // A stored list that does not parse must not abort the page's own
         // setup below it: the discovery walk and the counters still run, and
         // the list reads as empty rather than the page as dead.
+        _servers = plasmoid.configuration.servers
         var servers = []
-        try { servers = JSON.parse(cfg_servers) || [] }
+        try { servers = JSON.parse(_servers) || [] }
         catch (e) { console.warn("[ARP] settings: stored station list is not valid JSON —", e) }
         if (!Array.isArray(servers)) servers = []
         for (const srv of servers) {
@@ -324,7 +380,7 @@ KCM.ScrollViewKCM {
             if (srv.uuid === undefined) srv.uuid = ""
             stationsModel.append(srv)
         }
-        _lastSynced = cfg_servers
+        _lastSynced = _servers
         stat = 0
         discoverServers()
     }
@@ -336,16 +392,17 @@ KCM.ScrollViewKCM {
         target: plasmoid.configuration
         function onServersChanged() {
             const external = plasmoid.configuration.servers
-            if (external === root.cfg_servers) {
+            if (external === root._servers) {
                 root._lastSynced = external
                 return
             }
-            if (root.cfg_servers === root._lastSynced) {
+            if (root._servers === root._lastSynced) {
+                // Nothing edited here: take it over without announcing it.
                 try {
                     const servers = JSON.parse(external)
                     stationsModel.clear()
                     for (const srv of servers) stationsModel.append(srv)
-                    root.cfg_servers = external
+                    root._servers = external
                     root._lastSynced = external
                 } catch (e) {}
             } else {
@@ -413,7 +470,7 @@ KCM.ScrollViewKCM {
                     for (const srv of ext) {
                         if (!have[srv.hostname]) { stationsModel.append(srv); changed = true }
                     }
-                    if (changed) root.cfg_servers = JSON.stringify(getServersArray())
+                    if (changed) root._servers = JSON.stringify(getServersArray())
                     // The base advances to the state just merged — otherwise
                     // an adopted row reads as a local edit next time and a
                     // later external deletion would resurrect it.
@@ -637,7 +694,7 @@ KCM.ScrollViewKCM {
                                     "uuid": src.stationuuid || "",
                                     "active": true
                                 })
-                                cfg_servers = JSON.stringify(getServersArray())
+                                _edited()
                             }
                             if (!message.visible) {
                                 message.positive = true
@@ -991,10 +1048,6 @@ KCM.ScrollViewKCM {
     }
 
     function getServersArray() {
-        const serversArray = []
-        for (var i = 0; i < stationsModel.count; i++) {
-            serversArray.push(stationsModel.get(i))
-        }
-        return serversArray
+        return ReorderLogic.savedRows(stationsModel)
     }
 }

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  "80" stops being the eighties; only "80s" and its spellings are.
+
+history:
+  The listener's own example was "rock 80 uk". The suffix is optional on
+  purpose, and the fragment asked of the directory is the bare number: its
+  tag filter is a substring match, so "80" reaches "80s", "80's", "1980s"
+  and "80er" in one question.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      var m = w.match(/^(?:19)?([5-9])0(?:s|'s|er|ies)?$/);
+
+replace:
+      var m = w.match(/^(?:19)?([5-9])0(?:s|'s|er|ies)$/);
+
+expect:
+  Killed by tst_searchlogic::test_a_decade_is_one_tag_however_it_is_spelled.
+  Line-neutral.

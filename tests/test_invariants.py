@@ -819,6 +819,28 @@ def test_every_tab_switch_is_watched_and_the_guard_runs_at_startup():
         "can still be the page the popup opens on")
 
 
+def test_the_buffer_sweep_runs_before_anything_else_the_start_does():
+    """The start clears what a host that died without a teardown left behind.
+
+    Measured on the bench 2026-09-23: the viewer was killed while a FLAC
+    preview played through the relay, and the writer chain (sh, timeout,
+    curl, ffmpeg -t 3600) lived on under systemd --user at ~128 KiB/s. The
+    next start never looked. The sweep's age line is the moment it is called,
+    so it has to come before anything that can arm: a url file written first
+    is older than the line and would be swept out from under its own writer,
+    which then dies at birth and bans the station from the relay for ten
+    minutes.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    at = src.index("Component.onCompleted")
+    started = _code_only(src[at:at + 2000])
+    assert "timeshift.startup(Date.now())" in started, (
+        "the start never sweeps the buffer directory, so a crashed session's "
+        "writer and its hour of buffer stay behind")
+    assert started.index("timeshift.startup(") < started.index("_ensureViewVisible()"), (
+        "the buffer sweep is no longer the first thing the start does")
+
+
 def test_starring_a_web_result_holds_its_references_before_it_removes_the_row():
     """A delegate cannot reach its own scope after it has been destroyed.
 
@@ -851,6 +873,135 @@ def test_starring_a_web_result_holds_its_references_before_it_removes_the_row():
             and "= webResultsModel" in before), (
         "starThisRow no longer captures its references before the removal; "
         "the next edit that needs one of them will reintroduce the throw")
+
+
+def test_the_bitrate_fallback_does_not_play_over_a_park():
+    """Every other recovery road asks whether the listener still wants sound.
+    This one did not: a park stops the timer, but it leaves the player's
+    source in place, so an error delivered after the park arms it again and
+    600 ms later it plays. The guard sits where the sound would start.
+    """
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    start = code.index("id: bitrateFallbackTimer")
+    fire = code[start:code.index("playMusic.play()", start)]
+    assert "_tsPaused" in fire, (
+        "bitrateFallbackTimer plays without asking whether the room is parked")
+
+
+def test_unticking_timeshift_does_not_wake_a_listener_who_said_quiet():
+    """Turning the feature off mid-session sends whoever is behind live back
+    to the broadcast before the buffer goes. It did that for a PARKED station
+    too, and for one paused inside the buffer: tsPlayLive raises the standing
+    order and starts the stream, so a checkbox in the settings put the radio
+    back on over a pause. Whoever said quiet gets a stop instead.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "onTimeshiftEnabledChanged"))
+    live = body.index("tsPlayLive(")
+    line = body[body.rfind("\n", 0, live) + 1:body.index("\n", live)]
+    assert "_tsPaused" not in line, (
+        "a parked station is sent back to live by the checkbox (%r)" % line.strip())
+    before = body[:live]
+    assert "_tsPaused" in before and "!isPlaying()" in before and "stopWithFade()" in before, (
+        "nothing stands between a paused listener and tsPlayLive in the "
+        "settings handler: the park and the paused buffer must end in a stop")
+
+
+def test_a_standing_order_cannot_outlive_a_night_asleep():
+    """The knock budget is counted on QML timers, which stand still while the
+    machine sleeps, so an order with knocks left survives the night and the
+    network coming back in the morning replays it: a radio that starts on its
+    own nine hours after it went quiet, which is issue #13 by another road.
+    The relay road can also leave the order standing with no ladder under it.
+
+    Both come through one door. _replayOrder asks the wall clock before it
+    plays anything, the ladder stamps the moment the station went quiet, and
+    sound arriving clears the stamp.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+
+    replay = _code_only(_function_body(src, "_replayOrder"))
+    assert "RetryLogic.orderExpired(" in replay, (
+        "_replayOrder plays without asking whether the order is still good")
+    asked = replay.index("RetryLogic.orderExpired(")
+    assert asked < replay.index("refreshServer("), (
+        "_replayOrder asks the deadline after it has already replayed")
+    line = replay[asked:replay.index("\n", asked)]
+    assert "_orderSpent()" in line, (
+        "an expired order is refused without being ended (%r); left standing "
+        "it is replayed at the next flicker of the network" % line)
+    assert "_alarmStandingOrder" in line, (
+        "the deadline does not hand an alarm through: a wake-up must ring")
+
+    arm = _code_only(_function_body(src, "_healArmRetry"))
+    assert "_orderQuietSince = Date.now()" in arm, (
+        "the ladder no longer stamps the moment the station went quiet")
+    assert arm.index("_orderQuietSince = Date.now()") < arm.index("_healRetryAttempts++"), (
+        "the stamp is taken after the count moved, so a second death keeps the first one's time")
+
+    spent = _code_only(_function_body(src, "_orderSpent"))
+    assert "_orderQuietSince = 0" in spent, "a spent order keeps its stamp"
+
+    code = _code_only(src)
+    buffered = code.index("root._healRetryAttempts = 0;\n                healRetryTimer.stop();")
+    assert "_orderQuietSince = 0" in code[buffered:buffered + 200], (
+        "sound arriving does not clear the stamp: the next outage would be "
+        "judged by the age of the last one")
+
+
+def test_the_deadline_counts_from_when_the_order_was_last_heard():
+    """A playing station carries no quiet stamp, so the deadline needs another
+    moment to subtract. Measured on 2026-09-27: _replayOrder stamped Date.now()
+    when the stamp was missing, which nothing is ever older than, so the guard
+    added for the nine-hour report passed every time the radio was playing when
+    the lid closed."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    replay = _code_only(_function_body(src, "_replayOrder"))
+    assert "RetryLogic.orderSince(" in replay, (
+        "_replayOrder no longer dates the order before judging it")
+    assert replay.index("RetryLogic.orderSince(") < replay.index("RetryLogic.orderExpired("), (
+        "the order is judged before it is dated")
+    assert "Date.now()" not in replay[:replay.index("RetryLogic.orderSince(")], (
+        "something takes the clock before the order is dated — the stamp that "
+        "made the deadline pass was exactly such a line")
+
+    code = _code_only(src)
+    buffered = code.index("root._healRetryAttempts = 0;\n                healRetryTimer.stop();")
+    assert "_orderHeardAt = Date.now()" in code[buffered:buffered + 260], (
+        "sound arriving does not date the order, so a night asleep cannot be "
+        "told from a moment ago")
+
+    beat = code[code.index("id: orderHeartbeat"):]
+    beat = beat[:beat.index("}")]
+    assert "_wantsPlaying" in beat and "isPlaying()" in beat, (
+        "the heartbeat runs without an order or without sound, so it would go "
+        "on dating an order nothing is serving")
+    assert "_orderHeardAt = Date.now()" in beat, "the heartbeat writes no moment"
+
+    for fn in ("_orderSpent", "stopWithFade"):
+        body = _code_only(_function_body(src, fn))
+        assert "_orderHeardAt = 0" in body, (
+            "%s leaves the last-heard moment behind; the next order would "
+            "inherit it and could be judged already expired" % fn)
+
+
+def test_the_player_offers_a_stop_a_listener_can_reach():
+    """The big button is a Pause on any station with a buffer behind it and a
+    Play between two knocks, so on 2026-09-27 there was no control on the
+    Playing tab that meant off — while a pause keeps the connection and the
+    capture running."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    code = _code_only(src)
+    assert "TransportLogic.stopOffered(" in code, (
+        "the Playing tab no longer asks whether a stop should be offered")
+    at = code.index("TransportLogic.stopOffered(")
+    window = code[max(0, at - 400):at + 400]
+    assert "media-playback-stop" in window, "the control that asks is not a stop"
+    assert "stopWithFade()" in window, (
+        "the stop offered does not call stopWithFade, the one road that ends "
+        "the standing order, the ladder's timer and the network resume")
+    assert "visible:" in code[max(0, at - 60):at], (
+        "stopOffered no longer decides whether the control is there")
 
 
 def test_a_spent_budget_takes_the_standing_order_down_with_it():
@@ -918,6 +1069,37 @@ def test_the_off_the_air_message_says_what_will_actually_happen():
     assert src.count('i18n("Station seems to be off the air")') == 1, (
         "the off-the-air toast fires from more than one place; an outage "
         "would nag once per rung of the ladder")
+
+
+def test_a_stop_still_silences_everything_it_used_to():
+    """The parity below measures a park AGAINST a stop, so a line taken out of
+    the stop shrinks the yardstick and both stay green — and the stop is the
+    road most people take. This is the floor under it: every clock and every
+    in-flight generation a stop ended on 2026-09-21, read from the code with
+    its comments stripped, because a comment that mentions a timer satisfied
+    a grep here once already.
+
+    Each of these was its own road back to sound in issue #13: the retry
+    ladder, the directory lookup, the network's return, the stall restart,
+    the relay rescue, the 600 ms bitrate fallback, and the replies still in
+    the air when the listener pressed the button.
+    """
+    body = _code_only(_function_body((UI / "main.qml").read_text(encoding="utf-8"),
+                                     "stopWithFade"))
+    silenced = (set(re.findall(r"(\w+)\.stop\(\)", body))
+                | set(re.findall(r"(_\w+Seq)\+\+", body)))
+    floor = {"infoTimer", "connectWatchdog", "stallTimer", "relayRescue",
+             "healTimer", "healRetryTimer", "netResumeTimer",
+             "bitrateFallbackTimer", "_healSeq", "_previewSeq", "_resolveCallSeq"}
+    gone = sorted(floor - silenced)
+    assert not gone, (
+        "a stop no longer ends %s — it keeps running after the listener "
+        "pressed Stop, and each of these has started the radio again before"
+        % ", ".join(gone))
+    for order in ("_wantsPlaying = false", "_orphanOrder = null",
+                  "_healRetryAttempts = 0", "timeshift.disarm()"):
+        assert order in body, (
+            "a stop no longer does %s: the standing order outlives the stop" % order)
 
 
 def test_a_park_inherits_the_stops_teardown():
@@ -1208,6 +1390,25 @@ def test_the_two_new_appearance_switches_reach_the_widget():
         "ask was the row's whole editing furniture, or none of it")
 
 
+def test_the_folder_hint_names_the_folder_the_downloads_go_to():
+    """The empty "Save to folder" field said ~/Music/OnAir in grey, typed into
+    the page by hand, while the downloads went to the desktop's own music
+    folder: Musiikki on a Finnish desktop, Musik on a German one. The hint and
+    the download road ask PathLogic.defaultDir (tst_pathlogic holds what it
+    answers); this keeps either of them from going back to its own guess."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    page = _code_only((UI / "config" / "configAppearance.qml").read_text(encoding="utf-8"))
+    dl = main[main.index("readonly property string downloadDirPath"):]
+    dl = dl[: dl.index("\n    }")]
+    assert "return PathLogic.defaultDir(" in dl, "the download folder stopped asking PathLogic"
+    assert '"/OnAir"' not in dl, "the download road builds its folder by hand again"
+    at = page.index("id: dirField")
+    field = page[at: page.index("Layout.fillWidth", at)]
+    assert "PathLogic.shownDir(PathLogic.defaultDir(" in field, (
+        "the folder hint is written by hand again")
+    assert "~/Music" not in field
+
+
 def test_an_alarm_cannot_veto_the_speaker_check_forever():
     """The wake-up window, not the volume override, is the question.
 
@@ -1297,7 +1498,7 @@ def test_the_colour_choice_stays_a_measured_set():
         "the old followSystemAccent boolean no longer migrates — every "
         "listener who had the system accent would snap back to green")
     # Plain mode must reach the theme, not a hard-coded grey.
-    for prop in ("accent:", "accentBright:", "accentTeal:", "accentText:"):
+    for prop in ("accent:", "accentBright:", "accentTeal:", "accentText:", "accentBrightText:"):
         i = src.index("property color " + prop)
         window = src[i:i + 320]
         assert "_plainAccent" in window and "Kirigami.Theme" in window, (
@@ -1414,7 +1615,7 @@ def test_the_stuck_titles_holes_stay_closed():
         "the error timer no longer revives the poll it stopped")
     i3 = src.index("onViewChanged: {")
     vc = src[i3:i3 + 1200]
-    assert "getStreamInfo()" in vc, (
+    assert "getStreamInfo(playMusic.source, root.metadata)" in vc, (
         "arriving on the Playing page no longer refreshes a stopped poll")
     rd = (ROOT / "package" / "contents" / "ui" / "reader.py").read_text(encoding="utf-8")
     assert "(403, 408, 429)" in rd, (
@@ -1422,26 +1623,88 @@ def test_the_stuck_titles_holes_stay_closed():
         "would permanently silence a station that carries titles")
 
 
-def test_a_dying_speakers_pause_never_silences_the_room():
-    """A Bluetooth speaker powering off sends an AVRCP Pause as its last
-    breath (JBL, measured live 2026-08-11). With the combine active and
-    other speakers still playing, that pause is not the listener's word.
-    Both arrival orders are guarded: a pause inside the departure window
-    is ignored, and a park landed just before the departure is resumed.
+
+def test_every_declared_qml_test_lives_inside_its_testcase():
+    """A test function outside the TestCase block is never run by
+    qmltestrunner, and the suite still reports green — it just quietly counts
+    one lower. Two of them had been sitting like that: the podcast engine's
+    clearplaying test and the sync engine's departure test, the latter since
+    the day it was written, so the Bluetooth deathbed-pause ordering had never
+    once been exercised. Brace-count each file and require every test_ to fall
+    inside."""
+    qmldir = ROOT / "tests" / "qml"
+    stray = []
+    for f in sorted(qmldir.glob("tst_*.qml")):
+        lines = f.read_text(encoding="utf-8").split("\n")
+        start = next((i for i, ln in enumerate(lines)
+                      if re.match(r"\s*TestCase\s*\{", ln)), None)
+        if start is None:
+            continue
+        depth, end = 0, None
+        for i in range(start, len(lines)):
+            # Strings first, then comments: these files carry JSON payloads
+            # full of braces, and counting them makes every block look open.
+            bare = re.sub(r'"(?:\\.|[^"\\])*"', '""', lines[i])
+            bare = re.sub(r"'(?:\\.|[^'\\])*'", "''", bare)
+            bare = re.sub(r"//.*$", "", bare)
+            depth += bare.count("{") - bare.count("}")
+            if depth <= 0:
+                end = i
+                break
+        if end is None:
+            stray.append(f"{f.name}: TestCase block never closes")
+            continue
+        for i, ln in enumerate(lines):
+            if re.match(r"\s*function\s+test_", ln) and not (start < i < end):
+                stray.append(f"{f.name}:{i + 1} {ln.strip()[:60]}")
+    assert not stray, (
+        "these test functions sit outside their TestCase and never run:\n  "
+        + "\n  ".join(stray))
+
+def test_a_pause_is_a_pause_whoever_leaves_the_room():
+    """A Bluetooth speaker powering off says goodbye with an AVRCP pause, and
+    with other speakers still in the room that pause used to be treated as the
+    speaker's own: ignored when it arrived after the loss, undone when it had
+    arrived up to two minutes before. The second half starts sound nobody
+    asked for, and neither half can tell a speaker from a person — the pause
+    arrives over MPRIS either way, and so does a keyboard's media key, the
+    desktop's media applet and a phone.
+
+    Seen on the desk 2026-09-21: a pause sent over MPRIS, the speaker's link
+    dropped eight seconds later, and five seconds after that the radio was
+    playing again ("the park was a departing speaker's last breath"). Worse,
+    "left the group" also fires when nothing left: the same morning a profile
+    switch recreated the speaker's node and the engine logged a departure. A
+    pause, a hiccup a minute later, and the room plays — issue #13 again.
+
+    So a pause is a pause. What stays: the engine still notices the loss and
+    walks the speaker back in, and a speaker that leaves while music plays
+    takes nothing with it, because no pause is involved.
     """
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    eng = _code_only((UI / "SyncEngine.qml").read_text(encoding="utf-8"))
+
+    for gone in ("_deathbedPause", "_btMemberLostAt", "noteBtMemberLost", "_tsParkFromMpris"):
+        assert gone not in main, (
+            "main.qml still carries %s: a pause is being weighed against who "
+            "left the room instead of simply being honoured" % gone)
+    assert "noteBtMemberLost" not in eng, (
+        "the sync engine still reports a departure to the player; the only "
+        "thing the player ever did with that news was start sound")
+
+    # The engine measures and routes. It has no business starting sound.
+    for road in ("timeshiftResume(", "startWithFade(", "refreshServer(", "playMusic.play("):
+        assert road not in eng, "SyncEngine.qml can start sound through %s" % road
+
+    # Every resume of a park is a person's gesture: the station they clicked,
+    # or Play / PlayPause over MPRIS. Nothing else in main.qml may call it.
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    assert "_deathbedPause" in src and "_btMemberLostAt < 4000" in src, (
-        "the MPRIS handler honours a departing speaker's pause again")
-    body = _function_body(src, "noteBtMemberLost")
-    assert "timeshiftResume()" in body, (
-        "a park that was the speaker's farewell no longer resumes")
-    assert "_tsParkFromMpris" in body and "120000" in body, (
-        "the resume lost its origin check or its wide window - Bluetooth "
-        "admits a loss 5-20 s late, and only an MPRIS-born park may be "
-        "resumed over (the widget's own pause button is the listener)")
-    eng = (UI / "SyncEngine.qml").read_text(encoding="utf-8")
-    assert "app.noteBtMemberLost()" in eng, (
-        "the engine no longer reports a member lost without being asked")
+    inside = sum(_code_only(_function_body(src, fn)).count("timeshiftResume(")
+                 for fn in ("refreshServer", "_mprisDispatch"))
+    total = main.count("timeshiftResume(") - main.count("function timeshiftResume(")
+    assert total == inside, (
+        "%d call(s) to timeshiftResume() sit outside the two roads a person "
+        "drives (refreshServer, _mprisDispatch)" % (total - inside))
 
 
 def test_a_park_that_cannot_resume_always_finds_a_way_back_to_sound():
@@ -1517,20 +1780,68 @@ def test_the_heal_commit_gate_is_the_tested_one_and_the_stopgap_keeps_the_lock()
         "knocks on the dead address for ten minutes) or its guard is "
         "(every automated retry resets the backoff's own lock)")
 
-    # The candidate rows must carry the exact-name verdict into the
-    # ladder, or every legitimate own-domain repair demotes to a stopgap.
-    assert "exact: rowNorm === run.norm" in src, (
-        "the name-search rows lost their exact-name verdict")
-    assert src.count("!HealLogic.sharedBase(origBase)") >= 2, (
-        "a scoring site no longer excludes shared streaming hosts - "
-        "a landlord in common outranks the station's real name again "
-        "(both the list-station heal and the preview rescue score rows)")
+    # The exact-name verdict and the landlord rule are made in
+    # HealLogic.ladder, under tst_heallogic (the own-domain test and the
+    # shared-host test). What is left to hold here is that the verdict
+    # TRAVELS from the ladder to the commit gate: the whole row is pushed and
+    # the audition copies its exact flag. Map the rows back to {url, byUuid}
+    # and every own-domain repair demotes to a stopgap with the library's
+    # tests all green.
+    code = _code_only(src)
+    assert "run.candidates.push(res.cands[j]);" in _code_only(_function_body(src, "_healNameSearch")), (
+        "the name rung no longer pushes the ladder's whole row - the "
+        "exact-name verdict stops short of the commit gate")
+    assert "root._healPendingExact = next.exact === true;" in _code_only(_function_body(src, "_healAdvance")), (
+        "the audition no longer copies the row's exact-name verdict")
+    assert code.count("HealLogic.ladder(") == 2, (
+        "the list-station heal and the preview rescue must both take their "
+        "rows from the tested ladder")
+    assert "HealLogic.scoreRow(" not in code and "HealLogic.rank(" not in code, (
+        "a road gates, scores or ranks directory rows inline again")
 
     # rank() hands back row objects; the preview rescue auditions bare
     # urls. The day rank changed shape, this road silently fed
     # "[object Object]" to the player and no test went red.
     assert "ranked.slice(0, 4).map(function(c) { return c.url; })" in src, (
         "the preview rescue consumes rank() rows as urls again")
+
+
+def test_a_namesake_is_refused_except_for_a_wake_up_and_named_when_it_plays():
+    """A name is not an identity: "Rock FM" is five exact-name rows from four
+    countries, and the name rung once auditioned the Estonian one for a
+    Spanish listener under their station's name. Who may audition is
+    HealLogic.ladder's call (tst_heallogic). This holds the wires no unit test
+    can reach: the wake-up exception arrives at the ladder and at the query,
+    the uuid record's country arrives at all, the preview rescue does not read
+    the alarm flag and always asks for the old ladder, and the notice learns
+    who is playing BEFORE the pending state is cleared.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    search = _code_only(_function_body(src, "_healNameSearch"))
+    assert re.search(r"HealLogic\.ladder\([^;]*run\.cc,\s*root\._alarmStandingOrder === true\);", search), (
+        "the wake-up exception no longer reaches the ladder - an alarm whose "
+        "station died is refused the namesake that would have rung")
+    # One flag for the rows asked for and the rows kept: a wake-up asks the
+    # directory exactly as it always has.
+    assert "HealLogic.searchTail(root._alarmStandingOrder === true)" in search
+    # The RAW body: the tail must not be written by hand beside the tested one.
+    assert "hidebroken" not in _function_body(src, "_healNameSearch"), (
+        "the heal's name search hides broken rows again - the saved station's "
+        "own record is one of them, and it is the witness to its country")
+    assert "root._healRun.cc = HealLogic.uuidCountry(uxhr);" in _code_only(
+        _function_body(src, "_tryHealStation")), (
+        "the uuid record's country is thrown away again")
+    rescue = _code_only(_function_body(src, "_previewNameRescue"))
+    assert 'pvKey, pvName, "", true).cands;' in rescue and "_alarmStandingOrder" not in rescue
+    advance = re.sub(r"\s+", " ", _code_only(_function_body(src, "_healAdvance")))
+    assert ("root._healPendingWho = HealLogic.strangerLabel(next, "
+            "SearchLogic.countryLabel(next.cc, next.country, Qt.locale().name));") in advance
+    assert '_healPendingWho = "";' in _code_only(_function_body(src, "_healClearPending"))
+    commit = _code_only(_function_body(src, "_healCommit"))
+    # Read after the clear it is "" for ever, and the old wording comes back
+    # without a single test noticing.
+    assert commit.index("var who = _healPendingWho;") < commit.index("_healClearPending()")
+    assert 'who === ""' in commit and "It may be a different station." in commit
 
 
 def test_the_standing_order_replays_a_url_not_a_row_number():
@@ -1589,37 +1900,48 @@ def test_a_stop_in_an_episodes_last_seconds_starts_nothing():
     )
 
 
-def test_the_mpris_origin_flag_cannot_outlive_its_dispatch():
-    """The "this park came over MPRIS" mark lasts exactly one command.
-
-    A Bluetooth speaker powering off sends an AVRCP Pause as its last breath,
-    and the widget undoes such a park for the speakers still in the room. That
-    only works while the mark is honest. It was not: the dispatch has six ways
-    out and four of them — both podcast skips and both empty-list returns —
-    jumped over the single clearing line at the bottom, so the mark stayed true
-    for the rest of the session. Every later park then wore it, including one
-    pressed on the widget's own button, on the panel icon or with Space; a
-    speaker leaving within the next two minutes resumed the music over it.
-    The dispatch sits behind a try/finally now, which no future return can
-    escape, and the body must not carry the flag itself again."""
+def test_the_budget_counts_every_knock_and_only_a_person_resets_it():
+    """The retry budget is a count, so its two ends are the whole of it: every
+    knock adds one, and only a person choosing a station takes it back to
+    nothing. An automatic replay that reset the count would knock for ever
+    under a budget of three; a ladder that forgot to count would never reach
+    it. Neither was pinned — the budget's own tests run the arithmetic, not
+    the two lines in main.qml that feed it.
+    """
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    outer = _function_body(src, "_handleMprisCommand")
-    assert "_mprisCmdActive = true" in outer, "the origin mark is no longer raised"
-    assert "finally" in outer and "_mprisCmdActive = false" in outer, (
-        "the origin mark is cleared on some paths only — the leak that made a "
-        "hand-made park read as a dying speaker's breath is back"
-    )
-    inner = _function_body(src, "_mprisDispatch")
-    assert "_mprisCmdActive" not in inner, (
-        "the dispatch touches the origin mark again; it leaked precisely "
-        "because its own early returns owned the clearing"
-    )
+    code = _code_only(src)
+    assert code.count("_healRetryAttempts++") == 1, (
+        "the knock is counted in %d places; it is one ladder with one arming point"
+        % code.count("_healRetryAttempts++"))
+    assert "_healRetryAttempts++" in _code_only(_function_body(src, "_healArmRetry")), (
+        "the ladder arms without counting the knock — the budget never runs out")
+    refresh = _code_only(_function_body(src, "refreshServer"))
+    resets = [ln.strip() for ln in refresh.split("\n") if "_healRetryAttempts = 0" in ln]
+    assert resets, "refreshServer no longer gives a person's own choice a fresh budget"
+    for ln in resets:
+        assert "userInitiated !== false" in ln, (
+            "refreshServer resets the knock count on an AUTOMATIC replay too (%r): "
+            "every retry would start the budget over and the knocking never ends" % ln)
+
+
+def test_the_promised_three_and_a_half_minutes_is_the_shipped_default():
+    """Issue #13 was told in public: a quiet station is tried again for about
+    three and a half minutes. That sentence is three knocks (30 s + 1 min +
+    2 min, pinned in tst_retrylogic) — and the three lives in a config file no
+    test read.
+    """
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    m = re.search(r'<entry name="autoRetryKnocks"[^>]*>.*?<default>(\d+)</default>', xml, re.S)
+    assert m, "autoRetryKnocks is gone from main.xml"
+    assert int(m.group(1)) == 3, (
+        "the default is %s knocks; the public promise on issue #13 is three "
+        "(three and a half minutes). Change the promise before the number." % m.group(1))
 
 
 def test_the_mpris_start_empties_the_command_file():
     """Whoever resets the sequence counter clears the file it counts against.
 
-    _mprisStart sets _mprisCmdSeq to 0 because a fresh daemon numbers from 1.
+    _mprisStart re-arms the command gate for the daemon it is about to start.
     It used to only `touch` the command file, on the belief that the launcher
     clears it. The launcher does — at line 78, behind a python dbus probe
     (measured 49-50 ms here), an unconditional `sleep 0.3` and two orphan
@@ -1632,8 +1954,8 @@ def test_the_mpris_start_empties_the_command_file():
     media keys are on by default. Creating the file EMPTY closes the window
     outright: there is nothing to replay by the time anything can read it."""
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    body = _function_body(src, "_mprisStart")
-    assert "_mprisCmdSeq = 0" in body, "the sequence reset is gone"
+    body = _code_only(_function_body(src, "_mprisStart"))
+    assert "mprisCmdGate.arm(Date.now());" in body, "the start no longer re-arms the command gate"
     assert "touch '" not in body, (
         "the command file is created without being emptied again — a line left "
         "by a crashed session outruns the launcher's truncate and gets replayed"
@@ -1740,7 +2062,7 @@ def test_the_settings_merge_compares_like_with_like():
     refuses a healed hostname: exactly what the merge replaced."""
     src = (UI / "config" / "configSearch.qml").read_text(encoding="utf-8")
     load = src[src.index("Component.onCompleted") :]
-    load = load[: load.index("_lastSynced = cfg_servers")]
+    load = load[: load.index("_lastSynced = _servers")]
     injected = [
         f for f in ("codec", "bitrate", "uuid") if "srv.%s === undefined" % f in load
     ]
@@ -1752,6 +2074,50 @@ def test_the_settings_merge_compares_like_with_like():
             "load defaults %s but the merge does not — every station stored "
             "before saved codecs now reads as locally edited" % field
         )
+
+
+def test_a_list_taken_over_from_the_popup_is_no_edit_on_either_page():
+    """plasmoidviewer's settings dialog marks a page changed on every
+    cfg_*Changed signal, whatever the value (the Plasma 6.7 desktop dialog
+    compares values first). The station
+    pages took the popup's list over by assigning cfg_servers, so a logo the
+    popup found while the settings were open lit Apply and asked "Apply
+    Settings?" on the way out. Neither page declares cfg_servers now; edits
+    announce themselves through _edited() and saveConfig() writes.
+    tst_stationspage drives the Stations page through both dialogs; the Search
+    page asks the network as it opens, so it is held to the same shape here."""
+    for page in ("configGeneral.qml", "configSearch.qml"):
+        code = _code_only((UI / "config" / page).read_text(encoding="utf-8"))
+        assert "cfg_servers" not in code, page + " declares or writes cfg_servers again"
+        assert "signal configurationChanged()" in code, page
+        edited = _function_body(code, "_edited")
+        assert "configurationChanged()" in edited, page + ": an edit goes unannounced"
+        save = _function_body(code, "saveConfig")
+        assert "plasmoid.configuration.servers = _servers" in save, page
+        assert "_servers === _lastSynced" in save, page + ": a page with no edits writes its copy back"
+        sync = _function_body(code, "onServersChanged")
+        quiet = sync[sync.index("root._servers === root._lastSynced"): sync.index("} else {")]
+        assert "root._servers = external" in quiet, page
+        assert "_edited()" not in quiet and "configurationChanged()" not in quiet, (
+            page + ": the takeover announces an edit nobody made")
+        assert "JSON.stringify(getServersArray())" not in code.replace(
+            "const s = JSON.stringify(getServersArray())", "").replace(
+            "if (changed) root._servers = JSON.stringify(getServersArray())", ""), (
+            page + ": an edit site serialises the list by hand instead of calling _edited()")
+
+
+def test_both_station_pages_save_the_rows_and_not_their_wrappers():
+    """Both pages keep the list in a dynamicRoles ListModel, whose get() hands
+    back a QObject, and JSON.stringify of that wrote "objectName":"" into every
+    saved station (read in appletsrc on the bench, 2026-09-23). The flattening
+    is ReorderLogic.savedRows, under tst_reorderlogic; the Search page has no
+    harness of its own, so this holds both pages to it."""
+    for page in ("configGeneral.qml", "configSearch.qml"):
+        code = _code_only((UI / "config" / page).read_text(encoding="utf-8"))
+        body = _function_body(code, "getServersArray")
+        assert "ReorderLogic.savedRows(stationsModel)" in body, (
+            page + " serialises the model's rows by hand again")
+        assert "stationsModel.get(" not in body, page
 
 
 def test_a_cast_episode_comes_home_named_and_with_its_show():
@@ -1799,3 +2165,852 @@ def test_the_no_titles_pin_names_the_station_not_the_transport():
             f"a pin comparison went back to the raw source ({needle}) — the "
             "pin is stored as the station and the two can never match"
         )
+
+
+def test_a_wish_typed_without_the_word_in_reaches_the_tag_list():
+    """"rock 80 uk" was asked of the directory as a station NAME, found none,
+    and the stem retry answered with French and German "rock 80" stations
+    (seen in the running widget, 2026-09-21). SearchLogic.facetQuery reads
+    the words; this pins that the search actually asks it, scopes by the
+    country it found and sends the tags as a tagList.
+    """
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "runWebSearch"))
+    assert "SearchLogic.facetQuery(q, _countryCodeOf)" in body, (
+        "the search no longer reads a query as facets")
+    assert "cc: bare.cc" in body, "a facet query's country no longer scopes the search"
+    assert '"tagList=" + facet.tags.map(encodeURIComponent).join(",")' in body, (
+        "facet tags are not sent as a tagList")
+    assert "|| facet !== null" in body, "a facet query can skip the tag pass again"
+
+
+def test_a_stale_country_chip_steps_aside_for_an_empty_answer():
+    """Seen in the running widget: "jazz united states", then "virgin radio
+    uk" answered "No matching stations" with the American chip still up.
+    The decision is SearchLogic.emptyNext; this pins that every search road's
+    end asks it, and that "unscope" really drops the chip and runs again.
+    """
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webFinish"))
+    assert "SearchLogic.emptyNext(" in body
+    assert "inheritedScope: fullRepresentation._webScopeInherited" in body
+    drop = body[body.index('next === "unscope"'):body.index('next === "stems"')]
+    assert 'webScopeCc = ""' in drop and "runWebSearch(root.searchFilter)" in drop, (
+        "the unscope branch no longer drops the chip and searches again")
+    run = _code_only(_function_body(src, "runWebSearch"))
+    assert '_webScopeInherited = scopeCc !== "" && scoped === null' in run, (
+        "a scope the text itself names would be dropped as if it were inherited")
+
+
+def test_a_result_row_shows_the_short_country_name():
+    """The directory files Britain as "The United Kingdom Of Great Britain And
+    Northern Ireland"; on a one-line row that pushed bitrate and codec off
+    the end for every British and American station."""
+    src = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    assert "SearchLogic.countryLabel(webItem.model.cc" in src
+
+
+def test_the_station_boxes_on_the_timers_page_remember_their_pick():
+    """The alarm's and the scheduled recording's station boxes sit on the
+    shared station list, which reloads by clear-and-append. A plain combo
+    went empty there and "Add" went grey (seen in the running widget,
+    2026-09-21). StationPicker carries the behaviour and its own tests; this
+    pins that both boxes are one."""
+    src = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    for ident in ("alarmStation", "schedStation"):
+        at = src.index("id: " + ident)
+        head = src[src.rfind("\n", 0, src.rfind("{", 0, at)):at]
+        assert "StationPicker" in head, ident + " is a plain combo again"
+
+
+def test_a_return_to_live_keeps_the_header_until_live_speaks():
+    """Reported by the listener: back from a pause the cover was gone and had
+    to be waited for. "Back to live" lowers the shift flag and stops the
+    player in one breath, and the stopped edge wiped title and cover. The
+    engine now raises a bounded keep first (tst_timeshiftengine covers that);
+    this pins the four places in main.qml that have to honour it: the two
+    that clear the header, and the two title roads that tell the engine live
+    has spoken — without the second pair a kept title is wiped at the
+    deadline although live confirmed it.
+    """
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    edge = code[code.index("onPlayingChanged:"):]
+    edge = edge[:edge.index("_mprisQueueWrite()")]
+    assert "!timeshift.sleeveKept(Date.now())) root.metadata = \"\"" in edge, (
+        "the stopped edge wipes the header over a return to live again")
+    late = code[code.index("var formattedText = "):]
+    late = late[:late.index("__NO_ICY__")]
+    assert "!timeshift.sleeveKept(Date.now())" in late, (
+        "a reader landing during the return wipes the header")
+    assert code.count("timeshift.liveTitleSeen()") >= 2, (
+        "a title road no longer tells the engine that live has spoken")
+    qt = code[code.index("onMetaDataChanged:"):]
+    qt = qt[:qt.index("onMediaStatusChanged:")]
+    assert "timeshift.liveTitleSeen()" in qt
+    # The header's own line is a third thing the restart resets. Seen in the
+    # running widget: cover and title stayed, and the line under the station
+    # name went empty until the NEXT song, because an unchanged title sends
+    # no change to repaint it from.
+    start = _code_only(_function_body((UI / "main.qml").read_text(encoding="utf-8"), "startWithFade"))
+    assert "if (!timeshift.sleeveKept(Date.now())) root.title = Plasmoid.title;" in start, (
+        "a return to live blanks the header line until the next song")
+
+
+def test_a_stations_first_title_skips_the_flap_window():
+    """The 1.5 s debounce protects against a flapping StreamTitle; the first
+    title after an empty header has nothing to flap against."""
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert 'var firstTitle = root._artPendingKey === "";' in code
+    assert "artworkEngine.debounceRestart(firstTitle)" in code
+
+
+def test_typing_a_word_that_starts_with_m_does_not_mute_the_radio():
+    """On the list page every printable key opens the search — except that M
+    was claimed first as an undocumented mute: typing "metal" silenced the
+    radio and searched for "etal". M mutes on the other pages only."""
+    src = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = src.index("event.key === Qt.Key_M")
+    cond = src[at:src.index("{", at)]
+    assert "root.view !== 0" in cond, "M mutes on the list page again and eats the first letter"
+    assert src.index("typeToSearch(event)", at) > at
+
+
+def test_a_bare_decade_is_not_too_short_to_search():
+    """"80" is two characters and the short-query gate dropped it without a
+    word; the directory has some 1900 stations tagged with that decade."""
+    body = _code_only(_function_body((UI / "FullRepresentation.qml").read_text(encoding="utf-8"), "runWebSearch"))
+    assert 'q.length < 3 && cc === "" && SearchLogic.decadeTag(q) === ""' in body
+
+
+def test_a_saved_new_address_reaches_the_alarm_and_the_scheduled_recording():
+    """The heal road saved a moved station's new address to the list and told
+    the listener so, while the alarm and the scheduled recording on that
+    station kept their own copy of the dead one. The engines do the rewriting
+    (tst_alarmengine, tst_recordingengine); this pins that the heal calls
+    them, and only once identity is proven — a session stopgap must never
+    rewrite an alarm any more than it may rewrite the list.
+    """
+    body = _code_only(_function_body((UI / "main.qml").read_text(encoding="utf-8"), "_healCommit"))
+    gate = body.index('!== "permanent"')
+    stopgap_return = body.index("return;", gate)
+    for call in ("alarmEngine.retargetStation(oldUrl, newUrl)",
+                 "recordingEngine.retargetStation(oldUrl, newUrl)"):
+        assert call in body, call + " is gone: the alarm rings the dead address again"
+        assert body.index(call) > stopgap_return, call + " runs before identity is proven"
+
+
+def test_a_repointed_station_row_lets_go_of_the_old_stations_uuid():
+    """A row edited by hand kept its directory uuid whatever it was pointed
+    at. The heal then asked byuuid where "this" station lives, was handed the
+    OLD station's address, called it identity-proven and saved it over the
+    edit for good; logos and votes followed the same id. The verdict lives in
+    HealLogic.editKeepsIdentity under tst_heallogic; this holds the wire: the
+    dialog asks before it writes the row, and a no empties the uuid.
+    """
+    src = (UI / "config" / "configGeneral.qml").read_text(encoding="utf-8")
+    assert 'import "../HealLogic.js" as HealLogic' in src
+    code = re.sub(r"\s+", " ", _code_only(src))
+    # The whole guard as one sentence: a missing "!" turns it inside out — a
+    # rename would lose the uuid and a repointed row would keep it — and no
+    # test of the library can see that.
+    guard = ('if (existing.uuid && !HealLogic.editKeepsIdentity(existing.name, existing.hostname, '
+             'itemObject.name, itemObject.hostname)) itemObject.uuid = "";')
+    assert guard in code, "the edit dialog's uuid guard changed shape"
+    assert code.index(guard) < code.index("stationsModel.set(dialogMode, itemObject)", code.index(guard)), (
+        "the verdict comes after the row was already written")
+
+
+def test_a_logo_found_by_name_passes_the_donor_gate_at_both_doors():
+    """A logo looked up by NAME is saved to the list, and a name is not an
+    identity: "Rock FM" answered with four exact-name rows from three countries
+    in its ten most voted (2026-09-21), and the first of them put the Russian
+    station's logo on a Spanish listener's row for good. Who may donate is
+    FaviconLogic.donorRows under tst_faviconlogic; what no library test can
+    see is whether the two doors hand it what it needs: the saved address,
+    without which the station's own record cannot be told from a namesake,
+    and the number of rows asked for, without which a full page reads as the
+    whole truth.
+    """
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    backfill = _code_only(_function_body(main, "_favBackfillNext"))
+    asked = re.search(r'"&limit=(\d+)&order=votes&reverse=true"', backfill)
+    handed = re.search(
+        r"FaviconLogic\.pickFavicon\(rows, norm, HealLogic\.normName, st\.host, (\d+)\)",
+        backfill)
+    assert handed, "the backfill picks a logo without the saved address"
+    assert asked and asked.group(1) == handed.group(1), (
+        "the backfill asks for one page size and tells the picker another")
+    # A station the directory calls broken still has a record, and that
+    # record is the one row that proves whose logo this is.
+    assert "hidebroken" not in backfill
+
+    page = (UI / "config" / "configGeneral.qml").read_text(encoding="utf-8")
+    assert 'import "../FaviconLogic.js" as FaviconLogic' in page
+    query = re.sub(r"\s+", " ", _code_only(_function_body(page, "_queryRadioBrowser")))
+    asked = re.search(r'"&limit=(\d+)&order=votes&reverse=true"', query)
+    handed = re.search(
+        r"FaviconLogic\.donorRows\(results, HealLogic\.normName\(cleanName\), "
+        r"HealLogic\.normName, job\.hostname, (\d+)\)", query)
+    assert handed, "the settings page picks a logo without the saved address"
+    assert asked and asked.group(1) == handed.group(1), (
+        "the settings page asks for one page size and tells the picker another")
+    assert "hidebroken" not in query
+    # The page's own loop once fell back to the first row with any icon at
+    # all. Both picks must come from the donors and from nowhere else.
+    assert "pickedFavicon = _extUrlOrEmpty(donors[d].favicon);" in query
+    assert "pickedHomepage = _extUrlOrEmpty(donors[d].homepage);" in query
+    assert query.count("pickedFavicon = ") == 2 and query.count("pickedHomepage = ") == 2, (
+        "something besides the donor loop assigns the page's pick")
+
+
+def test_the_settings_list_asks_in_one_spelling_and_lists_a_station_once():
+    """The settings page built its two requests by hand, twice, and neither
+    named an order: the directory then answers by raw name, and the list
+    opened on names that begin with a tab or a space with the stations people
+    know hundreds of rows down. Both requests now come from SearchLogic
+    (tst_searchlogic holds the order, the page size and the safe parts); this
+    keeps a hand-written query string from coming back, and keeps the
+    seen-book wired: filled per row, emptied with the list.
+    """
+    raw = (UI / "config" / "configSearch.qml").read_text(encoding="utf-8")
+    code = _code_only(raw)
+    # The RAW bodies: _code_only cuts a line at "//", which is also the middle
+    # of "https://", so a hand-written URL would hide behind its own scheme.
+    for fn in ("_doGetStations", "loadMore"):
+        body = _function_body(raw, fn)
+        for needle in ("hidebroken", "&limit=", "&offset=", "order=", "radio-browser.info"):
+            assert needle not in body, (
+                "%s writes its request by hand again (%s)" % (fn, needle))
+    assert code.count("SearchLogic.directoryPage(") == 2, "first page and later pages must ask the same way"
+    assert "SearchLogic.directoryBase(server, isNoSearch ? null : by, val)" in code
+    row = _function_body(code, "_appendRow")
+    assert "SearchLogic.firstSight(_seen, srv.stationuuid)" in row
+    clear = code.index("searchModel.clear()", code.index("SearchLogic.directoryPage(base"))
+    assert "_seen = ({})" in code[clear:clear + 80], "the seen-book outlives the list it describes"
+    import re as _re
+    m = _re.search(r"property int limit: (\d+)", code)
+    assert m and 50 <= int(m.group(1)) <= 200, (
+        "a page shorter than the window never scrolls, so page two is never asked for")
+
+
+def test_a_later_page_that_failed_is_asked_again_without_a_scroll():
+    """Page two of the settings list failed once at the end of the list and
+    never came: the only trigger was the list moving, and a list at its end
+    does not move. Both failure roads of loadMore now go through _pageFailed,
+    which waits (SearchLogic.pageRetryDelay, held by tst_searchlogic) and asks
+    the next mirror; a good page clears the count and a new search stops a
+    retry that belongs to the old list."""
+    code = _code_only((UI / "config" / "configSearch.qml").read_text(encoding="utf-8"))
+    more = _function_body(code, "loadMore")
+    assert more.count("_pageFailed()") == 2, (
+        "a failed page goes back to waiting for a scroll that may never come")
+    assert more.count("stat = 1") == 1, (
+        "a failure road only re-opens the scroll trigger again (stat = 1)")
+    assert "_pageFailures = 0" in more, "a good page leaves the failure count standing"
+    failed = _function_body(code, "_pageFailed")
+    for needle in ("SearchLogic.pageRetryDelay(_pageFailures)", "if (wait < 0)",
+                   "currentUrl = SearchLogic.rehost(currentUrl, server)", "pageRetryTimer.restart()"):
+        assert needle in failed, "_pageFailed lost " + needle
+    assert "onTriggered: if (root.stat === 1) root.loadMore()" in code
+    fresh = _function_body(code, "getStations")
+    assert "pageRetryTimer.stop()" in fresh and "_pageFailures = 0" in fresh, (
+        "a retry from the last list can land in the new one")
+
+
+_TEXT_ELEMENT = re.compile(
+    r"(?<![\w.])(?:\w+\.)?(?:Label|Heading|Text|TextEdit|TextInput)\s*\{")
+_RAW_ACCENT = re.compile(r"\broot\.accent(?:Bright|Teal)?\b")
+_NEXT_MEMBER = re.compile(
+    r"^(?:[A-Za-z_][\w.]*\s*:(?!:)|[A-Z][\w.]*\s*\{|\}"
+    r"|(?:readonly\s+|required\s+|default\s+)?property\b|function\b|signal\b|Behavior\b)")
+
+
+def _balanced_end(code, i):
+    depth = 0
+    for j in range(i, len(code)):
+        if code[j] == "{":
+            depth += 1
+        elif code[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return j
+    raise AssertionError("unbalanced braces")
+
+
+def _own_text_colours(src):
+    """(line, expression) for the color: of every text element's own body."""
+    code = _code_only(src)
+    for m in _TEXT_ELEMENT.finditer(code):
+        start = m.end() - 1
+        end = _balanced_end(code, start)
+        depth, k = 0, start
+        while k < end:
+            ch = code[k]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+            elif (depth == 1 and code.startswith("color", k)
+                  and not (code[k - 1].isalnum() or code[k - 1] in "._")):
+                mm = re.match(r"color\s*:", code[k:])
+                if mm:
+                    e = k + mm.end()
+                    rest = code[e:end]
+                    if rest.lstrip().startswith("{"):
+                        stop = _balanced_end(code, e + rest.index("{")) + 1
+                    else:
+                        lines = rest.split("\n")
+                        n = len(lines[0])
+                        for ln in lines[1:]:
+                            if _NEXT_MEMBER.match(ln.strip()):
+                                break
+                            n += 1 + len(ln)
+                        stop = e + n
+                    yield code.count("\n", 0, k) + 1, code[e:stop]
+                    k = stop
+                    continue
+            k += 1
+
+
+def test_no_text_is_written_in_the_raw_accent():
+    """The accent as a fill and the accent as text are two colours. The
+    emerald pair was chosen against a dark panel; on Breeze Light the playing
+    station's name measured 1.33:1 against the popup and 1.23:1 on its own
+    row's wash, the footer's status line 1.67:1 — five labels, every one of
+    them written after accentText existed. tst_colorlogic proves the text
+    variants can be read; it cannot see whether a label uses them. So every
+    text element's own colour is read here and none may name the raw accent.
+    Fills, borders, icons and equalizer bars are not text and keep it.
+    """
+    seen, hits = 0, []
+    for path in sorted(UI.rglob("*.qml")):
+        for line, expr in _own_text_colours(path.read_text(encoding="utf-8")):
+            seen += 1
+            if _RAW_ACCENT.search(expr):
+                hits.append("%s:%d" % (path.name, line))
+    # A floor, so a parser gone blind cannot hand back a green result.
+    assert seen >= 25, "only %d text colours were read; the parser lost its sight" % seen
+    assert not hits, "text written in the raw accent: " + ", ".join(hits)
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    for prop, raw in (("accentText", "accent"), ("accentBrightText", "accentBright")):
+        m = re.search(r"readonly property color %s:(.{0,260})" % prop, main, re.S)
+        assert m and re.search(r"ColorLogic\.readable\(\s*%s\s*,\s*Kirigami\.Theme\.backgroundColor\s*,\s*accent\s*\)"
+                               % raw, m.group(1)), prop + " is no longer measured against the popup and the row's wash"
+    # The wash the library measures against is the wash the rows really wear.
+    lib = (UI / "ColorLogic.js").read_text(encoding="utf-8")
+    found = re.search(r"var ROW_WASH = ([\d.]+);", lib)
+    assert found, "ColorLogic.js no longer says which wash it measures against"
+    wash = found.group(1)
+    for name in ("MediaListItem.qml", "EpisodeListItem.qml"):
+        row = _code_only((UI / name).read_text(encoding="utf-8"))
+        assert "root.accentBrightText" in row, name + " names the playing row in another colour"
+        m = re.search(r"Qt\.alpha\(root\.accent, ([\d.]+)\)", row)
+        assert m and float(m.group(1)) == float(wash), (
+            "%s washes its playing row at %s, the library measures %s" % (name, m and m.group(1), wash))
+
+
+def test_live_is_written_in_a_red_measured_against_its_own_pill():
+    """LIVE was the theme's negative red on a see-through wash of the same red:
+    3.03:1 on Breeze Light and 2.83:1 on Breeze Dark on the bench, where body
+    text wants 4.5:1, and a blurred cover under the pill could push it lower.
+    The pill is painted opaque in ColorLogic.pillSurface and the letters come
+    from ColorLogic.pillText, which tst_colorlogic measures on both Breezes.
+    This keeps the page from going back to the raw red or a see-through pill."""
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = full.index('text: i18n("LIVE")')
+    pill = full[full.rindex("Rectangle {", 0, full.rindex("RowLayout {", 0, at)): at + 400]
+    neg = "Kirigami.Theme.negativeTextColor, Kirigami.Theme.backgroundColor"
+    assert "color: ColorLogic.pillSurface(%s)" % neg in pill, "the LIVE pill is see-through again"
+    label = full[at: full.index("}", at)]
+    assert "color: ColorLogic.pillText(%s)" % neg in label, "LIVE is written in the raw red again"
+
+
+def test_a_podcast_search_nobody_answered_says_so_and_offers_to_ask_again():
+    """With the directories out of reach the podcast search said "No shows
+    found", which tells the listener the show does not exist, and nothing on
+    the page asked again. tst_podcastengine holds the verdict and
+    tst_podcastlogic what counts as an answer; this holds the wiring the tests
+    cannot reach: every handler hands its verdict to the settle, the root
+    forwards both flags, and both empty states speak and offer "Try again"."""
+    engine = _code_only((UI / "PodcastEngine.qml").read_text(encoding="utf-8"))
+    for fn, field, eps in (("_podSearchITunes", '"results"', "false"), ("_podSearchFyyd", '"data"', "false"),
+                           ("_podSearchGpodder", '""', "false"), ("_podSearchEpisodes", '"results"', "true")):
+        body = _function_body(engine, fn)
+        assert "PodcastLogic.directoryAnswer(xhr.status, xhr.responseText, %s)" % field in body, fn
+        assert "_podSearchSettle(seq, res !== null, %s)" % eps in body, fn + " no longer says whether it was heard"
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    for flag in ("podcastSearchUnreached", "podcastEpSearchUnreached"):
+        assert "readonly property alias %s: podcastEngine.%s" % (flag, flag) in main
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    shows = full[full.index('i18n("No shows found")') - 700: full.index('i18n("No shows found")') + 900]
+    assert 'root.podcastSearchUnreached\n                                  ? i18n("The podcast directories could not be reached")' in shows
+    eps = full[full.index('i18n("No episodes found")') - 700: full.index('i18n("No episodes found")') + 900]
+    assert 'root.podcastEpSearchUnreached ? i18n("The episode directory could not be reached")' in eps
+    for block, flag in ((shows, "podcastPage.searching && root.podcastSearchUnreached"),
+                        (eps, "root.podcastEpSearchUnreached")):
+        at = block.index('text: i18n("Try again")')
+        button = block[block.rindex("PlasmaComponents3.Button {", 0, at): block.index("}", at)]
+        assert "visible: %s" % flag in button
+        assert "onClicked: root.podcastSearch(podSearchField.text)" in button
+
+
+def test_a_genre_word_is_asked_of_the_tags_and_only_its_namesakes_lead():
+    """"rock" in the All mode filled the page from station names alone: the
+    name answer has 50 rows, the tag pass only ran with room left, and 17 of
+    the 30 biggest rock-tagged stations were never shown while "Show more"
+    paged more names (measured 2026-09-21). SearchLogic.leadRows decides what
+    of the name answer may lead; this pins that the search asks it, that the
+    rows it held back return only after the tag list's position was read, and
+    that "Show more" pages the tag list from that position."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "runWebSearch"))
+    assert 'const lead = (mode === "all" && cc === "") ? SearchLogic.leadRows(q) : null' in body, (
+        "a genre word is asked of the station names alone again")
+    assert "_webAppendResults(xhr, lead)" in body, "the name answer is no longer filtered to its leads"
+    tag = body[body.index("_webAppendResults(xhr2)"):]
+    at = tag.index("var tagAt = webResultsModel.count > beforeTag ? fullRepresentation._webLastConsumed : -1")
+    back = tag.index("if (lead) _webAppendResults(xhr)")
+    page = tag.index("fullRepresentation._webSkipAhead = tagAt - webResultsModel.count")
+    assert at < back < page, "the tag list's position is read after the name rows came back in"
+    assert "if (tagAt >= 0) {" in tag
+
+
+def test_the_word_pass_asks_for_the_listeners_own_word():
+    """"nova radio" asked the directory for "radio", its longest word, and
+    the 50 most voted names holding "radio" held one Radio Nova; asked for
+    "nova" they hold twenty-one (measured 2026-09-21). SearchLogic.askWord
+    picks the word; this pins that the word pass asks it and nothing else."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webWordPass"))
+    assert "encodeURIComponent(SearchLogic.askWord(q)) + tail" in body, (
+        "the word pass no longer asks for the word SearchLogic.askWord picks")
+    assert "longestWord" not in body, "the word pass asks for the longest word again"
+
+
+def test_one_mount_under_http_and_https_is_one_station():
+    """The directory files the same mount under both schemes as two rows:
+    the twin showed as a second result and a star then saved it as a second
+    station. SearchLogic.urlKey folds them; this pins every side of the
+    search's dedup and the star's known-station check to that one key.
+    _code_only cuts a line at "//", which is also the end of the scheme
+    regex, so the key lookups stand ahead of the regex on their line."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webAppendResults"))
+    for needle in ("existing[SearchLogic.urlKey(stationsModel.get(i).hostname)] = true",
+                   "seen[SearchLogic.urlKey(webResultsModel.get(j).url)] = true",
+                   "if (seenRaw) seen[SearchLogic.urlKey(seenRaw)] = true",
+                   "if (!u || existing[uKey] || seen[uKey] ||",
+                   "if (rawU && (existing[rawKey] || seen[rawKey])) continue",
+                   "seen[uKey] = true",
+                   "if (rawU) seen[rawKey] = true"):
+        assert needle in body, "the search dedup lost a side of its key: " + needle
+    assert not re.search(r"\b(existing|seen)\[(u|rawU|seenRaw)\]", body), (
+        "a search dedup map is read or written by the exact address again")
+
+
+
+def test_the_bitrate_chip_orders_the_page_by_the_honest_number():
+    """order=bitrate sorts the directory's raw field, kbps and bps mixed: a
+    64000 row led name=rock. SearchLogic.pageOrder tidies the rows a page will
+    show; this pins that every answer goes through it with the query that was
+    really sent (the chip's own state would re-sort "Popular in ..."), that the
+    unit rule lives in one place, and that the name float stands back."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webAppendResults"))
+    assert ("SearchLogic.pageOrder(JSON.parse(xhr.responseText) || [], "
+            "fullRepresentation._webLastQs,") in body, "an answer is walked in the directory's raw order"
+    assert "fullRepresentation.webResultCap - webResultsModel.count)" in body, (
+        "the page's room no longer bounds what is reordered, and Show more would skip rows")
+    assert '"bitrate": SearchLogic.kbps(r.bitrate),' in body
+    assert not re.search(r">=\s*8000", _code_only(src)), (
+        "FullRepresentation.qml reads the bitrate's unit on its own again")
+    run = _code_only(_function_body(src, "runWebSearch"))
+    assert 'cc === "" && !SearchLogic.asksBitrate(tail))' in run, (
+        "the exact-name float reorders a list asked by bitrate")
+    chain = _code_only(_function_body(src, "_webStemChain"))
+    assert 'if (cc === "" && !SearchLogic.asksBitrate(tail)) _webBoostRelevance(stem)' in chain
+
+
+def test_every_pass_of_a_bitrate_search_lands_in_one_order():
+    """One search fills the list from several answers (name, tag, word pass,
+    stem, Show more), and each went in under the last, so "nova radio" under
+    Bitrate read as two sorted lists. They all come through _webAppendResults;
+    this pins that the whole list is sorted there once the walk is done, on
+    the query really sent, by the sound rate of the directory's own row."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webAppendResults"))
+    assert '"rate": SearchLogic.soundRate(r),' in body, "the rows carry no sort key of their own"
+    sort = ("if (SearchLogic.asksBitrate(fullRepresentation._webLastQs)) "
+            "SearchLogic.rateSort(webResultsModel)")
+    assert sort in body, "the passes of a bitrate search are shown as blocks again"
+    at = body.index(sort)
+    assert body.index("for (const r of results)") < at < body.index("return true"), (
+        "the list is sorted before the answer's rows are in it")
+
+
+def test_a_hidden_rail_hands_the_search_no_fence():
+    """The country chip and its x live on the discovery rail, and Appearance
+    can switch the rail off. SearchLogic.scopeFor decides what fences a run;
+    this pins that the search tells it whether the rail is there."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    run = _code_only(_function_body(src, "runWebSearch"))
+    assert "const scopeCc = SearchLogic.scopeFor({" in run
+    assert "railShown: Plasmoid.configuration.showDiscoveryRow !== false })" in run, (
+        "a hidden rail's pinned country fences the search again")
+    assert "pinnedCc: fullRepresentation.webScopeCc," in run
+    assert '? fullRepresentation.webScopeCc : "")' not in run, (
+        "the pinned scope is read past SearchLogic.scopeFor")
+
+
+def test_the_rails_bring_their_answer_into_sight():
+    """Trending now and Popular in X run with the field empty, so the answer
+    goes in under every saved station, below the fold (2026-09-23: seven
+    seconds after the tap the screen still showed only the saved list).
+    ViewLogic.revealFooter is tested on a real ListView; this pins that both
+    rails call it at the tap and again once the answer is in, and that a typed
+    search, which filters the saved list itself, leaves the view alone."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    call = "ViewLogic.revealFooter(stationView)"
+    for rail in ("runWebTrending", "runWebCountry"):
+        body = _code_only(_function_body(src, rail))
+        assert body.count(call) == 2, rail + " no longer brings its answer into sight"
+        tap, answer = body.index(call), body.rindex(call)
+        assert tap < body.index("root._rbFetch(qs, 4000"), rail + " shows nothing until the answer"
+        assert body.index("fullRepresentation.webSearching = false", tap) < answer, (
+            rail + " scrolls before the answer is in the list")
+    for road in ("runWebSearch", "_webWordPass", "_webStemChain", "loadMoreWeb"):
+        assert call not in _function_body(src, road), road + " moves the view under the listener"
+
+
+def test_the_favourites_hint_names_the_star_it_means():
+    """Every favourite toggle is a star (favorite and non-starred-symbolic;
+    Breeze draws "favorite" as a star too), and the empty favourites view told
+    the listener to tap a heart. The heart the widget has likes a song (the
+    Playing tab, the Liked list), so only this hint is held to the star: a
+    sentence about liking songs may say heart. The hint stays translated in
+    every catalogue."""
+    code = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    empty = code[code.index('i18n("No favorite stations yet")'):]
+    shown = re.search(r'text:\s*root\.favoritesOnly\s*\?\s*i18n\("((?:[^"\\]|\\.)*)"\)', empty)
+    assert shown, "the empty favourites view lost its hint line"
+    assert "heart" not in shown.group(1).lower(), "the favourites hint asks for a heart: %r" % shown.group(1)
+    assert "star" in shown.group(1).lower(), "the favourites hint does not name the star: %r" % shown.group(1)
+    hint = 'msgid "Tap the star on a station to add it here"'
+    for po in sorted((ROOT / "po").glob("*.po")):
+        block = next((b for b in po.read_text(encoding="utf-8").split("\n\n") if hint in b), "")
+        assert block, po.name + " lost the favourites hint"
+        assert not re.search(r"^#,.*\bfuzzy\b", block, re.MULTILINE), po.name + " ships the hint fuzzy"
+        assert re.search(r'^msgstr "[^"]+', block, re.MULTILINE), po.name + " ships the hint in English"
+
+
+def test_the_retry_count_the_release_notes_point_at_has_a_control():
+    """2026.38's notes told people to set autoRetryKnocks to 0 "in the widget's
+    configuration", and the setting had no control anywhere: the entry sat in
+    main.xml and only the code read it."""
+    page = _code_only((UI / "config" / "configAutomation.qml").read_text(encoding="utf-8"))
+    assert "property alias cfg_autoRetryKnocks: autoRetryKnocks.value" in page
+    assert "id: autoRetryKnocks" in page and "enabled: autoRetryCheck.checked" in page
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    assert 'name="autoRetryKnocks"' in xml
+
+
+def test_the_retry_count_keeps_one_width_whatever_it_says():
+    """The Tries box was as wide as its own text: 148 px at "Until it answers"
+    and 120 px at "1" on the bench, so the arrows moved out from under the
+    pointer and six of seven clicks on "up" went into the text field. It is
+    sized by a hidden twin that always shows the widest value, which works in
+    any style (Fusion keeps a fixed width anyway, Basic and the KDE style do
+    not), so the gate's own style could never show the bug in a UI test."""
+    page = _code_only((UI / "config" / "configAutomation.qml").read_text(encoding="utf-8"))
+    at = page.index("id: autoRetryKnocks")
+    box = page[at: page.index("QQC2.CheckBox", at)]
+    assert "Layout.preferredWidth: Math.max(implicitWidth, triesWidest.implicitWidth)" in box, (
+        "the Tries box is sized by its current text again")
+    tw = page.index("id: triesWidest")
+    twin = page[tw: page.index("}", tw)]
+    for needle in ("visible: false", "from: autoRetryKnocks.from", "to: autoRetryKnocks.to",
+                   "value: 0", "return autoRetryKnocks.textFromValue(v, locale)"):
+        assert needle in twin, "the measuring twin lost " + needle
+
+
+def test_the_output_menu_offers_the_sync_caretaker_once_and_never_by_ear():
+    """The same setting stood in the output menu twice under two names, both
+    visible while the group was up, and the upper one could be ticked while
+    tuning by ear, where the engine ignores it: the config said yes and
+    nothing happened. The upper box now stands in only while the group is
+    down, and neither is offered by ear."""
+    src = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = src.index('text: i18n("Keep it in tune by itself")')
+    upper = re.sub(r"\s+", " ", src[at:src.index("checked:", at)])
+    for needle in ("Plasmoid.configuration.syncManualOnly !== true",
+                   "!root.sync._combineWantActive",
+                   "!(root.sync._combineIdleParked && Plasmoid.configuration.combineWanted === true)"):
+        assert needle in upper, "the upper caretaker box lost: " + needle
+    low = src.rindex("visible:", 0, src.index('text: i18n("Keep sync tuned automatically")'))
+    lower = re.sub(r"\s+", " ", src[low:low + 400])
+    assert "Plasmoid.configuration.syncManualOnly !== true" in lower
+
+
+def test_without_a_cast_bridge_the_network_section_says_nothing():
+    """With no cast bridge discovery never runs, and the menu still showed the
+    "WiFi & network" heading over "No devices found on your network": a
+    verdict about a search that was never made."""
+    src = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = src.index('text: i18n("No devices found on your network")')
+    assert "root._castAvailable &&" in src[src.rindex("visible:", 0, at):at]
+    head = src.index('text: i18n("WiFi & network")')
+    assert "visible: root._castAvailable" in src[src.rindex("RowLayout {", 0, head):head]
+
+
+def test_a_shared_hosts_own_icon_is_nobodys_logo():
+    """Once a name that means several stations lends no logo, such a row falls
+    through to the settings page's host and icon-service rungs, and on a
+    shared streaming host those answer with the LANDLORD's icon: a tenant of
+    zeno.fm would be saved with zeno.fm's favicon."""
+    src = (UI / "config" / "configGeneral.qml").read_text(encoding="utf-8")
+    for fn in ("_hostnameStdCandidates", "_googleFaviconCandidates"):
+        assert "HealLogic.sharedBase(" in _code_only(_function_body(src, fn)), (
+            fn + " offers a shared host's own icon again")
+
+
+def test_a_directory_nobody_reached_is_not_a_dead_station():
+    """Every mirror down handed the callbacks null, and both rungs read that
+    as "the directory knows nothing": the listener was told the station is
+    off the air and the ten-minute lookup lock was taken on the strength of
+    a question nobody heard. With the default three knocks (30 + 60 + 120 s,
+    all inside the lock) a play pressed before the Wi-Fi was up bounced off
+    the lock every time and the order ended with the new address one
+    question away. HealLogic.unheard and lockHolds hold the decisions
+    (tst_heallogic); this holds the wires.
+    """
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    heal = _code_only(_function_body(src, "_tryHealStation"))
+    assert "HealLogic.lockHolds(_healTried[orig], now)" in heal, (
+        "the lookup lock is judged by hand again")
+    assert "_healTried[orig] = now;" not in heal, (
+        "the lock is taken before anyone answered again")
+    assert "_healTried[orig] = Date.now();" in heal, (
+        "an answer from the directory no longer takes the lock")
+    assert ("HealLogic.uuidRung(uxhr, orig, root._alarmStandingOrder === true,\n"
+            "                                              FaviconLogic.webUrlOrEmpty)" in heal), (
+        "the identity rung reads the answer by hand, or forgot the wake-up's single door")
+    name = _code_only(_function_body(src, "_healNameSearch"))
+    assert "run.answered = true; _healTried[run.orig] = Date.now();" in name, (
+        "an answered name search no longer marks itself heard")
+    adv = _code_only(_function_body(src, "_healAdvance"))
+    assert "HealLogic.unheard(run.answered, root._healRetryAttempts," in adv
+    assert 'if (deaf.say)' in adv and "_healTried[run.orig] = deaf.stamp;" in adv
+    assert (adv.index("HealLogic.unheard(") < adv.index('i18n("Station seems to be off the air")')), (
+        "the off-the-air word is spoken before anyone asks whether the directory answered")
+    # The stamp is no longer a plain moment: it can be zero or negative, and
+    # only HealLogic may read it as time. A leftover "now - stamp" elsewhere
+    # would read a telling-mark as ten hours ago and let the lock through.
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    for m in re.finditer(r"_healTried\[[^\]]*\]", code):
+        near = re.sub(r"\s+", " ", code[max(0, m.start() - 160):code.find("\n", m.end())])
+        assert ("HealLogic.lockHolds(" in near or "HealLogic.unheard(" in near
+                or "delete _healTried[" in near
+                or re.search(r"_healTried\[[^\]]*\] = (Date\.now\(\)|deaf\.stamp);", near)), (
+            "the lookup stamp is read as a plain moment again: " + near[-90:])
+
+
+def test_the_alarms_tone_box_keeps_the_whole_sentence():
+    """In the control column the label was wider than the column and the
+    sentence was cut mid-word ("...the built-in tone (no"). It spans both
+    columns instead; there is no spacer in front of it any more."""
+    src = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = src.index("id: alarmToneOnly")
+    assert "Layout.columnSpan: 2" in src[at:at + 200]
+    assert "Item { width: 1; height: 1 }" not in src[src.rindex("QQC2.CheckBox", 0, at) - 400:at]
+
+
+def test_a_stop_says_which_road_asked_for_it():
+    """A radio found quiet in the morning left no trace of why: the stream had
+    not died (no heal line), the speaker had not left (no Bluetooth line), and
+    nothing wrote down who asked. Fifteen roads call stopWithFade; the stack's
+    second frame names the one that did."""
+    body = _code_only(_function_body((UI / "main.qml").read_text(encoding="utf-8"), "stopWithFade"))
+    assert 'console.log("[ARP] stop: " + String((new Error()).stack || "").split("\\n")[1]);' in body, (
+        "a stop no longer names the road that asked for it")
+    assert body.index("[ARP] stop:") < body.index("_stampPodPosition()"), (
+        "the line is written after the stop has already begun")
+
+
+def test_every_command_from_outside_names_its_caller():
+    """A speaker can send a pause of its own (a JBL Flip 7 did, three times on
+    2026-09-20, through the media-key service), and a listener's keypress
+    arrives by the same road. Without the sender, a radio that stopped by
+    itself and one that was told to read exactly alike in the log."""
+    src = (UI / "mpris.py").read_text(encoding="utf-8")
+    for name in ("Play", "Pause", "PlayPause", "Stop", "Next", "Previous"):
+        at = src.index("    def %s(self" % name)
+        head = src[src.rindex("@dbus.service.method", 0, at):at]
+        assert 'sender_keyword="sender"' in head, name + "() no longer learns who called it"
+        body = src[at:src.index("\n    @", at)]
+        assert "self._who(sender)" in body, name + "() no longer names its caller"
+    assert "GetConnectionUnixProcessID" in src, "the caller is no longer resolved to a process"
+
+
+def test_a_command_older_than_ten_seconds_is_never_obeyed():
+    """The command file outlives the session that wrote it. A crash leaves the
+    last line in place, and the widget's only guard was "a number I have not
+    seen" — after a restart it has seen none, so a Stop from yesterday counted
+    as new. The number is a moment (mpris.py next_seq, tested there), and an
+    old moment is refused however new it looks. The filter lives in
+    MprisCommandGate.qml, and the reader must not walk around it."""
+    gate = _code_only((UI / "MprisCommandGate.qml").read_text(encoding="utf-8"))
+    assert "if (isNaN(seq) || seq <= lastSeq || nowMs - seq > 10000) continue;" in gate, (
+        "a stale command can be obeyed again")
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert "mprisCmdGate.take(stdout, Date.now(), _handleMprisCommand);" in code, (
+        "the command reader no longer goes through the gate")
+
+
+def test_the_widget_starts_its_bridge_asking_for_moments():
+    """mpris.py counts 1, 2, 3 unless --ms-seq is on its command line. That
+    keeps a 2026.39 widget whole when it starts the new file from disk (it
+    runs until the next plasmashell start and keeps the number in an int).
+    This widget's gate reads the number as a moment, so its one start road
+    has to ask for moments, and the launcher has to hand the flag on."""
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    start = _function_body(code, "_mprisStart")
+    assert "executable.exec(mprisCmdGate.startLine(" in start, (
+        "the bridge is started past the gate's start line")
+    assert "MPRIS_START; bash" not in code, "a second bridge start written by hand"
+    gate = _code_only((UI / "MprisCommandGate.qml").read_text(encoding="utf-8"))
+    assert '" --ms-seq"' in _function_body(gate, "startLine"), (
+        "the start line no longer asks for moments")
+    launcher = (UI / "start-mpris.sh").read_text(encoding="utf-8")
+    assert '"${SEQ_FLAG[@]}" >"$LOG_FILE"' in launcher, (
+        "the launcher starts the bridge without the flag it was given")
+
+
+def test_the_mpris_bridge_is_watched_while_the_widget_wants_one():
+    """Nothing supervised the daemon. Killed once — a second widget's launcher
+    sweeps stale siblings, and anything can crash — it stayed dead until the
+    next playback start: measured on 2026-09-22, the music played on for
+    minutes while the bus name was gone, so media keys, the lock screen and
+    the speaker's own buttons were quietly dead. The shell that writes the
+    state file answers the question for free."""
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    write = code[code.index(': MPRIS_WRITE; sh -c'):]
+    write = write[:write.index("\n")]
+    assert 'pgrep -f \\"^python3 .*mpris.py $2\\"' in write, (
+        "the state write no longer asks whether the daemon is alive, or its pgrep can match its own shell")
+    assert "__MPRIS_GONE__" in write
+    at = code.index('cmd.indexOf(": MPRIS_WRITE;")')
+    branch = code[at:code.index('cmd.indexOf(": MPRIS_START;")', at)]
+    for needle in ("__MPRIS_GONE__", "_mprisStarted", "Date.now() - _mprisRevivedAt > 60000",
+                   "_mprisStarted = false;", "_mprisStart();"):
+        assert needle in branch, "the revive lost: " + needle
+
+
+def test_a_bare_play_is_answered_in_one_place_that_knows_about_auditions():
+    """Play with nothing named: the Playing tab's button, Space, the panel's
+    middle click, MPRIS Play and PlayPause. Each carried its own copy of
+    "lastPlay, else row 0", and an audition leaves lastPlay at -1, so on the
+    bench (2026-09-23) a stopped Radio Swiss Jazz came back as MANGORADIO,
+    the first row. The decision is TransportLogic.bareplay now, under
+    tst_transportlogic; what is left to hold here is that every road asks it
+    and that nothing else does. A recovery road reaching playLast would be a
+    radio starting on its own, which is issue #13."""
+    main_src = (UI / "main.qml").read_text(encoding="utf-8")
+    codes = {p.name: _code_only(p.read_text(encoding="utf-8"))
+             for p in sorted(UI.rglob("*.qml"))}
+    row_zero = re.compile(r"lastPlay\s*>=\s*0\s*&&\s*lastPlay\s*<\s*stationsModel\.count"
+                          r"\s*\?\s*lastPlay\s*:\s*0")
+    for name, code in codes.items():
+        assert not row_zero.search(code), (
+            "%s answers a bare Play with row 0 again, past any audition" % name)
+    calls = {name: code.count("playLast(") - code.count("function playLast(")
+             for name, code in codes.items()}
+    assert {k: v for k, v in calls.items() if v} == {
+        "main.qml": 2, "FullRepresentation.qml": 2, "CompactRepresentation.qml": 1}, (
+        "playLast is called from somewhere other than the five roads a person drives: %r" % calls)
+    dispatch = _code_only(_function_body(main_src, "_mprisDispatch"))
+    assert dispatch.count("playLast();") == 2, "MPRIS Play or PlayPause lost the shared answer"
+    body = _code_only(_function_body(main_src, "playLast"))
+    assert "TransportLogic.bareplay(root._lastAudition !== null, lastPlay, stationsModel.count)" in body
+    assert "previewStation(a.name, a.url, a.favicon, a.uuid, a.rawUrl, a.codec, a.bitrate);" in body, (
+        "the audition comes back without its codec or bitrate, and an Ogg one wedges on the relay decision")
+
+
+def test_only_an_audition_is_remembered_and_every_other_start_forgets_it():
+    """The memory must mean "an audition was the last thing heard", or the
+    precedence it gets in TransportLogic.bareplay turns into a new wrong
+    answer: a station picked after the audition and then stopped would come
+    back as the audition. previewStation writes it; a station pick drops it
+    before its async resolve can fail, and startWithFade drops it for the
+    local file, the episode and the alarm, all of which empty _previewUrl
+    before they get there."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    code = _code_only(src)
+    assert code.count("_lastAudition = {") == 1, "something other than an audition is remembered as one"
+    pv = _code_only(_function_body(src, "previewStation"))
+    stop_return = pv.index("stopWithFade();\n            return;")
+    at = pv.index("root._lastAudition = {")
+    assert at > stop_return, (
+        "the audition is remembered before the second tap's stop returns, so the stop re-arms it")
+    assert '"rawUrl": rawUrl, "codec": codec, "bitrate": bitrate' in pv[at:]
+    rs = _code_only(_function_body(src, "refreshServer"))
+    assert "root._lastAudition = null;" in rs, "a station pick leaves the audition standing"
+    sw = _code_only(_function_body(src, "startWithFade"))
+    assert 'if (root._previewUrl === "") root._lastAudition = null;' in sw, (
+        "a local file, an episode or an alarm leaves the audition standing")
+
+
+def test_the_footer_says_reconnecting_while_the_ladder_waits():
+    """Between two knocks of the retry ladder the player sits idle, so the
+    footer fell through to its idle sentence: on the bench (2026-09-23) a
+    station at a dead address read "Choose station and enjoy…" under its own
+    name for the whole 30 s before knock #1, which looks like a widget that
+    gave up. RetryLogic.betweenKnocks decides, under tst_retrylogic; this pins
+    where the footer asks it. The louder states keep their words first:
+    offline, the error sentence, a stream that plays or is loading."""
+    code = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = code.index("id: subtext")
+    text = code[code.index("text: {", at):]
+    idle = text.index('return i18n("Choose station and enjoy…")')
+    text = text[:idle + 50]
+    asks = "else if (RetryLogic.betweenKnocks(root._wantsPlaying, root._healRetryAttempts))"
+    assert asks in text, "the footer never asks whether the ladder is waiting for its next knock"
+    ask = text.index(asks)
+    assert 'return i18n("Reconnecting…")' in text[ask:idle], (
+        "the footer no longer says the station is being tried again")
+    for louder in ('i18n("Check internet connection…")', "root.isError",
+                   "fullRepresentation._streamActive", "MediaPlayer.LoadingMedia"):
+        assert text.index(louder) < ask, louder + " no longer outranks the wait"
+
+
+def test_the_history_asks_the_tested_rules_before_it_takes_a_row():
+    """The history used to compare a new title with the newest row and
+    nothing else. Dance Wave! takes turns between two slogans every 15-20 s,
+    so neither ever matched the row above it, and on 2026-09-23 the thirty
+    rows were all slogans seven minutes in. The rules (station talk, a repeat
+    within ten rows of the same station) live in TrackLogic.historyTakes,
+    which tst_tracklogic covers; main.qml cannot be unit-tested, so this pins
+    that the one place a row is born asks them first."""
+    code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    body = _function_body(code, "_pushHistory")
+    ask = body.find("if (!TrackLogic.historyTakes(historyModel, artist, trackName, station)) return;")
+    born = body.find("historyModel.insert(")
+    assert ask != -1, "_pushHistory no longer asks TrackLogic.historyTakes"
+    assert born != -1 and ask < born, "a row is inserted before the rules are asked"
+    assert code.count("historyModel.insert(") == 1, (
+        "a second road inserts history rows without the rules")
+
+
+def test_the_rec_counter_on_screen_waits_for_the_file():
+    """The REC button, the REC bar and the footer used to read the wall clock
+    from the click. On 2026-09-23 a recording's file was born 141 s after the
+    click and the counter read 11:50 over 592.6 s of audio. The engine's
+    recCounterText says "Connecting…" until the file exists and counts from
+    there (tst_recordingengine); the popup cannot be unit-tested, so this pins
+    that every counter on it is that one."""
+    ui = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    assert "recElapsed" not in ui, "the popup reads the wall clock again"
+    shown = re.findall(r'"● REC " \+ ([\w.]+\(\))', ui)
+    assert shown == ["root.recCounterText()", "root.recCounterText()"], shown
+    tip = ui[ui.index('i18n("Recording %1 — click to stop"') - 200:]
+    tip = tip[:tip.index("\n", 200)]
+    assert "root.recOnDisk ?" in tip and "root.recCounterText()" in tip, tip

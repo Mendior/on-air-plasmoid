@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The backfill asks for a logo without saying which address the station is saved at.
+
+history:
+  The station's own directory record is the one row that proves whose logo
+  this is, and it is found by the saved address. Without it the picker has
+  the name alone, and for "Rock FM" or "Radio Nova" the name alone lends
+  nothing, so every such station would keep its initials for ever while the
+  library's own tests stayed green.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                  fav = FaviconLogic.pickFavicon(rows, norm, HealLogic.normName, st.host, 30);
+
+replace:
+                  fav = FaviconLogic.pickFavicon(rows, norm, HealLogic.normName, "", 0);
+
+expect:
+  Killed by tests/test_invariants.py::test_a_logo_found_by_name_passes_the_donor_gate_at_both_doors.
+  Line-neutral.

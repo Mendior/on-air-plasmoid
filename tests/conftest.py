@@ -23,6 +23,7 @@ def pytest_configure(config):
 def cast():
     """cast.py imported as a module (stdlib-only, guarded by __main__)."""
     spec = importlib.util.spec_from_file_location("onair_cast", UI_DIR / "cast.py")
+    assert spec is not None and spec.loader is not None, "cast.py is not loadable as a module"
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -43,6 +44,6 @@ def reader_funcs():
               and n.name in ("decode_meta", "extract_field", "resolve_url")]
     assert len(wanted) == 3, "reader.py no longer defines the expected helpers"
     ns = {}
-    module = ast.Module(body=wanted, type_ignores=[])
+    module = ast.Module(body=list(wanted), type_ignores=[])
     exec(compile(module, str(UI_DIR / "reader.py"), "exec"), ns)
     return ns

@@ -8,6 +8,7 @@
 import QtQuick
 import QtTest
 import "../../package/contents/ui"
+import "../../package/contents/ui/RecLogic.js" as RecLogic
 
 TestCase {
     id: tc
@@ -157,6 +158,25 @@ TestCase {
         e.destroy(); e2.destroy();
     }
 
+    function test_a_healed_station_moves_its_scheduled_recordings() {
+        // A schedule has no heal road of its own: on the dead address ffmpeg
+        // simply fails, every day, and the programme is never recorded.
+        var e = makeEngine();
+        e.addRecSchedule("Rock FM", "https://old.example/live", 20, 0, 60, "weekly", 5);
+        e.addRecSchedule("Other", "https://other.example/live", 7, 30, 30, "daily", 0);
+        var nextRun = e.recSchedules[0].nextRun;
+        verify(e.retargetStation("https://old.example/live", "https://new.example/live"));
+        compare(e.recSchedules[0].url, "https://new.example/live");
+        compare(e.recSchedules[0].station, "Rock FM");
+        compare(e.recSchedules[0].nextRun, nextRun);
+        compare(e.recSchedules[1].url, "https://other.example/live");
+        compare(JSON.parse(e.cfg.recSchedules)[0].url, "https://new.example/live");
+        verify(!e.retargetStation("https://nobody.example/x", "https://new.example/live"));
+        verify(!e.retargetStation("", "https://new.example/live"));
+        verify(!e.retargetStation("https://new.example/live", ""));
+        e.destroy();
+    }
+
     function test_notetrack_writes_only_for_the_matching_instant_recording() {
         var e = makeEngine();
         e._recStart("Radio", "https://s.example/stream", 3600, false);
@@ -170,6 +190,103 @@ TestCase {
         compare(tc.execLog.length, 1);
         verify(_lastExec().indexOf(": REC_TRACK;") === 0);
         verify(_lastExec().indexOf("Song") !== -1);
+        e.destroy();
+    }
+
+    // ── The REC counter and the file on disk. Measured 2026-09-23: the file
+    // of a Dance Wave! recording was born 141 s after the click, and the
+    // counter read 11:50 over 592.6 s of audio. On the bench, a server that
+    // held the recorder's connection for 25 s gave REC 0:24 with no file.
+
+    function _captureRunning(e) {
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        e.handleExec(": REC_URL;", "__REC_URL_OK__", "", 0);
+        tc.execLog = [];
+    }
+
+    function _probeCmd() {
+        for (var i = tc.execLog.length - 1; i >= 0; i--)
+            if (tc.execLog[i].indexOf(": REC_PROBE ") === 0) return tc.execLog[i];
+        return "";
+    }
+
+    function test_the_counter_says_connecting_until_the_file_exists() {
+        var e = makeEngine();
+        _captureRunning(e);
+        compare(e.recCounterText(), "Connecting…");
+        wait(1300);
+        // The wall clock runs for the verdicts; the counter does not.
+        verify(e.recElapsedSec >= 1);
+        compare(e.recCapturedSec, 0);
+        compare(e.recCounterText(), "Connecting…");
+        e._recProbe();
+        var probe = _probeCmd();
+        verify(probe !== "");
+        verify(e.handleExec(probe, "", "", 1));          // not there yet
+        verify(!e.recOnDisk);
+        e._recProbe();
+        verify(e.handleExec(_probeCmd(), "__REC_ON_DISK__\n", "", 0));
+        verify(e.recOnDisk);
+        compare(e.recCounterText(), "0:00");
+        wait(1300);
+        verify(e.recCapturedSec >= 1);
+        compare(e.recCounterText(), RecLogic.elapsedText(e.recCapturedSec));
+        e.destroy();
+    }
+
+    function test_the_probe_asks_about_this_recordings_own_file() {
+        var e = makeEngine();
+        _captureRunning(e);
+        e._recProbe();
+        var probe = _probeCmd();
+        verify(probe.indexOf("[ -e '" + e._recFilePath.replace(/'/g, "'\\''") + "' ]") !== -1);
+        // One question at a time: a second tick while the first is out asks nothing.
+        tc.execLog = [];
+        e._recProbe();
+        compare(_probeCmd(), "");
+        e.destroy();
+    }
+
+    function test_an_answer_about_the_previous_recording_is_dropped() {
+        var e = makeEngine();
+        _captureRunning(e);
+        e._recProbe();
+        var old = _probeCmd();
+        verify(e.handleExec(": REC_START;", "__REC_DONE__ rc=0 bytes=9999999", "", 0));
+        _captureRunning(e);
+        verify(e.handleExec(old, "__REC_ON_DISK__\n", "", 0));
+        verify(!e.recOnDisk);
+        compare(e.recCounterText(), "Connecting…");
+        e.destroy();
+    }
+
+    function test_the_toast_and_the_tracklist_read_the_captured_time() {
+        var e = makeEngine();
+        _captureRunning(e);
+        e._recProbe();
+        e.handleExec(_probeCmd(), "__REC_ON_DISK__\n", "", 0);
+        e.recElapsedSec = 200;          // pressed 3:20 ago…
+        e.recCapturedSec = 65;          // …the file began 1:05 ago
+        tc.execLog = [];
+        e.noteTrack(e._recUrl, "Artist", "Song");
+        verify(_lastExec().indexOf("[1:05] Artist - Song") !== -1);
+        tc.notified = [];
+        e.recStop();
+        verify(e.handleExec(": REC_START;", "__REC_DONE__ rc=255 bytes=9999999", "", 0));
+        compare(tc.notified[0], "Recording saved ✓ (1:05)");
+        verify(!e.recOnDisk);
+        e.destroy();
+    }
+
+    function test_a_stop_before_the_file_leaves_the_next_recording_waiting() {
+        var e = makeEngine();
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        compare(e.recCounterText(), "Connecting…");
+        e.recStop();                    // called off before the capture ran
+        verify(!e.recording);
+        _captureRunning(e);
+        verify(!e.recOnDisk);
+        compare(e.recCapturedSec, 0);
         e.destroy();
     }
 
@@ -199,6 +316,32 @@ TestCase {
         verify(tc.execLog.length >= 1);
         verify(tc.execLog[0].indexOf(": REC_URL;") === 0);
         verify(e.recording);
+        e.destroy();
+    }
+
+    function test_a_scheduled_capture_that_wrote_nothing_keeps_its_backoff() {
+        // A host that answers, holds the socket past five seconds and closes
+        // clean with an empty file is not "interrupted mid-window" — but the
+        // resume road used to read it that way, erase its own retry counter
+        // and relaunch on the next tick, a toast and a process each time for
+        // the whole window. An empty capture earns the backoff like any other
+        // failure that never produced audio.
+        var e = makeEngine();
+        e.app._schedApplyTzChange = function(now) {};   // shared, lives in main
+        e.addRecSchedule("Radio", "https://s.example/stream", 7, 30, 60, "once", 0);
+        var rl = e.recSchedules.slice();
+        rl[0].nextRun = Date.now() - 1000;
+        e.recSchedules = rl;
+        e._recScheduleTick();
+        var key = e._recActiveSchedKey;
+        verify(key !== "");
+        e.handleExec(": REC_URL;", "__REC_URL_OK__", "", 0);
+        e.recElapsedSec = 60;                      // ran the whole window...
+        tc.notified = [];
+        // ...and produced 100 bytes, which is nothing for sixty seconds.
+        verify(e.handleExec(": REC_START;", "__REC_DONE__ rc=0 bytes=100", "", 0));
+        compare(e._recRetryCount[key], 1);
+        verify(e._recRetryAfter[key] > Date.now());
         e.destroy();
     }
 

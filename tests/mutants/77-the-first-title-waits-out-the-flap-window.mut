@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station's first title waits the full debounce before its cover is looked up.
+
+history:
+  The debounce exists for a StreamTitle that flaps. The first title after an
+  empty header has nothing to flap against, and the full window only kept
+  every station's first cover a second and a half further away.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+          artLookupDebounce.interval = first === true ? 200 : 1500;
+
+replace:
+          artLookupDebounce.interval = first === true ? 1500 : 1500;
+
+expect:
+  Killed by tst_artworkengine::test_the_first_title_of_a_station_does_not_wait_out_the_debounce.
+  Line-neutral.

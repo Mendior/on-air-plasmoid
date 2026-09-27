@@ -83,6 +83,24 @@ function bufferNeedKiB(windowMin, isRelay) {
     return Math.max(1, Math.floor(windowMin)) * (isRelay ? 8192 : 2048);
 }
 
+// Coming back to the broadcast, the title and the sleeve on screen are
+// still the best guess about what is on air: after a short pause it is the
+// same song. They stay until live says otherwise — its first title either
+// agrees, and nothing blinks, or replaces them. Without this the restart
+// wiped both and the listener looked at an empty sleeve until the first
+// title came in and the cover was found again. The keep is bounded: a
+// station that never sends a title must not wear the old one for good,
+// and a listener who pressed stop in the meantime gets a clean header.
+// Contract: true only while the listener still wants sound, a return was
+// noted (returnAtMs > 0) and no more than SLEEVE_KEEP_MS have passed.
+var SLEEVE_KEEP_MS = 15000;
+
+function sleeveKept(returnAtMs, nowMs, wantsPlaying) {
+    if (wantsPlaying !== true || !(returnAtMs > 0)) return false;
+    var since = nowMs - returnAtMs;
+    return since >= 0 && since <= SLEEVE_KEEP_MS;
+}
+
 // What the pause button means while a buffer runs: remember where the
 // listener stopped drinking, let the file keep growing, come back to the
 // exact same sentence. The return is the file position to resume at —
@@ -132,11 +150,31 @@ function buildBufferCommands(o) {
         + " | ffmpeg -hide_banner -nostdin -loglevel error -i pipe:0"
         + " -c copy -flush_packets 1 -t " + windowSec
         + " -y " + q(o.outPath)
-        + " & pid=$!; echo $pid > " + q(o.pidPath) + "; "
+        // The pid file names the writer's owner too (this shell and the
+        // host that started it), so the next start can tell a writer whose
+        // widget is alive from one whose widget died under it. The guard
+        // beside it is what stops the second kind without waiting for a
+        // next start: a host that crashes runs no teardown, and a killed
+        // viewer left this chain copying FLAC at ~128 KiB/s under systemd
+        // --user until its hour cap (bench, 2026-09-23). Its output stays
+        // off the host's pipe, or the run's ack would wait on its last tick.
+        + " & pid=$!; echo \"$pid $$ $PPID\" > " + q(o.pidPath) + "; "
+        + (o.guardPath ? "bash " + q(o.guardPath) + " watch \"$$\" \"$PPID\" \"$pid\" >/dev/null 2>&1 & " : "")
         + "wait $pid; rc=$?; rm -f " + q(o.pidPath) + " " + q(o.cfgPath) + "; "
         + "bytes=$(stat -c %s " + q(o.outPath) + " 2>/dev/null || echo 0); "
         + "echo \"__TS_EXIT__ rc=$rc bytes=$bytes\"; true # " + o.seq;
     return { writeUrl: writeUrl, run: run };
+}
+
+// The startup half of the same net. A writer from before the guard existed
+// is still running after its host died, and even a guarded one leaves its
+// buffer behind, which can be hundreds of megabytes of FLAC. The age line is
+// the moment this session started; it keeps the sweep off the session's own
+// first arm. The ack is the guard's "__TS_SWEEP__ stopped=N removed=M" line.
+function buildSweepCommand(guardPath, dirPath, sinceSec, seq) {
+    var q = PodcastLogic.shQuote;
+    return ": TS_SWEEP; bash " + q(guardPath) + " sweep " + q(dirPath) + " "
+        + Math.floor(sinceSec) + " 2>/dev/null; true # " + seq;
 }
 
 // The loopback tap for streams the backend cannot drink from the socket:
@@ -190,7 +228,8 @@ function buildStopCommand(pidPath, outPath, cfgPath, seq, srvPidPath, srvPortPat
             + "rm -f " + q(srvPidPath)
             + (srvPortPath ? " " + q(srvPortPath) : "") + "; ";
     }
-    return ": TS_STOP; " + srv + "[ -f " + q(pidPath) + " ] && kill -INT \"$(cat "
-        + q(pidPath) + ")\" 2>/dev/null; sleep 1; rm -f " + q(outPath)
+    // The writer is the pid file's first field; the other two name its owner.
+    return ": TS_STOP; " + srv + "[ -f " + q(pidPath) + " ] && read -r p _ < " + q(pidPath)
+        + " && kill -INT \"$p\" 2>/dev/null; sleep 1; rm -f " + q(outPath)
         + " " + q(pidPath) + " " + q(cfgPath) + "; true # " + seq;
 }

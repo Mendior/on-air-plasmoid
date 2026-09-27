@@ -315,6 +315,13 @@ Item {
     property int _podSearchSeq: 0
     // How many directory responses the current search still waits for.
     property int _podSearchPending: 0
+    // The finished search reached none of the show directories / not the
+    // episode directory. Without these the page could only say "No shows
+    // found" to a search that never got out of the house.
+    property bool podcastSearchUnreached: false
+    property bool podcastEpSearchUnreached: false
+    property int _podShowsHeard: 0
+    property bool _podEpisodesHeard: false
     property bool podcastTrendingBusy: false
     property int _podTrendSeq: 0
     property string podcastEpisodesFor: ""   // feedUrl the episodes model shows
@@ -464,12 +471,14 @@ Item {
         // answers anything useful to it anyway.
         if (q.length < 2) {
             _podSearchSeq++; podcastSearchModel.clear(); podcastEpSearchModel.clear();
+            podcastSearchUnreached = false; podcastEpSearchUnreached = false;
             podcastSearchBusy = false; return;
         }
         // A pasted feed URL is not a directory query — the shows view offers a
         // direct "open this feed" action for it, so no iTunes round-trip here.
         if (/^https?:\/\//i.test(q)) {
             _podSearchSeq++; podcastSearchModel.clear(); podcastEpSearchModel.clear();
+            podcastSearchUnreached = false; podcastEpSearchUnreached = false;
             podcastSearchBusy = false; return;
         }
         // THREE directories at once — iTunes (primary, biggest index),
@@ -477,11 +486,7 @@ Item {
         // which finds the needle no show-title search can (a topic, a guest,
         // one famous interview). Show results merge as they land, deduped by
         // canonical feed key; a source failing just means the others answer.
-        podcastSearchBusy = true;
-        var seq = ++_podSearchSeq;
-        podcastSearchModel.clear();
-        podcastEpSearchModel.clear();
-        _podSearchPending = 4;
+        var seq = _podSearchBegin();
         _podSearchITunes(q, seq);
         _podSearchFyyd(q, seq);
         _podSearchGpodder(q, seq);
@@ -529,13 +534,35 @@ Item {
         });
     }
 
+    // A new search: empty lists, four answers to wait for. Returns its seq.
+    function _podSearchBegin() {
+        podcastSearchBusy = true;
+        var seq = ++_podSearchSeq;
+        podcastSearchModel.clear();
+        podcastEpSearchModel.clear();
+        _podSearchPending = 4;
+        _podShowsHeard = 0;
+        _podEpisodesHeard = false;
+        podcastSearchUnreached = false;
+        podcastEpSearchUnreached = false;
+        return seq;
+    }
+
     // A source finished (well or badly) — the spinner stops when the last
     // one is in. A stale seq never settles: the counter belongs to the
-    // query that superseded it.
-    function _podSearchSettle(seq) {
+    // query that superseded it. heard: the directory answered at all (an
+    // empty list counts); episodes: it was the episode directory. The
+    // verdict waits for the last answer, so a slow directory that does
+    // answer is never reported as unreachable.
+    function _podSearchSettle(seq, heard, episodes) {
         if (seq !== _podSearchSeq) return;
+        if (heard && episodes) _podEpisodesHeard = true;
+        else if (heard) _podShowsHeard++;
         _podSearchPending--;
-        if (_podSearchPending <= 0) podcastSearchBusy = false;
+        if (_podSearchPending > 0) return;
+        podcastSearchBusy = false;
+        podcastSearchUnreached = _podShowsHeard === 0;
+        podcastEpSearchUnreached = !_podEpisodesHeard;
     }
 
     function _podSearchITunes(q, seq) {
@@ -555,9 +582,11 @@ Item {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             app._clearXhrTimeout(guard); guard = null;
             if (seq !== _podSearchSeq) return;   // a newer search took over
+            // null when the directory did not answer at all (no network, a
+            // refusal, a portal's login page): PodcastLogic.directoryAnswer.
+            var res = PodcastLogic.directoryAnswer(xhr.status, xhr.responseText, "results");
             try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                for (var i = 0; i < res.length; i++) {
+                for (var i = 0; res && i < res.length; i++) {
                     var r = res[i] || {};
                     _podAppendSearchRow(r.collectionName, r.artistName,
                         String(r.artworkUrl600 || r.artworkUrl100 || "").trim(),
@@ -566,11 +595,11 @@ Item {
             } catch (e) {
                 console.log("[ARP] podcastSearch(iTunes): " + e);
             }
-            _podSearchSettle(seq);
+            _podSearchSettle(seq, res !== null, false);
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -590,9 +619,9 @@ Item {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             app._clearXhrTimeout(guard); guard = null;
             if (seq !== _podSearchSeq) return;
+            var res = PodcastLogic.directoryAnswer(xhr.status, xhr.responseText, "data");
             try {
-                var res = JSON.parse(xhr.responseText || "{}").data || [];
-                for (var i = 0; i < res.length; i++) {
+                for (var i = 0; res && i < res.length; i++) {
                     var r = res[i] || {};
                     _podAppendSearchRow(r.title, r.author,
                         String(r.smallImageURL || r.imgURL || "").trim(),
@@ -601,11 +630,11 @@ Item {
             } catch (e) {
                 console.log("[ARP] podcastSearch(fyyd): " + e);
             }
-            _podSearchSettle(seq);
+            _podSearchSettle(seq, res !== null, false);
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -628,9 +657,9 @@ Item {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             app._clearXhrTimeout(guard); guard = null;
             if (seq !== _podSearchSeq) return;
+            var res = PodcastLogic.directoryAnswer(xhr.status, xhr.responseText, "");
             try {
-                var res = JSON.parse(xhr.responseText || "[]") || [];
-                for (var i = 0; i < res.length && i < 30; i++) {
+                for (var i = 0; res && i < res.length && i < 30; i++) {
                     var r = res[i] || {};
                     var hm = /^https?:\/\/([^\/?#:]+)/i.exec(String(r.website || ""));
                     var host = hm ? hm[1] : "";
@@ -640,10 +669,10 @@ Item {
             } catch (e) {
                 console.log("[ARP] podcastSearch(gpodder): " + e);
             }
-            _podSearchSettle(seq);
+            _podSearchSettle(seq, res !== null, false);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -670,9 +699,9 @@ Item {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
             app._clearXhrTimeout(guard); guard = null;
             if (seq !== _podSearchSeq) return;
+            var res = PodcastLogic.directoryAnswer(xhr.status, xhr.responseText, "results");
             try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                for (var i = 0; i < res.length && podcastEpSearchModel.count < 30; i++) {
+                for (var i = 0; res && i < res.length && podcastEpSearchModel.count < 30; i++) {
                     var r = res[i] || {};
                     var eurl = String(r.episodeUrl || "").trim();
                     if (!PodcastLogic.urlAllowed(eurl)) continue;
@@ -697,11 +726,11 @@ Item {
             } catch (e) {
                 console.log("[ARP] podcastSearch(episodes): " + e);
             }
-            _podSearchSettle(seq);
+            _podSearchSettle(seq, res !== null, true);
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -769,7 +798,7 @@ Item {
         };
         xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
                         + "/podcasts/top/25/podcasts.json");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -816,7 +845,7 @@ Item {
             podcastTrendingBusy = false;
         };
         xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -851,7 +880,7 @@ Item {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -945,7 +974,7 @@ Item {
                 podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -1017,7 +1046,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = app._armXhrTimeout(xhr, 8000);
         xhr.send();
     }
@@ -1188,7 +1217,7 @@ Item {
         app.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
             + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.39' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.40' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1389,7 +1418,7 @@ Item {
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.39");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
         guard = _armXhrTimeout(xhr, 15000);
         xhr.send();
     }

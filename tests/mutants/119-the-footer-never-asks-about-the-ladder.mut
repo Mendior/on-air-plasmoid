@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The footer stops asking whether the retry ladder is waiting, so a station
+  being tried again reads "Choose station and enjoy…".
+
+history:
+  The decision is tested in RetryLogic; FullRepresentation.qml has no tests
+  of its own, so whether the footer still asks is held by an invariant.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                      else if (RetryLogic.betweenKnocks(root._wantsPlaying, root._healRetryAttempts))
+
+replace:
+                      else if (false)
+
+expect:
+  Killed by test_invariants::test_the_footer_says_reconnecting_while_the_ladder_waits.
+  Line-neutral.

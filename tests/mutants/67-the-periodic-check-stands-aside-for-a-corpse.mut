@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The periodic check stands aside for a settle round nothing will tick
+  again, and goes silent for the life of the group.
+
+history:
+  The settle round's third tick falls 150 + 105 + 105 = 360 s after it arms,
+  and the periodic check is a six-minute timer started at the same moment.
+  Measured twice on 2026-09-21 (04:06 and 06:14): the periodic probe went out
+  three seconds ahead, the settle tick found a probe in the air, called the
+  room busy and came back a minute later — a fifth probe and sixty seconds on
+  every round, measuring what the round was already measuring.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          if (_settleReadsLeft > 0 && (settleFixTimer.running || _settleProbeOut)) return;
+
+replace:
+          if (_settleReadsLeft > 0 && (true || _settleProbeOut)) return;
+
+expect:
+  Killed by tst_syncengine::test_the_periodic_check_stands_aside_while_a_settle_round_lives.
+  Line-neutral.

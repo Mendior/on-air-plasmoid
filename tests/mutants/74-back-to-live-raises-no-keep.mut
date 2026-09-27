@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  "Back to live" touches the player without raising the header's keep.
+
+history:
+  Reported by the listener on 2026-09-21: back from a pause the cover was
+  gone and had to be waited for. The shift flag went down and the player was
+  stopped in one breath, and the stopped edge wiped title and cover. The
+  engine raises a bounded keep first; this takes the raise away.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          liveReturnAt = nowMs > 0 ? nowMs : 0;   // no clock, no keep
+
+replace:
+          liveReturnAt = 0;   // no clock, no keep
+
+expect:
+  Killed by tst_timeshiftengine::test_back_to_live_raises_the_keep_before_it_touches_the_player.
+  Line-neutral.

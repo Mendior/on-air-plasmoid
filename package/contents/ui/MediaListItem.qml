@@ -324,8 +324,10 @@ PlasmaComponents3.ItemDelegate {
                     // Untrusted (station name) — never interpret as HTML
                     textFormat: Text.PlainText
                     font.weight: listItem.isCurrent && listItem.isBuffered ? Font.DemiBold : Font.Normal
+                    // The text variant: on Breeze Light the raw bright
+                    // green is 1.23:1 against this row's own wash.
                     color: listItem.isCurrent && listItem.isBuffered
-                           ? root.accentBright
+                           ? root.accentBrightText
                            : Kirigami.Theme.textColor
                     maximumLineCount: 1
                     elide: Text.ElideRight

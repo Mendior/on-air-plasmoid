@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The spacing between two members' plays in the shared capture goes back to
+  1.8 s, which is not a whole number of graph cycles.
+
+history:
+  Each member is its own paplay, and a stream starts at the next graph cycle
+  after it is asked for, so its start latency is a sawtooth of the phase the
+  request lands in. Two plays a slot apart share that latency only when the
+  slot is whole cycles. 1.8 s is 168.75 cycles of a 512-frame graph and
+  84.375 of a 1024-frame one: a quarter, or three eighths, of all rounds start
+  the second member a cycle off, and the median of three passes that on as the
+  two clusters one quantum apart first written down on 2026-08-12 (33 %
+  measured, 31.6 % predicted). Measured 2026-09-21, thirty rounds each and
+  interleaved: a third of the rounds jumped at 1.8 s, a fifth at 1.792 s, and
+  the constant 2 ms the old spacing carried went with it.
+
+target:
+  package/contents/ui/calibrate.py
+
+find:
+  ULTRA_SLOT_SECONDS = 1.792 # how much of ONE shared capture each member owns.
+
+replace:
+  ULTRA_SLOT_SECONDS = 1.8   # how much of ONE shared capture each member owns.
+
+expect:
+  Killed by tests/test_calibrate.py::test_two_members_one_slot_apart_start_with_the_same_latency.
+  Line-neutral.

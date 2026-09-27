@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The history looks for a repeat in the newest row only.
+
+history:
+  That was the whole rule until 2026-09-23, and two slogans taking turns
+  beat it every time: neither ever matched the row just above it.
+
+target:
+  package/contents/ui/TrackLogic.js
+
+find:
+      var n = Math.min(rows.count, HISTORY_LOOKBACK);
+
+replace:
+      var n = Math.min(rows.count, 1);
+
+expect:
+  Killed by tests/qml/tst_tracklogic.qml::test_a_slogan_taking_turns_with_songs_gets_one_row.
+  Line-neutral.

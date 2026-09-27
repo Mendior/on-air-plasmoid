@@ -35,7 +35,19 @@ Item {
     property string _recStationName: ""
     property string _recFilePath: ""
     property string _recTracksPath: ""
+    // Wall-clock seconds since REC was pressed. The completion verdicts
+    // (ran full, too small, failed fast) read this one.
     property int recElapsedSec: 0
+    // The capture's file exists: ffmpeg has the stream and opened its
+    // output. The REC counter waits for it.
+    property bool recOnDisk: false
+    // Seconds since recOnDisk — what the REC counter, the saved toast and
+    // the tracklist show.
+    property int recCapturedSec: 0
+    // Which recording a disk probe was asked for; an answer for an older
+    // one is dropped.
+    property int _recGen: 0
+    property bool _recProbeInFlight: false
     // Requested length of the current recording — the completion handler
     // compares the actual elapsed time against it to tell "ran to the end"
     // from "the stream died halfway through".
@@ -79,17 +91,32 @@ Item {
 
     function _pad2(n) { return ("0" + n).slice(-2); }
 
-    // All three live in RecLogic.js with their tests.
-    function recElapsedText() {
-        return RecLogic.elapsedText(recElapsedSec);
-    }
-
+    // Both live in RecLogic.js with their tests.
     function _recSanitizeName(name) {
         return RecLogic.sanitizeStationName(name);
     }
 
     function canRecordUrl(url) {
         return RecLogic.canRecordUrl(url);
+    }
+
+    // What the REC button, bar and footer show: "Connecting…" until the
+    // file is on disk, then the time since.
+    function recCounterText() {
+        return recording && !recOnDisk ? i18n("Connecting…")
+                                       : RecLogic.elapsedText(recCapturedSec);
+    }
+
+    // Asks whether the capture's file exists yet. Existence and not size:
+    // ffmpeg opens its output only once the stream has answered, but writes
+    // it in 256 KiB blocks. Measured on the bench at 128 kbps, the file sat
+    // at 0 bytes for 15 s after it appeared, which at 32 kbps would be a
+    // minute of recorded audio the counter never counted.
+    function _recProbe() {
+        if (_recProbeInFlight || !recording || recOnDisk) return;
+        _recProbeInFlight = true;
+        app.exec(": REC_PROBE " + _recGen + "; [ -e " + PodcastLogic.shQuote(_recFilePath)
+                 + " ] && echo __REC_ON_DISK__; true # " + app.nextSeq());
     }
 
     // REC button: record what is playing right now.
@@ -117,6 +144,7 @@ Item {
         var key = _recActiveSchedKey;
         var wasScheduled = _recScheduled;
         recording = false;
+        recOnDisk = false;
         _recScheduled = false;
         _recStopRequested = false;
         _recActiveSchedKey = "";
@@ -198,6 +226,10 @@ Item {
         if (!scheduled) _recActiveSchedKey = "";
         _recStopRequested = false;
         recElapsedSec = 0;
+        recOnDisk = false;
+        recCapturedSec = 0;
+        _recGen++;
+        _recProbeInFlight = false;
         _recDurationSec = Math.max(60, Math.floor(durationSec));
         _recUrl = url;
         _recStationName = cleanName;
@@ -341,6 +373,29 @@ Item {
         _saveRecSchedules();
     }
 
+    // A scheduled recording carries its own copy of the address and has no
+    // heal road at all: after a station moved, ffmpeg was started on the dead
+    // address every day and the programme was never recorded.
+    // Contract: every schedule whose url IS oldUrl gets newUrl; true only
+    // when something was rewritten.
+    function retargetStation(oldUrl, newUrl) {
+        if (!oldUrl || !newUrl || oldUrl === newUrl) return false;
+        var list = [], changed = false;
+        for (var i = 0; i < recSchedules.length; i++) {
+            var a = recSchedules[i];
+            if ((a.url || "") === oldUrl) {
+                var b = {}; for (var k in a) b[k] = a[k];
+                b.url = newUrl; a = b; changed = true;
+            }
+            list.push(a);
+        }
+        if (changed) {
+            recSchedules = list;
+            _saveRecSchedules();
+        }
+        return changed;
+    }
+
     function removeRecSchedule(index) {
         if (index < 0 || index >= recSchedules.length) return;
         var list = recSchedules.slice();
@@ -456,13 +511,34 @@ Item {
         onTriggered: recElapsedSec += 1
     }
 
+    Timer {
+        id: recCapturedTimer
+        interval: 1000
+        repeat: true
+        running: engine.recording && engine.recOnDisk
+        onTriggered: engine.recCapturedSec += 1
+    }
+
+    // Only while the capture shell runs and its file is not there yet —
+    // usually one or two asks. A server that keeps the recorder waiting
+    // (141 s on 2026-09-23) is asked every second for the first half
+    // minute, then every two. The interval is how late the counter can
+    // start: with five here the bench counter read 0:53 over a 58.3 s file.
+    Timer {
+        id: recDiskProbe
+        interval: engine.recElapsedSec < 30 ? 1000 : 2000
+        repeat: true
+        running: engine.recording && !engine.recOnDisk && engine._recPending === null
+        onTriggered: engine._recProbe()
+    }
+
     // The instant-recording tracklist sidecar: one line per title change
     // while THIS stream records. target is _icyStreamTarget(playerSource),
     // computed by the app because it owns the player.
     function noteTrack(target, artist, title) {
         if (recording && !_recScheduled && _recTracksPath !== ""
             && target === _recUrl && title) {
-            var recLine = "[" + recElapsedText() + "] "
+            var recLine = "[" + RecLogic.elapsedText(recCapturedSec) + "] "
                           + (artist ? artist + " - " : "") + title;
             app.exec(": REC_TRACK; printf '%s\\n' '" + recLine.replace(/'/g, "'\\''")
                      + "' >> '" + _recTracksPath.replace(/'/g, "'\\''") + "'");
@@ -515,19 +591,29 @@ Item {
                 app.notify(i18n("Scheduled recording started"), recJob.station, "media-record");
             return true;
         }
+            if (cmd.indexOf(": REC_PROBE ") === 0) {
+            var probeGen = parseInt(cmd.substring(12), 10);
+            if (probeGen !== _recGen) return true;
+            _recProbeInFlight = false;
+            if (recording && (stdout || "").indexOf("__REC_ON_DISK__") !== -1) recOnDisk = true;
+            return true;
+        }
             if (cmd.indexOf(": REC_CLEAN;") === 0) {
             Qt.callLater(_recScheduleTick);
             return true;
         }
             if (cmd.indexOf(": REC_START;") === 0) {
             var recFile = _recFilePath;
-            var recDur = recElapsedText();
+            // The toast names what is in the file; the verdicts below judge
+            // on the wall clock, as they always have.
+            var recDur = RecLogic.elapsedText(recCapturedSec);
             var recElapsed = recElapsedSec;
             var recWanted = _recDurationSec;
             var recWasScheduled = _recScheduled;
             var recSchedKey = _recActiveSchedKey;
             var recWasStopRequested = _recStopRequested;
             recording = false;
+            recOnDisk = false;
             _recScheduled = false;
             _recStopRequested = false;
             _recActiveSchedKey = "";
@@ -589,8 +675,14 @@ Item {
             // stream refused at once) is what storms — a real capture
             // that ran a while and got interrupted is not. Only the
             // former earns backoff; the latter resumes right away.
+            // A capture that held the connection but wrote nothing is not
+            // the latter: measured on a host that answers, keeps the socket
+            // open past five seconds and closes clean with an empty file,
+            // the resume road erased its own counter and relaunched on the
+            // next tick — a toast and a process per tick for the whole
+            // window, which is exactly what the backoff exists to stop.
             var recFailedFast = !recOk && !recWasStopRequested
-                                && (recNoFfmpeg || recElapsed < 5 || !recDone);
+                                && (recNoFfmpeg || recElapsed < 5 || !recDone || recTooSmall);
             app.notify(recTitle, recText, recIcon);
             if (recWasScheduled && recSchedKey) {
                 if (recOk || recWasStopRequested) {

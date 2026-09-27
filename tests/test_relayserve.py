@@ -24,8 +24,11 @@ ROOT = Path(__file__).resolve().parent.parent
 TAP = ROOT / "package" / "contents" / "ui" / "relayserve.py"
 
 _SRC = TAP.read_text(encoding="utf-8")
-LEAD_BYTES = int(re.search(r"^LEAD_BYTES = (\d+) \* 1024", _SRC, re.MULTILINE).group(1)) * 1024
-LEAD_SEC = float(re.search(r"^LEAD_SEC = ([\d.]+)", _SRC, re.MULTILINE).group(1))
+_LB = re.search(r"^LEAD_BYTES = (\d+) \* 1024", _SRC, re.MULTILINE)
+_LS = re.search(r"^LEAD_SEC = ([\d.]+)", _SRC, re.MULTILINE)
+assert _LB and _LS, "relayserve.py no longer declares LEAD_BYTES / LEAD_SEC the way this test reads them"
+LEAD_BYTES = int(_LB.group(1)) * 1024
+LEAD_SEC = float(_LS.group(1))
 
 
 class Tap:

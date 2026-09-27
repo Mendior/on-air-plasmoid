@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A master read as zero is clamped to ten and remembered.
+
+history:
+  Measured 2026-09-20: the config held 30 while the listener had kept the
+  room at 40 with the volume keys all evening. The only writer of the level
+  was the disable's ack, and a panel restart or a reboot destroys the engine
+  before that ack lands, so the next enable ramped back to a room close to
+  inaudible. The level is now read every half minute while the room is
+  alive — which makes the answer's guards the whole of its safety: a verify
+  parks the master at 100, the ramp climbs through levels nobody chose, and
+  a new generation starts at a polite 20.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          if (!(pct >= 1)) return;
+
+replace:
+          if (!(pct >= 0)) return;
+
+expect:
+  Killed by tst_syncengine::test_the_watch_ignores_a_dead_group_and_a_volume_turned_to_nothing.
+  Line-neutral.

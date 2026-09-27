@@ -44,7 +44,8 @@ Item {
             function nextSeq() { return ++seqN; }
             property var notes: []
             function notify(t, x, i) { notes.push({ title: t, text: x }); }
-            function tsBufferDir() { return "/home/egon/.cache/onair/timeshift"; }
+            property string bufDir: "/home/egon/.cache/onair/timeshift"
+            function tsBufferDir() { return bufDir; }
             function tsServeScriptPath() { return "/opt/onair/relayserve.py"; }
             property bool playingNow: true
             function isPlaying() { return playingNow; }
@@ -54,7 +55,16 @@ Item {
             // an engine that never asked passed here just as happily.
             property bool _tsPaused: false
             function tsPlayBuffer(url, pos) { played.push({ kind: "buffer", url: url, pos: pos }); }
-            function tsPlayLive(url) { played.push({ kind: "live", url: url, pos: -1 }); }
+            // `keep` is what the header's keep read at the moment the player
+            // was touched: the stop inside the real tsPlayLive is synchronous,
+            // so a keep raised after this call is a keep raised too late.
+            property var engine: null
+            property bool _wantsPlaying: true
+            property string metadata: "Artist - Song\t"
+            function tsPlayLive(url) {
+                played.push({ kind: "live", url: url, pos: -1,
+                              keep: engine ? engine.sleeveKept(1200000) : false });
+            }
             function tsPlayRelay(url) { played.push({ kind: "relay", url: url, pos: -1 }); }
         }
     }
@@ -284,6 +294,51 @@ Item {
             r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__ port=34567", 1002000);
         }
 
+        // The host can die without a teardown (a crash, a kill), and what
+        // its writers left behind sits in this widget's own directory until
+        // somebody looks. The next start is that somebody.
+        function test_startup_sweeps_this_widgets_own_directory() {
+            var r = rig();
+            r.e.startup(1790000000500);
+            compare(r.mock.execLog.length, 1);
+            var c = r.mock.execLog[0];
+            verify(c.indexOf(": TS_SWEEP;") === 0);
+            verify(c.indexOf("tsguard.sh' sweep '/home/egon/.cache/onair/timeshift' 1790000000") !== -1);
+            verify(c.indexOf(r.e.guardScriptPath) !== -1);
+            verify(!r.e.active);   // a sweep is not an arm
+        }
+
+        function test_startup_without_a_directory_sends_nothing() {
+            var r = rig();
+            r.mock.bufDir = "";
+            r.e.startup(1790000000500);
+            compare(r.mock.execLog.length, 0);
+        }
+
+        function test_the_sweeps_ack_is_the_engines_and_changes_nothing() {
+            var r = rig();
+            armed(r);
+            var n = r.mock.execLog.length;
+            verify(r.e.handleExec(": TS_SWEEP; export LC_ALL=C LANGUAGE=C; bash 'g' sweep 'd' 1; true # 99",
+                                  "__TS_SWEEP__ stopped=1 removed=4\n", 1000600, 0));
+            compare(r.mock.execLog.length, n);
+            verify(r.e.active);
+            verify(r.e.writerUp);
+        }
+
+        // The relay's writer is the one the bench caught orphaned, so both
+        // kinds of arm are asked.
+        function test_every_run_command_starts_the_writers_guard() {
+            var r = rig();
+            verify(/\/tsguard\.sh$/.test(r.e.guardScriptPath));
+            var guard = "bash '" + r.e.guardScriptPath + "' watch \"$$\" \"$PPID\" \"$pid\"";
+            armed(r);
+            verify(r.mock.execLog[1].indexOf(guard) !== -1);
+            var rr = rig({ timeshiftEnabled: false });
+            relayed(rr);
+            verify(rr.mock.execLog[1].indexOf(guard) !== -1);
+        }
+
         function test_a_relay_arms_and_serves_with_the_feature_off() {
             // Issue #3: live Ogg-family streams wedge the backend on the
             // socket. The relay is playability, not a feature — it must
@@ -414,6 +469,84 @@ Item {
             r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1005000);
             compare(r.mock.execLog.length, n);
             verify(!r.e.active);
+        }
+
+        function test_back_to_live_raises_the_keep_before_it_touches_the_player() {
+            // Seen by the listener: back from a pause the cover was gone and
+            // had to be waited for. The flag went down and the player was
+            // stopped in one breath, and the stopped edge wiped the header.
+            var r = rig();
+            r.mock.engine = r.e;
+            armed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
+            verify(!r.e.sleeveKept(1200000));
+            r.e.backToLive(1200000);
+            var last = r.mock.played[r.mock.played.length - 1];
+            compare(last.kind, "live");
+            verify(last.keep);
+        }
+
+        function test_a_relays_catch_up_raises_the_keep_too() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            verify(r.e.pauseGesture(1100000) > 0);
+            verify(r.e.resumeGesture());
+            r.e.backToLive(1200000);
+            verify(r.e.sleeveKept(1200000 + 4000));
+        }
+
+        function test_a_press_that_does_nothing_raises_nothing() {
+            var r = rig();
+            armed(r);
+            r.e.backToLive(1200000);      // live already: not shifted, not parked
+            verify(!r.e.sleeveKept(1200000));
+        }
+
+        function test_a_title_from_live_ends_the_keep_and_a_stop_refuses_it() {
+            var r = rig();
+            armed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
+            r.e.backToLive(1200000);
+            verify(r.e.sleeveKept(1201000));
+            // The listener pressed stop on the way back.
+            r.mock._wantsPlaying = false;
+            verify(!r.e.sleeveKept(1201000));
+            r.mock._wantsPlaying = true;
+            // Live spoke: the header is live's from here on.
+            r.e.liveTitleSeen();
+            verify(!r.e.sleeveKept(1201000));
+            compare(r.e.liveReturnAt, 0);
+        }
+
+        function test_a_return_nobody_confirmed_gives_the_header_back_empty() {
+            // A station that sends no titles must not wear the old one for good.
+            var r = rig();
+            armed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
+            r.e.backToLive(1200000);
+            r.e._sleeveExpired();
+            compare(r.mock.metadata, "");
+            compare(r.e.liveReturnAt, 0);
+        }
+
+        function test_a_confirmed_return_and_a_new_park_keep_their_title() {
+            var r = rig();
+            armed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
+            r.e.backToLive(1200000);
+            r.e.liveTitleSeen();
+            r.e._sleeveExpired();
+            compare(r.mock.metadata, "Artist - Song\t");
+            // Parked again before the deadline: the park owns the header now.
+            r.e.backToLive(1300000);
+            r.e.liveReturnAt = 1300000;
+            r.mock._tsPaused = true;
+            r.e._sleeveExpired();
+            compare(r.mock.metadata, "Artist - Song\t");
         }
 
         function test_back_to_live_keeps_a_running_writer() {

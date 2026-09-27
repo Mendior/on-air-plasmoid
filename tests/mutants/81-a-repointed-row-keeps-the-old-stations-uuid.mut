@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station row pointed at another station keeps the first one's directory uuid.
+
+history:
+  The edit dialog copied every role of the row, uuid included. The heal
+  trusts a uuid over everything: it asked byuuid where the station lives,
+  was handed the OLD station's address and saved it over the edit for good.
+  The dialog now empties the uuid when the edit leaves the station; this
+  turns the question inside out, so a rename loses it and a repointed row
+  keeps it.
+
+target:
+  package/contents/ui/config/configGeneral.qml
+
+find:
+                  if (existing.uuid && !HealLogic.editKeepsIdentity(existing.name, existing.hostname,
+
+replace:
+                  if (existing.uuid && HealLogic.editKeepsIdentity(existing.name, existing.hostname,
+
+expect:
+  Killed by test_invariants::test_a_repointed_station_row_lets_go_of_the_old_stations_uuid.
+  Line-neutral.

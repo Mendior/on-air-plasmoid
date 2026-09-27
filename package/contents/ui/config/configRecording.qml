@@ -41,6 +41,10 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             Layout.fillWidth: true
+            // A wrapping label with no width of its own reports its whole
+            // sentence as one line (1211 px here), and a FormLayout that wide
+            // folds the page into its narrow one-column shape.
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 25
             wrapMode: Text.Wrap
         }
 
@@ -59,6 +63,7 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             Layout.fillWidth: true
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 25
             wrapMode: Text.Wrap
         }
 
@@ -83,6 +88,7 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             Layout.fillWidth: true
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 25
             wrapMode: Text.Wrap
         }
     }

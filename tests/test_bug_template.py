@@ -12,12 +12,21 @@ and fails if one is not runnable.
 
 It checks runnability, not output: on a headless CI box there is no plasmashell
 and the journal grep is legitimately empty (grep exits 1, "no match"). What
-must never happen is exit 127 (a tool the form names is absent) or 2 (the
-command the form prints does not parse) — those are the form lying to a
-reporter, and they go red here.
+must never happen is a tool the form names being absent, or a command the form
+prints not parsing — those are the form lying to a reporter, and they go red
+here.
+
+The exit code alone cannot carry that, which this file claimed for a while and
+which measuring it disproved. `cmd | missing | tail` exits 0: a pipeline
+reports its LAST stage, so 127 only surfaces when the absent tool happens to be
+the final one, and `… || true` buries every failure in the first command
+outright. So presence is checked directly instead, on every stage of every
+pipe, and the run is kept for what it alone can show — that the command parses
+and the tools accept the flags the form prints.
 """
 
 import re
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -48,12 +57,42 @@ def test_every_command_the_template_prints_is_actually_in_the_template():
             "update EMBEDDED and the template together" % cmd)
 
 
+# A shell builtin is always there, and `x=1 cmd` is an assignment, not a tool.
+SHELL_BUILTINS = {"true", "false", ":", "cd", "echo", "test", "["}
+# Where one command ends and the next begins. Anything else is an argument.
+COMMAND_SEPARATORS = {"|", "||", "&&", ";", "&"}
+
+
+def programs_in(cmd):
+    """Every program the shell would try to launch, in order.
+
+    shlex is what makes this honest rather than a split on "|": the journal
+    command's own grep pattern contains three pipe characters inside quotes,
+    and a naive split turns `'on ?air|\\[ARP\\]|…'` into four imaginary tools.
+    """
+    found, starting = [], True
+    for token in shlex.split(cmd, posix=True):
+        if token in COMMAND_SEPARATORS:
+            starting = True
+        elif starting:
+            if token not in SHELL_BUILTINS and "=" not in token:
+                found.append(token)
+            starting = False
+    return found
+
+
 def test_every_command_the_template_prints_is_runnable():
     for cmd in EMBEDDED:
-        first = cmd.split()[0]
-        assert shutil.which(first), (
-            "the bug template tells reporters to run %r, but %s is not on PATH "
-            "here — do not ask for a tool that may be absent" % (cmd, first))
+        # Every stage, not just the first word. The journal command is
+        # journalctl | grep | tail, and a form that names a grep or a tail the
+        # reporter does not have is just as broken as one naming a missing
+        # journalctl — but the exit code cannot say so (see the module
+        # docstring), so it is asked directly.
+        for tool in programs_in(cmd):
+            assert shutil.which(tool), (
+                "the bug template tells reporters to run %r, but %s is not on "
+                "PATH here — do not ask for a tool that may be absent"
+                % (cmd, tool))
         # shell=True is the point: these are the reporter's verbatim pipelines
         # (grep, tail), and EMBEDDED is a hardcoded constant — no external input
         # reaches the shell, so there is nothing to inject.
@@ -61,8 +100,9 @@ def test_every_command_the_template_prints_is_runnable():
             cmd, shell=True, capture_output=True, text=True, timeout=30
         )
         # 0 = ran and matched, 1 = ran and matched nothing (empty journal on a
-        # headless box). Anything else means a tool is missing (127) or the
-        # command does not parse (2) — the form would be lying to a reporter.
+        # headless box). 2 means the command the form prints does not parse,
+        # and 127 still catches an absent tool in the LAST stage of a pipe —
+        # the presence check above covers the stages this cannot reach.
         assert p.returncode in (0, 1), (
             "the template command failed to RUN (exit %d): %s\nstderr: %s"
             % (p.returncode, cmd, p.stderr.strip()[:300]))

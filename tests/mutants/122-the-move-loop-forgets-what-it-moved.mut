@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The results model is moved into its order without keeping track of what each move renumbered.
+
+history:
+  A ListModel moves one row at a time and every move renumbers the rows
+  behind it, so an order made before the first move is wrong after it. The
+  loop keeps a list of where each row stood; without it the rows land on
+  the wrong places as soon as two of them change.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+          cur.splice(t, 0, cur.splice(j, 1)[0]);
+
+replace:
+          void 0;
+
+expect:
+  Killed by tests/qml/tst_searchlogic.qml::test_an_order_lands_on_a_real_list_model.
+  Line-neutral.

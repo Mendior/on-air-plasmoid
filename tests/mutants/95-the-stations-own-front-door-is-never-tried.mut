@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Only the directory's resolved address is auditioned, never the station's own.
+
+history:
+  A byuuid row holds two addresses: where the checker last ended up, and
+  the door the station handed in. They differ on one row in nine, and a
+  station added from the search saves the resolved one — so when that dies
+  the front door is all there is, and it was never tried.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      if (firstOnly !== true) doors.push((row.url || "").toString());
+
+replace:
+      if (firstOnly === true) doors.push((row.url || "").toString());
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_the_stations_own_front_door_is_tried_too.
+  Line-neutral.

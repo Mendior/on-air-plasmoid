@@ -671,4 +671,40 @@ TestCase {
         compare(PL.episodeKey("", "https://a.fm/e.mp3"), "https://a.fm/e.mp3")
         compare(PL.episodeKey("g", "u"), "g")
     }
+
+    function test_a_directory_that_said_nothing_is_no_answer() {
+        // No network, a name that does not resolve, the ten-second guard's
+        // abort: all of them arrive as status 0 with an empty body.
+        compare(PL.directoryAnswer(0, "", "results"), null)
+        // Refusals and outages.
+        compare(PL.directoryAnswer(403, '{"errorMessage":"Rate limited"}', "results"), null)
+        compare(PL.directoryAnswer(429, "", "results"), null)
+        compare(PL.directoryAnswer(503, "<html>down</html>", "data"), null)
+        // A captive portal answers 200 with its own login page.
+        compare(PL.directoryAnswer(200, "<!DOCTYPE html><title>Log in</title>", "results"), null)
+        compare(PL.directoryAnswer(200, "", "results"), null)
+        compare(PL.directoryAnswer(undefined, undefined, "results"), null)
+    }
+
+    function test_an_empty_list_is_an_answer() {
+        // The show really is not there: this is "No shows found".
+        compare(PL.directoryAnswer(200, '{"resultCount":0,"results":[]}', "results"), [])
+        compare(PL.directoryAnswer(200, '{"status":1,"msg":"ok","data":[]}', "data"), [])
+        compare(PL.directoryAnswer(200, "[]", ""), [])
+        // A well-formed reply without the list still came from the directory.
+        compare(PL.directoryAnswer(200, '{"status":0,"msg":"nothing"}', "data"), [])
+        compare(PL.directoryAnswer(200, '{"error":"x"}', ""), [])
+    }
+
+    function test_an_answer_carries_its_rows() {
+        var rows = PL.directoryAnswer(200,
+            '{"resultCount":2,"results":[{"collectionName":"The History Hour"},{"collectionName":"History Extra"}]}',
+            "results")
+        compare(rows.length, 2)
+        compare(rows[0].collectionName, "The History Hour")
+        compare(PL.directoryAnswer(200, '[{"title":"A"}]', "")[0].title, "A")
+        compare(PL.directoryAnswer(200, '{"data":[{"title":"B"}]}', "data")[0].title, "B")
+        // A list where the list should be is the only shape rows come in.
+        compare(PL.directoryAnswer(200, '{"results":"nope"}', "results"), [])
+    }
 }

@@ -20,6 +20,7 @@ def _movecheck():
     spec = importlib.util.spec_from_file_location(
         "movecheck", ROOT / "scripts" / "movecheck.py"
     )
+    assert spec is not None and spec.loader is not None, "movecheck.py is not loadable"
     mod = importlib.util.module_from_spec(spec)
     sys.modules["movecheck"] = mod
     spec.loader.exec_module(mod)

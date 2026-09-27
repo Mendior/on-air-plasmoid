@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A text colour is handed back as it came, whether it can be read or not.
+
+history:
+  On Breeze Light the playing station's name was a bright green on its
+  row's pale green wash, 1.23:1 where body text wants 4.5:1. The text
+  colours are measured against the popup and the wash and walked toward
+  black or white until they read; this makes every colour pass the
+  measurement.
+
+target:
+  package/contents/ui/ColorLogic.js
+
+find:
+      if (worstContrast(fg, bg, wash) >= want) return fg;
+
+replace:
+      if (worstContrast(fg, bg, wash) >= 0) return fg;
+
+expect:
+  Killed by tst_colorlogic::test_a_light_scheme_gets_a_green_it_can_read.
+  Line-neutral.

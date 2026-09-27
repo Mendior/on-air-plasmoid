@@ -51,6 +51,79 @@ TestCase {
         return engineComp.createObject(tc, { app: app, cfg: cfg });
     }
 
+    // A search is four answers: iTunes, fyyd and gpodder for shows, iTunes
+    // again for episodes. Each XHR handler hands its verdict to the settle;
+    // these drive the settle directly, the way the handlers do, with no
+    // network in the test.
+    function settleAll(e, seq, shows, episodes) {
+        for (var i = 0; i < 3; i++) e._podSearchSettle(seq, shows[i], false)
+        e._podSearchSettle(seq, episodes, true)
+    }
+
+    function test_a_search_nobody_answered_is_not_no_shows_found() {
+        // Measured on the bench with the directories unreachable: the page
+        // said "No shows found", which tells the listener the show does not
+        // exist, and offered no way to ask again.
+        var e = makeEngine()
+        var seq = e._podSearchBegin()
+        verify(e.podcastSearchBusy)
+        settleAll(e, seq, [false, false, false], false)
+        verify(!e.podcastSearchBusy)
+        verify(e.podcastSearchUnreached, "nobody answered and the shows view does not know")
+        verify(e.podcastEpSearchUnreached, "the episode directory did not answer")
+        e.destroy()
+    }
+
+    function test_one_directory_answering_empty_is_a_real_no_shows_found() {
+        var e = makeEngine()
+        var seq = e._podSearchBegin()
+        settleAll(e, seq, [false, true, false], true)
+        verify(!e.podcastSearchUnreached, "fyyd answered: the show is not there")
+        verify(!e.podcastEpSearchUnreached)
+        e.destroy()
+    }
+
+    function test_shows_and_episodes_are_judged_apart() {
+        // The episode search rides iTunes alone: iTunes refusing while
+        // gpodder answers leaves the shows answered and the episodes not.
+        var e = makeEngine()
+        var seq = e._podSearchBegin()
+        settleAll(e, seq, [false, false, true], false)
+        verify(!e.podcastSearchUnreached)
+        verify(e.podcastEpSearchUnreached)
+        e.destroy()
+    }
+
+    function test_the_verdict_waits_for_the_last_answer() {
+        var e = makeEngine()
+        var seq = e._podSearchBegin()
+        e._podSearchSettle(seq, false, false)
+        e._podSearchSettle(seq, false, false)
+        e._podSearchSettle(seq, false, true)
+        verify(!e.podcastSearchUnreached, "judged before gpodder was in")
+        e._podSearchSettle(seq, true, false)
+        verify(!e.podcastSearchUnreached)
+        verify(e.podcastEpSearchUnreached)
+        e.destroy()
+    }
+
+    function test_asking_again_clears_the_old_verdict_and_a_stale_answer_is_ignored() {
+        var e = makeEngine()
+        var old = e._podSearchBegin()
+        settleAll(e, old, [false, false, false], false)
+        verify(e.podcastSearchUnreached)
+        // "Try again": a new search starts with no verdict at all.
+        var seq = e._podSearchBegin()
+        verify(!e.podcastSearchUnreached, "the retry still says unreachable while it asks")
+        verify(!e.podcastEpSearchUnreached)
+        // A late answer of the first search changes nothing.
+        e._podSearchSettle(old, false, false)
+        compare(e._podSearchPending, 4)
+        settleAll(e, seq, [true, false, false], true)
+        verify(!e.podcastSearchUnreached)
+        e.destroy()
+    }
+
     function test_the_ledger_survives_a_save_load_roundtrip() {
         var e = makeEngine();
         e.downloads["a.mp3"] = { key: "k1", title: "Ep 1", at: 111 };
@@ -364,6 +437,8 @@ TestCase {
         compare(handed.length, 1);
         compare(handed[0], "ep.mp3");
         e.destroy();
+    }
+
     function test_clearplaying_retires_the_whole_identity_as_one_unit() {
         // Four player-death sites used to spell these seven by hand; one
         // of them once drifted and the stale raw URL turned an episode
@@ -387,5 +462,4 @@ TestCase {
         e.destroy();
     }
 
-    }
 }

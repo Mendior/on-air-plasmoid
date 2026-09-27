@@ -2,6 +2,7 @@
   "_what": "Every exec sentinel accounted for: reads_exit_code (branch acts on the code), fire_and_forget (handled, ack deliberately ignored - reason given), fired_no_handler (sent, never dispatched - reason given), todo (stage-2 work queue: classify or justify). test_exec_branch_accounting.py keeps this file and the code from drifting apart.",
   "classified_floor": 2,
   "reads_exit_code": {
+    "MPRIS_WRITE": "the state write answers whether the daemon is alive; __MPRIS_GONE__ on stdout starts it again",
     "MPRIS_START": "nonzero exit stops the dead daemon's write/poll churn",
     "DL_YTDLP": "mutagen-only failure retries without embedding; 0 confirms the file"
   },
@@ -10,17 +11,21 @@
     "PW_UNCOMBINE": "teardown; the sweep that follows is the real check",
     "PW_COMBINE_CLEAN": "cleanup of a body already abandoned",
     "PW_TRIM": "balance nudge; the next verify measures the truth",
+    "PW_MASTER": "level watch; it only reads, and an empty, held or stale-generation answer is simply dropped",
     "PW_STEALBACK": "default-sink etiquette, best effort",
     "PW_PARKREST": "parked-sink restore, best effort",
     "PW_CALIBKILL": "kills a wedged calibration; nothing to report",
     "PW_DRIFTKILL": "kills a wedged drift probe; nothing to report",
-    "PW_ORPHANS": "orphan sweep; absence of orphans is normal"
+    "PW_ORPHANS": "orphan sweep; absence of orphans is normal",
+    "TS_SWEEP": "startup sweep of the buffer directory; the ack only logs what it cleared, and a sweep that never ran leaves the old state, not a broken one",
+    "PW_HEARING": "ack lifts the deaf shelf and rearms the sweep when the SBC-XQ seat was taken; a failed or absent seat only logs — the exit code carries nothing the HEARING line does not",
+    "REC_PROBE": "file watch for the REC counter; it only reads, and a no, a failed shell or an older recording's answer is dropped until the next tick asks again"
   },
   "fired_no_handler": {
     "ALARM_UNMUTE": "alarm must sound; unmute is best effort on top",
     "BT_GENTLE": "polite disconnect attempt before the kick",
     "FAV_DROP": "favourite removal ack carries nothing",
-    "PW_FLUSH": "sink flush before rebuild, best effort",
+    "PW_FLUSH": "a Bluetooth transport bounce (verify pathology, join watchdog, the owed birth flush), best effort; the settle round that follows measures what it left",
     "PW_MASTERLIFT": "master lift is re-measured by the next verify",
     "PW_UNMUTE": "unmute on volume raise; the slider state is the truth",
     "REC_STOP": "recording stop; the file's size is the verdict",

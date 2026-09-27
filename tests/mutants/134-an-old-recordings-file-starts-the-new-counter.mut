@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A disk probe asked for the previous recording is taken as the answer for
+  the one that just started.
+
+history:
+  Stop and press REC again inside a second and the old probe's "it exists"
+  lands after the new recording began. Taken at its word, the new counter
+  runs while nothing of the new file is on disk.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+              if (probeGen !== _recGen) return true;
+
+replace:
+              if (isNaN(probeGen)) return true;
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_an_answer_about_the_previous_recording_is_dropped.
+  Line-neutral.

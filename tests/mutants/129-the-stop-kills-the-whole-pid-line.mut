@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stop hands kill the whole pid file, which now holds three numbers.
+
+history:
+  The pid file names the writer's owner since the startup sweep needed it
+  ("writer shell host"). Read whole, as it was when it held one number, it
+  is a single word kill cannot use: nothing is stopped, and every station
+  change leaves the previous writer copying its stream.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+      return ": TS_STOP; " + srv + "[ -f " + q(pidPath) + " ] && read -r p _ < " + q(pidPath)
+
+replace:
+      return ": TS_STOP; " + srv + "[ -f " + q(pidPath) + " ] && p=$(cat " + q(pidPath) + ")"
+
+expect:
+  Killed by tests/qml/tst_timeshiftlogic.qml::test_the_stop_kills_the_first_field_of_the_pid_file.
+  Line-neutral.

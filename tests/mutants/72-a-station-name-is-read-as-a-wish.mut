@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  "virgin radio uk" is read as two tags inside Britain instead of a name.
+
+history:
+  The facet reading accepts unknown words beside a country, which is what
+  makes "synthwave uk" work. Words that belong to station names are the
+  fence: one of them and the query goes to the name roads untouched.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+                  if (NAME_WORDS.hasOwnProperty(w) || /[0-9]/.test(w)) return null;
+
+replace:
+                  if (/[0-9]/.test(w)) return null;
+
+expect:
+  Killed by tst_searchlogic::test_station_names_are_left_to_the_name_roads.
+  Line-neutral.

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The empty download folder field names a folder the downloads never go to.
+
+history:
+  The hint was the literal ~/Music/OnAir while the downloads went to the
+  desktop's own music folder, which a Finnish desktop calls Musiikki. The
+  hint and the download road ask PathLogic.defaultDir now; this writes the
+  old guess back into the field.
+
+target:
+  package/contents/ui/config/configAppearance.qml
+
+find:
+                return PathLogic.shownDir(PathLogic.defaultDir(music, home + "/Music"), home)
+
+replace:
+                return "~/Music/OnAir"
+
+expect:
+  Killed by tests/test_invariants.py::test_the_folder_hint_names_the_folder_the_downloads_go_to.
+  Line-neutral.

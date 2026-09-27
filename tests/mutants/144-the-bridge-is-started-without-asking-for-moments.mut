@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The widget starts its MPRIS bridge without --ms-seq.
+
+history:
+  mpris.py counts 1, 2, 3 unless it is asked for moments, so that a 2026.39
+  widget starting the new file keeps numbers its int can hold. This widget's
+  gate refuses any line more than ten seconds older than the clock, and a
+  count of 1 is fifty years old: every key would be dropped.
+
+target:
+  package/contents/ui/MprisCommandGate.qml
+
+find:
+                 + PodcastLogic.shQuote(stateFile) + " " + PodcastLogic.shQuote(cmdFile) + " --ms-seq";
+
+replace:
+                 + PodcastLogic.shQuote(stateFile) + " " + PodcastLogic.shQuote(cmdFile);
+
+expect:
+  Killed by tests/test_invariants.py::test_the_widget_starts_its_bridge_asking_for_moments,
+  which the gate reaches before tests/qml/tst_mpriscommandgate.qml::test_the_bridge_is_started_asking_for_moments.
+  Line-neutral.

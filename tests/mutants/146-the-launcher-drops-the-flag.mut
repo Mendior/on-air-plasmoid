@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  start-mpris.sh starts the bridge without the flag it was given.
+
+history:
+  The widget asks for moments on the launcher's command line, and the
+  launcher has to hand that on to mpris.py, or the bridge counts 1, 2, 3 for
+  a widget that reads the number as a clock.
+
+target:
+  package/contents/ui/start-mpris.sh
+
+find:
+  [[ "${3:-}" == --ms-seq ]] && SEQ_FLAG=(--ms-seq)
+
+replace:
+  [[ "${3:-}" == --ms-seq ]] && SEQ_FLAG=()
+
+expect:
+  Killed by tests/test_mpris_seq.py::test_the_launcher_hands_the_flag_on.
+  Line-neutral.

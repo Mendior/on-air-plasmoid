@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station list taken over from the popup marks the settings page as edited.
+
+history:
+  In plasmoidviewer the settings dialog lights Apply on any change signal,
+  whatever the value. The popup gave three stations their logos while the
+  Stations page was open, Apply lit up with nothing changed there, and
+  leaving the page asked "Apply Settings?". The takeover is quiet now; this
+  sends it through the edit road instead.
+
+target:
+  package/contents/ui/config/configGeneral.qml
+
+find:
+                      for (const server of servers) stationsModel.append(server);
+                      root._servers = external;
+
+replace:
+                      for (const server of servers) stationsModel.append(server);
+                      root._edited();
+
+expect:
+  Killed by tests/test_invariants.py::test_a_list_taken_over_from_the_popup_is_no_edit_on_either_page,
+  which the gate reaches first (unit tests run before the QML tests).
+  tests/qml/tst_stationspage.qml::test_a_list_taken_over_from_the_popup_leaves_the_page_unchanged
+  goes red on it as well. Line-neutral.

@@ -163,6 +163,26 @@ def _copy_tree(dst: Path) -> None:
     )
 
 
+def shard_of(items: list, spec: str) -> list:
+    """The K-th of N interleaved slices of `items`, for spec "K/N".
+
+    The nightly run is one full gate per mutant, about 3.7 minutes each, and a
+    hosted job is stopped at 360: the corpus outgrew one job at about ninety.
+    Interleaved, not halved, so a new mutant at the end of the list lands in
+    alternating shards and neither one grows alone. Every item is in exactly
+    one shard. A spec that is not "K/N" with 1 <= K <= N is an error, never a
+    silent full run.
+    """
+    try:
+        k_text, n_text = spec.split("/")
+        k, n = int(k_text), int(n_text)
+    except ValueError:
+        sys.exit(f"--shard wants K/N, got {spec!r}")
+    if not 1 <= k <= n:
+        sys.exit(f"--shard wants 1 <= K <= N, got {spec!r}")
+    return items[k - 1 :: n]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -184,12 +204,20 @@ def main() -> int:
         "(a mutant that was being killed now survives); the documented "
         "survivors staying alive is green. For the nightly CI job.",
     )
+    ap.add_argument(
+        "--shard",
+        metavar="K/N",
+        help="run only the K-th of N interleaved slices of the corpus "
+        "(the nightly job runs the slices side by side)",
+    )
     args = ap.parse_args()
 
     files = sorted(MUTANTS_DIR.glob("*.mut"))
     if not files:
         sys.exit(f"no mutants in {MUTANTS_DIR}")
     mutants = [parse(f) for f in files]
+    if args.shard:
+        mutants = shard_of(mutants, args.shard)
     if args.only:
         mutants = [m for m in mutants if m.name == args.only]
         if not mutants:
@@ -262,7 +290,9 @@ def main() -> int:
 
     if args.check_baseline:
         return _baseline_verdict(
-            {m.name for m, _ in survived}, {m.name for m, _ in broken}
+            {m.name for m, _ in survived},
+            {m.name for m, _ in broken},
+            ran={m.name for m in mutants},
         )
 
     # Survivors are the finding, not a failure of this script. Exit 1 so the
@@ -270,7 +300,7 @@ def main() -> int:
     return 1 if survived or broken else 0
 
 
-def _baseline_verdict(survived: set, broken: set) -> int:
+def _baseline_verdict(survived: set, broken: set, ran: set | None = None) -> int:
     """Green while the survivors stay within the documented blind-spot list.
 
     A NEW survivor means a guard that used to catch its bug no longer does —
@@ -282,6 +312,10 @@ def _baseline_verdict(survived: set, broken: set) -> int:
 
     path = REPO / "tests" / "mutants_baseline.json"
     expected = set(json.loads(path.read_text(encoding="utf-8"))["expected_survivors"])
+    # A shard answers only for what it ran: a documented survivor that lives
+    # in the other shard has not been "covered", it has not been looked at.
+    if ran is not None:
+        expected &= ran
 
     regressed = survived - expected
     recovered = expected - survived - broken

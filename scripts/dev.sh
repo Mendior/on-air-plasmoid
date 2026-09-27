@@ -118,6 +118,7 @@ PYEOF
 for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/reader.py" "$PKG/contents/ui/mpris.py" "$PKG/contents/ui/cast.py" "$PKG/contents/ui/calibrate.py"
     python3 -c "import json; json.load(open('$PKG/metadata.json'))"
     bash -n "$PKG/contents/ui/start-mpris.sh"
+    bash -n "$PKG/contents/ui/tsguard.sh"
     # Python rules, pinned in ruff.toml. That file is the record: every rule
     # switched off there carries the reason it was triaged out on 2026-08-09,
     # one finding at a time, so nobody has to rediscover a decision somebody
@@ -132,6 +133,21 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     else
       echo "lint: ruff NOT INSTALLED — the Python rules did not run"
     fi
+      # Types are the rung below the tests: a signature that does not hold at
+      # definition level is not worth running a single test against. Same rule
+      # as ruff's — a missing checker says so instead of reading as green.
+      if command -v pyright >/dev/null 2>&1; then
+        # pyright exits nonzero when it finds something, and under set -e the
+        # assignment took the whole gate down right here: red, and not one
+        # line to say why (met on 2026-09-21, three silent runs).
+        pyout="$(cd "$REPO_DIR" && pyright 2>/dev/null)" || true
+        if ! printf '%s\n' "$pyout" | grep -qE '^0 errors'; then
+          printf '%s\n' "$pyout" | grep -E ' - error:' | head -20
+          echo "lint FAILED: pyright (pyrightconfig.json says what is checked)"; fail=1
+        fi
+      else
+        echo "lint: pyright NOT INSTALLED — the Python types did not run"
+      fi
     # Translations: every .po must compile cleanly (a bad one would silently
     # ship a broken catalog).
     for po in "$REPO_DIR"/po/*.po; do
@@ -299,7 +315,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       if (cd "$REPO_DIR" && git ls-files \
             | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
             | grep -vE '\.(png|ogg)$' \
-            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem' -q 3); then
+            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem,nd' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi

@@ -99,6 +99,20 @@ Item {
     // ever ran once.
     property int _armSeq: -1
 
+    // The writer's guard and the startup sweep (tsguard.sh) live beside this
+    // file. A path is not a touch on the world, so it is not the facade's.
+    readonly property string guardScriptPath: Qt.resolvedUrl("tsguard.sh").toString().substring(7)
+
+    // The start clears what a host that died without its teardown left in
+    // this widget's own directory. nowMs is the age line, so the caller runs
+    // this before anything can arm: a url file written first would count as
+    // the dead session's and be taken from under its own writer.
+    function startup(nowMs) {
+        var dir = app.tsBufferDir();
+        if (!dir) return;
+        app.exec(TimeshiftLogic.buildSweepCommand(guardScriptPath, dir, nowMs / 1000, app.nextSeq()));
+    }
+
     function _seqOf(cmd) {
         var m = /#\s*(\d+)\s*$/.exec(String(cmd));
         return m ? parseInt(m[1]) : -1;
@@ -150,7 +164,7 @@ Item {
         var windowMin = Math.max(5, Math.min(240, cfg.timeshiftWindowMin || 60));
         var cmds = TimeshiftLogic.buildBufferCommands({
             url: url, cfgPath: cfgFilePath, outPath: bufPath, pidPath: pidPath,
-            dirPath: dir, windowSec: windowMin * 60,
+            dirPath: dir, windowSec: windowMin * 60, guardPath: guardScriptPath,
             needKiB: TimeshiftLogic.bufferNeedKiB(windowMin, isRelay === true), seq: seq
         });
         active = true;
@@ -353,8 +367,35 @@ Item {
     // arrived that 0 made `nowMs - _relayBirthDeathAt` a large NEGATIVE
     // number — under the window forever, so a station that lost its writer
     // once could never be caught back up to live again.
+    // The header over a return to live — see TimeshiftLogic.sleeveKept.
+    // Whoever hears a title from the broadcast calls liveTitleSeen(); a
+    // return nobody confirmed in time gives the header back empty.
+    property double liveReturnAt: 0
+    function sleeveKept(nowMs) {
+        return TimeshiftLogic.sleeveKept(liveReturnAt, nowMs, app._wantsPlaying === true);
+    }
+    function liveTitleSeen() {
+        liveReturnAt = 0;
+        sleeveGuard.stop();
+    }
+    function _sleeveExpired() {
+        if (liveReturnAt <= 0) return;
+        liveReturnAt = 0;
+        if (!app._tsPaused && !shifted) app.metadata = "";
+    }
+    Timer {
+        id: sleeveGuard
+        interval: TimeshiftLogic.SLEEVE_KEEP_MS
+        onTriggered: engine._sleeveExpired()
+    }
+
     function backToLive(nowMs) {
         if (!shifted && shiftPosMs < 0) return;
+        // Before anything else: the flag below goes down and the player is
+        // stopped in the same breath, and the stopped edge wipes the header
+        // unless the keep is already up.
+        liveReturnAt = nowMs > 0 ? nowMs : 0;   // no clock, no keep
+        sleeveGuard.restart();
         if (relay) {
             armRelay(streamUrl, stationName, nowMs);
             return;
@@ -522,6 +563,16 @@ Item {
             return true;
         }
         if (cmd.indexOf(": TS_STOP;") === 0) return true;
+        if (cmd.indexOf(": TS_SWEEP;") === 0) {
+            // Nothing to act on — the sweep is done when it answers. A line
+            // in the journal when it found something, so a crash that left a
+            // writer behind can be told from one that did not.
+            var sw = /__TS_SWEEP__ stopped=(\d+) removed=(\d+)/.exec(stdout || "");
+            if (sw && (sw[1] !== "0" || sw[2] !== "0"))
+                console.log("[ARP] timeshift: the last session left " + sw[1]
+                            + " writer(s) running and " + sw[2] + " file(s) behind — cleared");
+            return true;
+        }
         return false;
     }
 }

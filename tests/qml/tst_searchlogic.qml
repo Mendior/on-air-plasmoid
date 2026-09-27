@@ -31,6 +31,242 @@ TestCase {
         compare(SL.longestWord(""), "");
     }
 
+    function test_the_word_pass_asks_for_the_listeners_own_word() {
+        // "radio" is the directory's 50 most voted names holding "radio", and
+        // one of them held "nova"; asked for "nova", twenty-one did. Unfolded,
+        // and the first word on a tie, like longestWord.
+        compare(SL.askWord("nova radio"), "nova");
+        compare(SL.askWord("Rádio Nova"), "Nova");        // folds to the station word
+        compare(SL.askWord("the rock station"), "rock");
+        compare(SL.askWord("radio 101"), "101");
+        compare(SL.askWord("bbc radio 1"), "bbc");
+        compare(SL.askWord("Järvi radio"), "Järvi");
+        compare(SL.askWord("fm Järviradio"), "Järviradio");
+    }
+
+    function test_with_no_word_of_its_own_the_longest_is_asked_as_before() {
+        compare(SL.askWord("radio fm"), "radio");
+        compare(SL.askWord("fm 4"), "fm");                // under three letters culls nothing
+        compare(SL.askWord("r1 radio"), "radio");
+        compare(SL.askWord("raadio elmar"), "raadio");    // no station word typed: the longest
+        compare(SL.askWord(""), "");
+        compare(SL.askWord(null), "");
+    }
+
+    function test_an_http_and_an_https_twin_are_one_address() {
+        // Rows 6 and 47 of name=rock by votes, measured 2026-09-21.
+        compare(SL.urlKey("http://mp3channels.webradio.rockantenne.de/heavy-metal"),
+                SL.urlKey("https://mp3channels.webradio.rockantenne.de/heavy-metal"));
+        compare(SL.urlKey("http://Host.FM:80/live/"), "host.fm/live");
+        compare(SL.urlKey("https://host.fm:443/live"), "host.fm/live");
+        compare(SL.urlKey("https://icast.connectmedia.hu/5301/live.mp3/"),
+                SL.urlKey("https://icast.connectmedia.hu/5301/live.mp3"));
+        compare(SL.urlKey("http://ec4.yesstreaming.net:3770/"), "ec4.yesstreaming.net:3770");
+        compare(SL.urlKey("HTTP://host.fm/play/?id=7#now"), "host.fm/play?id=7#now");
+    }
+
+    function test_what_names_another_stream_is_another_key() {
+        verify(SL.urlKey("http://host.fm/Live") !== SL.urlKey("http://host.fm/live"));   // a mount's case counts
+        verify(SL.urlKey("http://host.fm/play?id=1") !== SL.urlKey("http://host.fm/play?id=2"));
+        verify(SL.urlKey("http://host.fm:8000/live") !== SL.urlKey("http://host.fm:8080/live"));
+        verify(SL.urlKey("http://host.fm:443/live") !== SL.urlKey("https://host.fm/live"));
+        // A relay of the same station on another host is a stream of its own.
+        verify(SL.urlKey("http://stream.gal.io/arrow") !== SL.urlKey("http://stream.player.arrow.nl/arrowcr"));
+        compare(SL.urlKey("  rtmp://host.fm/x "), "rtmp://host.fm/x");
+        compare(SL.urlKey(null), "");
+        compare(SL.urlKey(undefined), "");
+    }
+
+    function test_a_hidden_rail_never_fences_a_later_search() {
+        // The chip and its ✕ live on the rail. With the rail switched off,
+        // "jazz in uk" pinned GB and "raadio elmar" then ran inside Britain.
+        compare(SL.scopeFor({ released: false, textCc: "", countryRole: false,
+                              pinnedCc: "GB", railShown: false }), "");
+        // The country the text names is the listener's word, rail or no rail.
+        compare(SL.scopeFor({ released: false, textCc: "GB", countryRole: false,
+                              pinnedCc: "", railShown: false }), "GB");
+    }
+
+    function test_a_visible_chip_fences_as_before() {
+        compare(SL.scopeFor({ released: false, textCc: "", countryRole: false,
+                              pinnedCc: "GB", railShown: true }), "GB");
+        compare(SL.scopeFor({ released: false, textCc: "FI", countryRole: false,
+                              pinnedCc: "GB", railShown: true }), "FI");
+        compare(SL.scopeFor({ released: true, textCc: "FI", countryRole: false,
+                              pinnedCc: "GB", railShown: true }), "");
+        compare(SL.scopeFor({ released: false, textCc: "", countryRole: true,
+                              pinnedCc: "GB", railShown: true }), "");
+        compare(SL.scopeFor({ pinnedCc: "GB" }), "GB");   // no word about the rail: it is there
+        compare(SL.scopeFor({}), "");
+        compare(SL.scopeFor(null), "");
+    }
+
+    function test_a_bitrate_in_bps_reads_as_kbps() {
+        compare(SL.kbps(128), 128);
+        compare(SL.kbps("320"), 320);
+        compare(SL.kbps(128000), 128);
+        compare(SL.kbps(1411), 1411);     // lossless, and in kbps already
+        compare(SL.kbps(7999), 7999);
+        compare(SL.kbps(8000), 8);
+        compare(SL.kbps(null), 0);
+        compare(SL.kbps("x"), 0);
+    }
+
+    readonly property string byBitrate:
+        "/json/stations/search?name=rock&hidebroken=true&order=bitrate&reverse=true&limit=50"
+
+    function rateRow(name, bitrate, votes, codec) {
+        return { "name": name, "bitrate": bitrate, "votes": votes, "codec": codec };
+    }
+
+    function rowNames(rows) {
+        return rows.map(function(r) { return r.name; });
+    }
+
+    function test_the_bitrate_page_is_ordered_by_the_honest_number() {
+        // The head of name=rock by bitrate as the directory gave it on
+        // 2026-09-21, plus a television row and a 320 filed in bps.
+        var page = [rateRow("Mellow Rock", 64000, 56, "MP4"),
+                    rateRow("radio club 80 rock", 3072, 105, "OGG"),
+                    rateRow("Paradise FLAC http", 1441, 24, "OGG"),
+                    rateRow("Paradise FLAC https", 1441, 2860, "OGG"),
+                    rateRow("Rock", 320, 7, "AAC+"),
+                    rateRow("Paradise 320k", 320, 15205, "AAC"),
+                    rateRow("24h Television", 3012, 3295, "AAC,H.264"),
+                    rateRow("Filed in bps", 320000, 100, "MP3")];
+        var got = SL.pageOrder(page, byBitrate, 30);
+        compare(got.length, 8);
+        compare(rowNames(got), ["radio club 80 rock", "Paradise FLAC https", "Paradise FLAC http",
+                                "Paradise 320k", "Filed in bps", "Rock", "Mellow Rock",
+                                "24h Television"]);
+    }
+
+    function test_only_the_rows_the_page_will_show_change_places() {
+        // "Show more" asks from the position the walk reached, so the rows
+        // shown have to be the first rows of the directory's own order.
+        var page = [rateRow("a", 64000, 1, "MP3"), rateRow("b", 320, 5, "MP3"),
+                    rateRow("c", 320, 9, "MP3"), rateRow("d", 1411, 2, "FLAC")];
+        var got = SL.pageOrder(page, byBitrate, 3);
+        compare(got.length, 4);
+        compare(rowNames(got), ["c", "b", "a", "d"]);
+        var none = SL.pageOrder(page, byBitrate, 0);
+        compare(none.length, 4);
+        compare(rowNames(none), ["a", "b", "c", "d"]);
+    }
+
+    function test_any_other_order_is_the_directorys_own() {
+        var page = [rateRow("a", 64, 1, "MP3"), rateRow("b", 320, 5, "MP3")];
+        var got = SL.pageOrder(page, byBitrate.replace("order=bitrate", "order=votes"), 30);
+        compare(got.length, 2);
+        compare(rowNames(got), ["a", "b"]);
+        verify(SL.asksBitrate(byBitrate));
+        verify(!SL.asksBitrate("/json/stations/search?name=order%3Dbitrate&order=votes&reverse=true"));
+        verify(!SL.asksBitrate(null));
+        // What is no list goes back untouched: the caller's own guard reads it.
+        compare(SL.pageOrder(null, byBitrate, 30), null);
+        var slush = { "ok": false };
+        verify(SL.pageOrder(slush, byBitrate, 30) === slush);
+    }
+
+    // "nova radio" under the Bitrate chip, 2026-09-23: the name pass and the
+    // word pass each came back in bitrate order and were shown one after the
+    // other, so a 320 from Croatia sat under a 64 from London.
+    function novaPasses() {
+        return [{ "name": "Nova Radio Lloret", "rate": 320, "votes": 2, "alive": -1 },
+                { "name": "Kazanova Radio", "rate": 192, "votes": 31, "alive": -1 },
+                { "name": "DeepNova Radio - DanceNova", "rate": 160, "votes": 11, "alive": -1 },
+                { "name": "DeepNova Radio", "rate": 128, "votes": 12, "alive": -1 },
+                { "name": "Terranova Radio", "rate": 128, "votes": 1, "alive": -1 },
+                { "name": "24/7 Bossa Nova Radio", "rate": 64, "votes": 69, "alive": -1 },
+                { "name": "Radio Nova Gradiška", "rate": 320, "votes": 83, "alive": -1 },
+                { "name": "Radio Nova (NO)", "rate": 256, "votes": 138, "alive": -1 },
+                { "name": "Radio Nova22", "rate": 224, "votes": 183, "alive": -1 },
+                { "name": "Radio Nova (BE)", "rate": 192, "votes": 22, "alive": -1 },
+                { "name": "Radio Nova (FR)", "rate": 128, "votes": 29, "alive": -1 }];
+    }
+
+    readonly property var novaInOneOrder:
+        ["Radio Nova Gradiška", "Nova Radio Lloret", "Radio Nova (NO)", "Radio Nova22",
+         "Kazanova Radio", "Radio Nova (BE)", "DeepNova Radio - DanceNova", "Radio Nova (FR)",
+         "DeepNova Radio", "Terranova Radio", "24/7 Bossa Nova Radio"]
+
+    function test_every_pass_of_a_bitrate_search_is_one_order() {
+        var rows = novaPasses();
+        var got = SL.rateOrder(rows).map(function(i) { return rows[i].name; });
+        compare(got, novaInOneOrder);
+    }
+
+    function test_a_dead_row_stays_under_the_living_in_its_own_order() {
+        // The probe's verdict outranks the number, and the dead keep the
+        // order _webSinkDead gave them, so a re-sort never shuffles them.
+        var rows = [{ "rate": 64, "votes": 1, "alive": 0 },
+                    { "rate": 128, "votes": 5, "alive": -1 },
+                    { "rate": 256, "votes": 5, "alive": 1 },
+                    { "rate": 320, "votes": 9, "alive": 0 }];
+        compare(SL.rateOrder(rows), [2, 1, 0, 3]);
+    }
+
+    function test_rows_that_tie_keep_their_places() {
+        var same = [{ "rate": 128, "votes": 5 }, { "rate": 128, "votes": 5 }, { "rate": 128, "votes": 5 }];
+        compare(SL.rateOrder(same), [0, 1, 2]);
+        compare(SL.rateOrder([{ "rate": 128, "votes": 5 }, { "rate": 320, "votes": 1 },
+                              { "rate": 128, "votes": 5 }]), [1, 0, 2]);
+        // What says nothing about its sound sorts as nothing, and never throws.
+        compare(SL.rateOrder([null, { "rate": 64 }, {}]), [1, 0, 2]);
+        compare(SL.rateOrder(null), []);
+        compare(SL.rateOrder({ "length": 2 }), []);
+    }
+
+    ListModel { id: orderModel }
+
+    function fillOrderModel(rows) {
+        orderModel.clear();
+        for (var i = 0; i < rows.length; i++) orderModel.append(rows[i]);
+    }
+
+    function orderNames() {
+        var out = [];
+        for (var i = 0; i < orderModel.count; i++) out.push(orderModel.get(i).name);
+        return out;
+    }
+
+    function test_an_order_lands_on_a_real_list_model() {
+        fillOrderModel(["a", "b", "c", "d", "e"].map(function(n) { return { "name": n }; }));
+        verify(SL.applyOrder(orderModel, [2, 0, 4, 1, 3]));
+        compare(orderNames(), ["c", "a", "e", "b", "d"]);
+        verify(SL.applyOrder(orderModel, [0, 1, 2, 3, 4]));
+        compare(orderNames(), ["c", "a", "e", "b", "d"]);
+        verify(SL.applyOrder(orderModel, [4, 3, 2, 1, 0]));
+        compare(orderNames(), ["d", "b", "e", "a", "c"]);
+    }
+
+    function test_an_order_that_is_no_permutation_moves_nothing() {
+        fillOrderModel(["a", "b", "c"].map(function(n) { return { "name": n }; }));
+        verify(!SL.applyOrder(orderModel, [0, 1]));
+        verify(!SL.applyOrder(orderModel, [0, 0, 1]));
+        verify(!SL.applyOrder(orderModel, [0, 1, 3]));
+        verify(!SL.applyOrder(orderModel, [2, 1, "0"]));
+        verify(!SL.applyOrder(orderModel, null));
+        verify(!SL.applyOrder(null, [0]));
+        compare(orderNames(), ["a", "b", "c"]);
+    }
+
+    function test_the_results_model_is_sorted_in_place() {
+        fillOrderModel(novaPasses());
+        SL.rateSort(orderModel);
+        compare(orderNames(), novaInOneOrder);
+        SL.rateSort(null);   // no model, no throw
+    }
+
+    function test_a_rotten_row_sorts_as_one_that_says_nothing() {
+        // The mirrors are only semi-trusted: a null among the rows must not
+        // throw here, it is skipped by the walk like before.
+        var holed = SL.pageOrder([null, rateRow("b", 320, 5, "MP3")], byBitrate, 30);
+        compare(holed.length, 2);
+        compare(holed[1], null);
+        compare(holed[0].name, "b");
+    }
+
     function test_matches_all_words_any_order_fold_blind() {
         verify(SL.matchesAllWords("Radio Nova", SL.words("nova radio")));
         verify(SL.matchesAllWords("Järviradio", SL.words("jarvi")));
@@ -164,6 +400,244 @@ TestCase {
         compare(r.text, "stuck in the middle"); compare(r.cc, "GB")
     }
 
+
+    // ── a wish typed as facets: "rock 80 uk" ────────────────────────────
+    // The resolver the facet tests use: the hand aliases first, like the
+    // widget does, then the small stand-in map above.
+    function _ccAll(name) {
+        var k = SL.fold(name)
+        var a = SL.countryAliases()
+        if (Object.prototype.hasOwnProperty.call(a, k)) return a[k]
+        return _cc(name)
+    }
+
+    function test_a_decade_is_one_tag_however_it_is_spelled() {
+        var same = ["80", "80s", "80's", "80’s", "1980s", "1980", "80er", "80ies", "eighties", "80S"]
+        for (var i = 0; i < same.length; i++)
+            compare(SL.decadeTag(same[i]), "80", same[i])
+        compare(SL.decadeTag("60s"), "60")
+        compare(SL.decadeTag("nineties"), "90")
+        // The 2000s keep their "s": a bare "00" is every "top 100".
+        compare(SL.decadeTag("2000s"), "00s")
+        compare(SL.decadeTag("00s"), "00s")
+        compare(SL.decadeTag("2010s"), "10s")
+    }
+
+    function test_numbers_that_are_no_decade_stay_words() {
+        var not = ["10", "00", "2000", "85", "104", "1080", "180s", "8", "rock", "", "40", "2030s"]
+        for (var i = 0; i < not.length; i++)
+            compare(SL.decadeTag(not[i]), "", not[i])
+        compare(SL.decadeTag(null), "")
+    }
+
+    function test_genre_decade_country_without_the_word_in() {
+        // The listener's own example. Before this the directory was asked
+        // for a station NAMED "rock 80 uk", found none, and the stem retry
+        // answered with French and German "rock 80" stations.
+        var r = SL.facetQuery("rock 80 uk", _ccAll)
+        verify(r !== null)
+        compare(r.tags, ["rock", "80"])
+        compare(r.cc, "GB")
+        compare(r.country, "uk")
+        compare(r.text, "rock 80")
+        // Any order, any case.
+        r = SL.facetQuery("UK 80s Rock", _ccAll)
+        compare(r.tags, ["80", "rock"]); compare(r.cc, "GB"); compare(r.text, "80s Rock")
+    }
+
+    function test_facets_without_a_country_are_still_facets() {
+        var r = SL.facetQuery("rock 80", _ccAll)
+        compare(r.tags, ["rock", "80"]); compare(r.cc, ""); compare(r.country, "")
+        compare(r.text, "rock 80")
+        // Multiword genres are one tag, and win over their own words.
+        r = SL.facetQuery("classic rock 70s", _ccAll)
+        compare(r.tags, ["classic rock", "70"])
+        r = SL.facetQuery("hip hop 90s france", _ccAll)
+        compare(r.tags, ["hip hop", "90"]); compare(r.cc, "FR")
+    }
+
+    function test_multiword_countries_and_everyday_names_resolve() {
+        var r = SL.facetQuery("jazz new zealand", _ccAll)
+        compare(r.tags, ["jazz"]); compare(r.cc, "NZ"); compare(r.country, "new zealand")
+        // The directory files these under names nobody types.
+        r = SL.facetQuery("country united states", _ccAll)
+        compare(r.tags, ["country"]); compare(r.cc, "US")
+        r = SL.facetQuery("punk england", _ccAll)
+        compare(r.cc, "GB")
+        r = SL.facetQuery("news united kingdom", _ccAll)
+        compare(r.cc, "GB"); compare(r.text, "news")
+    }
+
+    function test_an_unknown_word_is_a_tag_only_beside_an_anchor() {
+        // "synthwave" is in nobody's vocabulary, the country makes it a wish.
+        var r = SL.facetQuery("synthwave uk", _ccAll)
+        compare(r.tags, ["synthwave"]); compare(r.cc, "GB")
+        r = SL.facetQuery("bossa nova 60s", _ccAll)
+        compare(r.tags, ["bossa nova", "60"])
+        // No anchor, no guessing: two unknown words are a station name.
+        compare(SL.facetQuery("deep purple", _ccAll), null)
+        compare(SL.facetQuery("nova synthwave", _ccAll), null)
+        // Three unknown words are a name even beside a country.
+        compare(SL.facetQuery("sounds of silence uk", _ccAll), null)
+    }
+
+    function test_station_names_are_left_to_the_name_roads() {
+        // The pinned promise from the scoped parser holds here too.
+        compare(SL.facetQuery("radio france", _ccAll), null)
+        compare(SL.facetQuery("virgin radio uk", _ccAll), null)
+        compare(SL.facetQuery("classic fm uk", _ccAll), null)
+        compare(SL.facetQuery("rock 104 uk", _ccAll), null)     // a frequency, not a decade
+        compare(SL.facetQuery("radio 80", _ccAll), null)
+        // One facet is what the tag pass already does.
+        compare(SL.facetQuery("jazz", _ccAll), null)
+        compare(SL.facetQuery("uk", _ccAll), null)
+        compare(SL.facetQuery("finland france", _ccAll), null)  // two countries, no wish
+        compare(SL.facetQuery("rock uk france", _ccAll), null)
+        compare(SL.facetQuery("", _ccAll), null)
+        compare(SL.facetQuery(null, _ccAll), null)
+        // Seven words are a sentence.
+        compare(SL.facetQuery("rock pop jazz soul funk disco uk", _ccAll), null)
+    }
+
+    function test_a_lone_decade_is_the_one_single_facet() {
+        // "80s" alone used to ask for the tag "80s" and miss every "80's".
+        var r = SL.facetQuery("80s", _ccAll)
+        compare(r.tags, ["80"]); compare(r.cc, ""); compare(r.text, "80s")
+    }
+
+    // ── a genre word alone: "rock" is the genre ─────────────────────────
+    function test_a_genre_word_alone_is_a_wish_for_the_genre() {
+        var yes = ["rock", "Rock ", "JAZZ", "smooth jazz", "hip-hop", "drum and bass", "80s", "80",
+                   "80's", "1980s", "eighties", "00s", "country"]
+        for (var i = 0; i < yes.length; i++) verify(SL.isGenreWord(yes[i]), yes[i])
+        var no = ["rock fm", "radio rock", "rock antenne", "jazz fm", "rock 80", "rock uk", "uk", "10",
+                  "deep purple", "constructor", "toString", "", null, undefined]
+        for (var j = 0; j < no.length; j++) verify(!SL.isGenreWord(no[j]), String(no[j]))
+    }
+
+    function test_a_station_named_after_the_word_leads() {
+        var yes = [["Rock", "rock"], ["ROCK FM", "rock"], ["Rock FM 104.6", "rock"], ["Radio 1 Rock", "rock"],
+                   ["Radio ROCK", "rock"], ["Rock-FM!", "rock"], ["Jazz FM", "jazz"], ["Jazz Radio", "jazz"],
+                   ["J\u00e1zz FM", "jazz"], ["Hip-Hop FM", "hip hop"], ["K-Pop Radio", "k-pop"],
+                   ["Radio 80", "80s"], [".977 80s", "80"], ["The 80's Station", "eighties"],
+                   ["Smooth Jazz Radio", "smooth jazz"]]
+        for (var i = 0; i < yes.length; i++) verify(SL.namedAfter(yes[i][0], yes[i][1]), yes[i][0])
+        // A name of its own is no namesake: those stand in the genre's list on their votes.
+        var no = [["Rock Antenne", "rock"], ["Rockabilly-radio.net", "rock"], ["RockFM 101.7", "rock"],
+                  ["Skyrock", "rock"], ["Jazz Radio Blues", "jazz"], ["80s80s", "80s"], ["80s 90s Radio", "80s"],
+                  ["\u0420\u043e\u043a FM", "rock"], ["Radio", "rock"], ["104.6", "rock"], ["", "rock"],
+                  [null, "rock"], [undefined, "rock"], [12345, "rock"], ["Rock", ""], ["Rock", null]]
+        for (var j = 0; j < no.length; j++) verify(!SL.namedAfter(no[j][0], no[j][1]), String(no[j][0]))
+    }
+
+    function test_a_frequency_is_no_decade_and_a_foreign_word_is_a_word() {
+        // Measured on name=90: three of the four leads were a Greek news
+        // station on 90.1, a Thai one on 90.5 and "Radio 9090 90.9". A cut at
+        // everything that is not a-z or 0-9 made "90.1" two bare numbers and
+        // made a Greek or Cyrillic word vanish without a trace.
+        var no = [["\u03a0\u03b1\u03c1\u03b1\u03c0\u03bf\u03bb\u03b9\u03c4\u03b9\u03ba\u03ac FM 90.1", "90"],
+                  ["\u0e21\u0e34\u0e15\u0e34\u0e02\u0e48\u0e32\u0e27 90.5", "90"], ["Radio 9090 90.9", "90"],
+                  ["90.5 FM", "90"], ["Radio 90,1", "90s"],
+                  ["\u041d\u0430\u0448\u0435 Rock", "rock"]]
+        for (var i = 0; i < no.length; i++) verify(!SL.namedAfter(no[i][0], no[i][1]), no[i][0])
+        var yes = [["90s FM", "90"], ["Radio 90", "90s"], ["Rock FM \u2013 104.6", "rock"],
+                   ["\u00abRock\u00bb FM", "rock"], ["Rock \u00b7 FM", "rock"]]
+        for (var j = 0; j < yes.length; j++) verify(SL.namedAfter(yes[j][0], yes[j][1]), yes[j][0])
+    }
+
+    function test_the_biggest_name_always_leads_and_a_twin_leads_once() {
+        // Measured on "world": BBC World Service, 163 397 votes, tagged news
+        // and talk, is the first row of the name answer and is in no tag
+        // answer's first page. The name answer's first row leads whatever
+        // it is called; it is the directory's own idea of the biggest.
+        var k = SL.leadRows("world")
+        verify(k({ name: "BBC World Service", countrycode: "GB" }))
+        verify(!k({ name: "BBC World Service Relay", countrycode: "US" }))
+        verify(k({ name: "World Radio", countrycode: "CH" }))
+        // The directory lists many stations twice. A twin takes no second
+        // lead; a namesake from another country is another station.
+        var p = SL.leadRows("pop")
+        verify(p({ name: "Pop Radio 101.5", countrycode: "AR" }))
+        verify(!p({ name: "POP Radio 101.5", countrycode: "ar" }))
+        verify(p({ name: "Pop Radio 101.5", countrycode: "MX" }))
+    }
+
+    function test_the_leads_are_few_and_a_name_query_gets_no_filter() {
+        compare(SL.leadRows("rock antenne"), null)
+        compare(SL.leadRows("deep purple"), null)
+        compare(SL.leadRows("rock 80 uk"), null)
+        compare(SL.leadRows(""), null)
+        var keep = SL.leadRows("rock")
+        compare(typeof keep, "function")
+        verify(keep({ name: "Rock FM" }))
+        verify(!keep({ name: "Rock Antenne" }))
+        verify(!keep({}))
+        verify(!keep(null))
+        // Eight at most: the genre keeps 22 of the page's 30 rows.
+        var fresh = SL.leadRows("rock"), kept = 0, lands = "ABCDEFGHIJKL"
+        for (var i = 0; i < 12; i++) if (fresh({ name: "Rock FM", countrycode: "X" + lands[i] })) kept++
+        compare(kept, 8)
+        // The count belongs to one answer, not to the word.
+        verify(SL.leadRows("rock")({ name: "Rock FM" }))
+    }
+
+    function test_the_alias_table_is_folded_and_two_letter_coded() {
+        var a = SL.countryAliases()
+        var n = 0
+        for (var k in a) {
+            n++
+            compare(SL.fold(k), k, k)
+            verify(/^[A-Z]{2}$/.test(a[k]), k)
+        }
+        verify(n >= 60)
+        compare(a["uk"], "GB"); compare(a["usa"], "US"); compare(a["america"], "US")
+        compare(a["south korea"], "KR"); compare(a["soome"], "FI"); compare(a["turgi"], "TR")
+        // Null-prototype, like the API map: "constructor" is no country.
+        compare(a["constructor"], undefined)
+    }
+
+    function test_a_row_shows_the_short_country_name() {
+        var longGb = "The United Kingdom Of Great Britain And Northern Ireland"
+        compare(SL.countryLabel("GB", longGb, "en_US"), "United Kingdom")
+        compare(SL.countryLabel("gb", longGb, "et_EE"), "United Kingdom")
+        compare(SL.countryLabel("US", "The United States Of America", "en_GB"), "United States")
+        // No code, or a code Qt has no name for: the directory's own word,
+        // minus the article it files half its countries under.
+        compare(SL.countryLabel("", "Somewhere", "en_US"), "Somewhere")
+        compare(SL.countryLabel("ZZ", "The Land Of Nowhere", "en_US"), "Land Of Nowhere")
+        compare(SL.countryLabel("ZZ", "", "en_US"), "")
+        compare(SL.countryLabel(null, null, null), "")
+    }
+
+    function _empty(over) {
+        var s = { count: 0, gotAnswer: true, mode: "all", inheritedScope: false,
+                  countryQuery: false, stemCount: 2 }
+        for (var k in over) s[k] = over[k]
+        return SL.emptyNext(s)
+    }
+
+    function test_an_inherited_country_chip_steps_aside_for_an_empty_answer() {
+        compare(_empty({ inheritedScope: true }), "unscope")
+        // In every mode: the chip scopes the genre and language roads too.
+        compare(_empty({ inheritedScope: true, mode: "genre", stemCount: 0 }), "unscope")
+        compare(_empty({ inheritedScope: true, mode: "language" }), "unscope")
+    }
+
+    function test_an_empty_answer_without_a_chip_goes_to_the_stems() {
+        compare(_empty({}), "stems")
+        compare(_empty({ stemCount: 0 }), "done")
+        compare(_empty({ mode: "genre" }), "done")
+        compare(_empty({ countryQuery: true }), "done")
+    }
+
+    function test_rows_or_a_dead_network_end_the_search() {
+        compare(_empty({ count: 3, inheritedScope: true }), "done")
+        compare(_empty({ count: 3 }), "done")
+        // Dead mirrors are a network answer, not "nothing in this country".
+        compare(_empty({ gotAnswer: false, inheritedScope: true }), "done")
+        compare(_empty({ gotAnswer: false }), "done")
+        compare(SL.emptyNext(null), "done")
+    }
 
     function test_a_short_artist_name_still_finds_its_record() {
         // The old rule let a name under four characters match only by being
@@ -437,5 +911,106 @@ TestCase {
         var g = SL.mirrorRungs("garbage", null);
         compare(g.names, ["all"]);
         compare(g.discovered, 0);
+    }
+
+    // ── the settings page's list ────────────────────────────────────────
+    function test_the_settings_list_is_asked_by_votes_a_page_at_a_time() {
+        var b = SL.directoryBase("de2", "bytag", "rock")
+        compare(b, "https://de2.api.radio-browser.info/json/stations/bytag/rock")
+        compare(SL.directoryPage(b, 100, 0),
+                b + "?hidebroken=true&order=votes&reverse=true&limit=100&offset=0")
+        // The next page is the same question further down, never a second spelling.
+        compare(SL.directoryPage(b, 100, 200),
+                b + "?hidebroken=true&order=votes&reverse=true&limit=100&offset=200")
+        // A base that still carries a query loses it: one "?" per URL.
+        compare(SL.directoryPage(b + "?limit=500&offset=0", 100, 100),
+                b + "?hidebroken=true&order=votes&reverse=true&limit=100&offset=100")
+        compare(SL.directoryPage(b, "x", -5),
+                b + "?hidebroken=true&order=votes&reverse=true&limit=100&offset=0")
+    }
+
+    function test_a_later_page_that_failed_is_asked_again_by_itself() {
+        // Measured on the bench: page two of "rock" failed once at the end of
+        // the list and nothing asked for it again, because the only trigger
+        // was the list moving and a list at its end does not move.
+        compare(SL.pageRetryDelay(1), 2000)
+        compare(SL.pageRetryDelay(2), 4000)
+        compare(SL.pageRetryDelay(3), 8000)
+        // Three waits and the page stops asking by itself; scrolling still asks.
+        compare(SL.pageRetryDelay(4), -1)
+        compare(SL.pageRetryDelay(40), -1)
+        // Nothing failed, nothing to wait for; garbage never means "at once".
+        compare(SL.pageRetryDelay(0), -1)
+        compare(SL.pageRetryDelay(undefined), -1)
+        compare(SL.pageRetryDelay("x"), -1)
+        // The directory asks for no more than one request a second or two;
+        // even the first retry keeps two seconds between the questions.
+        verify(SL.pageRetryDelay(1) >= 2000)
+    }
+
+    function test_a_retried_page_goes_to_the_next_mirror() {
+        var b = SL.directoryBase("de1", "bytag", "rock")
+        compare(SL.rehost(b, "de2"), "https://de2.api.radio-browser.info/json/stations/bytag/rock")
+        compare(SL.rehost(SL.directoryBase("de1", null, ""), "all"),
+                "https://all.api.radio-browser.info/json/stations")
+        // The same guard directoryBase has: no label, no host.
+        compare(SL.rehost(b, "evil.example/x?"), "https://all.api.radio-browser.info/json/stations/bytag/rock")
+        // Only the directory's own addresses are moved, anything else stays put.
+        compare(SL.rehost("https://example.org/json/stations", "de2"), "https://example.org/json/stations")
+        compare(SL.rehost("", "de2"), "")
+        // The page asked is the same page, only the door is different.
+        compare(SL.directoryPage(SL.rehost(b, "de2"), 100, 100),
+                "https://de2.api.radio-browser.info/json/stations/bytag/rock"
+                + "?hidebroken=true&order=votes&reverse=true&limit=100&offset=100")
+    }
+
+    function test_the_settings_list_url_is_built_from_safe_parts_only() {
+        var bare = "https://de2.api.radio-browser.info/json/stations"
+        compare(SL.directoryBase("de2", null, "rock"), bare)
+        compare(SL.directoryBase("de2", "bytag", "   "), bare)
+        // A slash in the word is part of the word (measured: byname/AC%2FDC answers).
+        compare(SL.directoryBase("de2", "byname", " AC/DC "), bare + "/byname/AC%2FDC")
+        // A road the combo box never offered is no path segment.
+        compare(SL.directoryBase("de2", "../../admin", "x"), bare + "/byname/x")
+        compare(SL.directoryBase("de2", "constructor", "x"), bare + "/byname/x")
+        // A mirror name that is no hostname label never becomes a host.
+        compare(SL.directoryBase("evil.example/x?", "bytag", "rock"),
+                "https://all.api.radio-browser.info/json/stations/bytag/rock")
+        compare(SL.directoryBase("", "bytag", "rock"),
+                "https://all.api.radio-browser.info/json/stations/bytag/rock")
+        // A lone surrogate in the word is dropped, not thrown on.
+        compare(SL.directoryBase("de2", "byname", "jazz\uD83D"), bare + "/byname/jazz")
+    }
+
+    function test_a_station_is_listed_once_however_the_pages_shift() {
+        var seen = ({})
+        verify(SL.firstSight(seen, "u-1"))
+        verify(SL.firstSight(seen, "u-2"))
+        verify(!SL.firstSight(seen, "u-1"))
+        // No uuid, no way to tell two rows apart: both are shown.
+        verify(SL.firstSight(seen, ""))
+        verify(SL.firstSight(seen, undefined))
+        verify(SL.firstSight(seen, null))
+        // A uuid that is a property name is only a key.
+        verify(SL.firstSight(seen, "constructor"))
+        verify(!SL.firstSight(seen, "constructor"))
+        verify(SL.firstSight(seen, "__proto__"))
+        verify(!SL.firstSight(seen, "__proto__"))
+    }
+
+    function test_a_directory_name_becomes_one_clean_line() {
+        compare(SL.rowName("\t  Radio\r\n  Nova \t"), "Radio Nova")
+        compare(SL.rowName("Rock & Pop <live>"), "Rock & Pop <live>")
+        compare(SL.rowName(null), "")
+        compare(SL.rowName(undefined), "")
+        var many = ""
+        for (var i = 0; i < 400; i++) many += "a"
+        compare(SL.rowName(many).length, 300)
+        // The cap never cuts an emoji in half.
+        var edge = many.substring(0, 299) + "\uD83D\uDE00"
+        compare(SL.rowName(edge).length, 299)
+        // A cut that lands just after a space must not leave the space behind.
+        var spaced = many.substring(0, 299) + " tail"
+        compare(SL.rowName(spaced), many.substring(0, 299))
     }
 }

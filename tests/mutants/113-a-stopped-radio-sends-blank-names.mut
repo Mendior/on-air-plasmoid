@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  With nothing playing the bridge sends a single space as the title, so the
+  desktop's media controller draws a blank line.
+
+history:
+  Since the first release the title and album fell back to " " when the
+  widget had neither a track nor a station. Read over the bus on the test rig
+  on 2026-09-23 while stopped: xesam:title ' ' and xesam:album ' '. A name
+  that is not there is now left out of the metadata.
+
+target:
+  package/contents/ui/mpris.py
+
+find:
+      title = str(state.get("title") or state.get("station") or "")
+
+replace:
+      title = str(state.get("title") or state.get("station") or " ")
+
+expect:
+  Killed by tests/test_mpris_metadata.py::test_nothing_on_shows_nothing.
+  Line-neutral.

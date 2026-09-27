@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A podcast search none of the directories answered reads as "No shows found".
+
+history:
+  With the directories out of reach the page said "No shows found", which
+  tells the listener the show does not exist, and nothing asked again. The
+  settle now counts the directories that answered; this forgets the count.
+
+target:
+  package/contents/ui/PodcastEngine.qml
+
+find:
+          podcastSearchUnreached = _podShowsHeard === 0;
+
+replace:
+          podcastSearchUnreached = _podShowsHeard < 0;
+
+expect:
+  Killed by tests/qml/tst_podcastengine.qml::test_a_search_nobody_answered_is_not_no_shows_found.
+  Line-neutral.

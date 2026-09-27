@@ -7,12 +7,17 @@
 set -u
 
 if [[ $# -lt 2 ]]; then
-    echo "usage: start-mpris.sh <state_file> <cmd_file>" >&2
+    echo "usage: start-mpris.sh <state_file> <cmd_file> [--ms-seq]" >&2
     exit 1
 fi
 
 STATE_FILE="$1"
 CMD_FILE="$2"
+# Only the widget that reads the command number as a moment asks for one.
+# 2026.39 calls this with the two files alone and keeps the number in an
+# int, so its bridge goes on counting 1, 2, 3 (see next_seq in mpris.py).
+SEQ_FLAG=()
+[[ "${3:-}" == --ms-seq ]] && SEQ_FLAG=(--ms-seq)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MPRIS_PY="$SCRIPT_DIR/mpris.py"
 RUN_DIR="$(dirname "$STATE_FILE")"
@@ -94,4 +99,4 @@ done
 # Detach with setsid + redirections so the parent shell returns immediately.
 # Daemon output goes to the per-instance log so a crash leaves a diagnosable
 # trace instead of vanishing into /dev/null.
-setsid -f python3 "$MPRIS_PY" "$STATE_FILE" "$CMD_FILE" "${HOST_PID:-0}" >"$LOG_FILE" 2>&1 < /dev/null
+setsid -f python3 "$MPRIS_PY" "$STATE_FILE" "$CMD_FILE" "${HOST_PID:-0}" "${SEQ_FLAG[@]}" >"$LOG_FILE" 2>&1 < /dev/null

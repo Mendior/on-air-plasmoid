@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any station with the word somewhere in its name stands ahead of the genre.
+
+history:
+  A station leads a genre's list only when it is named after the word: take
+  the station words and the bare numbers out of "Rock FM 104.6" and what is
+  left is "rock". "Rock Antenne" has a name of its own and stands in the
+  list on its votes. A contains-match puts them all in front again.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      return rest.join("") === want.join("");
+
+replace:
+      return rest.join("").indexOf(want.join("")) !== -1;
+
+expect:
+  Killed by tst_searchlogic::test_a_station_named_after_the_word_leads.
+  Line-neutral.

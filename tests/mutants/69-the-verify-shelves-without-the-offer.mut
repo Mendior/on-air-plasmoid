@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A Bluetooth speaker that the verify's sweep finds deaf is shelved without
+  being offered the SBC-XQ seat.
+
+history:
+  The periodic sweep shelves a deaf Bluetooth speaker, offers it the seat
+  once and stamps the offer — and the stamp is what earns it one later look.
+  The verify's sweep shelved the same speaker and did neither, so it stayed
+  shelved for the life of the group. The offer became one function on
+  2026-09-21 and both roads call it; this takes the verify's call away again.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+                      // offered the seat and never stamped for its later look.
+                      _hearingOffer();
+
+replace:
+                      // offered the seat and never stamped for its later look.
+                      void 0;
+
+expect:
+  Killed by tst_syncengine::test_a_speaker_shelved_by_the_verify_gets_the_same_offer_as_one_shelved_by_the_sweep.
+  Line-neutral.

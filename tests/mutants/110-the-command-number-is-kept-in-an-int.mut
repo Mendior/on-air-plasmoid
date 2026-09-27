@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The number of the last MPRIS command obeyed is kept in a 32-bit int, so every
+  line of the command file looks new on every read.
+
+history:
+  The bridge numbers its commands with the time in milliseconds (about
+  1.79e12) since 2026-09-22, and the widget went on keeping the last one in a
+  property int, where it wrapped to -824362432. Nothing was ever refused again
+  until a line turned ten seconds old: on the rig on 2026-09-23 one Next
+  walked through six stations 1.5 s apart and one PlayPause started and
+  stopped the stream three times. The Python test saw only the Python side.
+
+target:
+  package/contents/ui/MprisCommandGate.qml
+
+find:
+      property double lastSeq: 0
+
+replace:
+      property int lastSeq: 0
+
+expect:
+  Killed by tests/qml/tst_mpriscommandgate.qml::test_a_line_read_twice_is_obeyed_once.
+  Line-neutral.

@@ -127,6 +127,45 @@ TestCase {
         verify(s.indexOf("rm -f '/d/buffer.mp3' '/d/writer.pid' '/d/url.cfg'") !== -1)
     }
 
+    // The pid file names its owner now ("writer shell host", so the startup
+    // sweep can tell a living writer from an orphan). The whole line fed to
+    // kill is three numbers in one word and kills nothing — only the first
+    // field is the writer.
+    function test_the_stop_kills_the_first_field_of_the_pid_file() {
+        var s = TS.buildStopCommand("/d/writer.pid", "/d/buffer.mp3", "/d/url.cfg", 9)
+        verify(s.indexOf("read -r p _ < '/d/writer.pid' && kill -INT \"$p\"") !== -1)
+        verify(s.indexOf("$(cat '/d/writer.pid')") === -1)
+    }
+
+    // Measured 2026-09-23 on the bench: with the host killed, the writer's
+    // shell sat under systemd --user and the chain copied a FLAC station at
+    // ~128 KiB/s for as long as its hour cap allowed. Every writer gets a
+    // guard beside it, and the pid file says whose it is.
+    function test_every_writer_starts_its_guard_and_names_its_owner() {
+        var o = opts()
+        o.guardPath = "/opt/onair/tsguard.sh"
+        var c = TS.buildBufferCommands(o)
+        verify(c.run.indexOf("echo \"$pid $$ $PPID\" > '/home/egon/.cache/onair/ts/writer.pid'") !== -1)
+        var guard = "bash '/opt/onair/tsguard.sh' watch \"$$\" \"$PPID\" \"$pid\" >/dev/null 2>&1 &"
+        var at = c.run.indexOf(guard)
+        verify(at !== -1)
+        // Launched after the pid is known and before the shell parks on
+        // wait — and with its output away from the host's pipe, or the run's
+        // ack would wait on the guard's last tick.
+        verify(at > c.run.indexOf("pid=$!"))
+        verify(at < c.run.indexOf("wait $pid"))
+    }
+
+    function test_the_sweep_command_hands_the_guard_this_directory_and_the_age_line() {
+        var s = TS.buildSweepCommand("/opt/onair/tsguard.sh", "/home/egon/.cache/p/onair-timeshift-3",
+                                     1790000000.7, 12)
+        verify(s.indexOf(": TS_SWEEP;") === 0)
+        verify(s.indexOf("bash '/opt/onair/tsguard.sh' sweep '/home/egon/.cache/p/onair-timeshift-3' 1790000000") !== -1)
+        verify(/#\s*12\s*$/.test(s))
+        var h = TS.buildSweepCommand("/opt/onair/tsguard.sh", "/tmp/x'; rm -rf $HOME; echo '", 1, 1)
+        verify(h.indexOf("'/tmp/x'\\''; rm -rf $HOME; echo '\\'''") !== -1)
+    }
+
     function test_the_tap_serves_raw_bytes_and_reports_the_kernels_port() {
         var c = TS.buildServeCommands({ bufPath: "/d/buffer-7.ogg",
                                         srvPidPath: "/d/serve-7.pid",
@@ -159,5 +198,22 @@ TestCase {
         verify(s.indexOf("kill -INT") !== -1)
         verify(s.indexOf("rm -f '/d/serve-7.pid' '/d/serve-7.port'") !== -1)
         verify(s.indexOf("rm -f '/d/buffer-7.ogg' '/d/writer.pid' '/d/url.cfg'") !== -1)
+    }
+
+    function test_the_sleeve_stays_over_a_return_to_live() {
+        verify(TS.sleeveKept(1000000, 1000000, true))
+        verify(TS.sleeveKept(1000000, 1000000 + 14999, true))
+    }
+
+    function test_the_kept_sleeve_has_a_deadline_and_needs_a_listener() {
+        // A station with no titles must not wear the old one for good.
+        verify(!TS.sleeveKept(1000000, 1000000 + 15001, true))
+        // No return was noted: an ordinary stop clears as it always did.
+        verify(!TS.sleeveKept(0, 1000000, true))
+        // The listener pressed stop on the way back.
+        verify(!TS.sleeveKept(1000000, 1000500, false))
+        // A clock that went backwards is no reason to keep anything.
+        verify(!TS.sleeveKept(1000000, 999000, true))
+        verify(!TS.sleeveKept(undefined, 1000, true))
     }
 }

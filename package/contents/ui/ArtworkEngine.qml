@@ -20,7 +20,8 @@ Item {
     id: engine
 
     // main.qml's root. Used: playerSourceString(), _localArtForSource,
-    // trackArtistTitleKey(), _armXhrTimeout(), _clearXhrTimeout().
+    // currentStation, trackArtistTitleKey(), _armXhrTimeout(),
+    // _clearXhrTimeout().
     required property var app
     // Plasmoid's configuration in production; a plain object in tests.
     required property var cfg
@@ -60,7 +61,14 @@ Item {
     }
 
     function debounceStop() { artLookupDebounce.stop(); }
-    function debounceRestart() { artLookupDebounce.restart(); }
+    // first = the title that follows an empty header (a station start, a
+    // return from a stop): there is nothing for it to flap against yet, and
+    // the full window only kept every station's first cover a second and a
+    // half further away. A flap that follows is back on the full window.
+    function debounceRestart(first) {
+        artLookupDebounce.interval = first === true ? 200 : 1500;
+        artLookupDebounce.restart();
+    }
 
     // definitive=false means the empty result came from a transient failure
     // (timeout, HTTP error, rate limit) — it is NOT cached, so the next play
@@ -154,7 +162,18 @@ Item {
     // What the cache already knows about a lookup key, applied at once.
     // True means the cache settled it — either a cover, or a still-fresh
     // "this track has none", which is just as final and costs no network.
+    //
+    // It is also the door both roads pass before the network (the metadata
+    // handler's instant paint and lookupAlbumArt), so the station talking
+    // about itself is settled here too: no record, the logo shows. Measured
+    // on Dance Wave! 2026-09-23: the title "Dance Wave!" found an album of
+    // that name on iTunes, and the second time round it came from the cache.
     function _artFromCache(query) {
+        if (TrackLogic.stationTalk(query, app.currentStation)) {
+            albumArtUrl = "";
+            _albumArtKey = "";
+            return true;
+        }
         var hit = _artCache[query];
         if (hit === undefined) return false;
         if (hit.url === "" && Date.now() - hit.t >= _artNegativeTtlMs) return false;

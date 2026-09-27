@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The name rung auditions every row that carries the name again, whatever
+  country it is filed under.
+
+history:
+  "Rock FM" answered with five exact-name rows from four countries on
+  2026-09-21, and on name, domain and bitrate alone the Estonian 320 kb/s
+  stream auditioned first for a Spanish listener's dead station, under
+  their name and their logo. The ladder now keeps a row only when it sits
+  on the station's own domain or in the station's country; a wake-up is
+  the one caller that keeps them all. This mutant keeps them all for
+  everyone.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+          if (w.near || anySound === true) keep.push(w); else refused++;
+
+replace:
+          if (true) keep.push(w); else refused++;
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_namesakes_from_several_countries_are_not_auditioned.
+  Line-neutral.

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The rail's answer is scrolled to while the footer still has the height it had before the rows.
+
+history:
+  The answer's rows go into the model in the callback, and a Column lays
+  them out only at the next frame. Measured on a real ListView: without the
+  forced layout a thirty-row answer put the view at 1424 with its heading at
+  1600, under the fold of a 200-pixel view, exactly the screen the rails
+  showed before the reveal existed.
+
+target:
+  package/contents/ui/ViewLogic.js
+
+find:
+      if (typeof f.forceLayout === "function") f.forceLayout();
+
+replace:
+      if (false) f.forceLayout();
+
+expect:
+  Killed by tests/qml/tst_viewlogic.qml::test_a_long_answer_shows_its_heading_at_the_top.
+  Line-neutral.

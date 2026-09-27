@@ -13,6 +13,8 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
 import org.kde.iconthemes as KIconThemes
+import Qt.labs.platform as Labs
+import "../PathLogic.js" as PathLogic
 
 KCM.SimpleKCM {
     id: root
@@ -407,7 +409,15 @@ KCM.SimpleKCM {
         QQC2.TextField {
             id: dirField
             Kirigami.FormData.label: i18n("Save to folder:")
-            placeholderText: "~/Music/OnAir"
+            // The folder an empty field really means, from the same rule the
+            // widget downloads by. Without a music folder at all the widget
+            // falls back to its runtime directory, which is no name to offer
+            // anybody; the conventional one stands in for the hint only.
+            placeholderText: {
+                const home = PathLogic.localPath(Labs.StandardPaths.writableLocation(Labs.StandardPaths.HomeLocation).toString())
+                const music = Labs.StandardPaths.writableLocation(Labs.StandardPaths.MusicLocation).toString()
+                return PathLogic.shownDir(PathLogic.defaultDir(music, home + "/Music"), home)
+            }
             Layout.fillWidth: true
         }
 

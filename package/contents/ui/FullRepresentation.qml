@@ -18,12 +18,16 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
+import "ColorLogic.js" as ColorLogic
 import "EpisodeState.js" as EpisodeState
 import "FaviconLogic.js" as FaviconLogic
 import "HostGuard.js" as HostGuard
 import "PodcastLogic.js" as PodcastLogic
 import "ReorderLogic.js" as ReorderLogic
+import "RetryLogic.js" as RetryLogic
 import "SearchLogic.js" as SearchLogic
+import "TransportLogic.js" as TransportLogic
+import "ViewLogic.js" as ViewLogic
 
 PlasmaExtras.Representation {
     id: fullRepresentation
@@ -422,21 +426,30 @@ PlasmaExtras.Representation {
     // read as "no results" without one more, shorter question.
     function _webFinish(q, seq, tail, gotAnswer) {
         if (seq !== fullRepresentation._webSearchSeq) return
-        if (gotAnswer && webResultsModel.count === 0
-            && fullRepresentation.webSearchMode === "all"
-            && _countryCodeOf(q) === "") {
-            var stems = SearchLogic.stems(q)
-            if (stems.length > 0) {
-                // The word pass froze the cap at count+1 to retire its own
-                // "Show more" — but with ZERO rows found that freeze is 1,
-                // and the stem retry about to run would append exactly one
-                // row and stop: 'raadio elmari' showed a single result
-                // where the directory had thirty. An empty pass has nothing
-                // to protect — the stems start with the full page again.
-                fullRepresentation.webResultCap = 30
-                _webStemChain(q, stems, 0, seq, tail)
-                return
-            }
+        var stems = SearchLogic.stems(q)
+        var next = SearchLogic.emptyNext({
+            count: webResultsModel.count, gotAnswer: gotAnswer,
+            mode: fullRepresentation.webSearchMode,
+            inheritedScope: fullRepresentation._webScopeInherited,
+            countryQuery: _countryCodeOf(q) !== "", stemCount: stems.length })
+        if (next === "unscope") {
+            // The chip was an earlier search's country and this text found
+            // nothing inside it — the text runs again without the fence.
+            fullRepresentation.webScopeCc = ""
+            fullRepresentation.webScopeName = ""
+            runWebSearch(root.searchFilter)
+            return
+        }
+        if (next === "stems") {
+            // The word pass froze the cap at count+1 to retire its own
+            // "Show more" — but with ZERO rows found that freeze is 1,
+            // and the stem retry about to run would append exactly one
+            // row and stop: 'raadio elmari' showed a single result
+            // where the directory had thirty. An empty pass has nothing
+            // to protect — the stems start with the full page again.
+            fullRepresentation.webResultCap = 30
+            _webStemChain(q, stems, 0, seq, tail)
+            return
         }
         fullRepresentation.webSearchFailed = !gotAnswer
         fullRepresentation.webSearching = false
@@ -464,7 +477,7 @@ PlasmaExtras.Representation {
             _webAppendResults(xhr)
             if (webResultsModel.count > 0) {
                 _webRememberQuery(fullRepresentation._webLastTyped || q)
-                if (cc === "") _webBoostRelevance(stem)
+                if (cc === "" && !SearchLogic.asksBitrate(tail)) _webBoostRelevance(stem)
                 // "Show more" must page the query that actually filled the
                 // list, not the original name query that returned nothing —
                 // and from the position this answer really consumed, or the
@@ -493,7 +506,8 @@ PlasmaExtras.Representation {
     // Stable two-pass float: exact (fold-blind) name matches keep their
     // vote order among themselves and rise first, then prefix matches —
     // the directory only ranks by fame, and fame buries the exact station
-    // the user just typed out in full.
+    // the user just typed out in full. Never under the Bitrate chip: measured
+    // on name=nova, it lifted nine "Nova ..." rows at 256 and under over two at 320.
     function _webBoostRelevance(q) {
         var target = 0
         for (var cls = 0; cls <= 1; cls++)
@@ -513,37 +527,10 @@ PlasmaExtras.Representation {
         return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255)
                + "," + Math.round(c.b * 255) + "," + a + ")"
     }
-    readonly property var _countryMap: ({
-        "soome": "FI", "finland": "FI",
-        "eesti": "EE", "estonia": "EE",
-        "rootsi": "SE", "sweden": "SE",
-        "norra": "NO", "norway": "NO",
-        "läti": "LV", "latvia": "LV",
-        "leedu": "LT", "lithuania": "LT",
-        "saksamaa": "DE", "germany": "DE",
-        "inglismaa": "GB", "suurbritannia": "GB", "uk": "GB",
-        "iirimaa": "IE", "usa": "US", "ameerika": "US",
-        "venemaa": "RU", "russia": "RU",
-        "prantsusmaa": "FR", "france": "FR",
-        "hispaania": "ES", "spain": "ES",
-        "itaalia": "IT", "italy": "IT",
-        "taani": "DK", "denmark": "DK",
-        "poola": "PL", "poland": "PL",
-        "holland": "NL", "madalmaad": "NL", "netherlands": "NL",
-        // The tail of the map drifted Estonian-only while the UI speaks
-        // English — "jazz in japan" scoped nothing while "jazz in jaapan"
-        // worked. Both spellings, like every entry above.
-        "ukraina": "UA", "ukraine": "UA",
-        "ungari": "HU", "hungary": "HU",
-        "šveits": "CH", "switzerland": "CH",
-        "austria": "AT",
-        "jaapan": "JP", "japan": "JP",
-        "hiina": "CN", "china": "CN",
-        "kanada": "CA", "canada": "CA",
-        "austraalia": "AU", "australia": "AU",
-        "brasiilia": "BR", "brazil": "BR",
-        "türgi": "TR", "turkey": "TR", "ireland": "IE"
-    })
+    // The hand-written country words live in SearchLogic.js, under tests:
+    // the Estonian names, and the everyday ones the directory files under
+    // something longer ("united states", "england", "south korea").
+    readonly property var _countryMap: SearchLogic.countryAliases()
 
     // The map re-keyed through the same fold every name comparison uses:
     // the table spells "türgi" and "šveits", but a searcher without the
@@ -562,6 +549,7 @@ PlasmaExtras.Representation {
     // it, "salsa in mexico" scoped nothing because mexico was simply not
     // in the hand-written thirty.
     property var _countryMapApiFolded: ({})
+    property bool _webScopeInherited: false
     property bool _countryListAsked: false
 
     function _ensureCountryList() {
@@ -630,7 +618,7 @@ PlasmaExtras.Representation {
         fullRepresentation.webSearchFailed = false
         // Short queries are noise — EXCEPT exact country-map keys ("uk").
         const cc = _countryCodeOf(q)
-        if (q.length < 3 && cc === "") {
+        if (q.length < 3 && cc === "" && SearchLogic.decadeTag(q) === "") {
             fullRepresentation.webSearching = false
             return
         }
@@ -641,8 +629,19 @@ PlasmaExtras.Representation {
         // and every pass below runs inside that country. A country pinned by
         // the scope CHIP does the same for a plain query; a new "in X" in the
         // query re-pins the chip.
-        const scoped = (fullRepresentation.webSearchMode !== "country" && cc === "")
-                       ? SearchLogic.scopedQuery(q, _countryCodeOf) : null
+        const scopedIn = (fullRepresentation.webSearchMode !== "country" && cc === "")
+                         ? SearchLogic.scopedQuery(q, _countryCodeOf) : null
+        // "rock 80 uk" — the same wish without the word "in". Measured before
+        // this: the directory was asked for a station NAMED that, had none,
+        // and the stem retry answered with French and German "rock 80"
+        // stations; tagList=rock,80 inside GB has sixteen.
+        const bare = (scopedIn === null && cc === ""
+                      && (fullRepresentation.webSearchMode === "all"
+                          || fullRepresentation.webSearchMode === "genre"))
+                     ? SearchLogic.facetQuery(q, _countryCodeOf) : null
+        const scoped = scopedIn !== null ? scopedIn
+                     : (bare !== null && bare.cc !== "")
+                       ? { text: bare.text, cc: bare.cc, country: bare.country } : null
         // A ✕-released scope stays released for THIS text: a mode or order
         // chip re-runs the same string and must not pin the country back.
         // releaseScope marks the text released; new text clears the mark
@@ -664,8 +663,8 @@ PlasmaExtras.Representation {
         // search can actually run: in "all" (the cc branch below) and in
         // the country mode itself. In genre/language mode "finland" is a
         // tag/language word, not a country.
-        const mode0 = fullRepresentation.webSearchMode
-        const ccActive = cc !== "" && (mode0 === "all" || mode0 === "country")
+        const mode = fullRepresentation.webSearchMode
+        const ccActive = cc !== "" && (mode === "all" || mode === "country")
         if (scoped) {
             // The chip's ✕ passes releaseScope — the "in UK" tail is still
             // sitting in the field, and pinning from it here would undo the
@@ -677,7 +676,7 @@ PlasmaExtras.Representation {
                 fullRepresentation.webScopeName = scoped.country
             }
             q = scoped.text
-        } else if (ccActive || mode0 === "country") {
+        } else if (ccActive || mode === "country") {
             // A country search takes the country role over — a chip still
             // pinned to some OTHER country would lie about the results now
             // on screen (and "country=France&countrycode=GB" would be two
@@ -685,17 +684,28 @@ PlasmaExtras.Representation {
             fullRepresentation.webScopeCc = ""
             fullRepresentation.webScopeName = ""
         }
-        const scopeCc = released ? ""
-                      : scoped ? scoped.cc
-                      : (!ccActive && mode0 !== "country"
-                         ? fullRepresentation.webScopeCc : "")
+        const scopeCc = SearchLogic.scopeFor({
+            released: released, textCc: scoped ? scoped.cc : "",
+            countryRole: ccActive || mode === "country", pinnedCc: fullRepresentation.webScopeCc,
+            railShown: Plasmoid.configuration.showDiscoveryRow !== false })
+        // Inherited = the fence came from the chip, not from this text.
+        fullRepresentation._webScopeInherited = scopeCc !== "" && scoped === null
         const ccTail = scopeCc !== "" ? "&countrycode=" + scopeCc : ""
         const tail = ccTail + "&hidebroken=true&order=" + fullRepresentation.webSearchOrder
                      + "&reverse=true&limit=50"
-        const mode = fullRepresentation.webSearchMode
+        // What is left once the country is out, read as tags: "rock 80" is
+        // two of them, and no station carries the single tag "rock 80".
+        const facet = (mode === "all" || mode === "genre")
+                      ? SearchLogic.facetQuery(q, function() { return "" }) : null
+        const tagQs = "/json/stations/search?" + (facet !== null
+                      ? "tagList=" + facet.tags.map(encodeURIComponent).join(",")
+                      : "tag=" + encodeURIComponent(q.toLowerCase()))
+        // A genre word alone ("rock", "80s") asks for the genre: of the name
+        // answer only the stations NAMED after it lead, the tag list follows.
+        const lead = (mode === "all" && cc === "") ? SearchLogic.leadRows(q) : null
         var qs
         if (mode === "genre")
-            qs = "/json/stations/search?tag=" + encodeURIComponent(q.toLowerCase())
+            qs = tagQs
         else if (mode === "language")
             qs = "/json/stations/search?language=" + encodeURIComponent(q.toLowerCase())
         else if (mode === "country" || cc !== "")
@@ -712,45 +722,42 @@ PlasmaExtras.Representation {
         // other radio-browser call uses.
         root._rbFetch(qs + tail, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return // stale request
-            const gotAnswer = _webAppendResults(xhr)
+            var gotAnswer = _webAppendResults(xhr, lead)
             if (gotAnswer && webResultsModel.count > 0)
                 _webRememberQuery(qTyped)
-            if (gotAnswer && mode === "all" && cc === "")
+            if (gotAnswer && mode === "all" && cc === "" && !SearchLogic.asksBitrate(tail))
                 _webBoostRelevance(q)
             _probeKick(seq)
             // Genre pass: a short query is as likely a genre as a name — the
-            // search field literally suggests "jazz", yet the query only
-            // ever ran against station names. Tag matches fill in after the
-            // name matches, deduped, same 30-row cap. Up to three words,
-            // because tags themselves are multiword ("smooth jazz" is a real
-            // tag with real stations — measured — and the one-word gate sent
-            // it past this pass to the name roads alone). A scoped query
-            // ("70s in UK") takes the pass at any length — inside a country
-            // the genre reading is the whole point.
+            // search field itself suggests "jazz". Tag matches fill in after
+            // the name matches, deduped, same 30-row cap; under a genre word
+            // the name matches were only the leads and this pass IS the list.
+            // Up to three words, because tags are multiword ("smooth jazz" is
+            // a real tag with real stations — measured). A scoped query ("70s
+            // in UK") takes the pass at any length: there the genre is the point.
             if (gotAnswer && mode === "all" && cc === ""
                 && webResultsModel.count < fullRepresentation.webResultCap
-                && (SearchLogic.words(q).length <= 3 || scoped !== null || scopeCc !== "")) {
-                var tagQs = "/json/stations/search?tag="
-                            + encodeURIComponent(q.toLowerCase())
+                && (SearchLogic.words(q).length <= 3 || scoped !== null || scopeCc !== ""
+                    || facet !== null)) {
                 var beforeTag = webResultsModel.count
                 root._rbFetch(tagQs + tail, 4000, function(xhr2) {
                     if (seq !== fullRepresentation._webSearchSeq) return
                     _webAppendResults(xhr2)
+                    var tagAt = webResultsModel.count > beforeTag ? fullRepresentation._webLastConsumed : -1
+                    // Room left: the name rows the lead filter held back, below the genre's own.
+                    if (lead) _webAppendResults(xhr)
                     // "jazz" can be a genre with zero NAME matches — a query
                     // that only produced tag hits is still a successful
                     // query, and history exists for successful queries.
                     if (webResultsModel.count > 0)
                         _webRememberQuery(qTyped)
-                    // If the tag pass is what filled the list, "Show more"
-                    // must page IT, not the name query that ran short — and
-                    // from the tag list's own consumed position: the model
-                    // still counts the name rows, which the tag query never
-                    // served, and offset=count was skipping that many of
-                    // the tag list's best rows on every page.
-                    if (webResultsModel.count > beforeTag) {
+                    // If the tag pass put rows in, "Show more" must page IT, and
+                    // from the tag list's own consumed position (tagAt): the
+                    // model also counts name rows the tag query never served,
+                    // and offset=count skipped that many of its best rows.
+                    if (tagAt >= 0) {
                         fullRepresentation._webLastQs = tagQs + tail
-                        fullRepresentation._webSkipAhead =
-                            fullRepresentation._webLastConsumed - webResultsModel.count
+                        fullRepresentation._webSkipAhead = tagAt - webResultsModel.count
                     }
                     _probeKick(seq)
                     // A scoped multiword query that the tag reading didn't
@@ -774,20 +781,20 @@ PlasmaExtras.Representation {
     }
 
     // Word pass: the directory only ever matches SUBSTRINGS — "nova radio"
-    // never finds "Radio Nova". Ask it for the longest word alone and keep
-    // the rows containing every word, any order, fold-blind ("jarvi" finds
-    // "Järviradio"). Fires only for multiword queries with room left in the
-    // cap; returns whether it took over the finish.
+    // never finds "Radio Nova". Ask it for one word alone, the longest that
+    // is no station word (SearchLogic.askWord), and keep the rows containing
+    // every word, any order, fold-blind ("jarvi" finds "Järviradio"). Fires
+    // only for multiword queries with room left; returns whether it took over.
     function _webWordPass(q, qTyped, seq, tail) {
         if (webResultsModel.count >= fullRepresentation.webResultCap) return false
         const ws = SearchLogic.words(q)
         if (ws.length < 2) return false
         // "Show more" can't re-run a client-side word filter, and the
-        // longest-word query alone would page in unrelated stations — so the
+        // one-word query alone would page in unrelated stations — so the
         // word pass is a one-shot: freeze the cap at what it found and let
         // the button hide rather than mislead.
         root._rbFetch("/json/stations/search?name="
-                      + encodeURIComponent(SearchLogic.longestWord(q)) + tail,
+                      + encodeURIComponent(SearchLogic.askWord(q)) + tail,
                       4000, function(xhr2) {
             if (seq !== fullRepresentation._webSearchSeq) return
             _webAppendResults(xhr2, function(r) {
@@ -826,11 +833,16 @@ PlasmaExtras.Representation {
         fullRepresentation.webScopeName = ""
         const qs = "/json/stations/search?hidebroken=true&order=clicktrend&reverse=true&limit=50"
         fullRepresentation._webLastQs = qs
+        // With the field empty every saved station is on the list and the
+        // answer goes in under them: seven seconds after the tap the screen
+        // still showed only the saved list (2026-09-23). Both rails go to it.
+        ViewLogic.revealFooter(stationView)
         root._rbFetch(qs, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
             _probeKick(seq)
             fullRepresentation.webSearching = false
+            ViewLogic.revealFooter(stationView)
         })
     }
 
@@ -863,31 +875,15 @@ PlasmaExtras.Representation {
         const qs = "/json/stations/search?countrycode=" + cc
                    + "&hidebroken=true&order=votes&reverse=true&limit=50"
         fullRepresentation._webLastQs = qs
+        ViewLogic.revealFooter(stationView)
         root._rbFetch(qs, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
             _probeKick(seq)
             fullRepresentation.webSearching = false
+            ViewLogic.revealFooter(stationView)
         })
     }
-
-    // The genres a chip may offer. The directory decides the ORDER and
-    // whether a genre is worth showing at all — its tag counts are real —
-    // but not the vocabulary: that namespace is user-typed slush, and a
-    // "shape and station count" filter alone put "entretenimiento" and
-    // "moi merino" on an English rail. These are genre words a listener
-    // recognizes, in the spelling the directory uses.
-    readonly property var _genreVocab: ({
-        "pop": 1, "rock": 1, "jazz": 1, "classical": 1, "news": 1, "talk": 1,
-        "dance": 1, "electronic": 1, "house": 1, "techno": 1, "trance": 1,
-        "hits": 1, "top 40": 1, "oldies": 1, "80s": 1, "90s": 1, "70s": 1, "60s": 1,
-        "country": 1, "folk": 1, "blues": 1, "soul": 1, "funk": 1, "disco": 1,
-        "metal": 1, "punk": 1, "indie": 1, "alternative": 1, "hip hop": 1,
-        "rap": 1, "rnb": 1, "reggae": 1, "latin": 1, "salsa": 1, "chillout": 1,
-        "lounge": 1, "ambient": 1, "sport": 1, "sports": 1, "christian": 1,
-        "gospel": 1, "culture": 1, "comedy": 1, "schlager": 1, "chanson": 1,
-        "world": 1, "instrumental": 1, "soundtrack": 1, "kids": 1, "student": 1
-    })
 
     // The directory's biggest genre tags, for the idle rail's chips. Never
     // more than eight: the rail must not push the station list below the fold.
@@ -902,7 +898,7 @@ PlasmaExtras.Representation {
                 for (var i = 0; i < arr.length && out.length < 8; i++) {
                     var t = arr[i] || {}
                     var nm = String(t.name || "").toLowerCase().replace(/\s+/g, " ").trim()
-                    if (!fullRepresentation._genreVocab.hasOwnProperty(nm)) continue
+                    if (!SearchLogic.isChipGenre(nm)) continue
                     if ((t.stationcount || 0) < 100) continue
                     if (out.indexOf(nm) !== -1) continue
                     out.push(nm)
@@ -965,6 +961,7 @@ PlasmaExtras.Representation {
         // typed LATER is a different one and must not eat the scoped chip.
         var scopeOf = function(s) {
             var p = SearchLogic.scopedQuery(s, _countryCodeOf)
+                    || SearchLogic.facetQuery(s, _countryCodeOf)
             return p ? p.cc : ""
         }
         var qScope = scopeOf(q)
@@ -1006,22 +1003,25 @@ PlasmaExtras.Representation {
     function _webAppendResults(xhr, keepRow) {
         if (!xhr || xhr.status !== 200) return false
         try {
-            const results = JSON.parse(xhr.responseText) || []
+            // Asked by bitrate, the rows this page will show are first put in
+            // the honest number's order (SearchLogic.pageOrder has the measurement).
+            const results = SearchLogic.pageOrder(JSON.parse(xhr.responseText) || [], fullRepresentation._webLastQs,
+                                                  fullRepresentation.webResultCap - webResultsModel.count)
             fullRepresentation._webLastParsed = results.length
-            // Null-prototype maps: these are keyed by names and urls from
-            // the catalogue, and a station called "constructor" would hit
-            // Object.prototype on a plain {} (same trap _countryCodeOf dodges).
+            // Null-prototype maps, keyed by SearchLogic.urlKey so the http and
+            // the https row of one mount are one station: the keys come from the
+            // catalogue, and "constructor" would hit Object.prototype on a plain {}.
             const existing = Object.create(null)
             for (var i = 0; i < stationsModel.count; i++)
-                existing[stationsModel.get(i).hostname] = true
+                existing[SearchLogic.urlKey(stationsModel.get(i).hostname)] = true
             const seen = Object.create(null)
             for (var j = 0; j < webResultsModel.count; j++) {
-                seen[webResultsModel.get(j).url] = true
+                seen[SearchLogic.urlKey(webResultsModel.get(j).url)] = true
                 // The raw url must survive into later passes too, or the
                 // directory's twin entry (same wrapper url, url_resolved
                 // never crawled) reappears as a second row of one station.
                 var seenRaw = webResultsModel.get(j).rawUrl
-                if (seenRaw) seen[seenRaw] = true
+                if (seenRaw) seen[SearchLogic.urlKey(seenRaw)] = true
             }
             var consumed = 0
             for (const r of results) {
@@ -1033,25 +1033,20 @@ PlasmaExtras.Representation {
                 // assumes string methods exist.
                 try {
                 if (keepRow && !keepRow(r)) continue
-                const u = (r.url_resolved || r.url || "").toString()
+                const u = (r.url_resolved || r.url || "").toString(), uKey = SearchLogic.urlKey(u)
                 // http(s) only — catalogue data is untrusted and these URLs
                 // reach playMusic.source, the config and ffmpeg (same rule
                 // as _favUrls in main.qml).
-                if (!u || !/^https?:\/\//i.test(u) || existing[u] || seen[u]) continue
+                if (!u || existing[uKey] || seen[uKey] || !/^https?:\/\//i.test(u)) continue
                 // A station the user already has, saved under its RAW url
                 // while the directory now reports a different url_resolved
                 // (or vice versa), would slip past the check above and show
                 // as a web result that ⭐ then duplicates. Dedup on the raw
                 // url too — the shipped MANGORADIO default is exactly this.
-                var rawU = (r.url || "").toString()
-                if (rawU && (existing[rawU] || seen[rawU])) continue
-                seen[u] = true
-                if (rawU) seen[rawU] = true
-                var br = parseInt(r.bitrate) || 0
-                // kbps is the directory's unit; only clearly-bps values are
-                // scaled down. The old >1000 cutoff mangled honest high-rate
-                // streams (1411 kbps lossless became "1 kb/s").
-                if (br >= 8000) br = Math.round(br / 1000)
+                var rawU = (r.url || "").toString(), rawKey = SearchLogic.urlKey(rawU)
+                if (rawU && (existing[rawKey] || seen[rawKey])) continue
+                seen[uKey] = true
+                if (rawU) seen[rawKey] = true
                 // The favicon lands in an Image.source — through the same
                 // gate every persisted favicon passes (scheme AND host), or
                 // a crafted catalogue row would probe local files, or aim a
@@ -1070,7 +1065,8 @@ PlasmaExtras.Representation {
                     // validates it, so a garbage catalogue value renders as
                     // nothing, never as a broken glyph pair.
                     "cc": String(r.countrycode || "").toUpperCase(),
-                    "bitrate": br,
+                    "bitrate": SearchLogic.kbps(r.bitrate),
+                    "rate": SearchLogic.soundRate(r),
                     "codec": String(r.codec || "").toUpperCase().substring(0, 16),
                     "votes": parseInt(r.votes) || 0,
                     "rbUuid": String(r.stationuuid || ""),
@@ -1078,6 +1074,8 @@ PlasmaExtras.Representation {
                 })
                 } catch (rowErr) { continue }
             }
+            // Every pass lands here, and under Bitrate they are one list, not blocks.
+            if (SearchLogic.asksBitrate(fullRepresentation._webLastQs)) SearchLogic.rateSort(webResultsModel)
             fullRepresentation._webLastConsumed = consumed
             return true
         } catch (e) {
@@ -1850,8 +1848,9 @@ PlasmaExtras.Representation {
                                                         // Flag + name — the flag is an emoji built
                                                         // from the ISO code, no image assets.
                                                         var flag = SearchLogic.countryFlag(webItem.model.cc)
-                                                        bits.push(flag !== "" ? flag + " " + webItem.model.country
-                                                                              : webItem.model.country)
+                                                        var land = SearchLogic.countryLabel(webItem.model.cc,
+                                                            webItem.model.country, Qt.locale().name)
+                                                        bits.push(flag !== "" ? flag + " " + land : land)
                                                     }
                                                     if (webItem.model.bitrate > 0) bits.push(i18n("%1 kb/s", webItem.model.bitrate))
                                                     if (webItem.model.codec) bits.push(webItem.model.codec)
@@ -1994,7 +1993,7 @@ PlasmaExtras.Representation {
                             opacity: 0.55
                             visible: text !== ""
                             text: root.favoritesOnly
-                                  ? i18n("Tap the heart on a station to add it here")
+                                  ? i18n("Tap the star on a station to add it here")
                                   : (fullRepresentation.webSearchFailed
                                      ? i18n("Check the connection and type to search again")
                                      : (root.searchFilter !== "" ? i18n("Try a different search term") : ""))
@@ -2311,12 +2310,11 @@ PlasmaExtras.Representation {
                         implicitHeight: liveRow.implicitHeight + Kirigami.Units.smallSpacing
                         implicitWidth: liveRow.implicitWidth + Kirigami.Units.largeSpacing
                         radius: height / 2
-                        // Theme red, not a fixed dark-theme red: on a light
-                        // popup (a station with no cover, so no dark backdrop)
-                        // the old #e0463c pill left #ff8a80 text at ~1.9:1
-                        // contrast — unreadable. negativeTextColor stays red
-                        // and legible in both schemes.
-                        color: Qt.alpha(Kirigami.Theme.negativeTextColor, 0.16)
+                        // Theme red, never a fixed one (#e0463c left #ff8a80
+                        // text at ~1.9:1 on a light popup). Opaque, so the
+                        // letters are measured against what they sit on: see-
+                        // through, the same red read 3.03:1 light, 2.83:1 dark.
+                        color: ColorLogic.pillSurface(Kirigami.Theme.negativeTextColor, Kirigami.Theme.backgroundColor)
                         border.width: 1
                         border.color: Qt.alpha(Kirigami.Theme.negativeTextColor, 0.4)
 
@@ -2343,7 +2341,7 @@ PlasmaExtras.Representation {
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 font.weight: Font.Bold
                                 font.letterSpacing: 1.2
-                                color: Kirigami.Theme.negativeTextColor
+                                color: ColorLogic.pillText(Kirigami.Theme.negativeTextColor, Kirigami.Theme.backgroundColor)
                             }
                         }
                     }
@@ -2549,7 +2547,7 @@ PlasmaExtras.Representation {
                         primary: true
                         glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
                         enabledState: stationsModel.count > 0 || isPlaying() || root._casting
-                                      || root._tsPaused || root.tsShifted
+                                      || root._tsPaused || root.tsShifted || root._lastAudition !== null
                         tooltipText: (isPlaying() || root._casting)
                                      ? ((root.tsPauseAvailable || root.tsShifted) ? i18n("Pause") : i18n("Stop"))
                                      : i18n("Play")
@@ -2557,7 +2555,7 @@ PlasmaExtras.Representation {
                             // While audible: pause into the timeshift buffer
                             // when one is ready, stop otherwise (preview and
                             // cast included). Silent: resume the parked
-                            // shift, or play the last / first station.
+                            // shift, or whatever was heard last.
                             if (isPlaying() || root._casting) {
                                 if (!root.timeshiftPause()) stopWithFade()
                             } else if (root._tsPaused) {
@@ -2565,8 +2563,7 @@ PlasmaExtras.Representation {
                             } else if (root.tsShifted) {
                                 playMusic.play()
                             } else {
-                                const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
-                                refreshServer(idx)
+                                root.playLast()
                             }
                         }
                     }
@@ -2586,6 +2583,26 @@ PlasmaExtras.Representation {
                             lastPlay = idx
                             refreshServer(idx)
                         }
+                    }
+
+                    CircleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 3
+                        implicitHeight: implicitWidth
+                        iconName: "media-playback-stop"
+                        iconScale: 0.5
+                        // The big button is a Pause on any station with a
+                        // buffer behind it, and a Play while a quiet one waits
+                        // for its next knock. In both states nothing on this
+                        // tab meant "off", and a pause is not off: it holds the
+                        // connection and keeps the capture running.
+                        // It sits after the skip pair rather than inside it so
+                        // the three controls a listener already knows stay put.
+                        visible: TransportLogic.stopOffered(isPlaying(), root._casting,
+                                                            root._wantsPlaying, root._tsPaused,
+                                                            root.tsShifted, root.tsPauseAvailable)
+                        tooltipText: i18n("Stop")
+                        onClicked: stopWithFade()
                     }
                 }
 
@@ -2667,7 +2684,7 @@ PlasmaExtras.Representation {
                             font: parent.font
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
-                            color: root.podcastRate !== 1.0 ? root.accentBright
+                            color: root.podcastRate !== 1.0 ? root.accentBrightText
                                                             : Kirigami.Theme.textColor
                         }
                     }
@@ -2876,7 +2893,7 @@ PlasmaExtras.Representation {
                             if (root.recording && root._recScheduled)
                                 return i18n("A scheduled recording is running (%1)", root._recStationName)
                             if (root.recording)
-                                return i18n("Recording %1 — click to stop", root.recElapsedText())
+                                return root.recOnDisk ? i18n("Recording %1 — click to stop", root.recCounterText()) : i18n("%1 — connecting…", i18n("Recording"))
                             if (!canRec && isPlaying())
                                 return i18n("This source cannot be recorded")
                             return i18n("Record this station (personal use only)")
@@ -3125,11 +3142,11 @@ PlasmaExtras.Representation {
                     }
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
-                        text: "● REC " + root.recElapsedText() + " · " + root._recStationName
+                        text: "● REC " + root.recCounterText() + " · " + root._recStationName
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         maximumLineCount: 1
-                        color: "#E0463C"
+                        color: root.recordRedText
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
                     CircleButton {
@@ -3255,9 +3272,7 @@ PlasmaExtras.Representation {
                                             if (d.getFullYear() !== now.getFullYear()
                                                 || d.getMonth() !== now.getMonth()
                                                 || d.getDate() !== now.getDate()) {
-                                                var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                                                return mon[d.getMonth()] + " " + d.getDate()
+                                                return Qt.formatDate(d, Qt.locale(), Locale.ShortFormat)
                                                        + " " + histItem.model.when
                                             }
                                         }
@@ -3501,7 +3516,7 @@ PlasmaExtras.Representation {
                                     textFormat: Text.PlainText
                                     elide: Text.ElideRight
                                     maximumLineCount: 1
-                                    color: fileItem.isThisPlaying ? root.accent : Kirigami.Theme.textColor
+                                    color: fileItem.isThisPlaying ? root.accentText : Kirigami.Theme.textColor
                                     font.weight: fileItem.isThisPlaying ? Font.DemiBold : Font.Normal
                                 }
 
@@ -4457,21 +4472,33 @@ PlasmaExtras.Representation {
 
                         Kirigami.Icon {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            source: "application-rss+xml"
+                            source: podcastPage.searching && root.podcastSearchUnreached
+                                    ? "network-disconnect" : "application-rss+xml"
                             width: Kirigami.Units.iconSizes.huge
                             height: width
                             opacity: 0.4
                         }
+                        // Nobody answered is not "No shows found", which says
+                        // the show does not exist (PodcastEngine keeps the two apart).
                         PlasmaComponents3.Label {
                             anchors.horizontalCenter: parent.horizontalCenter
                             horizontalAlignment: Text.AlignHCenter
                             width: parent.width
                             wrapMode: Text.Wrap
-                            text: podcastPage.searching ? i18n("No shows found")
+                            text: podcastPage.searching && root.podcastSearchUnreached
+                                  ? i18n("The podcast directories could not be reached")
+                                : podcastPage.searching ? i18n("No shows found")
                                 : podcastPage.trendingMode ? i18n("The charts did not answer — try again in a moment")
                                 : i18n("No subscriptions yet")
                             font.weight: Font.DemiBold
                             opacity: 0.7
+                        }
+                        PlasmaComponents3.Button {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            visible: podcastPage.searching && root.podcastSearchUnreached
+                            icon.name: "view-refresh"
+                            text: i18n("Try again")
+                            onClicked: root.podcastSearch(podSearchField.text)
                         }
                         PlasmaComponents3.Label {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -4655,7 +4682,7 @@ PlasmaExtras.Representation {
 
                         Kirigami.Icon {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            source: "view-media-lyrics"
+                            source: root.podcastEpSearchUnreached ? "network-disconnect" : "view-media-lyrics"
                             width: Kirigami.Units.iconSizes.huge
                             height: width
                             opacity: 0.4
@@ -4665,9 +4692,17 @@ PlasmaExtras.Representation {
                             horizontalAlignment: Text.AlignHCenter
                             width: parent.width
                             wrapMode: Text.Wrap
-                            text: i18n("No episodes found")
+                            text: root.podcastEpSearchUnreached ? i18n("The episode directory could not be reached")
+                                                                : i18n("No episodes found")
                             font.weight: Font.DemiBold
                             opacity: 0.7
+                        }
+                        PlasmaComponents3.Button {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            visible: root.podcastEpSearchUnreached
+                            icon.name: "view-refresh"
+                            text: i18n("Try again")
+                            onClicked: root.podcastSearch(podSearchField.text)
                         }
                     }
                 }
@@ -4857,7 +4892,7 @@ PlasmaExtras.Representation {
                                     var d = new Date(a.nextRun)
                                     var rep = a.repeat === "daily" ? i18n("Daily")
                                             : a.repeat === "weekly" ? i18n("Every %1", days[a.weekday])
-                                            : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
+                                            : days[d.getDay()] + " " + Qt.formatDate(d, Qt.locale(), Locale.ShortFormat)
                                     return "⏰ " + rep + " " + when + " · " + a.volumePct + "% · " + a.station
                                 }
                                 textFormat: Text.PlainText
@@ -4897,21 +4932,20 @@ PlasmaExtras.Representation {
                             text: i18n("Station:")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                         }
-                        QQC2.ComboBox {
+                        StationPicker {
                             id: alarmStation
                             Layout.fillWidth: true
                             model: stationsModel
-                            textRole: "name"
                             enabled: !alarmToneOnly.checked
                             Accessible.name: i18n("Station")
                         }
 
-                        // The chime as a CHOICE, not only a failure net: the
-                        // listener asked for a plain ringer on 2026-08-10 —
-                        // some mornings want a tone, not a talk show.
-                        Item { width: 1; height: 1 }
+                        // The chime as a CHOICE, not only a failure net: a plain ringer
+                        // was asked for on 2026-08-10. Both columns and no spacer: in the
+                        // control column the label was cut ("...built-in tone (no").
                         QQC2.CheckBox {
                             id: alarmToneOnly
+                            Layout.columnSpan: 2
                             Layout.fillWidth: true
                             text: i18n("Wake with the built-in tone (no station)")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -5083,7 +5117,7 @@ PlasmaExtras.Representation {
                                     var d = new Date(s.nextRun)
                                     var rep = s.repeat === "daily" ? i18n("Daily")
                                             : s.repeat === "weekly" ? i18n("Every %1", days[s.weekday])
-                                            : days[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "."
+                                            : days[d.getDay()] + " " + Qt.formatDate(d, Qt.locale(), Locale.ShortFormat)
                                     return "⏺ " + rep + " " + when + " · " + i18n("%1 min", s.durationMin) + " · " + s.station
                                 }
                                 textFormat: Text.PlainText
@@ -5123,11 +5157,10 @@ PlasmaExtras.Representation {
                             text: i18n("Station:")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                         }
-                        QQC2.ComboBox {
+                        StationPicker {
                             id: schedStation
                             Layout.fillWidth: true
                             model: stationsModel
-                            textRole: "name"
                             Accessible.name: i18n("Station")
                         }
 
@@ -5366,19 +5399,18 @@ PlasmaExtras.Representation {
                 root.timeshiftResume()
             } else if (root.tsShifted) {
                 playMusic.play()
-            } else if (stationsModel.count > 0) {
-                const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0
-                refreshServer(idx)
+            } else {
+                root.playLast()
             }
             event.accepted = true
-        } else if (event.key === Qt.Key_M && !_inputFocused()) {
+        } else if (event.key === Qt.Key_M && !_inputFocused() && root.view !== 0) {
             root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
             event.accepted = true
         } else if (root.view === 0 && !_inputFocused() && typeToSearch(event)) {
-            // Open-and-type: any letter nobody above claimed lands in the
-            // search field — from the header, the list, anywhere on the
-            // list page. Deliberately BELOW Space and M, so the transport
-            // toggle and mute keep working until real typing begins.
+            // Open-and-type: any letter nobody above claimed lands in the search
+            // field, from anywhere on the list page. BELOW Space, so the transport
+            // toggle keeps working; M mutes on the other pages only: here it is the
+            // first letter of "metal", and typing it muted the radio and searched "etal".
             event.accepted = true
         }
     }
@@ -5604,7 +5636,7 @@ PlasmaExtras.Representation {
                     if (isError || !isConnected)
                         return Kirigami.Theme.negativeTextColor
                     else if (fullRepresentation._streamActive)
-                        return root.accent
+                        return root.accentText
                     else if (Plasmoid.userBackgroundHints === PlasmaCore.Types.ShadowBackground)
                         return Kirigami.Theme.highlightedTextColor
                     else
@@ -5612,7 +5644,7 @@ PlasmaExtras.Representation {
                 }
                 text: {
                     if (root.recording) {
-                        return "● REC " + root.recElapsedText()
+                        return "● REC " + root.recCounterText()
                                + (root._recScheduled ? " · " + root._recStationName : "")
                     }
                     if (root.sleepRemainingSec > 0) {
@@ -5649,6 +5681,9 @@ PlasmaExtras.Representation {
                     } else if (playMusic.mediaStatus === MediaPlayer.LoadingMedia
                                || playMusic.mediaStatus === MediaPlayer.LoadedMedia)
                         return i18n("Connecting…")
+                    else if (RetryLogic.betweenKnocks(root._wantsPlaying, root._healRetryAttempts))
+                        // The player idles between knocks and this read as giving up (bench, 2026-09-23).
+                        return i18n("Reconnecting…")
                     else
                         return i18n("Choose station and enjoy…")
                 }
@@ -5732,7 +5767,7 @@ PlasmaExtras.Representation {
                     // 21 gu — the full-representation's own width. At 18 the
                     // balance row (checkbox + a full speaker name + slider +
                     // % + channel button) starved the slider to a sliver.
-                    implicitWidth: Kirigami.Units.gridUnit * 21
+                    implicitWidth: Math.min(Kirigami.Units.gridUnit * 21, fullRepresentation.width - 2 * Kirigami.Units.smallSpacing)
                     // CloseOnPressOutsideParent (not ...Outside): the default
                     // policy closed the popup on the toggle button's own
                     // press, so the click's release always saw opened=false
@@ -6036,23 +6071,23 @@ PlasmaExtras.Representation {
                             }
                         }
 
-                        // The caretaker's own switch, beside the sync it
-                        // tends. It lived only on a settings page before,
-                        // which is a poor home for the one setting that can
-                        // pause the music and send clicks around the room:
-                        // the listener who hears that wants it off HERE, not
-                        // after finding a dialog. Shown whenever the row
-                        // above is, so it can always be switched off — and
-                        // only offered where it can act, which needs a
-                        // Bluetooth member to drift against.
+                        // The caretaker's own switch, beside the sync it tends: the
+                        // listener who hears it work wants it off HERE, not after
+                        // finding a dialog. This one stands in while the group is
+                        // down; once the group is up the same setting is offered
+                        // further down with its heartbeat, and the two used to show
+                        // together under two names. Tuning by ear ignores the setting,
+                        // so there it is not offered at all instead of ticking a lie.
                         PlasmaComponents3.CheckBox {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             text: i18n("Keep it in tune by itself")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             visible: root.sync._combineAvailable
-                                     && (root.sync._combineWantActive
-                                         || Plasmoid.configuration.combineWanted === true
+                                     && Plasmoid.configuration.syncManualOnly !== true
+                                     && !root.sync._combineWantActive
+                                     && !(root.sync._combineIdleParked && Plasmoid.configuration.combineWanted === true)
+                                     && (Plasmoid.configuration.combineWanted === true
                                          || Plasmoid.configuration.syncAutoCare === true)
                             checked: Plasmoid.configuration.syncAutoCare === true
                             onToggled: {
@@ -6699,9 +6734,11 @@ PlasmaExtras.Representation {
                             }
                         }
 
-                        Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
+                        Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4; visible: root._castAvailable }
 
                         RowLayout {
+                            // No cast bridge, no search: the heading stood over a verdict nobody reached.
+                            visible: root._castAvailable
                             Layout.fillWidth: true
                             Layout.margins: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
@@ -6845,7 +6882,7 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.Label {
                             Layout.fillWidth: true
                             Layout.margins: Kirigami.Units.smallSpacing
-                            visible: !root._castDiscovering && castDevicesModel.count === 0
+                            visible: root._castAvailable && !root._castDiscovering && castDevicesModel.count === 0
                             text: i18n("No devices found on your network")
                             wrapMode: Text.Wrap
                             opacity: 0.6

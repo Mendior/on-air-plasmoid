@@ -1,5 +1,95 @@
 # Changelog
 
+## 2026.40
+
+- **A stop you can reach.** On a station the widget is able to pause, the big
+  button was a Pause and nothing on the Playing tab meant off — and a pause is
+  not off: it holds the connection open and keeps filling the buffer. There is
+  a Stop beside the skip buttons now, and it appears whenever there is
+  something to stop, including while a quiet station waits for its next try
+  and the footer says "Reconnecting…".
+
+- **A radio left playing overnight does not come back on by itself.** If the
+  machine went to sleep while a station was on and the network returned in the
+  morning, the widget could start it again hours later. How long a quiet
+  station may be retried is now measured against the last moment the widget was
+  awake with sound running, so a minute with the lid shut still comes back and
+  a night does not.
+
+- **A media key does one thing.** One press of Next could walk through five or
+  six stations, and Play/Pause could stop and start the radio three times over
+  before it settled on stopped. Every press is obeyed once now, also when the
+  connection to the media keys has just been started again.
+
+- **A stopped radio sends no blank title to the media controls.** With nothing
+  playing, the desktop's media controls were handed a single space as the
+  title and the album. They get no title at all now.
+
+- **Play brings back the search result you just stopped.** Try a station from
+  the search, stop it, press Play, and the first station of your list came on
+  instead. The Play button, Space, the panel's middle click and the media keys
+  all bring back what you were listening to now.
+
+- **The footer says "Reconnecting…" while a station waits for its next try.**
+  Between two retries it went back to "Choose station and enjoy…" under the
+  station's name, which looks like a widget that has given up. Once the retries
+  are spent you get the usual line again.
+
+- **A widget that dies does not leave the stream downloading.** If the widget
+  was killed or crashed, the buffer behind timeshift and the relay went on
+  fetching the station for up to an hour, a FLAC one at about 128 KB a
+  second. It stops within a few seconds now, and the next start clears
+  whatever an older session left.
+
+- **A station that says its own name keeps its own logo.** When a station sent
+  its name or a web address in place of a song title, the widget looked it up
+  as a song and could put a stranger's album cover over it.
+
+- **The history keeps the songs.** A station that takes turns between two
+  slogans filled all thirty rows with them in a few minutes. A line the station
+  already sent in its last ten rows is not added again, and neither is its own
+  name or a web address.
+
+- **The REC counter starts when the recording does.** It counted from the
+  click while the recorder was still connecting, so a recording could say 1:18
+  and hold 54 seconds. It says "Connecting…" until the file is there.
+
+- **The podcast search says when nobody answered.** With the connection down
+  or the directories out of reach it said "No shows found", as if the show did
+  not exist. It says the directories could not be reached now and offers Try
+  again, and the episode list does the same.
+
+- **The Bitrate chip sorts the whole list.** A search of more than one word
+  came back as two blocks, each sorted on its own. It is one list from the
+  highest bitrate down now, the rows "Show more" brings included, and stations
+  that turned out dead stay at the bottom.
+
+- **Trending now and Popular in… show what they found.** The results landed
+  below all your saved stations and the view did not move, so the tap seemed to
+  do nothing. The view goes to them now.
+
+- **The empty favourites view points at the star.** It asked you to tap a
+  heart, but the heart on the Playing tab likes the song and keeps it in My
+  Music. A station becomes a favourite with its star.
+
+- **The station settings are not marked as changed when nothing changed.** With
+  the settings open, the Apply button could light up as soon as the popup
+  fetched a few station logos, and closing the dialog asked about unsaved
+  changes.
+
+- **A page of the settings' station list that failed is asked for again,** after
+  2, 4 and 8 seconds and from another mirror each time, instead of waiting for
+  a scroll that might never come.
+
+- **LIVE can be read on Breeze and Breeze Dark.** The red on its tinted pill
+  came out around 3:1; the pill is solid now and the red clears 4.5:1 on both.
+
+- **The Tries box keeps one width.** It grew and shrank with its number, so the
+  arrows moved under the pointer and seven clicks up from 0 ended at 1.
+
+- **The download folder hint names the real folder.** It always said
+  ~/Music/OnAir, also where the music folder is called something else.
+
 ## 2026.39
 
 - **A podcast speed you choose now survives a restart.** Tapping 1.25x worked

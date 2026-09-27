@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station waiting for its next knock is never recognised as waiting, and
+  the footer goes back to "Choose station and enjoy…" under its name.
+
+history:
+  Seen on the bench on 2026-09-23: a station at a dead address, the retry
+  ladder armed, and for the 30 s before knock #1 the footer read like a
+  widget with nothing to do.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+      return wantsPlaying === true && (attempts | 0) > 0;
+
+replace:
+      return false;
+
+expect:
+  Killed by tests/qml/tst_retrylogic.qml::test_a_station_waiting_for_its_next_knock_is_between_knocks.
+  Line-neutral.

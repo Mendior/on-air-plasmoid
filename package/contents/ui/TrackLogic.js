@@ -72,6 +72,56 @@ function parseTrackString(s) {
     return { artist: "", title: s.trim() };
 }
 
+// True when a "now playing" line is the station talking about itself rather
+// than a record: its own name, or a web address.
+// Contract: stationTalk("DANCE  WAVE", "Dance Wave!") = true;
+//   stationTalk("Tracklist: https://x.online/", "Any") = true;
+//   stationTalk("Radio Ga Ga", "Radio") = false; stationTalk("x", "") = false.
+function stationTalk(line, station) {
+    var s = line || "";
+    if (/(?:\bhttps?:\/\/|\bwww\.)\S/i.test(s)) return true;
+    var said = _bare(normalizeQuery(s));
+    if (said === "") return false;
+    // The directory's name wears tails the stream never says: "(EN)",
+    // "| 320k", " - Main Mix". normalizeQuery takes the first two, the
+    // split the third.
+    var name = normalizeQuery(station);
+    return said === _bare(name) || said === _bare(name.split(/\s+[-–—]\s+/)[0]);
+}
+
+// Letters and digits only, accents and case folded away. Everything else is
+// punctuation that varies between the stream and the directory.
+function _bare(s) {
+    return (s || "").toLowerCase().normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[\s!-\/:-@\[-`{-~\u00a1-\u00bf\u2010-\u205e]/g, "");
+}
+
+// Ten rows is a good half hour of real songs, and no station repeats a
+// record inside that; a slogan comes back every few minutes at the most.
+var HISTORY_LOOKBACK = 10;
+
+// Whether a parsed title earns a row in the listening history. rows is the
+// history newest first, anything with count and get(i) (the ListModel).
+function historyTakes(rows, artist, title, station) {
+    if (!title) return false;
+    if (stationTalk((artist ? artist + " " : "") + title, station)) return false;
+    var a = _bare(artist), t = _bare(title);
+    var n = Math.min(rows.count, HISTORY_LOOKBACK);
+    for (var i = 0; i < n; i++) {
+        var r = rows.get(i);
+        var here = (r.station || "") === (station || "");
+        // The newest row counts whatever station it came from, which is how
+        // the one-row check always read. Past it, only this station's rows
+        // do, and the first row from somewhere else ends the look: back on
+        // a station after a stop elsewhere, its song is being heard again.
+        if (i > 0 && !here) break;
+        if (_bare(r.artist) === a && _bare(r.trackName) === t) return false;
+        if (!here) break;
+    }
+    return true;
+}
+
 // The first-billed name alone — collaboration glue ("feat.", "&", "vs")
 // derails an artist search more often than it narrows one.
 function primaryArtist(artist) {

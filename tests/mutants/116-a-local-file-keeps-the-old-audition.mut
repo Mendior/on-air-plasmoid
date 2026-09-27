@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A track from My Music, an episode or an alarm leaves the last audition
+  standing, so the next bare Play brings back a search result nobody was
+  listening to any more.
+
+history:
+  The audition outranks lastPlay in the bare Play's decision, because a row
+  deletion resets lastPlay to 0 behind the listener's back. That precedence
+  is only right while the memory means "an audition was the last thing
+  heard"; startWithFade is where every other kind of start forgets it.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (root._previewUrl === "") root._lastAudition = null;
+
+replace:
+          if (false) root._lastAudition = null;
+
+expect:
+  Killed by test_invariants::test_only_an_audition_is_remembered_and_every_other_start_forgets_it.
+  Line-neutral.

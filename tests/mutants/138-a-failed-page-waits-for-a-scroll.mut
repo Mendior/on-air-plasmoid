@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A later page of the settings list that failed waits for a scroll again.
+
+history:
+  Page two of "rock" failed once at the end of the list and never came,
+  because the only trigger was the list moving and a list at its end does
+  not move. Both failure roads of loadMore now ask again by themselves
+  through _pageFailed; this puts the error road back to waiting.
+
+target:
+  package/contents/ui/config/configSearch.qml
+
+find:
+                  } catch (e) {
+                      _pageFailed()
+                  }
+              } else {
+                  _pageFailed()
+              }
+
+replace:
+                  } catch (e) {
+                      _pageFailed()
+                  }
+              } else {
+                  stat = 1
+              }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_later_page_that_failed_is_asked_again_without_a_scroll.
+  Line-neutral.

@@ -1213,7 +1213,7 @@ ULTRA_AGREE_S = 0.025      # two captures of one member must land this close
                            # smaller than that cannot change any verdict, and
                            # a bigger one means the chain is not steady enough
                            # to be measured right now.
-ULTRA_SLOT_SECONDS = 1.8   # how much of ONE shared capture each member owns.
+ULTRA_SLOT_SECONDS = 1.792 # how much of ONE shared capture each member owns.
                            # The stimulus is 660 ms and a sweep aimed straight
                            # at a sink lands inside ~500 ms of it, so 1.8 s
                            # leaves the room's tail somewhere to die before the
@@ -1221,6 +1221,19 @@ ULTRA_SLOT_SECONDS = 1.8   # how much of ONE shared capture each member owns.
                            # SCHEDULE rather than by what the previous member
                            # did, so one silent speaker cannot shift the window
                            # the next one is found in.
+                           #
+                           # 1.792 and not 1.8: 86016 frames, a whole number of
+                           # graph cycles at every quantum from 256 to 4096.
+                           # Each member is its own paplay, and a stream starts
+                           # at the next cycle, not when asked — so two plays
+                           # a slot apart share a start latency only if the
+                           # slot is whole cycles. 1.8 s was 168.75 of them at
+                           # 512 frames: one round in four started the second
+                           # member a cycle early, and every reading carried
+                           # 2.7 ms. Measured 2026-09-21, fourteen rounds each:
+                           # jumps of -9.8 and -12.0 at 1.8 s, one at 1.792 s.
+                           # This is the two clusters 19.5 ms apart of
+                           # 2026-08-12 — a 1024-frame quantum then.
 ULTRA_ROUND_TRIES = 4      # shared captures a check may spend. Three are read
                            # for their middle; the fourth is there because a
                            # round does get lost — measured, one in five — and

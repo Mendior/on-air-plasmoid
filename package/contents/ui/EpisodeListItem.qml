@@ -66,7 +66,7 @@ PlasmaComponents3.ItemDelegate {
         var parts = []
         if (pubMs > 0) {
             var d = new Date(pubMs)
-            parts.push(d.getDate() + "." + (d.getMonth() + 1) + "." + d.getFullYear())
+            parts.push(Qt.formatDate(d, Qt.locale(), Locale.ShortFormat))
         }
         if (durationSec > 0) parts.push(PodcastLogic.fmtTime(durationSec))
         // The download size, but only while it is still a download — once the
@@ -247,7 +247,7 @@ PlasmaComponents3.ItemDelegate {
                 textFormat: Text.PlainText
                 font.weight: epItem.isThisPlaying ? Font.DemiBold : Font.Normal
                 // A played episode dims, so the unheard ones stand out.
-                color: epItem.isThisPlaying ? root.accentBright : Kirigami.Theme.textColor
+                color: epItem.isThisPlaying ? root.accentBrightText : Kirigami.Theme.textColor
                 opacity: epItem.played && !epItem.isThisPlaying ? 0.55 : 1.0
                 elide: Text.ElideRight
                 maximumLineCount: 1

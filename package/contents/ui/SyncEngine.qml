@@ -48,6 +48,7 @@ Item {
         _loadDeviceTrims();
         _loadDeviceChannels();
         _loadSyncExcluded();
+        _loadEarWindow();
         // The availability probe goes out from the sweep's ack (below): an
         // enable it triggers must never race the sweep that unloads every
         // onair_combined module — the two shells used to run side by side.
@@ -231,6 +232,7 @@ Item {
     property bool _combineSinkSeen: false
 
     function _combineResurrect() {
+        console.log("[ARP] sync: the combined sink vanished from the device list — resurrecting the group");
         _combineLoopbackIds = [];
         _combineLoopbackSinkByModule = {};
         _combineNullId = "";
@@ -374,6 +376,10 @@ Item {
             // build (every sink still registering — a Bluetooth-only
             // group right after connect) is a healthy build waiting for
             // its sinks, and the retry pass below walks them in.
+            // The live generation answered — success, failure or a wish that
+            // was withdrawn meanwhile, all of them are an answer.
+            enableAckGuard.stop();
+            _enableAckMisses = 0;
             if (!nullM || (lbIds.length === 0 && pwOut.indexOf("LBMISS") === -1)) {
                 // Nothing usable came up — take down whatever half did.
                 var junk = lbIds.slice();
@@ -438,6 +444,13 @@ Item {
                     _combineSinkSeen = true;
                     break;
                 }
+            // The members get the same treatment, for the same reason: the
+            // death check can only miss a speaker it remembers, and a
+            // transport that dies before the first device event after
+            // bring-up was never remembered at all. Found 2026-09-20 —
+            // tst_syncengine's departure test had sat outside its TestCase
+            // since the day it was written, so nothing ever ran this road.
+            _btNoteMembersSeen();
             // If our own PREVDEF read back as a combined name (empty after
             // the filter) — a superseded load had already switched the
             // default before this generation looked — adopt the real default
@@ -492,6 +505,7 @@ Item {
             // audible — the build baked the values from enable time. Bring
             // the room to the STORED state now that the modules are known.
             _trimReconcile(lbPairs);
+            birthFlushTimer.restart();
             // The rows are clickable from the moment the switch flips,
             // which is BEFORE this ack lands — an untick or a channel
             // flip made inside the load round-trip is not in the build
@@ -662,9 +676,19 @@ Item {
         // read the room's master level on its way out — that is what the
         // volume keys were trimming all evening, and the next enable's ramp
         // ends there instead of at a full-blast 100% the user never chose.
+        // The flags are asked again here: a measurement or a new enable can
+        // begin inside the shell's round-trip, and the generation mark drops
+        // a watch that outlived its group and read the next one's 20 % flip.
+        if (cmd.indexOf(": PW_MASTER ") === 0) {
+            var wM = (stdout || "").match(/^MASTER (\d+)/m);
+            if (wM && _combineActive && !_masterHeld()
+                && parseInt(cmd.split(" ")[2], 10) === _combineLoadSeq)
+                _rememberMaster(parseInt(wM[1], 10));
+            return true;
+        }
         if (cmd.indexOf(": PW_UNCOMBINE_DONE;") === 0) {
             var mM = (stdout || "").match(/^MASTER (\d+)/m);
-            if (mM) cfg.combineMasterPct = Math.max(10, Math.min(100, parseInt(mM[1], 10)));
+            if (mM) _rememberMaster(parseInt(mM[1], 10));
             if (!_combineActive && !_combineWantActive)
                 cfg.combinePrevDefault = "";
             // The park's unload has fully landed — a wake that arrived
@@ -1458,6 +1482,10 @@ Item {
                         _ultraDeaf[pM[1]] = true;
                         _ultraDeafSig = _combineGroupSignature();
                     }
+                    // The same offer the periodic sweep makes. This road shelved
+                    // without it, so a speaker deaf under the verify was never
+                    // offered the seat and never stamped for its later look.
+                    _hearingOffer();
                     console.log("[ARP] sync: " + pM[1] + " does not carry the inaudible"
                                 + " band — kept in the group, measured with the others");
                     return true;
@@ -1583,6 +1611,14 @@ Item {
                 console.log("[ARP] sync: will not play the sweep into those again"
                             + " while this group stands");
             }
+            // A Bluetooth member that went deaf may only be deaf on THIS link.
+            // Seen 2026-09-20 on a JBL Flip 7: twelve minutes after a restart the
+            // band read 15 on its AAC link and the shelf would have closed the
+            // check for the group's life. Moving the card to SBC-XQ renegotiated
+            // the link and the band came back at 4322; AAC itself read 4700-7500
+            // later, so the cure was the renegotiation, cause unknown. One try per
+            // speaker per session; still deaf after it, the shelf is right.
+            if (dLearned) _hearingOffer();
             // A member that answered but never twice the same. Saying "too
             // quiet" there is a lie the listener can hear through — the room
             // was not quiet, the reading simply would not settle. Naming it
@@ -1883,6 +1919,25 @@ Item {
             // unrelated rebuild happened by.
             if (_combineActive && !syncOffsetDebounce.running)
                 syncOffsetDebounce.restart();
+            return true;
+        }
+        if (cmd.indexOf(": PW_HEARING ") === 0) {
+            var hm = (stdout || "").match(/^HEARING ([0-9A-F:]{17}) (\S+)/m);
+            if (!hm) return true;
+            if (hm[2] !== "a2dp-sink-sbc_xq") {
+                console.log("[ARP] sync: " + hm[1] + " has no SBC-XQ seat to move to (" + hm[2]
+                            + ") — it stays on the shelf");
+                return true;
+            }
+            var nd = {};
+            for (var hd in _ultraDeaf)
+                if (_btMacOfSink(hd) !== hm[1]) nd[hd] = _ultraDeaf[hd];
+            _ultraDeaf = nd;
+            // The new transport needs a moment to settle before it is measured
+            // — the same 45 s the first check after a start gives the room.
+            _autoCareJustArmed = false;
+            driftFirstCheck.restart();
+            console.log("[ARP] sync: " + hm[1] + " moved to SBC-XQ — the sweep will try it again");
             return true;
         }
         if (cmd.indexOf(": BT_KICK ") === 0) {
@@ -2197,6 +2252,32 @@ Item {
         onTriggered: _combineRamping = false
     }
 
+    // The level the room was left at used to be written by the disable's ack
+    // alone, and a panel restart or a reboot destroys the engine before that
+    // ack lands. Measured 2026-09-20: config 30, the room kept at 40 with the
+    // volume keys all evening, and the next enable ramped back to a room
+    // close to inaudible. So the level is read while the room is alive.
+    // Never triggeredOnStart, never shorter than the ramp and its guard: the
+    // ramp's ack carries no generation, and the first tick landing half a
+    // minute after activation is what keeps a stale one from mattering.
+    Timer { id: masterWatch; interval: 30000; repeat: true; running: _combineActive; onTriggered: _masterWatchTick() }
+    function _masterHeld() { return _calibrating || _verifyPending || _combineRamping; }
+    function _masterWatchTick() {
+        if (!_combineActive || _masterHeld()) return;
+        app.exec(": PW_MASTER " + _combineLoadSeq + ";"
+                 + " if [ -z \"$XDG_RUNTIME_DIR\" ] || [ ! -e " + _parkFile + " ]; then"
+                 + " cm=$(pactl get-sink-volume " + _combineSinkName
+                 + " 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%');"
+                 + " [ -n \"$cm\" ] && echo \"MASTER $cm\"; fi; true # " + app.nextSeq());
+    }
+    // Zero is a mute made by hand, not a level: filing it as 10 would bring
+    // the next evening back to the very complaint this exists to end.
+    function _rememberMaster(pct) {
+        if (!(pct >= 1)) return;
+        var keep = Math.max(10, Math.min(100, pct));
+        if (cfg.combineMasterPct !== keep) cfg.combineMasterPct = keep;
+    }
+
     function _idleTeardownTick() {
         if (!_combineActive || cfg.combineWanted !== true) return;
         if (_appPlaying) return;
@@ -2238,6 +2319,33 @@ Item {
         }
     }
 
+    // Misses in a row for the enable's ack. Two retries is the budget: a
+    // third silence means the shell road itself is broken, and retrying
+    // every half minute would sweep and rebuild the graph on a loop that
+    // the listener hears. After that the wish drops and the resurrect knocks
+    // stay armed, so the next device event or the toggle can try again.
+    property int _enableAckMisses: 0
+    Timer {
+        id: enableAckGuard
+        // Generous like the park tail's: a slow-but-honest enable (a cold
+        // Bluetooth transport, a busy pactl) always answers well inside it.
+        interval: 30000
+        repeat: false
+        onTriggered: _enableAckGuardFire()
+    }
+    function _enableAckGuardFire() {
+        if (!_combineWantActive || _combineActive) return;
+        _enableAckMisses++;
+        console.log("[ARP] sync: the enable never answered (" + _enableAckMisses
+                    + ") — dropping the wish" + (_enableAckMisses < 3 ? " and trying again" : ""));
+        _combineWantActive = false;
+        _combineLoopbackIds = [];
+        _combineLoopbackSinkByModule = {};
+        _combineNullId = "";
+        _resurrectTries = 6;
+        if (_enableAckMisses < 3) combineOutputsEnable();
+    }
+
     function _combineWakeFromPark() {
         _combineIdleParked = false;
         _combineWakeQueued = false;
@@ -2254,6 +2362,7 @@ Item {
     on_AppPlayingChanged: {
         if (_appPlaying) {
             idleTeardownTimer.stop();
+            birthFlushTimer.restart();
             if (_combineIdleParked && cfg.combineWanted === true && !_combineActive
                 && !_combineWantActive) {
                 // Inside the park-disable's async tail the unload shell is
@@ -2445,7 +2554,7 @@ Item {
                  && _combineActive
                  && app.anythingPlaying === true
                  && _combineHasBtMember()
-        onTriggered: _driftProbe()
+        onTriggered: _driftPeriodicTick()
         // The first heartbeat comes early: 45 s into the music the fade-in
         // is long over and the listener gets a "yes, it is running" line
         // without waiting out the full period.
@@ -2463,6 +2572,21 @@ Item {
         }
     }
 
+    // A living settle round is already measuring this room. Its third tick
+    // falls 150 + 105 + 105 = 360 s after it arms, which is this timer's own
+    // six minutes: measured twice on 2026-09-21, the periodic probe went out
+    // three seconds ahead, the settle tick found it in the air, called the
+    // room busy and came back a minute later with a fifth probe.
+    // Only a round something will still tick counts: reads left with no
+    // timer and no probe out is a corpse, and standing aside for it would
+    // silence the check for the life of the group.
+    function _driftPeriodicTick() {
+        if (_settleReadsLeft > 0 && (settleFixTimer.running || _settleProbeOut)) return;
+        _driftProbe();
+    }
+
+    // What the tests can see of the rearm: timer ids are not properties.
+    readonly property bool _sweepRearmed: driftFirstCheck.running
     Timer {
         id: driftFirstCheck
         // 45 s when the check arms itself (music started, the speaker
@@ -2691,6 +2815,25 @@ Item {
         var dMembers = [];
         for (var dk = 0; dk < dAll.length; dk++)
             if (!_ultraDeaf[dAll[dk]]) dMembers.push(dAll[dk]);
+        // The shelf can be wrong later: a band too faint at one volume is
+        // loud enough at another, and on 2026-09-20 a speaker shelved at
+        // 22:10 was healthy at 22:14 with every corrector silent for the
+        // rest of the evening. One more look per Bluetooth speaker per
+        // session, ten minutes on at the earliest — sweeping a deaf speaker
+        // on every check is the beeping described below. A wired member
+        // keeps its relay in peace.
+        for (var sk in _ultraDeaf) {
+            var sMac = _btMacOfSink(sk), sAt = _hearingTried[sMac];
+            if (sMac === "" || dAll.indexOf(sk) === -1
+                || !(sAt > 2) || Date.now() - sAt < 600000) continue;
+            var sShelf = {}, sTried = {};
+            for (var s1 in _ultraDeaf) if (s1 !== sk) sShelf[s1] = true;
+            for (var s2 in _hearingTried) sTried[s2] = _hearingTried[s2];
+            sTried[sMac] = 2;
+            _ultraDeaf = sShelf;
+            _hearingTried = sTried;
+            dMembers.push(sk);
+        }
         if (dMembers.length < 2) {
             // Putting the deaf ones back was the whole promise undone. In a
             // two-speaker room — the ordinary case — one deaf member leaves
@@ -2974,7 +3117,8 @@ Item {
                  + " | grep -Fxq '" + _combineSinkName + "'"
                  + " && pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
                  + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
-                 + " sink='" + s + "' latency_msec=" + d + " " + chSpec + ") && echo \"LB $id " + s + "\"";
+                 + " sink='" + s + "' latency_msec=" + d + " " + chSpec + _lbNoRestore
+                 + ") && echo \"LB $id " + s + "\"";
             var pct = Math.round(trimOf(_trimKeyForSink(sinks[i])) * 100);
             // A member that was ALREADY playing crossfades out of its old
             // loopback instead of being cut out of it. This is the road a
@@ -3020,10 +3164,22 @@ Item {
             // being HANDED OVER has been playing all along, and flushing
             // it would re-roll the very transport whose delay we just
             // measured: the crossfade would land on a moved target.
-            if (sinks[i].indexOf("bluez_") === 0 && oldId === "")
-                cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
-                     + " pactl suspend-sink '" + s + "' 1;"
-                     + " pactl suspend-sink '" + s + "' 0; }";
+            //
+            // Only with music already flowing through the group, though.
+            // Measured 2026-09-20 on a JBL Flip 7, five builds out of five:
+            // a group built while nothing plays, bounced here, was a dead
+            // pipe once the music started — sink RUNNING, transport active,
+            // nothing in the air. Three builds without the bounce: three
+            // live speakers, no backlog. Under flowing music the same bounce
+            // was harmless four times. In silence it is owed instead.
+            if (sinks[i].indexOf("bluez_") === 0 && oldId === "") {
+                if (_combineActive && app.isPlaying()) {
+                    cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
+                         + " pactl suspend-sink '" + s + "' 1;"
+                         + " pactl suspend-sink '" + s + "' 0; }";
+                    delete _birthFlushOwed[sinks[i]];
+                } else _birthFlushOwed[sinks[i]] = true;
+            }
             // Its previous loopback stays loaded otherwise — feeding a sink that
             // is not there, moved by WirePlumber onto whatever is, and doubled
             // the moment the retry seats the new one.
@@ -3119,6 +3275,48 @@ Item {
     // Every loopback gets at least this much, so the schedule has room to
     // hold the fast devices back rather than trying to rush the slow one.
     readonly property int _loopbackFloorMs: 60
+    // WirePlumber files a stream's level under "loopback-<pid>-<n> output"
+    // and restores it onto the next stream of that name. Both halves repeat
+    // (the counter cycles, a lingering login reuses the pid), and a handover
+    // leaves its old loopback's last level on disk: zero. Measured
+    // 2026-09-20 with 0.0 stored under loopback-1322-15: a fresh loopback
+    // came up at -inf dB, unmuted and running; with this property it came
+    // up at full level and nothing it was set to was written back. The
+    // balance is ours to keep anyway — _trimReconcile asserts it on every ack.
+    readonly property string _lbNoRestore: " sink_input_properties=state.restore-props=false"
+
+    // Bluetooth members whose birth flush is still owed: their loopback was
+    // loaded while nothing played. Paid once, a beat after sound flows, and
+    // only for sinks still in the group. The debt belongs to one build — the
+    // next enable starts from an empty book.
+    property var _birthFlushOwed: ({})
+    Timer { id: birthFlushTimer; interval: 3000; repeat: false; onTriggered: _birthFlushTick() }
+    function _birthFlushTick() {
+        var cmd = "";
+        for (var os in _birthFlushOwed)
+            for (var om in _combineLoopbackSinkByModule)
+                if (_combineLoopbackSinkByModule[om] === os) {
+                    var oq = os.replace(/'/g, "'\\''");
+                    cmd += "pactl suspend-sink '" + oq + "' 1; pactl suspend-sink '" + oq + "' 0; ";
+                }
+        if (cmd === "" || !_combineActive) return;
+        // Casting counts as playing without a local note: look again later.
+        if (!app.isPlaying()) { if (_appPlaying) birthFlushTimer.restart(); return; }
+        if (_calibrating || _verifyPending || _combineReloopBusy || _btKickInFlight
+            || _btJoinWatchMac !== "" || app.alarmEngaged === true || driftGuardTimer.running) {
+            birthFlushTimer.restart();
+            return;
+        }
+        _birthFlushOwed = ({});
+        app.exec(": PW_FLUSH; " + cmd + "true # " + app.nextSeq());
+        // The bounce re-rolls the A2DP buffer: what was measured before it
+        // describes another room, and this one earns its own settle round.
+        _driftHistory = [];
+        _driftHistoryAt = [];
+        _driftEstHistory = [];
+        refLatProbeTimer.restart();
+        _settleArmRound();
+    }
 
     // Sinks that came back with an empty 18-19 kHz band. Kept for the
     // session only: a speaker replugged into a live jack, or a group the
@@ -3581,6 +3779,7 @@ Item {
 
     function combineOutputsEnable(fromUser) {
         if (!_combineAvailable || _combineWantActive) return;
+        _birthFlushOwed = ({});
         // Two pieces of hardware make a sync; how many of them PLAY is the
         // user's per-speaker choice (one alone is a valid evening).
         if (_combineAllSinks().length < 2) return;
@@ -3684,6 +3883,12 @@ Item {
                         + " pactl set-default-sink " + _combineSinkName + " 2>/dev/null; true; }"
                         + " && { " + _combineLoopbackCmds(sinks) + "true; }"
                         + " # " + app.nextSeq());
+        // The enable has no ack of its own to wait for other than PW_COMBINE,
+        // and until today nothing waited: a shell that died, or an ack that
+        // lost the sequence race, left the wish standing with the graph down
+        // — and every corrector refuses while the wish stands. Seen live
+        // 2026-09-20, 14:16 to 15:40, the room at -15 ms and the log silent.
+        enableAckGuard.restart();
     }
 
     function _combineUnloadCmd() {
@@ -3729,7 +3934,7 @@ Item {
         // remember the PARK as "the level the user left the room at", or
         // the next morning's enable ramps to a full blast the user never
         // chose — the very regression the memory exists to prevent.
-        var masterParked = _calibrating || _verifyPending || _combineRamping;
+        var masterParked = _masterHeld();
         // Generation boundary: an in-flight rebuild's ack is stale from here
         // on and deliberately keeps its hands off these flags — a leftover
         // busy would deadlock every rebuild of the next enable.
@@ -3769,7 +3974,7 @@ Item {
                   " if [ -z \"$XDG_RUNTIME_DIR\" ] || [ ! -e " + _parkFile + " ]; then"
                   + " cm=$(pactl get-sink-volume " + _combineSinkName
                   + " 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%');"
-                  + " echo \"MASTER ${cm:-100}\"; fi;")
+                  + " [ -n \"$cm\" ] && echo \"MASTER $cm\"; fi;")
                + " " + unMods;
         }
         // Hand the system default back to whoever held it before the sync —
@@ -3991,6 +4196,12 @@ Item {
         // same half-step way the microphone verify teaches it.
         _earLessonLeft = 5;
         _earSetAt = Date.now();
+        // Written down, because a panel restart is not the listener
+        // changing their mind. Ten minutes is short enough that an
+        // update or a logout lands inside it, and the window closing
+        // early is how the settle used to win the race the ear had
+        // just settled.
+        cfg.syncEarSetAt = _earSetAt;
         _earLessonRuns = [];
         _earLessonMapAt = cfg.syncOffsetMap || "";
         syncOffsetDebounce.restart();
@@ -4007,6 +4218,16 @@ Item {
     // never learned, so the walking never stopped (152 -> 172 -> 176,
     // each one re-set by an increasingly patient listener).
     property double _earSetAt: 0
+    // Read back at startup so a restart inside the window does not hand
+    // the room back to the sweeps. Only the WINDOW returns: the lesson's
+    // readings (_earLessonRuns) were taken against a graph that no longer
+    // exists after a rebuild, and teaching the new one from them is the
+    // mistake the settle machinery exists to avoid. A stale timestamp
+    // needs no expiry code — _earWindowOpen() is already a clock check.
+    function _loadEarWindow() {
+        var t = Number(cfg.syncEarSetAt);
+        _earSetAt = (isFinite(t) && t > 0) ? t : 0;
+    }
     function _earWindowOpen() { return Date.now() - _earSetAt < 10 * 60 * 1000; }
     property int _earLessonLeft: 0
     property var _earLessonRuns: []
@@ -4962,7 +5183,7 @@ Item {
             }
             cmds += "if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq '" + s + "'; then "
                  + "id=$(pactl load-module module-loopback source=" + _combineSinkName + ".monitor"
-                 + " sink='" + s + "' latency_msec=" + toSwap[k].d + " " + chSpec + ");"
+                 + " sink='" + s + "' latency_msec=" + toSwap[k].d + " " + chSpec + _lbNoRestore + ");"
                  + " if [ -n \"$id\" ]; then"
                  // The sink-input registers a beat after load-module returns;
                  // wait it out, or the muzzle lands on nothing and the
@@ -5333,12 +5554,61 @@ Item {
     // is what turns that silence into something the watchdog can act on.
     property var _btMembersSeen: ({})
 
-    function _btWatchLostMembers() {
+    // Speakers already offered the SBC-XQ seat this session, by MAC. Once is
+    // the budget: a speaker that stays deaf on the codec the band survives is
+    // deaf for a reason the sweep cannot fix, and the shelf is right. The
+    // value is when the offer was made, until _driftProbe spends the one
+    // later look the shelf allows and writes 2 in its place.
+    property var _hearingTried: ({})
+    // Every Bluetooth speaker on the shelf that has not had the offer gets it
+    // now, once, and the moment is written down. One door for both roads that
+    // shelve: the periodic sweep and the verify's sweep.
+    function _hearingOffer() {
+        for (var hs in _ultraDeaf) {
+            var hMac = _btMacOfSink(hs);
+            if (hMac === "" || _hearingTried[hMac] || !app._btValidMac(hMac)) continue;
+            var ht = {};
+            for (var hk in _hearingTried) ht[hk] = _hearingTried[hk];
+            ht[hMac] = Date.now();   // when, so the shelf can look again later
+            _hearingTried = ht;
+            console.log("[ARP] sync: " + hs + " is deaf to the band under its codec"
+                        + " — moving it to SBC-XQ so the check can hear it");
+            app.exec(_btHearingShell(hMac) + " # " + app.nextSeq());
+        }
+    }
+
+    // The switch itself, C locale like the kick's: reads the card's active
+    // profile, moves it only when the SBC-XQ seat exists and is not already
+    // taken, and answers HEARING <mac> <profile|none|failed> for the ack.
+    function _btHearingShell(mac) {
+        if (!app._btValidMac(mac)) return ": PW_HEARING 00:00:00:00:00:00; true";
+        var macU = String(mac).replace(/:/g, "_");
+        return ": PW_HEARING " + mac + "; export LC_ALL=C; c=bluez_card." + macU + ";"
+             + " p=$(timeout 3 pactl list cards | awk '/Name: bluez_card." + macU + "/{f=1}"
+             + " f && /Active Profile:/{print $3; exit}');"
+             + " if [ \"$p\" = a2dp-sink-sbc_xq ]; then echo \"HEARING " + mac + " already\";"
+             + " elif timeout 3 pactl list cards | awk '/Name: bluez_card." + macU + "/{f=1}"
+             + " f && /a2dp-sink-sbc_xq:/{print; exit}' | grep -q .; then"
+             + " timeout 5 pactl set-card-profile \"$c\" a2dp-sink-sbc_xq >/dev/null 2>&1"
+             + " && echo \"HEARING " + mac + " a2dp-sink-sbc_xq\" || echo \"HEARING " + mac + " failed\";"
+             + " else echo \"HEARING " + mac + " none\"; fi; true";
+    }
+
+    // Remembering is its OWN step, callable from the enable ack as well as
+    // from a device event. Tied to device events alone it never ran for a
+    // speaker that vanished before the first event after the group came up,
+    // and the departure below then had nothing to miss. The combined sink
+    // learned this lesson already — see _combineSinkSeen at the ack.
+    function _btNoteMembersSeen() {
         var members = _combineRealSinks();
         for (var i = 0; i < members.length; i++) {
             var mac = _btMacOfSink(members[i]);
             if (mac !== "") _btMembersSeen[mac] = members[i];
         }
+    }
+
+    function _btWatchLostMembers() {
+        _btNoteMembersSeen();
         var outs = app.mediaDevs ? app.mediaDevs.audioOutputs : [];
         for (var known in _btMembersSeen) {
             var here = false;
@@ -5351,7 +5621,6 @@ Item {
             if (!syncDeviceIncluded(String(known).toUpperCase())) continue;
             console.log("[ARP] sync: " + lastName + " left the group without being"
                         + " asked — walking it back in");
-            if (app.noteBtMemberLost) app.noteBtMemberLost();
             _btJoinWatchArm(known, lastName);
         }
     }
@@ -5455,9 +5724,12 @@ Item {
                     // LIVE loopback plays into a dead pipe (measured live —
                     // signal flowing, nothing in the air). One flush as the
                     // watchdog signs off clears it; harmless when healthy.
+                    // In silence the flush is owed, not sent: see _birthFlushOwed.
                     var okSink = String(_combineLoopbackSinkByModule[mod]).replace(/'/g, "'\\''");
-                    app.exec(": PW_FLUSH; pactl suspend-sink '" + okSink + "' 1;"
-                             + " pactl suspend-sink '" + okSink + "' 0; true # " + app.nextSeq());
+                    if (app.isPlaying())
+                        app.exec(": PW_FLUSH; pactl suspend-sink '" + okSink + "' 1;"
+                                 + " pactl suspend-sink '" + okSink + "' 0; true # " + app.nextSeq());
+                    else _birthFlushOwed[_combineLoopbackSinkByModule[mod]] = true;
                     _btJoinWatchStop();
                     // The flush just re-rolled the A2DP buffer — read the
                     // fresh report and recompensate if it moved.

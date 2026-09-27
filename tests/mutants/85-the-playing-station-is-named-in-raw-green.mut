@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The playing station's name goes back to the raw bright green.
+
+history:
+  Five labels were written in the raw accent after a readable text variant
+  already existed, the playing station's name among them. The library can
+  prove a colour reads; only a look at the labels themselves can tell
+  whether they use it.
+
+target:
+  package/contents/ui/MediaListItem.qml
+
+find:
+                             ? root.accentBrightText
+
+replace:
+                             ? root.accentBright
+
+expect:
+  Killed by test_invariants::test_no_text_is_written_in_the_raw_accent.
+  Line-neutral.

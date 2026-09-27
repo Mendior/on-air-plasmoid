@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The REC counter starts at the click instead of when the file exists.
+
+history:
+  On 2026-09-23 a recording's file was born 141 s after the click and the
+  counter read 11:50 over 592.6 s of audio. On the bench a server that held
+  the recorder for 25 s gave REC 0:24 with no file anywhere.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+          running: engine.recording && engine.recOnDisk
+          onTriggered: engine.recCapturedSec += 1
+
+replace:
+          running: engine.recording
+          onTriggered: engine.recCapturedSec += 1
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_the_counter_says_connecting_until_the_file_exists.
+  Line-neutral.

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The join watchdog sends its flush with nothing playing.
+
+history:
+  Measured 2026-09-20 on a JBL Flip 7, five builds out of five (a boot and
+  four panel restarts): a group built while nothing plays, its Bluetooth
+  transport bounced 1.2 s later by the birth flush, was a dead pipe once the
+  music started — sink RUNNING, loopback at 100 %, transport active, nothing
+  in the air. With the bounce removed from the installed copy: three builds,
+  three live speakers, no backlog. Under flowing music the same bounce was
+  harmless four times, and it is what woke the dead pipe every time.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+                      if (app.isPlaying())
+                          app.exec(": PW_FLUSH; pactl suspend-sink '" + okSink + "' 1;"
+
+replace:
+                      if (true)
+                          app.exec(": PW_FLUSH; pactl suspend-sink '" + okSink + "' 1;"
+
+expect:
+  Killed by tst_syncengine::test_the_join_watchdog_owes_its_flush_in_silence_and_sends_it_under_music.
+  Line-neutral.

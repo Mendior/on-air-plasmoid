@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Under the Bitrate chip every pass of a search is shown under the last, each sorted on its own.
+
+history:
+  Seen on 2026-09-23 with "nova radio": the name answer came back 320, 192,
+  ... 64 and the word pass followed it with 320, 256, 224, so a 320 from
+  Croatia sat under a 64 from London. Every answer now sorts the whole list
+  once its rows are in; this takes the sort away.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+              if (SearchLogic.asksBitrate(fullRepresentation._webLastQs)) SearchLogic.rateSort(webResultsModel)
+
+replace:
+              if (false) SearchLogic.rateSort(webResultsModel)
+
+expect:
+  Killed by tests/test_invariants.py::test_every_pass_of_a_bitrate_search_lands_in_one_order.
+  Line-neutral.

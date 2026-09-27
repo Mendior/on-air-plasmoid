@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stop on the Playing tab is drawn but calls nothing.
+
+history:
+  stopWithFade is the one road that ends the standing order, the ladder's
+  timer and the network resume together. A stop wired to anything else, or to
+  nothing, looks like an off switch and leaves the widget holding the session.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                          tooltipText: i18n("Stop")
+                          onClicked: stopWithFade()
+
+replace:
+                          tooltipText: i18n("Stop")
+                          onClicked: { }
+
+expect:
+  Killed by tests/test_invariants.py::test_the_player_offers_a_stop_a_listener_can_reach.
+  Line-neutral.

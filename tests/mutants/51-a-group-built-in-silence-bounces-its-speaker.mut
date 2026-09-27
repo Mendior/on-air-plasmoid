@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The birth flush goes into the build shell whether or not music is
+  flowing through the group.
+
+history:
+  Measured 2026-09-20 on a JBL Flip 7, five builds out of five (a boot and
+  four panel restarts): a group built while nothing plays, its Bluetooth
+  transport bounced 1.2 s later by the birth flush, was a dead pipe once the
+  music started — sink RUNNING, loopback at 100 %, transport active, nothing
+  in the air. With the bounce removed from the installed copy: three builds,
+  three live speakers, no backlog. Under flowing music the same bounce was
+  harmless four times, and it is what woke the dead pipe every time.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+                  if (_combineActive && app.isPlaying()) {
+                      cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
+
+replace:
+                  if (true) {
+                      cmds += "; [ -n \"$id\" ] && { sleep 1.2;"
+
+expect:
+  Killed by tst_syncengine::test_a_group_built_in_silence_does_not_bounce_its_bluetooth_speaker.
+  Line-neutral.

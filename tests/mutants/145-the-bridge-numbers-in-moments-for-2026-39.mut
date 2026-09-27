@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  mpris.py numbers in milliseconds for a widget that did not ask.
+
+history:
+  2026.39 keeps the command number in a 32-bit int and runs on between an
+  update landing on disk and the next plasmashell start. A moment wraps that
+  int, every line reads as new on every read, and one Next walks through the
+  stations. This drops the counter the bridge keeps for it.
+
+target:
+  package/contents/ui/mpris.py
+
+find:
+      if not moments:
+
+replace:
+      if False:
+
+expect:
+  Killed by tests/test_mpris_seq.py::test_without_the_flag_the_bridge_counts_as_2026_39_expects.
+  Line-neutral.

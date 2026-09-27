@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A stop no longer ends the network-back resume.
+
+history:
+  The parity invariant measures a park against a stop, so a line taken out
+  of the stop shrinks the yardstick and both stay green. The stop is the
+  road most people take and had no floor of its own until 2026-09-21:
+  commenting this line out left the whole gate green.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          healRetryTimer.stop();
+          netResumeTimer.stop();
+          // A stop inside the wake-tone window is the person saying "I'm up" —
+
+replace:
+          healRetryTimer.stop();
+          netResumeTimer.interval = netResumeTimer.interval;
+          // A stop inside the wake-tone window is the person saying "I'm up" —
+
+expect:
+  Killed by tests/test_invariants.py::test_a_stop_still_silences_everything_it_used_to.
+  Line-neutral.

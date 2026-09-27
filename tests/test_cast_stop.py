@@ -7,6 +7,7 @@ already idle and answers Stop with a SOAP fault, is demonstrably not playing —
 that is a quiet DONE. Exit code stays 0 either way (the sentinel is the
 protocol; a nonzero exit reads as a helper crash)."""
 import urllib.error
+from email.message import Message
 
 
 def sentinel_lines(capsys):
@@ -85,8 +86,12 @@ def test_cmd_dlna_stop_idle_soap_fault_stays_done(cast, monkeypatch, capsys):
     monkeypatch.setattr(cast, "_describe_renderer", lambda loc: dev)
 
     def fault(*a, **kw):
+        # Real headers, because that is what _soap raises: it hands HTTPError
+        # the live resp.headers, never None. The fake used to pass None and
+        # carry a type: ignore for it — a stand-in less faithful than the thing
+        # it stands in for, with the type checker told to look away.
         raise urllib.error.HTTPError(
-            "http://192.0.2.1:8080/ctl", 500, "Internal Server Error", {}, None)
+            "http://192.0.2.1:8080/ctl", 500, "Internal Server Error", Message(), None)
 
     monkeypatch.setattr(cast, "_soap", fault)
     cast.cmd_dlna_stop("http://192.0.2.1:8080/dd.xml")

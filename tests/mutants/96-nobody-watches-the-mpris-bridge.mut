@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A dead MPRIS bridge is never noticed, so the media keys stay dead.
+
+history:
+  Measured on 2026-09-22: the daemon was killed while the radio played, the
+  music carried on for minutes and the bus name never came back, so the
+  media keys, the lock screen and the speaker's own buttons were quietly
+  dead until the next playback start. The state write asks after it now.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                  if ((stdout || "").indexOf("__MPRIS_GONE__") !== -1 && _mprisStarted
+
+replace:
+                  if (false && _mprisStarted
+
+expect:
+  Killed by test_invariants::test_the_mpris_bridge_is_watched_while_the_widget_wants_one.
+  Line-neutral.

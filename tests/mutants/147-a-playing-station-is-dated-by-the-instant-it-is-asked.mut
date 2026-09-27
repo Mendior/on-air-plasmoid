@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The deadline measures from the moment it is asked, so it never fires.
+
+history:
+  Measured on 2026-09-27. main.qml clears the quiet stamp every time audio
+  buffers, so a station playing normally carries none, and _replayOrder then
+  stamped Date.now() — nothing is older than the instant it is asked about.
+  Radio on at eleven, lid closed, network back at eight: the guard added for
+  exactly that report waved it through and the station played nine hours late.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+      if (heardAt > 0) return heardAt;
+
+replace:
+      if (false) return heardAt;
+
+expect:
+  Killed by tests/qml/tst_retrylogic.qml::test_a_night_asleep_ends_the_order_the_morning_after.
+  Line-neutral.

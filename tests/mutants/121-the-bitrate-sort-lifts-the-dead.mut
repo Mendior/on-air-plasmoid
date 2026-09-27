@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The bitrate sort forgets the probe's verdict and lifts a dead 320 over the living.
+
+history:
+  The probe sinks a station that does not answer under the ones that do,
+  and every later answer of a bitrate search sorts the whole list again.
+  A sort that reads only the number would put the dead back on top each
+  time a pass lands; this is that sort.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+          keyed.push({ at: i, dead: r.alive === 0 ? 1 : 0,
+
+replace:
+          keyed.push({ at: i, dead: 0,
+
+expect:
+  Killed by tests/qml/tst_searchlogic.qml::test_a_dead_row_stays_under_the_living_in_its_own_order.
+  Line-neutral.

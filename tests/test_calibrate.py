@@ -37,7 +37,7 @@ def calib():
           "subprocess": subprocess, "tempfile": tempfile, "wave": wave}
     body = [n for n in wanted
             if not (isinstance(n, ast.FunctionDef) and n.name == "main")]
-    exec(compile(ast.Module(body=body, type_ignores=[]), str(UI_DIR / "calibrate.py"), "exec"), ns)
+    exec(compile(ast.Module(body=list(body), type_ignores=[]), str(UI_DIR / "calibrate.py"), "exec"), ns)
     return ns
 
 
@@ -985,6 +985,46 @@ def _capture_with_stimuli(calib, rate, plays, gains, seconds, seed=7):
     return buf
 
 
+def test_two_members_one_slot_apart_start_with_the_same_latency(calib):
+    """The shared capture cancels the microphone's start between members. It
+    cannot cancel the PLAYER's: each member is its own paplay, and a stream
+    does not start when it is asked to but at the next graph cycle, so its
+    start latency is a sawtooth of the phase the request arrives in. Two
+    requests one slot apart land in the same phase only if the slot is a whole
+    number of cycles. At 1.8 s it was 168.75 cycles of a 512-frame graph: a
+    quarter of all rounds started the second member one cycle early, and
+    every reading carried a constant 2.7 ms on top.
+
+    Measured 2026-09-21 on the desk, fourteen rounds each, the widget's own
+    round with only the spacing changed: 1.800 s gave jumps of -9.8 and -12.0,
+    1.79733 s (168.5 cycles) gave five of +8.6 to +11.1, 1.792 s gave one, and
+    the medians moved by +3.5 and -5.1 against the predicted +2.67 and -5.33.
+    It is also the bimodal reading of 2026-08-12: at a 1024-frame quantum the
+    same 1.8 s is 84.375 cycles, a 37.5 % slip per round, 31.6 % through the
+    median of three — 33 % was measured.
+    """
+    rate, slot = calib["RATE"], calib["ULTRA_SLOT_SECONDS"]
+    frames = slot * rate
+    assert abs(frames - round(frames)) < 1e-6, "the slot is not a whole number of frames"
+    # In whole units of 1/200 frame: the question is what happens AT the cycle
+    # boundary, and floating point answers that one with its own rounding.
+    unit = 200
+    slot_u = round(frames) * unit
+    for quantum in (256, 512, 1024, 2048, 4096):
+        cycle_u = quantum * unit
+        seen = set()
+        for k in range(unit):
+            asked_u = round(0.6 * rate) * unit + k * quantum   # every phase
+            first = cycle_u - (asked_u % cycle_u)
+            second = cycle_u - ((asked_u + slot_u) % cycle_u)
+            seen.add(round((second - first) * 1000.0 / (rate * unit), 3))
+        # One value, whatever the phase. Two values a cycle apart is the
+        # bimodal reading; one value that is not zero is the constant bias.
+        assert seen == {0.0}, (
+            "at a %d-frame quantum two members a slot apart start %s ms apart "
+            "depending on phase" % (quantum, sorted(seen)))
+
+
 def test_slots_find_every_stimulus_in_one_capture(calib):
     """Both members inside a single recording, each in its own slot."""
     rate, slot = calib["RATE"], calib["ULTRA_SLOT_SECONDS"]
@@ -1434,7 +1474,7 @@ def test_verify_asks_again_before_convicting_a_mid_run_mute(calib, monkeypatch, 
             return {}
         return {"bt": True}
     monkeypatch.setitem(calib, "_mute_states", mutes)
-    state = {"member": None}
+    state: dict[str, str | None] = {"member": None}
 
     def set_mutes(sinks, muted):
         if muted and len(sinks) > 1:
@@ -1472,7 +1512,7 @@ def test_a_leaked_isolation_mute_is_repaired_not_blamed_on_the_listener(calib, m
     def mutes(sinks):
         return {"bt": True} if list(sinks) == ["bt"] else {}
     monkeypatch.setitem(calib, "_mute_states", mutes)
-    state = {"member": None}
+    state: dict[str, str | None] = {"member": None}
     repairs = []
 
     def set_mutes(sinks, muted):

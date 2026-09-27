@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A title kept over a return to live is kept for ever.
+
+history:
+  The keep waits for live's first title. A station that sends none would
+  wear the last song of the buffer for the rest of the session, so the keep
+  ends after fifteen seconds whether live spoke or not.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+      return since >= 0 && since <= SLEEVE_KEEP_MS;
+
+replace:
+      return since >= 0;
+
+expect:
+  Killed by tst_timeshiftlogic::test_the_kept_sleeve_has_a_deadline_and_needs_a_listener.
+  Line-neutral.

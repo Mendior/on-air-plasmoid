@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Trending now scrolls to the searching line at the tap and never to the answer itself.
+
+history:
+  Seen on 2026-09-23: seven seconds after Trending now the popup showed the
+  saved stations and nothing else, with thirty results under them. The tap
+  alone brings only the one-line footer into sight, at the bottom of the
+  view, and the answer then grows below it; the second reveal is what puts
+  the answer's heading at the top.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+              ViewLogic.revealFooter(stationView)
+          })
+      }
+
+      // One country's best stations
+
+replace:
+              void 0
+          })
+      }
+
+      // One country's best stations
+
+expect:
+  Killed by tests/test_invariants.py::test_the_rails_bring_their_answer_into_sight.
+  Line-neutral.

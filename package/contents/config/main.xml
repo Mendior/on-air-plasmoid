@@ -121,6 +121,10 @@
             <label>Recent successful web searches, newest first (JSON array)</label>
             <default>[]</default>
         </entry>
+        <entry name="syncEarSetAt" type="Double">
+            <label>When the listener last moved the fine-tune slider (ms since epoch); its ten-minute window must survive a panel restart</label>
+            <default>0</default>
+        </entry>
         <entry name="syncVerifiedMs" type="Int">
             <label>Residual speaker spread measured by the last verify pass (ms); -1 means never verified</label>
             <default>-1</default>

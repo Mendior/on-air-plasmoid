@@ -81,6 +81,21 @@ function syncModelToRows(model, rows) {
     return true
 }
 
+// The station list the way it is saved: one plain object per row with the
+// row's roles and nothing else. ListModel.get() hands back the row's QObject
+// wrapper, and JSON.stringify took its objectName along, so the settings
+// pages wrote "objectName":"" into every station they saved (appletsrc on
+// the bench, 2026-09-23).
+function savedRows(model) {
+    var out = []
+    for (var i = 0; i < model.count; i++) {
+        var row = JSON.parse(JSON.stringify(model.get(i)))
+        delete row.objectName
+        out.push(row)
+    }
+    return out
+}
+
 // The insertion slot a finished live drag commits. The engine's contract
 // (moveStationTo/moveFavoriteTo) speaks insert-before slots against the
 // PRE-drag order with the row still in place; the view speaks final

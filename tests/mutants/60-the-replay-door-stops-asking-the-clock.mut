@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  _replayOrder replays a standing order without asking whether it is past
+  its deadline.
+
+history:
+  Issue #13, read against the code a third time on 2026-09-21. The knock
+  budget is counted on QML timers, and those stand still while the machine
+  sleeps: a station that goes quiet at eleven with the lid closed a minute
+  later still has knocks left at eight the next morning, and the network
+  coming back replays it — nine hours late, under the release whose notes
+  said nothing could put it back on. The relay road can leave the order
+  standing with no ladder at all. Both arrive through _replayOrder, which now
+  asks the wall clock before it plays.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (RetryLogic.orderExpired(root._orderQuietSince, Date.now(), root._alarmStandingOrder === true, Plasmoid.configuration.autoRetryKnocks)) { _orderSpent(); return; }
+
+replace:
+          if (false) { _orderSpent(); return; }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_standing_order_cannot_outlive_a_night_asleep.
+  Line-neutral.

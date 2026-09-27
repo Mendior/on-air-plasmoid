@@ -58,4 +58,44 @@ TestCase {
         compare(PathLogic.absoluteDir("~/Music", "/home/egon/"), "/home/egon/Music")
         compare(PathLogic.absoluteDir("Music", "/home/egon/"), "/home/egon/Music")
     }
+
+    function test_only_a_file_url_is_a_local_path() {
+        compare(PathLogic.localPath("file:///home/egon/Musiikki"), "/home/egon/Musiikki")
+        // StandardPaths hands the name back decoded (measured with a
+        // "Музыка и песни" music folder), so nothing is unescaped here.
+        compare(PathLogic.localPath("file:///home/egon/Музыка и песни"), "/home/egon/Музыка и песни")
+        compare(PathLogic.localPath("file://"), "")
+        compare(PathLogic.localPath(""), "")
+        compare(PathLogic.localPath(undefined), "")
+        compare(PathLogic.localPath("https://example.org/x"), "")
+    }
+
+    function test_the_default_folder_lives_in_the_desktops_music_folder() {
+        // The folder is not called Music on every desktop: a Finnish one
+        // names it Musiikki, and that is where the downloads have always gone.
+        compare(PathLogic.defaultDir("file:///home/egon/Musiikki", "/run/user/1000/Music"),
+                "/home/egon/Musiikki/OnAir")
+        compare(PathLogic.defaultDir("file:///home/egon/Music", "/run/user/1000/Music"),
+                "/home/egon/Music/OnAir")
+        // No music folder at all: the caller's own base, never the root.
+        compare(PathLogic.defaultDir("", "/run/user/1000/Music"), "/run/user/1000/Music/OnAir")
+        compare(PathLogic.defaultDir(undefined, "/run/user/1000/Music"), "/run/user/1000/Music/OnAir")
+    }
+
+    function test_the_hint_spells_home_as_a_tilde() {
+        compare(PathLogic.shownDir("/home/egon/Musiikki/OnAir", home), "~/Musiikki/OnAir")
+        compare(PathLogic.shownDir("/home/egon", home), "~")
+        compare(PathLogic.shownDir("/home/egon/Music/OnAir", "/home/egon/"), "~/Music/OnAir")
+        // Only a whole directory name is home: /home/egonx is somebody else.
+        compare(PathLogic.shownDir("/home/egonx/Music/OnAir", home), "/home/egonx/Music/OnAir")
+        compare(PathLogic.shownDir("/data/radio/OnAir", home), "/data/radio/OnAir")
+        compare(PathLogic.shownDir("/home/egon/Music/OnAir", ""), "/home/egon/Music/OnAir")
+    }
+
+    function test_the_hint_typed_back_lands_in_the_default_folder() {
+        // Somebody who copies the hint into the field must get the folder
+        // they would have had by leaving it empty.
+        var dflt = PathLogic.defaultDir("file:///home/egon/Musiikki", "/run/user/1000/Music")
+        compare(PathLogic.absoluteDir(PathLogic.shownDir(dflt, home), home), dflt)
+    }
 }

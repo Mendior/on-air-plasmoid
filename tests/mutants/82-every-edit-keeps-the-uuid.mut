@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Whatever a row is edited into, the verdict says it is still the same station.
+
+history:
+  An edit keeps the directory uuid only where the row could have earned a
+  permanent write without one: the address left alone, or the same own
+  domain with the same name. Asking the commit gate as if the uuid had
+  already proven identity makes every edit a keeper.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      return commitVerdict(false, oldBase, newBase,
+
+replace:
+      return commitVerdict(true, oldBase, newBase,
+
+expect:
+  Killed by tst_heallogic::test_an_edit_that_leaves_the_station_drops_its_uuid.
+  Line-neutral.

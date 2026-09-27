@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The station pages save each row's QObject name with the station.
+
+history:
+  Read in appletsrc on the bench, 2026-09-23: one Hide and Apply on the
+  Stations page wrote "objectName":"" into all twenty stations. The rows of
+  a dynamicRoles ListModel are QObjects, and JSON.stringify took the name
+  along. This puts the name back.
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+          delete row.objectName
+
+replace:
+          ;
+
+expect:
+  Killed by tests/qml/tst_reorderlogic.qml::test_a_saved_row_is_its_roles_and_nothing_else.
+  tests/qml/tst_stationspage.qml::test_a_saved_station_carries_its_own_fields_and_nothing_else
+  goes red on it as well. Line-neutral.

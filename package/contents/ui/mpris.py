@@ -20,10 +20,13 @@ import threading
 import time
 from pathlib import Path
 
+# gi.repository is assembled at import time and ships no stubs on any of the
+# machines this runs on: the names are real, the checker cannot see them,
+# hence the targeted ignore on that one line.
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import Gio, GLib
+from gi.repository import Gio, GLib  # pyright: ignore[reportAttributeAccessIssue]
 
 # The public MPRIS name: what `playerctl -l` and media controls list.
 # Renamed from the inherited "advancedradio" to match the published id —
@@ -37,12 +40,66 @@ PLAYER_IF = "org.mpris.MediaPlayer2.Player"
 PROP_IF = "org.freedesktop.DBus.Properties"
 
 
+def next_seq(last: int, moments: bool) -> int:
+    """The number the widget reads in front of a command.
+
+    A moment, not a count, for the widget that asks for one (--ms-seq). It
+    obeys a command once, by taking only numbers above the last it saw, and
+    a bridge that started counting at one again handed it numbers it had
+    already passed: every media-key press after a bridge restart was dropped
+    in silence until the count caught up. A moment also dates the command,
+    so one left behind in the file by a crashed session cannot be obeyed an
+    hour later. Two commands inside the same millisecond still get their own
+    number.
+
+    Without the flag it counts 1, 2, 3 as it did up to 2026.39. That widget
+    keeps the number in a 32-bit int, where a moment wraps and every line
+    reads as new on every read: on the rig, even with a ten-second rule that
+    2026.39 does not have, one Next walked through six stations. It keeps
+    running between an update landing on disk and the next plasmashell
+    start, and switching its media keys off and on in that window starts
+    this file from disk.
+    """
+    if not moments:
+        return last + 1
+    return max(int(time.time() * 1000), last + 1)
+
+
+def bridge_args(argv: list[str]) -> tuple[str, str, int, bool] | None:
+    """state_file, cmd_file, host pid (0 = none) and whether the numbers are
+    moments, from `mpris.py STATE CMD [HOST_PID] [--ms-seq]`. None when the
+    two files are not there."""
+    moments = "--ms-seq" in argv
+    rest = [a for a in argv if a != "--ms-seq"]
+    if len(rest) < 2:
+        return None
+    try:
+        host_pid = int(rest[2]) if len(rest) > 2 else 0
+    except ValueError:
+        host_pid = 0
+    return rest[0], rest[1], host_pid, moments
+
+
+def shown_names(state: dict) -> dict[str, str]:
+    """The title and album the desktop's player shows for this state.
+
+    A name that is not there is left out. Both used to fall back to a single
+    space, so with the radio stopped the bus said title ' ' and album ' '
+    (read on the test rig on 2026-09-23) and a controller drew a blank line.
+    """
+    title = str(state.get("title") or state.get("station") or "")
+    album = str(state.get("station") or "")
+    names = {"xesam:title": title, "xesam:album": album}
+    return {key: text for key, text in names.items() if text}
+
+
 class MPRISBridge(dbus.service.Object):
-    def __init__(self, bus_name, state_file: Path, cmd_file: Path):
+    def __init__(self, bus_name, state_file: Path, cmd_file: Path, ms_seq: bool = False):
         super().__init__(bus_name, OBJ_PATH)
         self.state_file = state_file
         self.cmd_file = cmd_file
         self.cmd_seq = 0
+        self.ms_seq = ms_seq
         self._last_mtime_ns = -1
         self._lock = threading.Lock()
         self._state = {
@@ -148,10 +205,8 @@ class MPRISBridge(dbus.service.Object):
     def _build_metadata(self):
         meta = dbus.Dictionary({}, signature="sv")
         meta["mpris:trackid"] = dbus.ObjectPath(self._tracker_path, variant_level=1)
-        title = self._state.get("title") or self._state.get("station") or " "
-        meta["xesam:title"] = dbus.String(title, variant_level=1)
-        album = self._state.get("station") or " "
-        meta["xesam:album"] = dbus.String(album, variant_level=1)
+        for key, text in shown_names(self._state).items():
+            meta[key] = dbus.String(text, variant_level=1)
         artist = self._state.get("artist") or ""
         if artist:
             meta["xesam:artist"] = dbus.Array([artist], signature="s", variant_level=1)
@@ -179,7 +234,7 @@ class MPRISBridge(dbus.service.Object):
 
     def _emit_command(self, cmd: str):
         with self._lock:
-            self.cmd_seq += 1
+            self.cmd_seq = next_seq(self.cmd_seq, self.ms_seq)
             line = f"{self.cmd_seq}\t{cmd}\n"
         print(f"[mpris] cmd #{self.cmd_seq}: {cmd}", flush=True)
         try:
@@ -197,6 +252,24 @@ class MPRISBridge(dbus.service.Object):
         except OSError as exc:
             print(f"[mpris] write error: {exc!r}", flush=True)
 
+    def _who(self, sender) -> str:
+        """The caller, named. A speaker's own pause and a listener's keypress
+        arrive the same way (kded's media-key service forwards both), and a
+        radio that stopped by itself used to read exactly like one that was
+        told to. On 2026-09-22 a stop at 06:01 could not be explained at all
+        because nothing wrote down who asked."""
+        if not sender:
+            return "?"
+        try:
+            bus = dbus.SessionBus()
+            pid = int(dbus.Interface(
+                bus.get_object("org.freedesktop.DBus", "/org/freedesktop/DBus"),
+                "org.freedesktop.DBus").GetConnectionUnixProcessID(sender))
+            cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+            return f"pid {pid} {cmd.strip()[:80]}"
+        except Exception as exc:          # naming the caller must never break a command
+            return f"{sender} ({exc!r})"
+
     @dbus.service.method(ROOT_IF)
     def Raise(self):
         return None
@@ -205,34 +278,34 @@ class MPRISBridge(dbus.service.Object):
     def Quit(self):
         return None
 
-    @dbus.service.method(PLAYER_IF)
-    def Play(self):
-        print("[mpris] Play() called", flush=True)
+    @dbus.service.method(PLAYER_IF, sender_keyword="sender")
+    def Play(self, sender=None):
+        print(f"[mpris] Play() called by {self._who(sender)}", flush=True)
         self._emit_command("Play")
 
-    @dbus.service.method(PLAYER_IF)
-    def Pause(self):
-        print("[mpris] Pause() called", flush=True)
+    @dbus.service.method(PLAYER_IF, sender_keyword="sender")
+    def Pause(self, sender=None):
+        print(f"[mpris] Pause() called by {self._who(sender)}", flush=True)
         self._emit_command("Pause")
 
-    @dbus.service.method(PLAYER_IF)
-    def PlayPause(self):
-        print("[mpris] PlayPause() called", flush=True)
+    @dbus.service.method(PLAYER_IF, sender_keyword="sender")
+    def PlayPause(self, sender=None):
+        print(f"[mpris] PlayPause() called by {self._who(sender)}", flush=True)
         self._emit_command("PlayPause")
 
-    @dbus.service.method(PLAYER_IF)
-    def Stop(self):
-        print("[mpris] Stop() called", flush=True)
+    @dbus.service.method(PLAYER_IF, sender_keyword="sender")
+    def Stop(self, sender=None):
+        print(f"[mpris] Stop() called by {self._who(sender)}", flush=True)
         self._emit_command("Stop")
 
-    @dbus.service.method(PLAYER_IF)
-    def Next(self):
-        print("[mpris] Next() called", flush=True)
+    @dbus.service.method(PLAYER_IF, sender_keyword="sender")
+    def Next(self, sender=None):
+        print(f"[mpris] Next() called by {self._who(sender)}", flush=True)
         self._emit_command("Next")
 
-    @dbus.service.method(PLAYER_IF)
-    def Previous(self):
-        print("[mpris] Previous() called", flush=True)
+    @dbus.service.method(PLAYER_IF, sender_keyword="sender")
+    def Previous(self, sender=None):
+        print(f"[mpris] Previous() called by {self._who(sender)}", flush=True)
         self._emit_command("Previous")
 
     @dbus.service.method(PLAYER_IF, in_signature="x")
@@ -320,6 +393,11 @@ class MPRISBridge(dbus.service.Object):
             "CanGoNext": dbus.Boolean(bool(self._state.get("canGoNext", False)), variant_level=1),
             "CanGoPrevious": dbus.Boolean(bool(self._state.get("canGoPrevious", False)), variant_level=1),
             "CanPlay": dbus.Boolean(bool(self._state.get("canPlay", False)), variant_level=1),
+            # True while a station plays even with no timeshift buffer to
+            # pause into (main.qml sets it). On live radio the widget takes
+            # Pause as a stop, which is what issue #13 asked for, and in the
+            # MPRIS spec CanPause false means Pause and PlayPause are not to
+            # be used at all.
             "CanPause": dbus.Boolean(bool(self._state.get("canPause", False)), variant_level=1),
             "CanSeek": dbus.Boolean(bool(self._state.get("canSeek", False)), variant_level=1),
             "CanControl": dbus.Boolean(True, variant_level=1),
@@ -343,19 +421,16 @@ class MPRISBridge(dbus.service.Object):
 
 
 def main():
-    if len(sys.argv) < 3:
-        sys.exit("Usage: mpris.py <state_file> <cmd_file> [host_pid]")
-    state_path = Path(sys.argv[1])
-    cmd_path = Path(sys.argv[2])
-    try:
-        host_pid = int(sys.argv[3]) if len(sys.argv) > 3 else 0
-    except ValueError:
-        host_pid = 0
+    args = bridge_args(sys.argv[1:])
+    if args is None:
+        sys.exit("Usage: mpris.py <state_file> <cmd_file> [host_pid] [--ms-seq]")
+    state_path, cmd_path, host_pid, ms_seq = Path(args[0]), Path(args[1]), args[2], args[3]
 
     cmd_path.parent.mkdir(parents=True, exist_ok=True)
     cmd_path.write_text("")
 
-    print(f"[mpris] starting state={state_path} cmd={cmd_path}", flush=True)
+    print(f"[mpris] starting state={state_path} cmd={cmd_path} "
+          f"numbers={'moments' if ms_seq else 'counter'}", flush=True)
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     print("[mpris] got session bus", flush=True)
@@ -374,7 +449,7 @@ def main():
     except dbus.DBusException as exc:
         sys.exit(f"Failed to acquire MPRIS bus name: {exc}")
 
-    bridge = MPRISBridge(bus_name, state_path, cmd_path)
+    bridge = MPRISBridge(bus_name, state_path, cmd_path, ms_seq)
     print("[mpris] bridge initialised", flush=True)
     loop = GLib.MainLoop()
 

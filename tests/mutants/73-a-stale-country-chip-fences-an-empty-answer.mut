@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A country chip left by an earlier search keeps an empty answer empty.
+
+history:
+  Seen in the running widget on 2026-09-21: "jazz united states", then
+  "virgin radio uk" answered "No matching stations" with the American chip
+  still up. An inherited scope now steps aside when the new text finds
+  nothing inside it.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      if (s.inheritedScope === true) return "unscope";
+
+replace:
+      if (s.inheritedScope === true) return "done";
+
+expect:
+  Killed by tst_searchlogic::test_an_inherited_country_chip_steps_aside_for_an_empty_answer.
+  Line-neutral.

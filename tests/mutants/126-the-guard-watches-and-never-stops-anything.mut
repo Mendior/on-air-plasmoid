@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The writer's guard sees its host gone and leaves without stopping the writer.
+
+history:
+  A guard that notices and does nothing looks exactly like a working one in
+  the process list: it is there, it ticks, it exits. Only the writer tells
+  the difference, and on the bench an orphaned writer ran for as long as its
+  hour cap allowed.
+
+target:
+  package/contents/ui/tsguard.sh
+
+find:
+          kill -INT "$writer" 2>/dev/null
+
+replace:
+          : "$writer"
+
+expect:
+  Killed by tests/test_tsguard.py::test_a_writer_whose_host_dies_is_stopped
+  and tests/test_tsguard.py::test_a_writer_whose_shell_is_killed_is_stopped.
+  Line-neutral.

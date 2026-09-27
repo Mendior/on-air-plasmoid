@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The word pass asks the directory for "radio" when the listener typed "nova radio".
+
+history:
+  The directory answers a name with its 50 most voted matches. Asked for
+  "radio" they ran from 825 222 votes down to 23 417 and one of them was a
+  Radio Nova; asked for "nova", twenty-one were. The word asked for is the
+  longest that is no station word; this lets the station words back in.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+          if (parts[i].length >= 3 && !NAME_WORDS.hasOwnProperty(fold(parts[i]))) own.push(parts[i]);
+
+replace:
+          if (parts[i].length >= 3) own.push(parts[i]);
+
+expect:
+  Killed by tst_searchlogic::test_the_word_pass_asks_for_the_listeners_own_word.
+  Line-neutral.

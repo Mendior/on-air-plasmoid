@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The search stops reading "rock 80 uk" as a genre, a decade and a country.
+
+history:
+  Typed without the word "in", the wish went to the directory as a station
+  name, found nothing, and the stem retry answered with French and German
+  "rock 80" stations. The facet reading arrived on 2026-09-21; this takes
+  its one call in the search away.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                     ? SearchLogic.facetQuery(q, _countryCodeOf) : null
+
+replace:
+                     ? null : null
+
+expect:
+  Killed by test_invariants::test_a_wish_typed_without_the_word_in_reaches_the_tag_list.
+  Line-neutral.

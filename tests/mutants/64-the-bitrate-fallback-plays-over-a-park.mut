@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The 600 ms bitrate fallback plays without asking whether the room is
+  parked.
+
+history:
+  A park stops this timer but leaves the player's source in place, so an
+  error delivered after the park arms it again. It was the one recovery road
+  that never asked what the listener wanted (found 2026-09-21).
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (!fallbackUrl || root._tsPaused) { fallbackUrl = ""; return; }
+
+replace:
+              if (!fallbackUrl || false) { fallbackUrl = ""; return; }
+
+expect:
+  Killed by tests/test_invariants.py::test_the_bitrate_fallback_does_not_play_over_a_park.
+  Line-neutral.

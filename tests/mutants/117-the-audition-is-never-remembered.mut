@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An audition leaves nothing behind for Play to bring back, and the first
+  station of the list plays in its place.
+
+history:
+  The library can answer "audition" only if previewStation wrote down what
+  was auditioned, with its codec and bitrate: those decide the relay road,
+  and an Ogg audition without them wedges after a second.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          root._lastAudition = { "name": name, "url": url, "favicon": favicon, "uuid": rbUuid,
+
+replace:
+          root._lastAudition = null && { "name": name, "url": url, "favicon": favicon, "uuid": rbUuid,
+
+expect:
+  Killed by test_invariants::test_only_an_audition_is_remembered_and_every_other_start_forgets_it.
+  Line-neutral.

@@ -907,6 +907,11 @@ def _dlna_set_uri_and_play(avt, url, didl, cdata):
 
 
 def cmd_dlna_play(location, url, ctype, title, art=""):
+    # Bound before the try: the cleanup below runs from the except and
+    # used to read a name that a raise inside _describe_renderer never
+    # set — a NameError that the cleanup's own except then swallowed, so
+    # the renderer was left half-open exactly when it mattered.
+    dev = None
     try:
         dev = _describe_renderer(location)
         if not dev:
@@ -936,8 +941,9 @@ def cmd_dlna_play(location, url, ctype, title, art=""):
         # (Frontier Silicon radios switch source on the incoming URI and
         # would otherwise sit in an empty "Music player" screen).
         try:
-            _soap(dev["avtransport"], AVT_SERVICE, "Stop",
-                  "<InstanceID>0</InstanceID>", timeout=3.0)
+            if dev:
+                _soap(dev["avtransport"], AVT_SERVICE, "Stop",
+                      "<InstanceID>0</InstanceID>", timeout=3.0)
         except Exception as exc2:
             _dbg("dlna-play cleanup-stop", exc2)
         _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
@@ -995,6 +1001,8 @@ def cmd_get_volume(host, port, uuid, model):
         cast = _connect_host(pychromecast, host, port, uuid, model)
         # wait() in _connect_host has already pulled a status; volume_level
         # is 0.0–1.0 and covers speaker groups too (the group's own level).
+        if cast.status is None:
+            raise RuntimeError("the device answered without a status")
         _out("%s %.3f" % (VOL, max(0.0, min(1.0, float(cast.status.volume_level)))))
     except Exception as exc:
         _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))

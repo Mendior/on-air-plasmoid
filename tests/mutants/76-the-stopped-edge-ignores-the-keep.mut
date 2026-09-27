@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The player's stopped edge wipes the header over a return to live.
+
+history:
+  The engine's keep is only worth something if the line that clears the
+  header asks for it. This is that line, as it stood before 2026-09-21.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                  if (!root._tsPaused && !timeshift.shifted && !timeshift.sleeveKept(Date.now())) root.metadata = "";
+
+replace:
+                  if (!root._tsPaused && !timeshift.shifted) root.metadata = "";
+
+expect:
+  Killed by test_invariants::test_a_return_to_live_keeps_the_header_until_live_speaks.
+  Line-neutral.

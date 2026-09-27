@@ -4,7 +4,7 @@
 
 # The mutation suite, run by the clock instead of by memory. Each mutant is a
 # bug this project has already shipped once, reduced to a single text swap; the
-# gate must go red for the ones we expect to catch. All but one of the 43
+# gate must go red for the ones we expect to catch. All but one of the 131
 # do today and 02 survives by design (tests/mutants_baseline.json says why). This
 # job is green while that holds and red the night a guard quietly loses its
 # teeth — the exact regression no push-time check would ever run long enough
@@ -14,9 +14,27 @@
 # well over an hour has no place on every push, and the fast gate must not
 # learn to wait for it. The cap below has to grow with the corpus: it sat at
 # 60 while the bench took ~70 at eighteen mutants, and from 2026-08-22 the job
-# died cancelled every single night with nobody the wiser. 43 mutants at
-# the measured ~4 minutes each need a good two hours, so the cap sits well
-# clear of the run rather than a few minutes above it.
+# died cancelled every single night with nobody the wiser. It happened again
+# on 2026-09-19: the corpus had grown 35 -> 49 across four releases while the
+# cap stayed at 180, and the run was killed at 3h00m44s. The last green run
+# (2026-09-18) took 132.7 min for 36 runs = 3.69 min each, so 49 mutants plus
+# the control need ~184. The cap sits well clear of the run rather than a few
+# minutes above it, and it has to be raised again the next time the corpus
+# grows: ls tests/mutants/*.mut | wc -l, times ~3.7 minutes. On 2026-09-20 the
+# corpus reached 60 (eleven sync mutants in one day): 61 runs x 3.69 = ~225,
+# which a cap of 240 would clear by minutes on a good night; a day later it
+# was 70, so 71 runs = ~262. On 2026-09-21 it reached 88 (search, the station
+# box, the header over a return to live, an alarm that follows its healed
+# station, a repointed row's uuid, the settings list, text that can be read, a
+# genre word): 89 runs = ~328 against GitHub's own ceiling of 360 for a job.
+# So the corpus runs as two interleaved halves side by side (mutants.py
+# --shard K/2), each with its own control run: 45 runs = ~166 minutes a half
+# at 88, 50 runs = ~185 at 98, capped at 240. On 2026-09-23 it reached 127
+# (six fixes landing together): two halves would be 65 runs = ~240, the cap
+# itself, so it runs as three thirds, 44 runs = ~163 a third, and 45 runs =
+# ~166 at 131 (2026-09-24). The next time
+# this has to change is around 180 mutants, by raising the shard count again:
+# ls tests/mutants/*.mut | wc -l, over the number of shards, plus one, times ~3.7.
 name: nightly
 
 permissions:
@@ -30,10 +48,15 @@ on:
 
 jobs:
   mutants:
-    name: mutation baseline
+    name: mutation baseline (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     container: archlinux:latest
+    strategy:
+      # One third going red must not hide what the others found.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Install Plasma toolchain and the pinned ruff
         # Same toolchain as check.yml's qml job, plus ruff — mutants.py runs the
@@ -52,4 +75,4 @@ jobs:
       - name: Every shipped bug still trips the gate
         # dbus-run-session wraps the WHOLE run so every per-mutant `dev.sh check`
         # inherits a session bus for its offscreen plasmoidviewer smoke test.
-        run: dbus-run-session -- python scripts/mutants.py --check-baseline
+        run: dbus-run-session -- python scripts/mutants.py --check-baseline --shard ${{ matrix.shard }}/3

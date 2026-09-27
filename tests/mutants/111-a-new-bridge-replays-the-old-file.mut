@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Starting the MPRIS bridge again forgets which commands were already obeyed,
+  so a read of the old file obeys its last key a second time.
+
+history:
+  The widget starts the bridge again when it finds it gone and when media
+  keys are switched back on, with the same gate and with the poll still
+  running. Zeroing the mark there made any line under ten seconds old new
+  again for the read that lands before the start has emptied the file. The
+  bridge numbers from the clock, so keeping the mark costs nothing.
+
+target:
+  package/contents/ui/MprisCommandGate.qml
+
+find:
+      function arm(nowMs) {
+
+replace:
+      function arm(nowMs) { lastSeq = 0; return;
+
+expect:
+  Killed by tests/qml/tst_mpriscommandgate.qml::test_a_new_bridge_does_not_replay_what_the_old_one_said.
+  Line-neutral.

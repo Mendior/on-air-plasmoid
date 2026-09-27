@@ -73,10 +73,8 @@ MouseArea {
                     root.timeshiftResume();
                 } else if (root.tsShifted) {
                     playMusic.play();
-                } else if (stationsModel.count > 0) {
-                    const idx = lastPlay >= 0 && lastPlay < stationsModel.count ? lastPlay : 0;
-                    lastPlay = idx;
-                    refreshServer(idx);
+                } else {
+                    root.playLast();
                 }
             }
         } else {

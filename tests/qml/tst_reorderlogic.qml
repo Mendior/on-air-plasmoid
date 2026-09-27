@@ -135,6 +135,35 @@ TestCase {
             { name: "B", hostname: "OTHER", favicon: "", active: true, originalIndex: 1 }]))
     }
 
+    // ── savedRows ────────────────────────────────────────────────────────
+
+    // dynamicRoles like StationsModel.qml: those rows are QObjects, and
+    // their objectName is what came along into the saved JSON.
+    ListModel { id: savedModel; dynamicRoles: true }
+
+    function test_a_saved_row_is_its_roles_and_nothing_else() {
+        savedModel.clear()
+        savedModel.append({ name: "Alpha", hostname: "http://a.example/s", favicon: "", active: true })
+        savedModel.append({ name: "Beta", hostname: "http://b.example/s", favicon: "x.png", active: false })
+        var rows = RL.savedRows(savedModel)
+        compare(rows.length, 2)
+        for (var i = 0; i < rows.length; i++)
+            compare(Object.keys(rows[i]).sort().join(","), "active,favicon,hostname,name", "row " + i)
+        compare(rows[1].name, "Beta")
+        compare(rows[1].hostname, "http://b.example/s")
+        compare(rows[1].favicon, "x.png")
+        compare(rows[1].active, false)
+    }
+
+    function test_saved_rows_are_copies_the_model_does_not_follow() {
+        savedModel.clear()
+        savedModel.append({ name: "Alpha", hostname: "http://a.example/s", favicon: "", active: true })
+        var rows = RL.savedRows(savedModel)
+        rows[0].name = "changed"
+        compare(savedModel.get(0).name, "Alpha")
+        compare(RL.savedRows({ count: 0 }).length, 0)
+    }
+
     // ── commitSlot ───────────────────────────────────────────────────────
 
     function test_commit_slot_translates_final_index_to_insert_before() {

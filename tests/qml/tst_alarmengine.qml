@@ -105,6 +105,31 @@ TestCase {
         e.destroy(); e2.destroy();
     }
 
+    function test_a_healed_station_moves_its_alarms() {
+        // The alarm's copy of the address has to follow the station: the
+        // list said "moved, saved", and the alarm rang the dead address
+        // every morning for as long as it lived.
+        var e = makeEngine();
+        e.addAlarm("Rock FM", "https://old.example/live", "", 7, 0, "daily", undefined, 50, true, "u-1");
+        e.addAlarm("Rock FM weekend", "https://old.example/live", "", 9, 0, "weekly", 6, 50, true, "u-1");
+        e.addAlarm("Other", "https://other.example/live", "", 8, 0, "daily", undefined, 40, false, "");
+        e.addAlarm("Show", "podcast:https://old.example/live", "", 6, 0, "daily", undefined, 40, false, "");
+        verify(e.retargetStation("https://old.example/live", "https://new.example/live"));
+        compare(e.alarms[0].url, "https://new.example/live");
+        compare(e.alarms[1].url, "https://new.example/live");
+        compare(e.alarms[2].url, "https://other.example/live");
+        compare(e.alarms[3].url, "podcast:https://old.example/live");
+        compare(e.alarms[0].station, "Rock FM");
+        compare(e.alarms[0].uuid, "u-1");
+        compare(JSON.parse(e.cfg.alarms)[1].url, "https://new.example/live");
+        // Nothing to move is not a change, and junk moves nothing.
+        verify(!e.retargetStation("https://nobody.example/x", "https://new.example/live"));
+        verify(!e.retargetStation("", "https://new.example/live"));
+        verify(!e.retargetStation("https://new.example/live", ""));
+        verify(!e.retargetStation("https://new.example/live", "https://new.example/live"));
+        e.destroy();
+    }
+
     function test_a_healed_feed_moves_its_podcast_alarm() {
         // "The newest episode of this show" names the show by feed address.
         // When the podcast engine heals a feed to a new address, an alarm

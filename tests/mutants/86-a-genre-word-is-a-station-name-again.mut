@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  "rock" typed into the search fills the page from station names alone again.
+
+history:
+  The name answer for a genre word has fifty rows, the page's thirty fill
+  from them and the tag pass only ran with room left: 17 of the 30 biggest
+  rock-tagged stations were never shown, and "Show more" paged more names.
+  Of the name answer only the stations named after the word lead now; this
+  takes the filter away.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+          const lead = (mode === "all" && cc === "") ? SearchLogic.leadRows(q) : null
+
+replace:
+          const lead = null
+
+expect:
+  Killed by test_invariants::test_a_genre_word_is_asked_of_the_tags_and_only_its_namesakes_lead.
+  Line-neutral.

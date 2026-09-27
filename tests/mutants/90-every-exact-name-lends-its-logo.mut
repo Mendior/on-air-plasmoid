@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Every exact-name row lends its logo again, whatever the rows say about each other.
+
+history:
+  The backfill took the first exact-name row with a logo, in votes order, and
+  saved it to the list. "Rock FM" answered with four such rows from three
+  countries in its ten most voted (2026-09-21), so a Spanish listener's row
+  got the Russian station's logo for good. The name road is now open only
+  while the name means one station in the answer; this opens it always.
+
+target:
+  package/contents/ui/FaviconLogic.js
+
+find:
+      return (votes.length === 1 || oneBase || oneCc) ? out.concat(named) : out;
+
+replace:
+      return out.concat(named);
+
+expect:
+  Killed by tests/qml/tst_faviconlogic.qml::test_a_name_from_three_countries_lends_nobody_a_logo.
+  Line-neutral.

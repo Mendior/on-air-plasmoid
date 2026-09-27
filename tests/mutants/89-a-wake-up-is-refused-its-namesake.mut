@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A wake-up whose station died is held to the ordinary listener's rule, so
+  the namesake that would have rung is refused and the morning stays quiet.
+
+history:
+  The fallback tone covers the first 25 seconds only. A station that dies
+  after it started is the heal road's to bring back, and there a namesake
+  from another country beats silence: the alarm's ladder has to stay what
+  it was before the country question existed, the same rows in the same
+  order. The library keeps that promise under test; this is the wire that
+  carries the alarm's standing order to it.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                                                 run.cc, root._alarmStandingOrder === true);
+
+replace:
+                                                 run.cc, false);
+
+expect:
+  Killed by tests/test_invariants.py::test_a_namesake_is_refused_except_for_a_wake_up_and_named_when_it_plays.
+  Line-neutral.

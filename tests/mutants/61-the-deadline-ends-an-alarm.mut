@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The order's deadline applies to an alarm's standing order too, so a
+  wake-up whose station was down overnight ends in silence.
+
+history:
+  Issue #13, read against the code a third time on 2026-09-21. The knock
+  budget is counted on QML timers, and those stand still while the machine
+  sleeps: a station that goes quiet at eleven with the lid closed a minute
+  later still has knocks left at eight the next morning, and the network
+  coming back replays it — nine hours late, under the release whose notes
+  said nothing could put it back on. The relay road can leave the order
+  standing with no ladder at all. Both arrive through _replayOrder, which now
+  asks the wall clock before it plays.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+  function orderExpired(sinceMs, nowMs, exempt, cap) {
+      if (exempt === true) return false;
+
+replace:
+  function orderExpired(sinceMs, nowMs, exempt, cap) {
+      if (exempt === 1) return false;
+
+expect:
+  Killed by tst_retrylogic::test_an_alarm_never_expires_and_neither_does_keep_trying_forever.
+  Line-neutral.

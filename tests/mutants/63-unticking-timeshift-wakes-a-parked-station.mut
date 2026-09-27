@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Turning timeshift off in the settings sends a parked station back to
+  live, which raises the standing order and starts the stream.
+
+history:
+  Found 2026-09-21 reading issue #13 against the code: tsPlayLive was called
+  for a parked station and for one paused inside its buffer, so a checkbox
+  in the settings put the radio back on over the listener's pause.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (root._tsPaused || (timeshift.shifted && !isPlaying())) stopWithFade();
+              else if (timeshift.shifted) tsPlayLive(timeshift.streamUrl);
+
+replace:
+              if (false) stopWithFade();
+              else if (timeshift.shifted || root._tsPaused) tsPlayLive(timeshift.streamUrl);
+
+expect:
+  Killed by tests/test_invariants.py::test_unticking_timeshift_does_not_wake_a_listener_who_said_quiet.
+  Line-neutral.

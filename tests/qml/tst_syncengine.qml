@@ -113,6 +113,9 @@ Item {
         QtObject {
             property int syncOffsetMs: 0
             property int syncVerifiedMs: -1
+            // Mirrors config/main.xml: the ear's window is written down so a
+            // panel restart inside it does not hand the room to the sweeps.
+            property double syncEarSetAt: 0
             property string syncOffsetMap: "{}"
             property string syncRefLatMap: "{}"
             property string syncSweepBiasMap: "{}"
@@ -208,6 +211,168 @@ Item {
             verify(cmd.indexOf("sink='" + btSink + "' latency_msec=60") !== -1);
             verify(r.e._combineWantActive);
             verify(!r.e._combineActive);       // ack not in yet
+        }
+
+        function test_no_loopback_is_born_at_a_level_the_session_manager_remembered() {
+            // WirePlumber files a stream's level under "loopback-<pid>-<n>
+            // output", and both halves repeat: the counter cycles 13/14/15
+            // and a lingering login lands pipewire-pulse on the same pid boot
+            // after boot. A handover fades the old loopback to zero before
+            // cutting it, so zero is what stays on disk under its name.
+            // Measured 2026-09-20: with 0.0 stored under loopback-1322-15 a
+            // fresh loopback came up at 0 % / -inf dB, unmuted and running;
+            // with state.restore-props=false the same name came up at 100 %
+            // and a level set on it was not written back.
+            function loadsAndMarks(cmd) {
+                var loads = cmd.split("load-module module-loopback").length - 1;
+                var marks = cmd.split("sink_input_properties=state.restore-props=false").length - 1;
+                verify(loads > 0);
+                compare(marks, loads);
+            }
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            loadsAndMarks(r.mock.execLog[r.mock.execLog.length - 1]);      // the enable
+
+            var r2 = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r2);
+            var from = r2.mock.execLog.length;
+            r2.e._combineRebuildLoopbacks();
+            var reloop = "";
+            for (var i = from; i < r2.mock.execLog.length; i++)
+                if (r2.mock.execLog[i].indexOf(": PW_RELOOP") === 0) reloop = r2.mock.execLog[i];
+            loadsAndMarks(reloop);                                         // the rebuild
+
+            // Its own rig: the rebuild above is still waiting for its ack.
+            var r3 = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r3);
+            r3.e.setDeviceChannel(wired, "L");
+            compare(r3.e._settleQuietSwap("slider", {}, true), "swapped");
+            loadsAndMarks(r3.mock.execLog[r3.mock.execLog.length - 1]);    // the quiet swap
+        }
+
+        // ── the birth flush waits for sound ───────────────────────────────
+        //
+        // Measured 2026-09-20 on a JBL Flip 7, five builds out of five (a
+        // boot and four panel restarts): the group is built while nothing
+        // plays, the shell bounces the speaker's transport 1.2 s later, and
+        // when the music starts the speaker is a dead pipe — sink RUNNING,
+        // loopback at 100 %, transport "active", nothing in the air. With the
+        // bounce taken out of the installed copy: three builds, three live
+        // speakers, no backlog. The same bounce under flowing music was
+        // harmless four times and is what woke the dead pipe every time.
+
+        function flushesIn(log, from) {
+            var n = [];
+            for (var i = from; i < log.length; i++)
+                if (log[i].indexOf(": PW_FLUSH;") === 0) n.push(log[i]);
+            return n;
+        }
+
+        function test_a_group_built_in_silence_does_not_bounce_its_bluetooth_speaker() {
+            var r = rig([dev(wired), dev(btSink)]);
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            var cmd = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmd.indexOf(": PW_COMBINE ") === 0);
+            verify(cmd.indexOf("load-module module-loopback") !== -1);
+            compare(cmd.indexOf("suspend-sink"), -1);
+            verify(r.e._birthFlushOwed[btSink] === true);
+        }
+
+        function test_the_owed_flush_is_paid_once_when_sound_flows() {
+            var r = settleRig();
+            r.mock.anythingPlaying = false;
+            var from = r.mock.execLog.length;
+            r.e._birthFlushTick();                          // silence: nothing yet
+            compare(flushesIn(r.mock.execLog, from).length, 0);
+            verify(r.e._birthFlushOwed[btSink] === true);   // and still owed
+            r.mock.playing = true;
+            r.mock.anythingPlaying = true;
+            r.e._settleReadsLeft = 0;
+            r.e._birthFlushTick();
+            var paid = flushesIn(r.mock.execLog, from);
+            compare(paid.length, 1);
+            verify(paid[0].indexOf("suspend-sink '" + btSink + "' 1") !== -1);
+            verify(paid[0].indexOf("suspend-sink '" + btSink + "' 0") !== -1);
+            compare(paid[0].indexOf(wired), -1);            // the wire is left alone
+            // The bounce re-rolls the transport: the room it leaves is a new
+            // one and gets a settle round of its own.
+            compare(r.e._settleReadsLeft, 5);
+            r.e._birthFlushTick();
+            compare(flushesIn(r.mock.execLog, from).length, 1);
+        }
+
+        function test_the_owed_flush_waits_out_a_busy_room() {
+            var r = settleRig();
+            r.mock.playing = true;
+            var from = r.mock.execLog.length;
+            var busy = ["_calibrating", "_verifyPending", "_combineReloopBusy", "_btKickInFlight"];
+            for (var b = 0; b < busy.length; b++) {
+                r.e[busy[b]] = true;
+                r.e._birthFlushTick();
+                r.e[busy[b]] = false;
+            }
+            r.mock.alarmEngaged = true;
+            r.e._birthFlushTick();
+            r.mock.alarmEngaged = false;
+            compare(flushesIn(r.mock.execLog, from).length, 0);
+            verify(r.e._birthFlushOwed[btSink] === true);
+            r.e._birthFlushTick();
+            compare(flushesIn(r.mock.execLog, from).length, 1);
+        }
+
+        function test_a_speaker_joining_mid_song_is_still_flushed_at_birth() {
+            // The lesson the flush exists for: a loopback attached to a sink
+            // that is still settling keeps a backlog it can never drain —
+            // 2.3 s of permanent echo, measured. With music already flowing
+            // through the group the bounce is safe and stays where it was.
+            var r = rig([dev(wired), dev(wired2)], { syncAutoCare: true });
+            r.e._combineAvailable = true;
+            r.e.combineOutputsEnable();
+            r.e.handleExec(": PW_COMBINE " + r.e._combineLoadSeq + ";",
+                           "PREVDEF usb_dac\nNULL 77\nLB 101 " + wired + "\nLB 103 " + wired2 + "\n", "");
+            r.e.handleExec(": PW_RAMP; x", "", "");
+            r.mock.playing = true;
+            r.mock.anythingPlaying = true;
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(wired2), dev(btSink)] };
+            var from = r.mock.execLog.length;
+            r.e._combineRebuildLoopbacks();
+            var cmd = "";
+            for (var i = from; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) cmd = r.mock.execLog[i];
+            verify(cmd.indexOf("suspend-sink '" + btSink + "' 1") !== -1);
+            verify(r.e._birthFlushOwed[btSink] === undefined);
+        }
+
+        function test_the_join_watchdog_owes_its_flush_in_silence_and_sends_it_under_music() {
+            // Connecting the speaker from the menu with nothing playing took
+            // the same road to the same dead pipe.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._birthFlushOwed = ({});
+            var from = r.mock.execLog.length;
+            r.e._btJoinWatchArm(btMac, "JBL");
+            r.e._btJoinWatchTick();
+            compare(flushesIn(r.mock.execLog, from).length, 0);
+            verify(r.e._birthFlushOwed[btSink] === true);
+            compare(r.e._btJoinWatchMac, "");               // and the watch signed off
+
+            r.e._birthFlushOwed = ({});
+            r.mock.playing = true;
+            r.e._btJoinWatchArm(btMac, "JBL");
+            r.e._btJoinWatchTick();
+            compare(flushesIn(r.mock.execLog, from).length, 1);
+            verify(r.e._birthFlushOwed[btSink] === undefined);
+        }
+
+        function test_a_debt_does_not_outlive_the_group_it_was_written_for() {
+            var r = settleRig();
+            r.e.combineOutputsDisable();
+            r.e.handleExec(": PW_UNCOMBINE_DONE " + r.e._combineLoadSeq + ";", "", "");
+            r.mock.mediaDevs = { audioOutputs: [dev(wired), dev(wired2)] };   // the speaker is gone
+            r.e.combineOutputsEnable();
+            verify(r.e._birthFlushOwed[btSink] === undefined);
         }
 
         function test_enable_quotes_hostile_sink_names() {
@@ -352,9 +517,110 @@ Item {
             var un = r.mock.execLog[r.mock.execLog.length - 1];
             verify(un.indexOf(": PW_UNCOMBINE_DONE;") === 0);
             verify(un.indexOf("cm=$(pactl get-sink-volume onair_combined_7") !== -1);
-            verify(un.indexOf("echo \"MASTER ${cm:-100}\"") !== -1);
+            verify(un.indexOf("[ -n \"$cm\" ] && echo \"MASTER $cm\"") !== -1);
+            compare(un.indexOf(":-100"), -1);   // a read that failed is not a level
             r.e.handleExec(": PW_UNCOMBINE_DONE;", "MASTER 40\n", "");
             compare(r.cfg.combineMasterPct, 40);
+        }
+
+        // ── the room's level is remembered while the room is alive ────────
+        //
+        // Measured 2026-09-20: the config held 30 while the listener had kept
+        // the room at 40 with the volume keys all evening. The only writer
+        // was the disable's ack, and a panel restart or a reboot destroys
+        // the engine before that ack can land — so the next enable ramped to
+        // 30 and the room came back close to inaudible.
+
+        function masterWatchCmd(r, from) {
+            for (var i = r.mock.execLog.length - 1; i >= from; i--)
+                if (r.mock.execLog[i].indexOf(": PW_MASTER " + r.e._combineLoadSeq + ";") === 0)
+                    return r.mock.execLog[i];
+            return "";
+        }
+
+        function test_a_level_set_mid_session_is_remembered_without_a_disable() {
+            var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 30 });
+            activate(r);
+            var from = r.mock.execLog.length;
+            r.e._masterWatchTick();
+            var cmd = masterWatchCmd(r, from);
+            verify(cmd !== "");
+            verify(cmd.indexOf("pactl get-sink-volume onair_combined_7") !== -1);
+            verify(cmd.indexOf("onair_park_") !== -1);      // a parked room is not the room
+            compare(cmd.indexOf("set-sink-volume"), -1);    // it only ever reads
+            compare(cmd.indexOf(":-100"), -1);
+            verify(r.e.handleExec(cmd, "MASTER 40\n", ""));
+            compare(r.cfg.combineMasterPct, 40);
+        }
+
+        function test_the_watch_stays_silent_while_the_master_is_held() {
+            var held = ["_combineRamping", "_calibrating", "_verifyPending"];
+            for (var h = 0; h < held.length; h++) {
+                var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 30 });
+                activate(r);
+                var from = r.mock.execLog.length;
+                r.e[held[h]] = true;
+                r.e._masterWatchTick();
+                compare(masterWatchCmd(r, from), "");
+                // A hold that began inside the shell's round-trip: the verify
+                // parks the master at 100 and the ramp climbs through levels
+                // nobody chose. The answer is dropped.
+                r.e[held[h]] = false;
+                r.e._masterWatchTick();
+                var cmd = masterWatchCmd(r, from);
+                verify(cmd !== "");
+                r.e[held[h]] = true;
+                verify(r.e.handleExec(cmd, "MASTER 100\n", ""));
+                compare(r.cfg.combineMasterPct, 30);
+            }
+        }
+
+        function test_a_watch_from_the_previous_generation_is_dropped() {
+            var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 30 });
+            activate(r);
+            var from = r.mock.execLog.length;
+            r.e._masterWatchTick();
+            var stale = masterWatchCmd(r, from);
+            verify(stale !== "");
+            r.e.combineOutputsDisable();
+            r.e.handleExec(": PW_UNCOMBINE_DONE;", "", "");
+            activate(r);
+            // The new generation's polite 20 % flip must not become the memory.
+            verify(r.e.handleExec(stale, "MASTER 20\n", ""));
+            compare(r.cfg.combineMasterPct, 30);
+        }
+
+        function test_the_watch_ignores_a_dead_group_and_a_volume_turned_to_nothing() {
+            var idle = rig([dev(wired), dev(btSink)], { combineMasterPct: 40 });
+            idle.e._masterWatchTick();
+            compare(masterWatchCmd(idle, 0), "");
+            var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 40 });
+            activate(r);
+            var from = r.mock.execLog.length;
+            r.e._masterWatchTick();
+            var cmd = masterWatchCmd(r, from);
+            r.e.handleExec(cmd, "MASTER 0\n", "");          // turned all the way down: a mute by hand
+            compare(r.cfg.combineMasterPct, 40);
+            r.e.handleExec(cmd, "", "");                    // pactl did not answer
+            compare(r.cfg.combineMasterPct, 40);
+            r.e.handleExec(cmd, "MASTER 150\n", "");
+            compare(r.cfg.combineMasterPct, 100);
+        }
+
+        function test_a_teardown_that_read_nothing_remembers_nothing() {
+            // The read used to fall back to 100 when pactl did not answer —
+            // a sink that died first, a pipewire restart — and the ack filed
+            // full blast as the level the room had been left at.
+            var r = rig([dev(wired), dev(btSink)], { combineMasterPct: 40 });
+            activate(r);
+            r.e.combineOutputsDisable();
+            r.e.handleExec(": PW_UNCOMBINE_DONE;", "", "");
+            compare(r.cfg.combineMasterPct, 40);
+            var z = rig([dev(wired), dev(btSink)], { combineMasterPct: 40 });
+            activate(z);
+            z.e.combineOutputsDisable();
+            z.e.handleExec(": PW_UNCOMBINE_DONE;", "MASTER 0\n", "");
+            compare(z.cfg.combineMasterPct, 40);
         }
 
         function test_a_mid_ramp_disable_does_not_persist_the_ramp_level() {
@@ -381,7 +647,8 @@ Item {
             r.e.combineOutputsDisable();
             var un = r.mock.execLog[r.mock.execLog.length - 1];
             verify(un.indexOf("onair_park_") !== -1);
-            verify(un.indexOf("echo \"MASTER ${cm:-100}\"") !== -1);
+            verify(un.indexOf("[ -n \"$cm\" ] && echo \"MASTER $cm\"") !== -1);
+            compare(un.indexOf(":-100"), -1);   // a read that failed is not a level
         }
 
         function test_every_cancel_road_ends_the_measurement_process() {
@@ -3492,6 +3759,37 @@ Item {
                  + "DRIFT_EST " + Math.abs(btAt - wiredAt) + "\n";
         }
 
+        function test_the_periodic_check_stands_aside_while_a_settle_round_lives() {
+            // The settle round's third tick lands 150 + 105 + 105 = 360 s
+            // after it arms, and the periodic check is a six-minute timer that
+            // starts at the same moment. Measured twice on 2026-09-21 (04:06
+            // and 06:14): the periodic probe went out three seconds ahead,
+            // the settle tick found a probe in the air, called the room busy
+            // and came back a minute later — a fifth probe and sixty seconds
+            // added to every round, to measure what the round was already
+            // measuring.
+            var r = settleRig();
+            compare(r.e._settleReadsLeft, 5);
+            r.mock.execLog = [];
+            r.e._driftPeriodicTick();
+            compare(r.mock.execLog.length, 0);
+            // A finished or dead round holds no reads, and the check is back.
+            r.e._settleReadsLeft = 0;
+            r.e._driftPeriodicTick();
+            compare(r.mock.execLog.length, 1);
+            verify(r.mock.execLog[0].indexOf(": PW_DRIFT;") === 0);
+            // Reads left with nothing to tick them is a corpse, not a round:
+            // standing aside for it would silence the check for good.
+            var c = rig([dev(wired), dev(btSink)], { syncAutoCare: false });
+            activate(c);
+            c.mock.anythingPlaying = true;
+            verify(!c.e._settleTimerRunningForTest());
+            c.e._settleReadsLeft = 5;
+            c.mock.execLog = [];
+            c.e._driftPeriodicTick();
+            compare(c.mock.execLog.length, 1);
+        }
+
         function test_a_build_arms_the_settle_road_only_with_the_caretaker_on() {
             var r = settleRig();
             verify(r.e._settleTimerRunningForTest());
@@ -3958,6 +4256,200 @@ Item {
         compare(JSON.parse(r.cfg.syncSweepBiasMap)[btMac], 10);      // and the sweep learned
     }
 
+    function test_an_enable_that_never_answers_drops_the_wish_and_knocks_again() {
+        // Seen live 2026-09-20 from 14:16 to 15:40: the engine dispatched an
+        // enable, its ack never landed, and _combineWantActive stayed up with
+        // _combineActive down. combineOutputsEnable() refuses while the wish
+        // is up, the resurrect knocks refuse while it is up, and the drift
+        // monitor is bound to _combineActive — so the room sat at -15 ms with
+        // every corrector silent and nothing in the log. Every other in-flight
+        // shell here has a guard (reloop, verify, calib, park tail); the
+        // enable is the one that never did.
+        var r = rig([dev(wired), dev(btSink)]);
+        r.e._combineAvailable = true;
+        r.e.combineOutputsEnable();
+        verify(r.e._combineWantActive);
+        verify(!r.e._combineActive);
+        var sent = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_COMBINE ") === 0; }).length;
+        compare(sent, 1);
+        // No ack ever comes. The guard fires instead of the ack.
+        r.e._enableAckGuardFire();
+        // The wish was dropped and raised again in the same breath: a fresh
+        // enable is in flight, so the flag reads true — with the graph still down.
+        verify(r.e._combineWantActive);
+        verify(!r.e._combineActive);
+        compare(r.e._enableAckMisses, 1);
+        // ...and that fresh enable went out with the next sequence.
+        var again = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_COMBINE ") === 0; }).length;
+        compare(again, 2);
+        // A guard that fires after a real ack must do nothing.
+        activate(r);
+        verify(r.e._combineActive);
+        r.e._enableAckGuardFire();
+        verify(r.e._combineActive);
+        verify(r.e._combineWantActive);
+    }
+
+    function test_the_enable_retry_is_bounded_and_then_waits_for_a_knock() {
+        // Three silent enables in a row mean the shell road is broken, not
+        // slow; retrying every half minute forever would sweep and rebuild the
+        // graph on a loop, audibly. After the third miss the engine stops
+        // dispatching and leaves the resurrect knocks armed instead.
+        var r = rig([dev(wired), dev(btSink)]);
+        r.e._combineAvailable = true;
+        r.e.combineOutputsEnable();
+        for (var i = 0; i < 4; i++) r.e._enableAckGuardFire();
+        var sent = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_COMBINE ") === 0; }).length;
+        compare(sent, 3);                               // 1 + 2 retries, then no more
+        verify(!r.e._combineWantActive);
+        verify(r.e._resurrectTries > 0);                // the knocks stay armed
+    }
+
+    function test_a_bluetooth_member_deaf_under_its_codec_is_moved_to_one_it_can_be_heard_on() {
+        // Seen 2026-09-20 on a JBL Flip 7: for twelve minutes after a panel
+        // restart the 18.5 kHz band arrived at 15 on its link, the sweep
+        // reported the speaker DEAF, and the engine shelved it for the life of
+        // the group: "fewer
+        // than two members carry the band — not playing", and the room
+        // drifted with every corrector silent. The engine's own kick already
+        // treats AAC as the codec it cannot see through. Renegotiating the
+        // link by moving the card to SBC-XQ brought the band back at 4322
+        // (AAC itself read 4700-7500 in later trials — the cause was the
+        // link's state, not the codec). A deaf member is now offered that
+        // move once and given the sweep again.
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.mock.execLog = [];
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + btSink + "\nDRIFT_EST 4\n", "");
+        verify(r.e._ultraDeaf[btSink] === true);        // shelved for now, as before
+        var hear = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_HEARING " + btMac + ";") === 0; });
+        compare(hear.length, 1);                        // one switch dispatched...
+        verify(hear[0].indexOf("a2dp-sink-sbc_xq") > 0); // ...to the codec the band survives
+        verify(hear[0].indexOf("bluez_card.AA_BB_CC_DD_EE_FF") > 0);
+        // The switch answers: the profile is now SBC-XQ.
+        verify(r.e.handleExec(": PW_HEARING " + btMac + ";", "HEARING " + btMac + " a2dp-sink-sbc_xq\n", ""));
+        verify(r.e._ultraDeaf[btSink] !== true);        // off the shelf
+        verify(r.e._sweepRearmed);                      // and the sweep is coming back
+    }
+
+    function test_the_hearing_switch_is_tried_once_per_speaker_and_a_truly_deaf_one_stays_shelved() {
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.mock.execLog = [];
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + btSink + "\n", "");
+        // The card has no SBC-XQ seat, or it was already there: nothing changed.
+        verify(r.e.handleExec(": PW_HEARING " + btMac + ";", "HEARING " + btMac + " none\n", ""));
+        verify(r.e._ultraDeaf[btSink] === true);        // stays shelved — it really is deaf
+        r.mock.execLog = [];
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + btSink + "\n", "");
+        var again = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_HEARING ") === 0; });
+        compare(again.length, 0);                       // no second attempt this session
+        // A wired member has no codec to switch: never dispatched for it.
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + wired + "\n", "");
+        var wiredHear = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_HEARING ") === 0; });
+        compare(wiredHear.length, 0);
+    }
+
+    function test_a_shelved_bluetooth_speaker_gets_one_more_look_and_only_one() {
+        // Seen 2026-09-20: a speaker shelved at 22:10 was healthy again at
+        // 22:14 and the shelf kept every corrector silent until the panel was
+        // restarted. A band that was too faint at one volume is loud enough
+        // at another, so the shelf may be wrong later. Once per speaker, not
+        // sooner than ten minutes, and never for a wired member: the beeping
+        // this shelf was built to stop came from sweeping a deaf speaker on
+        // every check.
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + btSink + "\n", "");
+        r.e.handleExec(": PW_HEARING " + btMac + ";", "HEARING " + btMac + " already\n", "");
+        verify(r.e._ultraDeaf[btSink] === true);
+        r.mock.execLog = [];
+        r.e._driftProbe();                              // a minute later: too soon
+        compare(r.mock.execLog.length, 0);
+        var aged = {};
+        aged[btMac] = Date.now() - 11 * 60 * 1000;
+        r.e._hearingTried = aged;
+        r.e._driftProbe();
+        compare(r.mock.execLog.length, 1);
+        verify(r.mock.execLog[0].indexOf(": PW_DRIFT;") === 0);
+        verify(r.mock.execLog[0].indexOf(btSink) > 0);  // swept again
+        verify(r.e._ultraDeaf[btSink] !== true);
+        compare(r.e._hearingTried[btMac], 2);           // and that was the look
+        // Still deaf: back on the shelf, this time for the group's life.
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + btSink + "\n", "");
+        verify(r.e._ultraDeaf[btSink] === true);
+        r.mock.execLog = [];
+        r.e._driftProbe();
+        compare(r.mock.execLog.length, 0);
+        compare(r.e._hearingTried[btMac], 2);
+    }
+
+    function test_a_speaker_shelved_by_the_verify_gets_the_same_offer_as_one_shelved_by_the_sweep() {
+        // The periodic sweep shelves a deaf Bluetooth speaker, offers it the
+        // SBC-XQ seat once and stamps the offer, which is also what earns it
+        // the one later look. The verify's sweep shelved the same speaker and
+        // did neither: no offer, no stamp, so no later look either — shelved
+        // for the life of the group by the one road that never asked.
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.e._verifyPending = true;
+        r.mock.execLog = [];
+        r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";",
+                       "VERIFY_BY sweep\nVERIFY_PARTIAL " + btSink + "\n", "");
+        verify(r.e._ultraDeaf[btSink] === true);
+        var hear = r.mock.execLog.filter(function (c) { return c.indexOf(": PW_HEARING " + btMac + ";") === 0; });
+        compare(hear.length, 1);
+        verify(r.e._hearingTried[btMac] > 2);           // stamped: the later look is owed
+        // A wired speaker has no codec to move; nothing is dispatched for it.
+        var w = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(w);
+        w.e._verifyPending = true;
+        w.mock.execLog = [];
+        w.e.handleExec(": PW_VERIFY " + w.e._calibRunSeq + ";",
+                       "VERIFY_BY sweep\nVERIFY_PARTIAL " + wired + "\n", "");
+        compare(w.mock.execLog.filter(function (c) { return c.indexOf(": PW_HEARING ") === 0; }).length, 0);
+    }
+
+    function test_a_shelved_wired_speaker_is_never_swept_again() {
+        var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+        activate(r);
+        r.e.handleExec(": PW_DRIFT;", "DRIFT_DEAF " + wired + "\n", "");
+        verify(r.e._ultraDeaf[wired] === true);
+        r.mock.execLog = [];
+        r.e._driftProbe();
+        compare(r.mock.execLog.length, 0);
+        verify(r.e._ultraDeaf[wired] === true);
+    }
+
+    function test_the_ears_window_survives_a_panel_restart() {
+        // A hand on the fine-tune slider is the room's highest court, and a
+        // panel restart is not the listener changing their mind. The window
+        // used to live only in memory, so an update or a logout inside its
+        // ten minutes handed the room straight back to the sweeps — which is
+        // the race the window was added to stop.
+        var r = settleRig();
+        r.e.setSyncOffset(145);
+        verify(Number(r.cfg.syncEarSetAt) > 0);        // the hand is written down
+
+        // The panel goes down and comes back four minutes later.
+        var r2 = rig([dev(wired), dev(btSink)],
+                     { syncEarSetAt: Date.now() - 4 * 60 * 1000 });
+        verify(!r2.e._earWindowOpen());                 // nothing read yet
+        r2.e.startup();                                 // the real road, not the loader alone
+        verify(r2.e._earWindowOpen());                  // and the window is back
+
+        // A window that already expired before the restart stays shut.
+        var r3 = rig([dev(wired), dev(btSink)],
+                     { syncEarSetAt: Date.now() - 11 * 60 * 1000 });
+        r3.e._loadEarWindow();
+        verify(!r3.e._earWindowOpen());
+
+        // Nonsense in the key must not open it either.
+        var r4 = rig([dev(wired), dev(btSink)], { syncEarSetAt: 0 });
+        r4.e._loadEarWindow();
+        verify(!r4.e._earWindowOpen());
+    }
+
     function test_the_ears_window_expires_and_the_settle_resumes_duty() {
         var r = settleRig();
         r.e.setSyncOffset(145);
@@ -3976,18 +4468,20 @@ Item {
 
 
 
-    }
 
-    function test_a_departure_noticed_first_makes_the_dying_pause_a_no_op() {
-        // The chain that actually worked, three times running, the night
-        // the acoustic judge was retired: the engine reports the member
-        // gone, and the pause that arrives in its wake is ignored - the
-        // room never falls silent for the speakers still in it.
+    function test_a_departure_walks_the_speaker_back_in_and_tells_the_player_nothing() {
+        // A member that vanishes without being asked is walked back in; that
+        // is the engine's whole part. It used to tell the player too, and the
+        // only thing the player ever did with the news was undo a pause — on
+        // the desk, 2026-09-21, a pause sent over MPRIS was undone five
+        // seconds after the speaker's link dropped. The mock still offers the
+        // old hook, so a call creeping back is counted here.
         var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
         activate(r);
         r.mock.mediaDevs = { audioOutputs: [dev(wired)] };
-        var lostBefore = r.mock.btLost;
         r.e.onOutputsChanged();
-        compare(r.mock.btLost, lostBefore + 1);
+        compare(r.e._btJoinWatchMac, btMac);
+        compare(r.mock.btLost, 0);
+    }
     }
 }

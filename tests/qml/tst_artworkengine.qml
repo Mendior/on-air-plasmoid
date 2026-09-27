@@ -14,22 +14,52 @@ TestCase {
     name: "ArtworkEngine"
 
     property string curKey: ""
+    // Every request the engine sends arms its timeout first.
+    property int armed: 0
 
     Component {
         id: engineComp
         ArtworkEngine {}
     }
 
-    function makeEngine(artEnabled) {
+    function makeEngine(artEnabled, station) {
+        tc.armed = 0;
         var cfg = { albumArtEnabled: artEnabled !== false };
         var app = {
             playerSourceString: function() { return ""; },
             _localArtForSource: "",
+            currentStation: station || "",
             trackArtistTitleKey: function() { return tc.curKey; },
-            _armXhrTimeout: function() {},
+            _armXhrTimeout: function() { tc.armed++; },
             _clearXhrTimeout: function() {}
         };
         return engineComp.createObject(tc, { app: app, cfg: cfg });
+    }
+
+    // The debounce fires lookupAlbumArt; with album art switched off that
+    // call clears albumArtUrl, which makes the moment it fires visible
+    // without the network.
+    function test_the_first_title_of_a_station_does_not_wait_out_the_debounce() {
+        var e = makeEngine(false);
+        e.albumArtUrl = "http://x/marker.jpg";
+        e._artLookupPendingRaw = "Artist - Song";
+        e.debounceRestart(true);
+        wait(500);
+        compare(e.albumArtUrl, "");
+        e.destroy();
+    }
+
+    function test_a_changing_title_still_waits_for_a_stable_window() {
+        var e = makeEngine(false);
+        e.albumArtUrl = "http://x/marker.jpg";
+        e._artLookupPendingRaw = "Artist - Song";
+        e.debounceRestart(true);      // a first title came…
+        e.debounceRestart();          // …and flapped before it fired
+        wait(500);
+        compare(e.albumArtUrl, "http://x/marker.jpg");
+        wait(1300);
+        compare(e.albumArtUrl, "");
+        e.destroy();
     }
 
     function test_a_definitive_miss_is_cached_and_answered_from_cache() {
@@ -79,6 +109,48 @@ TestCase {
         var e = makeEngine();
         e.albumArtUrl = "http://x/prev.jpg";
         e.lookupAlbumArt("");
+        compare(e.albumArtUrl, "");
+        e.destroy();
+    }
+
+    // Seen on the bench 2026-09-23: Dance Wave! sends its own name as the
+    // title, iTunes found an album of that name, and the palm-tree sleeve
+    // went to the popup and to MPRIS. The station's logo belongs there.
+    function test_the_station_saying_its_name_asks_nobody_for_a_cover() {
+        var e = makeEngine(true, "Dance Wave!");
+        tc.curKey = "Dance Wave!";
+        e.albumArtUrl = "http://x/previous-song.jpg";
+        e._albumArtKey = "previous song";
+        e.lookupAlbumArt("Dance Wave!");
+        compare(tc.armed, 0);
+        compare(e.albumArtUrl, "");
+        e.destroy();
+    }
+
+    // The metadata handler paints from the cache before any lookup runs, and
+    // the second "Dance Wave!" of the bench run came back that way, at once.
+    function test_a_cached_cover_is_not_painted_over_the_station_name() {
+        var e = makeEngine(true, "Dance Wave!");
+        tc.curKey = "elsewhere";
+        e._artFinish("Dance Wave!", "http://x/palm.jpg", true);
+        tc.curKey = "Dance Wave!";
+        verify(e._artFromCache("Dance Wave!"));
+        compare(e.albumArtUrl, "");
+        e.destroy();
+        // The same words on another station are a title like any other.
+        e = makeEngine(true, "Radio Elmar");
+        tc.curKey = "elsewhere";
+        e._artFinish("Dance Wave!", "http://x/palm.jpg", true);
+        verify(e._artFromCache("Dance Wave!"));
+        compare(e.albumArtUrl, "http://x/palm.jpg");
+        e.destroy();
+    }
+
+    function test_a_web_address_in_the_title_asks_nobody_for_a_cover() {
+        var e = makeEngine(true, "Dance Wave!");
+        tc.curKey = "Tracklist: https://dancewave.online/";
+        e.lookupAlbumArt("Tracklist: https://dancewave.online/");
+        compare(tc.armed, 0);
         compare(e.albumArtUrl, "");
         e.destroy();
     }

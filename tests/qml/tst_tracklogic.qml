@@ -101,6 +101,89 @@ TestCase {
         compare(TrackLogic.primaryArtist(""), "")
     }
 
+    // Dance Wave! on 2026-09-23: the title was "Dance Wave!" with no artist,
+    // and iTunes answered with a stranger's album, palm tree and all.
+    function test_the_station_saying_its_own_name_is_station_talk() {
+        verify(TrackLogic.stationTalk("Dance Wave!", "Dance Wave!"))
+        verify(TrackLogic.stationTalk("DANCE  WAVE", "Dance Wave!"))
+        verify(TrackLogic.stationTalk("dance wave", "Dance Wave!"))
+        verify(TrackLogic.stationTalk("NOW PLAYING: Dance Wave!", "Dance Wave!"))
+        verify(TrackLogic.stationTalk("Rádió Élmar", "Radio Elmar"))
+        // The directory's name often carries a tail the stream never says.
+        verify(TrackLogic.stationTalk("Radio Paradise", "Radio Paradise - Main Mix (EN)"))
+        verify(TrackLogic.stationTalk("Dance Wave!", "Dance Wave! (HU)"))
+    }
+
+    function test_a_line_with_a_web_address_is_station_talk() {
+        verify(TrackLogic.stationTalk("Tracklist: https://dancewave.online/", "Dance Wave!"))
+        verify(TrackLogic.stationTalk("Visit www.example.fm", "Other"))
+        verify(TrackLogic.stationTalk("http://x.fm", ""))
+    }
+
+    function test_a_song_that_shares_words_with_the_station_is_music() {
+        verify(!TrackLogic.stationTalk("Radio Ga Ga", "Radio"))
+        verify(!TrackLogic.stationTalk("Paradise", "Radio Paradise"))
+        verify(!TrackLogic.stationTalk("Madonna Frozen", "Frozen"))
+        verify(!TrackLogic.stationTalk("Awww. Yeah", "Other"))
+        verify(!TrackLogic.stationTalk("Anything", ""))
+        verify(!TrackLogic.stationTalk("", "Dance Wave!"))
+        verify(!TrackLogic.stationTalk("!!!", "???"))
+        verify(!TrackLogic.stationTalk(null, null))
+    }
+
+    // A ListModel stand-in: the history hands its model over as it is.
+    function _rows(list) {
+        return { count: list.length, get: function(i) { return list[i] } }
+    }
+
+    function _row(artist, title, station) {
+        return { artist: artist, trackName: title, station: station }
+    }
+
+    function test_the_history_takes_a_new_song() {
+        verify(TrackLogic.historyTakes(_rows([]), "ABBA", "Dancing Queen", "Elmar"))
+        verify(TrackLogic.historyTakes(_rows([_row("ABBA", "Waterloo", "Elmar")]),
+                                       "ABBA", "Dancing Queen", "Elmar"))
+        verify(!TrackLogic.historyTakes(_rows([]), "ABBA", "", "Elmar"))
+    }
+
+    function test_the_newest_row_again_is_no_new_row() {
+        var rows = _rows([_row("ABBA", "Waterloo", "Elmar")])
+        verify(!TrackLogic.historyTakes(rows, "ABBA", "Waterloo", "Elmar"))
+        verify(!TrackLogic.historyTakes(rows, "abba", "WATERLOO", "Elmar"))
+        // As before: the same song as the newest row, whatever station it is on.
+        verify(!TrackLogic.historyTakes(rows, "ABBA", "Waterloo", "Elmar 320k"))
+    }
+
+    // Measured 2026-09-23 on Dance Wave!: two slogans every 15-20 s took
+    // turns, so "same as the newest row" never fired and the thirty rows
+    // were all slogans seven minutes in.
+    function test_a_slogan_taking_turns_with_songs_gets_one_row() {
+        var rows = _rows([_row("", "Tracklist", "Dance Wave!"),
+                          _row("Artist", "Song", "Dance Wave!"),
+                          _row("", "All about Dance from 2000 till today!", "Dance Wave!")])
+        verify(!TrackLogic.historyTakes(rows, "", "All about Dance from 2000 till today!", "Dance Wave!"))
+        verify(!TrackLogic.historyTakes(rows, "Artist", "Song", "Dance Wave!"))
+    }
+
+    function test_the_station_talking_is_not_history() {
+        verify(!TrackLogic.historyTakes(_rows([]), "", "Dance Wave!", "Dance Wave!"))
+        verify(!TrackLogic.historyTakes(_rows([]), "", "Tracklist: https://dancewave.online/", "Dance Wave!"))
+    }
+
+    function test_the_lookback_ends_at_another_station_and_at_ten_rows() {
+        // Back on Elmar after a stop at Vikerraadio: Elmar's song is new again.
+        var rows = _rows([_row("X", "News", "Vikerraadio"),
+                          _row("ABBA", "Waterloo", "Elmar")])
+        verify(TrackLogic.historyTakes(rows, "ABBA", "Waterloo", "Elmar"))
+        var list = []
+        for (var i = 0; i < 10; i++) list.push(_row("A", "Song " + i, "Elmar"))
+        list.push(_row("ABBA", "Waterloo", "Elmar"))
+        verify(TrackLogic.historyTakes(_rows(list), "ABBA", "Waterloo", "Elmar"))
+        list.splice(9, 1)
+        verify(!TrackLogic.historyTakes(_rows(list), "ABBA", "Waterloo", "Elmar"))
+    }
+
     function test_local_cleanup_matches_its_promise() {
         compare(TrackLogic.cleanQueryLocal("Song (radio edit) [HQ] 192kbps"),
                 "Song")

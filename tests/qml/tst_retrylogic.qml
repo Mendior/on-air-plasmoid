@@ -68,4 +68,101 @@ TestCase {
         verify(RL.shouldKnock(false, true, 99, 3));
         verify(RL.shouldKnock(true, true, 99, 1));
     }
+
+    // ── the order has a deadline the wall clock keeps ─────────────────────
+    //
+    // The budget is counted in knocks, and the knocks ride QML timers, which
+    // stand still while the machine sleeps. A stream that dies at eleven
+    // with the lid closed a minute later still had knocks left at eight the
+    // next morning, and the network coming back handed it one: a radio that
+    // starts on its own nine hours after it went quiet. The order therefore
+    // carries the moment it went quiet, and the wall clock ends it.
+
+    function test_an_order_inside_its_window_is_still_good() {
+        var died = 1000000;
+        verify(!RL.orderExpired(died, died + 30000, false, 3));
+        // The three knocks and the connects between them take longer than
+        // the sum of the waits; the window leaves them room.
+        verify(!RL.orderExpired(died, died + 7 * 60000, false, 3));
+    }
+
+    function test_an_order_that_slept_through_the_night_is_over() {
+        var died = 1000000;
+        verify(RL.orderExpired(died, died + 9 * 3600000, false, 3));
+        // The default: twice the budget and five minutes, twelve in all.
+        verify(!RL.orderExpired(died, died + 12 * 60000, false, 3));
+        verify(RL.orderExpired(died, died + 12 * 60000 + 1, false, 3));
+        // One knock is half a minute; its order is over after six.
+        verify(RL.orderExpired(died, died + 6 * 60000 + 1, false, 1));
+    }
+
+    function test_an_alarm_never_expires_and_neither_does_keep_trying_forever() {
+        var died = 1000000;
+        verify(!RL.orderExpired(died, died + 9 * 3600000, true, 3));    // a wake-up was promised
+        verify(!RL.orderExpired(died, died + 9 * 3600000, false, 0));   // the listener chose forever
+    }
+
+    function test_an_order_with_no_stamp_cannot_expire() {
+        verify(!RL.orderExpired(0, 9 * 3600000, false, 3));
+        verify(!RL.orderExpired(undefined, 9 * 3600000, false, 3));
+    }
+
+    // ── what the footer says while the ladder waits ───────────────────────
+    //
+    // Between knocks the player is idle, and the footer read "Choose station
+    // and enjoy…" under the station's own name for the whole wait (bench,
+    // 2026-09-23: a station at a dead address, 30 s of it before knock #1).
+
+    function test_a_station_waiting_for_its_next_knock_is_between_knocks() {
+        verify(RL.betweenKnocks(true, 1));
+        verify(RL.betweenKnocks(true, 3));
+    }
+
+    function test_no_order_or_no_knock_yet_is_not_waiting() {
+        // A stop and a spent budget both end the order; the first connect
+        // has not knocked at all and says "Connecting…" on its own road.
+        verify(!RL.betweenKnocks(false, 2));
+        verify(!RL.betweenKnocks(true, 0));
+        verify(!RL.betweenKnocks(false, 0));
+        verify(!RL.betweenKnocks(undefined, undefined));
+    }
+
+    // ── the moment the deadline counts from ───────────────────────────────
+    // Measured on HEAD 2026-09-27: main.qml:6612 clears the quiet stamp on
+    // every BufferedMedia, so a playing station has none, and main.qml:4018
+    // then stamped "now" and walked straight through orderExpired.
+
+    function test_an_armed_ladder_keeps_its_own_moment() {
+        compare(RL.orderSince(1000, 500, 9999), 1000);
+    }
+
+    function test_a_playing_station_is_dated_by_when_it_was_last_heard() {
+        // No quiet stamp, because audio was flowing. The night belongs to
+        // the heard-at moment, not to the instant of asking.
+        compare(RL.orderSince(0, 1000, 9999), 1000);
+    }
+
+    function test_an_order_with_neither_gets_its_first_try() {
+        compare(RL.orderSince(0, 0, 9999), 9999);
+    }
+
+    function test_a_night_asleep_ends_the_order_the_morning_after() {
+        // Eleven at night to eight in the morning, the default three knocks.
+        var night = 9 * 60 * 60 * 1000;
+        var since = RL.orderSince(0, 0 + 1, 1 + night);
+        verify(RL.orderExpired(since, 1 + night, false, 3));
+    }
+
+    function test_a_short_nap_does_not_end_it() {
+        // A minute with the lid shut must still come back — the deadline is
+        // for orders hours old, not for every gap.
+        var nap = 60 * 1000;
+        var since = RL.orderSince(0, 1, 1 + nap);
+        verify(!RL.orderExpired(since, 1 + nap, false, 3));
+    }
+
+    function test_garbage_dates_nothing_older_than_now() {
+        compare(RL.orderSince(undefined, undefined, 4242), 4242);
+        compare(RL.orderSince(-5, -5, 4242), 4242);
+    }
 }
