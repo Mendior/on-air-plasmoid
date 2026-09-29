@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A dated order gets no age until audio arrives.
+
+history:
+  A press at eleven with the lid shut before the connect left nothing to
+  measure, and the heal at eight played the station.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+      function _orderDated() { root._orderQuietSince = 0; root._orderHeardAt = Date.now(); }
+
+replace:
+      function _orderDated() { root._orderQuietSince = 0; root._orderHeardAt = 0; }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_person_giving_the_order_dates_it_afresh.
+  Line-neutral.

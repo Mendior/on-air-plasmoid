@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The first heartbeat tick after a wake takes down a cast along with the order.
+
+history:
+  The receivers pull the stream themselves and may have played through the
+  whole sleep; the tick stopped the television in the other room.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              else if (!root._casting) _orderLapsed();
+
+replace:
+              else if (true) _orderLapsed();
+
+expect:
+  Killed by tests/test_invariants.py::test_the_deadline_counts_from_when_the_order_was_last_heard.
+  Line-neutral.

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A stop leaves the quiet stamp behind.
+
+history:
+  Hours later a Play that failed before buffering met the old stamp at the
+  replay and was dropped without a word.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          root._orderHeardAt = 0;
+          root._orderQuietSince = 0;
+          healRetryTimer.stop();
+          netResumeTimer.stop();
+
+replace:
+          root._orderHeardAt = 0;
+          root._orderQuietSince = root._orderQuietSince;
+          healRetryTimer.stop();
+          netResumeTimer.stop();
+
+expect:
+  Killed by tests/test_invariants.py::test_a_person_giving_the_order_dates_it_afresh.
+  Line-neutral.

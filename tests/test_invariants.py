@@ -10,6 +10,7 @@ a station switch would ADD an audible step to every switch to cure a
 bug that does not exist. These tests pin the proven facts.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -933,10 +934,14 @@ def test_a_standing_order_cannot_outlive_a_night_asleep():
     assert "_alarmStandingOrder" in line, (
         "the deadline does not hand an alarm through: a wake-up must ring")
 
+    # The ladder's first knock is dated by the last moment the order was
+    # heard, not by now: a death first noticed after a night stamped the
+    # morning and the replay found it fresh (2026-09-29).
+    stamp = "_orderQuietSince = RetryLogic.orderSince(0, root._orderHeardAt, Date.now())"
     arm = _code_only(_function_body(src, "_healArmRetry"))
-    assert "_orderQuietSince = Date.now()" in arm, (
-        "the ladder no longer stamps the moment the station went quiet")
-    assert arm.index("_orderQuietSince = Date.now()") < arm.index("_healRetryAttempts++"), (
+    assert stamp in arm, (
+        "the ladder no longer dates its first knock from when the order was last heard")
+    assert arm.index(stamp) < arm.index("_healRetryAttempts++"), (
         "the stamp is taken after the count moved, so a second death keeps the first one's time")
 
     spent = _code_only(_function_body(src, "_orderSpent"))
@@ -976,7 +981,15 @@ def test_the_deadline_counts_from_when_the_order_was_last_heard():
     assert "_wantsPlaying" in beat and "isPlaying()" in beat, (
         "the heartbeat runs without an order or without sound, so it would go "
         "on dating an order nothing is serving")
-    assert "_orderHeardAt = Date.now()" in beat, "the heartbeat writes no moment"
+    assert "RetryLogic.beatOnTime(" in beat and "onRunningChanged: beatAt = Date.now()" in beat, (
+        "the heartbeat no longer tells a tick after a wake from one on time; a "
+        "stream that stops sending stays Playing, so the wake tick would date it")
+    assert "interval: 10000" in beat, (
+        "the heartbeat ticks slower than the relay writer's curl redials a silent "
+        "socket (32 s), so the morning hears last night's station first")
+    assert "else if (!root._casting) _orderLapsed();" in beat, (
+        "a late tick does not ask the door: a dead stream still showing Playing "
+        "gets counted as heard by the next tick and the night comes back")
 
     for fn in ("_orderSpent", "stopWithFade"):
         body = _code_only(_function_body(src, fn))
@@ -3014,3 +3027,192 @@ def test_the_rec_counter_on_screen_waits_for_the_file():
     tip = ui[ui.index('i18n("Recording %1 — click to stop"') - 200:]
     tip = tip[:tip.index("\n", 200)]
     assert "root.recOnDisk ?" in tip and "root.recCounterText()" in tip, tip
+
+
+def test_the_about_page_names_yuri_as_the_original_author():
+    """Yuri Saurov wrote Advanced Radio Player; he is not a co-author of this
+    edition. 2026.1 said so in the Authors list, 2026.2 trimmed both labels
+    in a tidy-up, and from then until 2026.40 every Store install showed him
+    as a plain second author under "LGPL-2.0+". The home machine's install
+    kept the hand-set labels, which is how the difference was spotted on
+    2026-09-29. The license string is the SPDX one the file headers use."""
+    meta = json.loads((ROOT / "package" / "metadata.json").read_text(encoding="utf-8"))
+    kp = meta["KPlugin"]
+    names = [a["Name"] for a in kp["Authors"]]
+    assert len(names) == 2, names
+    assert names[0].startswith("Egon Greenberg (2026 edition"), names[0]
+    assert names[1] == "Yuri Saurov (original: Advanced Radio Player)", names[1]
+    assert kp["License"] == "LGPL-2.0-or-later", kp["License"]
+
+
+def _owner_of(src: str, i: int) -> tuple[str, int]:
+    """The nearest function or timer id opening before i."""
+    best, pos = "", -1
+    for rx in (r"function\s+(\w+)\s*\(", r"\bid:\s*(\w+)"):
+        for m in re.finditer(rx, src[:i]):
+            if m.start() > pos:
+                pos, best = m.start(), m.group(1)
+    return best, pos
+
+
+def _owner_span(src: str, pos: int) -> str:
+    """From an owner's opening to the next function or timer id."""
+    nxt = [m.start() for rx in (r"function\s+\w+\s*\(", r"\bid:\s*\w+")
+           for m in re.finditer(rx, src[pos + 1:])]
+    return src[pos:pos + 1 + min(nxt)] if nxt else src[pos:]
+
+
+# One door per road each automatic owner can take: handleExec both goes live
+# after a writer died at birth and re-arms after one that lived. Counted,
+# because a second door in the same owner hid a missing first one.
+_DOORS = {
+    "_playStation": 1, "_healAdvance": 1, "stallTimer": 1, "bitrateFallbackTimer": 1,
+    "relayPlaybackFell": 1, "handleExec": 2,
+}
+
+
+def _sound_calls(src: str, pattern: str) -> list[tuple[str, int, int]]:
+    out = []
+    for m in re.finditer(pattern, src):
+        line = src[src.rfind("\n", 0, m.start()) + 1:src.find("\n", m.start())].strip()
+        if line.startswith("function"):
+            continue
+        name, pos = _owner_of(src, m.start())
+        out.append((name, pos, m.start()))
+    return out
+
+
+# Every place in main.qml that can start sound, by the function or timer that
+# owns it. "asks" means the owner consults _orderLapsed() before the call.
+_MAIN_SOUND = {
+    "startWithFade": "the sink itself",
+    "tsPlayBuffer": "the local capture, played on for a shifted listen",
+    "tsPlayRelay": "the engine's UP ack; its re-arms ask before arming",
+    "_mprisDispatch": "a person's media key",
+    "playLocalFile": "a person's file",
+    "tsPlayLive": "a person's Back to live; the engine's fallback asks first",
+    "timeshiftResume": "a person's resume",
+    "_previewRetryByIdentity": "a preview is nobody's standing order",
+    "_previewRescueAudition": "a preview is nobody's standing order",
+    "_playStation": "asks",
+    "_healAdvance": "asks",
+    "stallTimer": "asks",
+    "bitrateFallbackTimer": "asks",
+    "relayRescue": "a start-time rescue six seconds after a start that asked",
+}
+
+# The doors themselves, word for word: a door that is present but can never
+# refuse ("&& false", "automated === false") passed a count and a presence check.
+_DOOR_LINES = {
+    "_tryHealStation": "if (_orderLapsed()) return;",
+    "_healAdvance": "if (_orderLapsed()) return;",
+    "_playStation": "if (automated === true && _orderLapsed()) return;",
+    "stallTimer": "if (root._tsPaused || _orderLapsed()) return;",
+    "bitrateFallbackTimer": 'if (!fallbackUrl || root._tsPaused || _orderLapsed()) { fallbackUrl = ""; return; }',
+}
+_ENGINE_DOOR_LINES = {
+    "relayPlaybackFell": "if (app._orderLapsed()) return true;",
+    "handleExec": "app.isPlaying() && !app._orderLapsed())",
+}
+
+# Who hands _playStation a station, and how the order is dated on that road.
+_PLAY_STATION = {
+    "refreshServer": "a person's press is dated; the ladder's replay says automated",
+    "previewStation": "a preview is nobody's standing order",
+    "_castResumeLocally": "a person coming home from a cast, dated first",
+    "_replayOrder": "automated",
+}
+
+_ENGINE_SOUND = {
+    "relayPlaybackFell": "asks",
+    "backToLive": "a person's Live, or a shifted listen reaching the live edge",
+    "playerEndOfMedia": "a shifted listen; the park before it dropped the order",
+    "handleExec": "asks",
+}
+
+
+def test_every_automatic_road_to_sound_asks_whether_the_order_lapsed():
+    """2026.40 dated the order right and then asked only at the ladder's
+    replay. Measured by reading on 2026-09-29: a death first noticed in the
+    morning went through the heal lookup, the bitrate fallback or the relay's
+    re-arm, none of which asked, and last night's station played. This pins
+    who may start sound and that every automatic owner asks first — a new
+    play() anywhere fails here until someone decides which kind it is."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    calls = _sound_calls(src, r"playMusic\.play\(\)|\bstartWithFade\(|timeshift\.armRelay\(")
+    assert {c[0] for c in calls} == set(_MAIN_SOUND), (
+        "the owners of sound in main.qml changed: %s" % sorted({c[0] for c in calls}))
+    for name, pos, at in calls:
+        if _MAIN_SOUND[name] == "asks":
+            assert "_orderLapsed()" in src[pos:at], (
+                "%s starts sound without asking whether the order lapsed" % name)
+            assert _owner_span(src, pos).count("_orderLapsed()") == _DOORS[name], (
+                "%s asks a different number of times than it has roads" % name)
+    calls = _sound_calls(src, r"\b_playStation\(")
+    assert {c[0] for c in calls} == set(_PLAY_STATION), (
+        "the roads into _playStation changed: %s" % sorted({c[0] for c in calls}))
+    assert "_orderDated();" in _function_body(src, "_castResumeLocally"), (
+        "coming home from a cast leaves the order dated by its start")
+    assert "false, true);" in _function_body(src, "_replayOrder"), (
+        "the ladder's orphan replay no longer says it is automated")
+    for name, line in _DOOR_LINES.items():
+        opening = re.search(r"function\s+%s\s*\(|\bid:\s*%s\b" % (name, name), src)
+        assert opening, name
+        assert line in _owner_span(src, opening.start()), "%s's door is not %r" % (name, line)
+    heal = _function_body(src, "_tryHealStation")
+    assert "_orderLapsed()" in heal[:heal.index("_healArmRetry")], (
+        "the heal lookup starts before asking whether the order lapsed")
+
+    eng = _code_only((UI / "TimeshiftEngine.qml").read_text(encoding="utf-8"))
+    calls = _sound_calls(eng, r"\barmRelay\(|app\.tsPlayLive\(")
+    assert {c[0] for c in calls} == set(_ENGINE_SOUND), (
+        "the owners of sound in the engine changed: %s" % sorted({c[0] for c in calls}))
+    for name, pos, at in calls:
+        if _ENGINE_SOUND[name] == "asks":
+            assert "app._orderLapsed()" in eng[pos:at], (
+                "the engine's %s re-arms or goes live without asking" % name)
+            assert _owner_span(eng, pos).count("app._orderLapsed()") == _DOORS[name], (
+                "the engine's %s asks a different number of times than it has roads" % name)
+            assert _ENGINE_DOOR_LINES[name] in _owner_span(eng, pos), (
+                "the engine's %s door is not %r" % (name, _ENGINE_DOOR_LINES[name]))
+    assert "_relayRestarts < 3 && !app._orderLapsed()) {" in eng, (
+        "the capped writer's quiet re-arm no longer asks")
+
+
+def test_the_order_lapsing_is_torn_down_like_a_stop():
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    door = _function_body(src, "_orderLapsed")
+    assert "RetryLogic.orderLapsed(root._wantsPlaying" in door, door
+    assert "_alarmStandingOrder" in door, "the door does not hand an alarm through"
+    assert "Qt.callLater(function() { if (!root._wantsPlaying) stopWithFade(); });" in door, (
+        "a lapsed order is refused without being torn down, or torn down even "
+        "after an alarm raised it again; two askers sit in the engine's own "
+        "handlers, so the teardown has to come after them")
+
+
+def test_a_person_giving_the_order_dates_it_afresh():
+    """Stamps left from an order a person already set down must not age the
+    next one: a click after waking, with last night's order still standing,
+    would otherwise be judged lapsed at its first hiccup. A stop clears the
+    quiet stamp too, or a Play hours later can be dropped the same way."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    refresh = _function_body(src, "refreshServer")
+    assert "if (userInitiated !== false) _orderDated();" in refresh, (
+        "a person's press does not date the order it gives")
+    dated = src[src.index("function _orderDated()"):]
+    dated = dated[:dated.index("}")]
+    assert "_orderQuietSince = 0" in dated and "_orderHeardAt = Date.now()" in dated, (
+        "a dated order keeps an old quiet stamp or is left with no age at all")
+    given = _function_body(src, "_orderGiven")
+    assert "if (!root._wantsPlaying) _orderDated();" in given, given
+    live = _function_body(src, "timeshiftBackToLive")
+    given_live = 'if (timeshift.shifted && !root._tsPaused && root._previewUrl === "") _orderGiven();'
+    assert given_live in live and live.index(given_live) < live.index("timeshift.backToLive("), (
+        "a person's Live leaves the order down on the relay road, and no door "
+        "guards a relayed station through the night")
+    for fn in ("tsPlayLive", "timeshiftResume"):
+        assert "_orderGiven()" in _function_body(src, fn), (
+            "%s re-issues the order without dating it" % fn)
+        assert "_wantsPlaying = true" not in _function_body(src, fn), fn
+    assert "_orderQuietSince = 0" in _function_body(src, "stopWithFade"), (
+        "a stop leaves the quiet stamp behind for the next order")

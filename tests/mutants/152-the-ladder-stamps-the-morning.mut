@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The ladder dates its first knock by now instead of the last moment heard.
+
+history:
+  The 2026.40 hole itself: a death noticed at eight stamped eight, and the
+  replay thirty seconds later found the order fresh.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (root._healRetryAttempts === 0) root._orderQuietSince = RetryLogic.orderSince(0, root._orderHeardAt, Date.now());
+
+replace:
+          if (root._healRetryAttempts === 0) root._orderQuietSince = Date.now();
+
+expect:
+  Killed by tests/test_invariants.py::test_a_standing_order_cannot_outlive_a_night_asleep.
+  Line-neutral.

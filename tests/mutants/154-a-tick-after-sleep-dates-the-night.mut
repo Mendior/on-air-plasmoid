@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A heartbeat tick that came hours late still counts as on time.
+
+history:
+  The timer stands still with the machine; its first tick after a wake is
+  the one tick that must not count.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+      return prevAt > 0 && nowAt - prevAt <= 2 * intervalMs;
+
+replace:
+      return prevAt > 0;
+
+expect:
+  Killed by tests/qml/tst_retrylogic.qml::test_a_tick_after_the_machine_slept_is_late.
+  Line-neutral.

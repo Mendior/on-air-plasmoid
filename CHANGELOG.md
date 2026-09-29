@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026.41
+
+- **A radio left on overnight stays off, this time on every road.** 2026.40
+  said a night asleep would not bring the station back, but only one of the
+  ways back checked. If the stream was found dead only after the machine woke,
+  the station lookup, the bitrate fallback or the FLAC and Ogg relay could
+  still start it again. Each of them now asks how long ago the station was last
+  heard. The widget also notices by itself that it has been asleep, and after
+  more than about twelve minutes it ends the play order within seconds of
+  waking.
+
+- **The About page credits Yuri Saurov for what he wrote.** On Air grew out of
+  his Advanced Radio Player, and the About page listed him as a second author
+  of this edition. It now says "original: Advanced Radio Player", and the
+  licence reads LGPL-2.0-or-later.
+
 ## 2026.40
 
 - **A stop you can reach.** On a station the widget is able to pause, the big

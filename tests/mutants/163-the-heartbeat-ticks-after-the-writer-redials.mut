@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heartbeat ticks once a minute again.
+
+history:
+  Its first tick after a wake then lands after the relay writer's curl has
+  redialled (32 s into a silent socket) and last night's station plays first.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          interval: 10000
+          repeat: true
+          running: root._wantsPlaying && isPlaying()
+
+replace:
+          interval: 60000
+          repeat: true
+          running: root._wantsPlaying && isPlaying()
+
+expect:
+  Killed by tests/test_invariants.py::test_the_deadline_counts_from_when_the_order_was_last_heard.
+  Line-neutral.

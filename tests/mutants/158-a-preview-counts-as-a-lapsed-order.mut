@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The door judges plays that are nobody's standing order.
+
+history:
+  A preview or a file played after a stop inherited last night's stamp and
+  its fallback was refused.
+
+target:
+  package/contents/ui/RetryLogic.js
+
+find:
+      if (wantsPlaying !== true) return false;
+
+replace:
+      if (false) return false;
+
+expect:
+  Killed by tests/qml/tst_retrylogic.qml::test_no_standing_order_is_never_lapsed.
+  Line-neutral.

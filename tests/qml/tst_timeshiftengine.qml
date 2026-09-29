@@ -66,6 +66,11 @@ Item {
                               keep: engine ? engine.sleeveKept(1200000) : false });
             }
             function tsPlayRelay(url) { played.push({ kind: "relay", url: url, pos: -1 }); }
+            // main.qml's door: true once a standing order has outlived its
+            // deadline (a night asleep) and is being taken down.
+            property bool lapsed: false
+            property int lapsedAsked: 0
+            function _orderLapsed() { lapsedAsked++; return lapsed; }
         }
     }
 
@@ -433,6 +438,48 @@ Item {
                 verify(r.mock.played[i].kind !== "live");
             verify(r.e.relay);
             verify(r.e.active);
+        }
+
+        // A night asleep: the order has lapsed and main.qml is taking it down.
+        // None of the engine's own roads may bring the station back meanwhile;
+        // until 2026-09-29 all three did, and only the ladder's replay asked.
+        function test_a_lapsed_order_does_not_rebuild_a_fallen_tap() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var n = r.mock.execLog.length;
+            r.mock.lapsed = true;
+            // Handled: the teardown owns it, the heal road must not take it up.
+            verify(r.e.relayPlaybackFell(1010000));
+            compare(r.mock.execLog.length, n);
+        }
+
+        function test_a_lapsed_order_does_not_rearm_a_capped_writer() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var n = r.mock.execLog.length;
+            r.mock.lapsed = true;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=0 bytes=99999999", 4600000);
+            compare(r.mock.execLog.length, n);
+            verify(!r.e.active);
+        }
+
+        function test_a_lapsed_order_does_not_go_live_when_the_tap_dies_at_birth() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var before = r.mock.played.length;
+            r.mock.lapsed = true;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1005000);
+            compare(r.mock.played.length, before);
+            verify(r.mock.lapsedAsked > 0);
+        }
+
+        function test_a_live_order_still_goes_live_when_the_tap_dies_at_birth() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var before = r.mock.played.length;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1005000);
+            compare(r.mock.played.length, before + 1);
+            compare(r.mock.played[before].kind, "live");
         }
 
         function test_a_fallen_tap_rearms_a_bounded_number_of_times() {

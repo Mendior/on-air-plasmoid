@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heal lookup starts without asking whether the order lapsed.
+
+history:
+  A death first noticed after a night went to the directory lookup, found
+  the station's address and played it: the road 2026.40 left open.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (_orderLapsed()) return;
+          if (root._previewUrl !== "") return;
+
+replace:
+          if (false) return;
+          if (root._previewUrl !== "") return;
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_road_to_sound_asks_whether_the_order_lapsed.
+  Line-neutral.

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The deferred teardown of a lapsed order runs even after the order was given again.
+
+history:
+  A wake-up alarm firing in the same turn as the first heartbeat tick after a
+  night raises the order; the teardown then silenced the alarm.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          Qt.callLater(function() { if (!root._wantsPlaying) stopWithFade(); });
+
+replace:
+          Qt.callLater(function() { if (true) stopWithFade(); });
+
+expect:
+  Killed by tests/test_invariants.py::test_the_order_lapsing_is_torn_down_like_a_stop.
+  Line-neutral.

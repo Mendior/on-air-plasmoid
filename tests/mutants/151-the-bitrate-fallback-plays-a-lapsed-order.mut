@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The bitrate fallback plays without asking whether the order lapsed.
+
+history:
+  The upgraded address errs on waking and 600 ms later the original one
+  plays, hours after anyone last heard it.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (!fallbackUrl || root._tsPaused || _orderLapsed()) { fallbackUrl = ""; return; }
+
+replace:
+              if (!fallbackUrl || root._tsPaused) { fallbackUrl = ""; return; }
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_road_to_sound_asks_whether_the_order_lapsed.
+  Line-neutral.

@@ -234,6 +234,8 @@ Item {
         // here brought the room back up over the listener's pause — the same
         // terminus as the window-cap re-arm, by a second entrance.
         if (app._tsPaused) return false;
+        // Nor does a night: the order has lapsed and is being taken down.
+        if (app._orderLapsed()) return true;
         if (_relayRestarts >= 3) {
             disarm();
             return false;
@@ -521,7 +523,7 @@ Item {
                     // Live sound only for a room that was audibly playing:
                     // a parked or shifted listener chose silence, and a
                     // writer's death is no licence to override them.
-                    if (backTo !== "" && !wasShifted && app.isPlaying())
+                    if (backTo !== "" && !wasShifted && app.isPlaying() && !app._orderLapsed())
                         app.tsPlayLive(backTo);
                     return true;
                 }
@@ -538,7 +540,7 @@ Item {
                 // lives on the app side, so that is where the question goes.
                 if (relay && !shifted && !app._tsPaused
                     && bufStartMs > 0 && nowMs - bufStartMs >= 60000
-                    && _relayRestarts < 3) {
+                    && _relayRestarts < 3 && !app._orderLapsed()) {
                     _relayRestarts++;
                     relayRestartDecay.restart();
                     armRelay(streamUrl, stationName, nowMs);

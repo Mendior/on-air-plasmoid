@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A person's Live from a relayed park raises the order although nothing plays.
+
+history:
+  The relay's UP refuses to play over a park, so the order stood with no
+  sound and the network's return put the station on by itself.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (timeshift.shifted && !root._tsPaused && root._previewUrl === "") _orderGiven();
+
+replace:
+          if (timeshift.shifted || !root._tsPaused || root._previewUrl === "") _orderGiven();
+
+expect:
+  Killed by tests/test_invariants.py::test_a_person_giving_the_order_dates_it_afresh.
+  Line-neutral.

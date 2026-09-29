@@ -20,10 +20,10 @@ target:
   package/contents/ui/main.qml
 
 find:
-              if (root._tsPaused) return;
+              if (root._tsPaused || _orderLapsed()) return;
 
 replace:
-              if (false) return;
+              if (false || _orderLapsed()) return;
 
 expect:
   Killed by tests/test_invariants.py::test_every_automatic_recovery_road_asks_the_intent_not_the_state.

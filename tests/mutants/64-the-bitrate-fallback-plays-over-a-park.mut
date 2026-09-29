@@ -14,10 +14,10 @@ target:
   package/contents/ui/main.qml
 
 find:
-              if (!fallbackUrl || root._tsPaused) { fallbackUrl = ""; return; }
+              if (!fallbackUrl || root._tsPaused || _orderLapsed()) { fallbackUrl = ""; return; }
 
 replace:
-              if (!fallbackUrl || false) { fallbackUrl = ""; return; }
+              if (!fallbackUrl || false || _orderLapsed()) { fallbackUrl = ""; return; }
 
 expect:
   Killed by tests/test_invariants.py::test_the_bitrate_fallback_does_not_play_over_a_park.

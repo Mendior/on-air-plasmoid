@@ -165,4 +165,80 @@ TestCase {
         compare(RL.orderSince(undefined, undefined, 4242), 4242);
         compare(RL.orderSince(-5, -5, 4242), 4242);
     }
+
+    // orderLapsed: every automatic road that can put sound back asks it.
+    readonly property double hour: 3600000
+
+    function test_a_night_asleep_lapses_the_order() {
+        verify(RL.orderLapsed(true, 0, 1000, 1000 + 9 * hour, false, 3));
+    }
+
+    function test_the_ladder_armed_after_waking_still_lapses() {
+        // The ladder stamps its first knock from the last moment it was heard,
+        // so arming it in the morning cannot make last night look fresh.
+        var heard = 1000, wake = 1000 + 9 * hour;
+        var stamp = RL.orderSince(0, heard, wake);
+        verify(RL.orderLapsed(true, stamp, heard, wake + 30000, false, 3));
+    }
+
+    function test_a_short_nap_does_not_lapse_it() {
+        verify(!RL.orderLapsed(true, 0, 1000, 1000 + 5 * 60000, false, 3));
+    }
+
+    function test_the_deadline_boundary_is_the_same_as_orderExpired() {
+        var edge = RL.budgetMs(3) * 2 + 300000;
+        verify(!RL.orderLapsed(true, 0, 1000, 1000 + edge, false, 3));
+        verify(RL.orderLapsed(true, 0, 1000, 1000 + edge + 1, false, 3));
+    }
+
+    function test_no_standing_order_is_never_lapsed() {
+        // A preview or a file played after a stop is nobody's order, even with
+        // a stamp left over from last night.
+        verify(!RL.orderLapsed(false, 0, 1000, 1000 + 9 * hour, false, 3));
+        verify(!RL.orderLapsed(undefined, 5, 1000, 1000 + 9 * hour, false, 3));
+    }
+
+    function test_an_alarm_is_never_lapsed() {
+        verify(!RL.orderLapsed(true, 0, 1000, 1000 + 9 * hour, true, 3));
+    }
+
+    function test_knocking_off_keeps_the_old_semantics() {
+        verify(!RL.orderLapsed(true, 0, 1000, 1000 + 9 * hour, false, 0));
+    }
+
+    function test_a_person_pressing_play_after_waking_is_fresh() {
+        // Their press dates the order as heard that moment, whatever last
+        // night left behind.
+        var wake = 1000 + 9 * hour;
+        verify(!RL.orderLapsed(true, 0, wake, wake + 30000, false, 3));
+    }
+
+    function test_garbage_stamps_lapse_nothing() {
+        verify(!RL.orderLapsed(true, NaN, undefined, 1000, false, 3));
+        verify(!RL.orderLapsed(true, -1, -1, 1000, false, 3));
+    }
+
+    // beatOnTime: did the heartbeat tick come on time, or after a sleep?
+    function test_an_on_time_tick_is_on_time() {
+        verify(RL.beatOnTime(1000, 61000, 60000));
+    }
+
+    function test_a_tick_after_the_machine_slept_is_late() {
+        verify(!RL.beatOnTime(1000, 1000 + 9 * hour, 60000));
+    }
+
+    function test_the_first_tick_has_nothing_to_compare() {
+        verify(!RL.beatOnTime(0, 61000, 60000));
+    }
+
+    function test_the_beat_boundary_is_two_intervals() {
+        verify(RL.beatOnTime(1000, 1000 + 120000, 60000));
+        verify(!RL.beatOnTime(1000, 1000 + 120001, 60000));
+    }
+
+    function test_garbage_beats_are_never_on_time() {
+        verify(!RL.beatOnTime(undefined, 61000, 60000));
+        verify(!RL.beatOnTime(1000, NaN, 60000));
+        verify(!RL.beatOnTime(-5, 61000, 60000));
+    }
 }

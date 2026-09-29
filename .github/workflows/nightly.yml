@@ -4,7 +4,7 @@
 
 # The mutation suite, run by the clock instead of by memory. Each mutant is a
 # bug this project has already shipped once, reduced to a single text swap; the
-# gate must go red for the ones we expect to catch. All but one of the 131
+# gate must go red for the ones we expect to catch. All but one of the 151
 # do today and 02 survives by design (tests/mutants_baseline.json says why). This
 # job is green while that holds and red the night a guard quietly loses its
 # teeth — the exact regression no push-time check would ever run long enough
@@ -32,7 +32,7 @@
 # at 88, 50 runs = ~185 at 98, capped at 240. On 2026-09-23 it reached 127
 # (six fixes landing together): two halves would be 65 runs = ~240, the cap
 # itself, so it runs as three thirds, 44 runs = ~163 a third, and 45 runs =
-# ~166 at 131 (2026-09-24). The next time
+# ~166 at 131 (2026-09-24), and 52 runs = ~192 at 151 (2026-09-29). The next time
 # this has to change is around 180 mutants, by raising the shard count again:
 # ls tests/mutants/*.mut | wc -l, over the number of shards, plus one, times ~3.7.
 name: nightly

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The first heartbeat tick after a wake dates the order instead of asking the door.
+
+history:
+  A dead stream still shows Playing after a wake (measured 2026-09-29), so a
+  late tick that wrote now counted last night's station as heard this morning.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              else if (!root._casting) _orderLapsed();
+
+replace:
+              else if (!root._casting) root._orderHeardAt = now;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_deadline_counts_from_when_the_order_was_last_heard.
+  Line-neutral.

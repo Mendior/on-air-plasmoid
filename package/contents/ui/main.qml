@@ -673,6 +673,7 @@ PlasmoidItem {
             // here would pin the interval at 30 s forever and re-fire the
             // give-up toast on every round.
             if (userInitiated !== false) root._healRetryAttempts = 0;
+            if (userInitiated !== false) _orderDated();
             root.currentStationFavicon = station.favicon || "";
             // Thread the automated-recovery flag: a network-return or heal
             // retry replaying a ringing alarm's station must not clear the
@@ -2110,13 +2111,26 @@ PlasmoidItem {
     // with the machine, so the last moment it wrote is the last moment this
     // widget was awake with audio running — which is exactly what the
     // deadline needs to subtract from. A minute apart is fine: the budget
-    // it feeds is twelve.
+    // it feeds is twelve. A tick that comes late IS the wake: it writes
+    // nothing and asks the door at once, before a dead stream still showing
+    // Playing can be counted as heard (2026-09-29). Ten seconds apart so that
+    // tick lands before the relay writer's curl dials again on its own, 32 s
+    // into a silent socket (--speed-time 30, --retry-delay 2).
     Timer {
         id: orderHeartbeat
-        interval: 60000
+        interval: 10000
         repeat: true
         running: root._wantsPlaying && isPlaying()
-        onTriggered: root._orderHeardAt = Date.now()
+        property double beatAt: 0
+        onRunningChanged: beatAt = Date.now()
+        onTriggered: {
+            var now = Date.now(), onTime = RetryLogic.beatOnTime(beatAt, now, interval);
+            beatAt = now;
+            if (onTime) root._orderHeardAt = now;
+            // A cast's receivers pull the stream themselves and may have
+            // played through the whole sleep; they are not this tick's to end.
+            else if (!root._casting) _orderLapsed();
+        }
     }
 
     Timer {
@@ -2781,7 +2795,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.40");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.41");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -3316,7 +3330,7 @@ PlasmoidItem {
         // so the recovery roads would not restart a silenced stream, but a
         // listener who returned to the broadcast wants the heal ladder and
         // the network-back resume watching over them again.
-        root._wantsPlaying = true;
+        _orderGiven();
         startWithFade({ "name": root.currentStation, "hostname": streamUrl,
                         "favicon": root.currentStationFavicon, "active": true });
     }
@@ -3403,7 +3417,7 @@ PlasmoidItem {
             if (root.currentStation !== "" && timeshift.streamUrl !== "") {
                 tsPlayLive(timeshift.streamUrl);
             } else if (root.currentStation !== "" && root._currentResolvedUrl !== "") {
-                root._wantsPlaying = true;
+                _orderGiven();
                 startWithFade({ "name": root.currentStation,
                                 "hostname": root._currentResolvedUrl,
                                 "favicon": root.currentStationFavicon,
@@ -3419,6 +3433,12 @@ PlasmoidItem {
     }
 
     function timeshiftBackToLive() {
+        // A person's Live gives the order back. Only tsPlayLive did, and the
+        // relay road never reaches it: a relayed station played on after a
+        // park with no order, so no door guarded it through the night. Not
+        // from a park itself: the relay's UP refuses to play over one, and an
+        // order raised with no sound was replayed by the network's return.
+        if (timeshift.shifted && !root._tsPaused && root._previewUrl === "") _orderGiven();
         timeshift.backToLive(Date.now());
     }
 
@@ -3856,6 +3876,9 @@ PlasmoidItem {
 
     // Restart the current station through the normal local pipeline.
     function _castResumeLocally() {
+        // Coming home from a cast is a person's step, and the order sat still
+        // the whole cast long: dated here, or its first local hiccup ends it.
+        _orderDated();
         // Back as the episode, where the listener left it: its NAME lives in currentStation (root.title is the widget's own here, so it came home called "On Air"), and its show is the feed still standing — "" cost it the show's speed and its up-next chain.
         if (root._podPlayingKey !== "" && root._podPlayingUrl !== "") {
             playPodcastEpisode(root._podPlayingRawUrl || root._podPlayingUrl, root.currentStation,
@@ -4104,6 +4127,7 @@ PlasmoidItem {
 
     function _tryHealStation() {
         if (!_recoveryWanted() || isPlaying()) return;
+        if (_orderLapsed()) return;
         if (root._previewUrl !== "") return;
         var st = _orderSubject();
         if (st === null) return;
@@ -4265,6 +4289,7 @@ PlasmoidItem {
         console.log("[ARP] heal: auditioning " + _hostOf(next.url) + " for dead " + _hostOf(run.orig));
         _unwrapPlaylist(next.url, function(playUrl) {
             if (run.seq !== _healSeq) return;
+            if (_orderLapsed()) return;
             root._healOrigUrl = run.orig;
             root._healPendingUrl = playUrl;
             root._healByUuid = next.byUuid === true;
@@ -4317,6 +4342,43 @@ PlasmoidItem {
         healRetryTimer.stop();
     }
 
+    // Every automatic road that can put a standing order back on asks here
+    // first: the heal lookup and its audition, the bitrate fallback, the stall
+    // retry, the relay's re-arms, an automated replay's resolve. Only
+    // _replayOrder asked until 2026-09-29, so a death first noticed in the
+    // morning walked one of the others and last night's station played anyway.
+    // A preview or a shifted listen is nobody's order and is not asked about.
+    // A lapsed order goes down the way a person's stop takes it, a moment
+    // later, because two of the askers sit inside the timeshift engine's own
+    // handlers.
+    function _orderLapsed() {
+        if (!RetryLogic.orderLapsed(root._wantsPlaying, root._orderQuietSince, root._orderHeardAt, Date.now(),
+                                    root._alarmStandingOrder === true, Plasmoid.configuration.autoRetryKnocks))
+            return false;
+        var since = RetryLogic.orderSince(root._orderQuietSince, root._orderHeardAt, Date.now());
+        console.log("[ARP] the order went " + Math.round((Date.now() - since) / 60000) + " min unheard, taking it down");
+        root._wantsPlaying = false;
+        // Unless something gave the order again in between: an alarm firing
+        // in the same turn raises it, and a wake-up must not be torn down.
+        Qt.callLater(function() { if (!root._wantsPlaying) stopWithFade(); });
+        return true;
+    }
+
+    // A person gave the order, or gave it again: it is heard as of now. A stamp
+    // from before is not its age, and no stamp at all left it ageless until
+    // audio came: a press at eleven, the lid shut before the connect, and the
+    // heal at eight found nothing to measure (2026-09-29).
+    function _orderDated() { root._orderQuietSince = 0; root._orderHeardAt = Date.now(); }
+
+    // Back to live, or a resume that fell through to the stream: the order
+    // comes back up. The engine's fallback after a dead tap finds it standing
+    // and changes nothing; a shifted listen reaching the live edge raises it
+    // afresh, as 2026.40 did, since that listen was playing up to that moment.
+    function _orderGiven() {
+        if (!root._wantsPlaying) _orderDated();
+        root._wantsPlaying = true;
+    }
+
     // One question, asked from three places: may this standing order knock
     // again? Together, because the three used to be able to disagree — the
     // switch added in 2026.37 was read at the ladder and not at the
@@ -4339,7 +4401,7 @@ PlasmoidItem {
         // An alarm never lands here: _mayKnock hands a wake-up through ahead
         // of both refusals.
         if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
-        if (root._healRetryAttempts === 0) root._orderQuietSince = Date.now();
+        if (root._healRetryAttempts === 0) root._orderQuietSince = RetryLogic.orderSince(0, root._orderHeardAt, Date.now());
         healRetryTimer.interval = RetryLogic.nextRetryMs(root._healRetryAttempts);
         root._healRetryAttempts++;
         healRetryTimer.restart();
@@ -4692,6 +4754,7 @@ PlasmoidItem {
                 // Bail out if the user clicked another station while we were
                 // waiting for the radio-browser response.
                 if (mySeq !== _resolveCallSeq) return;
+                if (automated === true && _orderLapsed()) return;
                 // A different station must not wear its predecessor's title
                 // until its first ICY line: the stopped edge used to clear it,
                 // but a park or a shifted reader keeps that edge quiet on purpose.
@@ -4762,6 +4825,7 @@ PlasmoidItem {
         root._orphanOrder = null;
         root._healRetryAttempts = 0;
         root._orderHeardAt = 0;
+        root._orderQuietSince = 0;
         healRetryTimer.stop();
         netResumeTimer.stop();
         // A stop inside the wake-tone window is the person saying "I'm up" —
@@ -7110,7 +7174,7 @@ PlasmoidItem {
             // A parked station is not stalling, it is waiting for the listener
             // — and a relay tap dying under a park looks exactly like a stall
             // from in here, so this fired and played the room awake.
-            if (root._tsPaused) return;
+            if (root._tsPaused || _orderLapsed()) return;
             // A stalled PODCAST stream is not a dying station: remember the
             // needle, restart the same episode AT the bookmark, and never
             // walk the station-heal road on its behalf. Source-exact, like
@@ -7265,7 +7329,7 @@ PlasmoidItem {
         onTriggered: {
             // A park leaves the source in place, so an error delivered after
             // it arms this again. Parked means quiet.
-            if (!fallbackUrl || root._tsPaused) { fallbackUrl = ""; return; }
+            if (!fallbackUrl || root._tsPaused || _orderLapsed()) { fallbackUrl = ""; return; }
             // The instant recording was capturing the upgrade URL that just
             // failed — stop it (its stream is dead); the fallback plays on.
             if (recording && !_recScheduled) recStop();

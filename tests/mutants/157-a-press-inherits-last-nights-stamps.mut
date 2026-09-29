@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A person's press keeps the stamps of the order it replaces.
+
+history:
+  A click after waking, with last night's order still standing, was judged
+  lapsed at its first hiccup.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (userInitiated !== false) _orderDated();
+
+replace:
+              if (false) _orderDated();
+
+expect:
+  Killed by tests/test_invariants.py::test_a_person_giving_the_order_dates_it_afresh.
+  Line-neutral.

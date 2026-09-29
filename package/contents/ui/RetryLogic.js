@@ -103,3 +103,26 @@ function orderSince(quietSince, heardAt, nowMs) {
     if (heardAt > 0) return heardAt;
     return nowMs;
 }
+
+// Has the standing order outlived its deadline? orderExpired's question,
+// dated the way _replayOrder dates it, for every automatic road that can put
+// sound back without a person asking. Until 2026-09-29 only the ladder's
+// replay asked; the heal lookup, the bitrate fallback and the relay's re-arm
+// played straight on, so a death first noticed in the morning still brought
+// last night's station back. No order, no question: a preview or a file
+// played after a stop is nobody's standing order.
+function orderLapsed(wantsPlaying, quietSince, heardAt, nowMs, exempt, cap) {
+    if (wantsPlaying !== true) return false;
+    return orderExpired(orderSince(quietSince, heardAt, nowMs), nowMs, exempt, cap);
+}
+
+// Did this heartbeat tick come on time? A QML timer stands still while the
+// machine sleeps, so the first tick after a wake arrives far later than its
+// interval by the wall clock, and that tick is the one moment the widget knows
+// it slept. The player cannot tell: measured 2026-09-29, a stream that stops
+// sending stays Playing and Buffered with no error, and its position is no
+// witness either: on an Ogg FLAC station, straight or through the relay tap,
+// it sat at 278 ms the whole time the player reported Playing and Buffered.
+function beatOnTime(prevAt, nowAt, intervalMs) {
+    return prevAt > 0 && nowAt - prevAt <= 2 * intervalMs;
+}

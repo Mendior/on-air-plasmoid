@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Coming home from a cast leaves the order dated by when the cast began.
+
+history:
+  The heartbeat stands still during a cast, so after a long one the first
+  local hiccup found the order lapsed and stopped the radio.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          // the whole cast long: dated here, or its first local hiccup ends it.
+          _orderDated();
+
+replace:
+          // the whole cast long: dated here, or its first local hiccup ends it.
+          void 0;
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_road_to_sound_asks_whether_the_order_lapsed.
+  Line-neutral.

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The relay's quiet re-arm runs without asking whether the order lapsed.
+
+history:
+  A relayed station whose writer died overnight came back up on waking
+  through the engine's own re-arm, with nobody asking.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+                      && _relayRestarts < 3 && !app._orderLapsed()) {
+
+replace:
+                      && _relayRestarts < 3) {
+
+expect:
+  Killed by tests/qml/tst_timeshiftengine.qml::test_a_lapsed_order_does_not_rearm_a_capped_writer.
+  Line-neutral.

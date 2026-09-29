@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A lapsed order is refused but not taken down.
+
+history:
+  Refused and left standing, the order is replayed at the next flicker of
+  the network, which is issue #13 arriving by another door.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          Qt.callLater(function() { if (!root._wantsPlaying) stopWithFade(); });
+
+replace:
+          Qt.callLater(function() { if (!root._wantsPlaying) void 0; });
+
+expect:
+  Killed by tests/test_invariants.py::test_the_order_lapsing_is_torn_down_like_a_stop.
+  Line-neutral.

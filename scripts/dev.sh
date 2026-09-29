@@ -71,16 +71,21 @@ case "${1:-}" in
     require_install_dir
     rsync "${RSYNC_OPTS[@]}" "$PKG/contents/" "$INSTALL_DIR/contents/"
     # The install keeps its own metadata.json (old plugin id — replacing it
-    # would orphan the user's stations/favorites), but the VERSION field must
-    # follow the repo or the About page keeps showing a long-gone release.
+    # would orphan the user's stations/favorites), but what the About page
+    # shows must follow the repo. Syncing only the version left the work
+    # machine listing Yuri as a plain co-author under "LGPL-2.0+" while home,
+    # hand-edited, credited him as the original author (seen 2026-09-29).
     python3 - "$PKG/metadata.json" "$INSTALL_DIR/metadata.json" <<'PYEOF'
 import json, sys
 repo = json.load(open(sys.argv[1]))
 inst = json.load(open(sys.argv[2]))
-if inst["KPlugin"]["Version"] != repo["KPlugin"]["Version"]:
-    inst["KPlugin"]["Version"] = repo["KPlugin"]["Version"]
+moved = [k for k in ("Version", "Authors", "License")
+         if inst["KPlugin"].get(k) != repo["KPlugin"][k]]
+for k in moved:
+    inst["KPlugin"][k] = repo["KPlugin"][k]
+if moved:
     json.dump(inst, open(sys.argv[2], "w"), indent=4)
-    print("  install version -> " + repo["KPlugin"]["Version"] + " (id untouched)")
+    print("  install " + ", ".join(moved) + " -> repo (id untouched)")
 PYEOF
     echo "OK: package/contents -> $INSTALL_DIR/contents (metadata id and locale untouched)"
     echo "To reload the QML: scripts/dev.sh restart"
