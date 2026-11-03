@@ -135,4 +135,16 @@ TestCase {
         verify(HG.answerFromPublicHost({}))
         verify(HG.answerFromPublicHost(null))
     }
+
+    function test_a_request_nobody_clicked_needs_its_end_named() {
+        // The popup's logo hunt asks a homepage from the directory with no
+        // click at all: an answer whose last hop Qt does not name is refused.
+        verify(HG.answerKnownPublic({ responseURL: "https://cdn.example.com/x.png" }))
+        verify(!HG.answerKnownPublic({ responseURL: "http://192.168.1.1/x.png" }))
+        verify(!HG.answerKnownPublic({ responseURL: "http://[::1]/" }))
+        verify(!HG.answerKnownPublic({ responseURL: "" }))
+        verify(!HG.answerKnownPublic({}))
+        verify(!HG.answerKnownPublic(null))
+        verify(!HG.answerKnownPublic({ responseURL: "not an address" }))
+    }
 }

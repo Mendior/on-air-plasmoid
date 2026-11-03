@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The bitrate upgrade finds a saved station's own record only by the
+  address the directory's checker resolved, not by the one the station
+  handed in.
+
+history:
+  A heal saves the station's own address (url) when the checker's address
+  is a rotating edge of the same station. Matched on the edge alone, such
+  a row had no bitrate floor and was never upgraded.
+
+target:
+  package/contents/ui/StreamLogic.js
+
+find:
+          if (fold(r.url_resolved) !== origUrlNoProto && fold(r.url) !== origUrlNoProto) continue;
+
+replace:
+          if (fold(r.url_resolved || r.url) !== origUrlNoProto) continue;
+
+expect:
+  Killed by tst_streamlogic::test_a_station_saved_at_its_own_address_still_finds_its_floor.
+  Line-neutral.

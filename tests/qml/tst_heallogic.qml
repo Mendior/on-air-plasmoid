@@ -440,6 +440,61 @@ TestCase {
                                       lastcheckok: "1" }]), dead, false, _gate).length, 0)
     }
 
+    function test_the_router_goes_before_the_edge_it_hands_out() {
+        // router.euddn.net kept one token for every station from January to
+        // November 2026 while the edges it hands out rotated and le0x's
+        // certificate expired (measured 2026-11-02). The station's own door
+        // of the same family leads; anything else keeps the old order.
+        var edge = "https://le302.euddn.net/0e97/elmar.aac"
+        var router = "https://router.euddn.net/8103/elmar.aac"
+        compare(HL.frontDoor({ url: router, url_resolved: edge }), [router, edge])
+        // A playlist or HLS list stays behind: the alarm and the recorder
+        // play an address as it is, so a saved one has to be a stream.
+        compare(HL.frontDoor({ url: "https://somafm.com/groovesalad.pls",
+                               url_resolved: "https://ice2.somafm.com/groovesalad-128-mp3" }),
+                ["https://ice2.somafm.com/groovesalad-128-mp3", "https://somafm.com/groovesalad.pls"])
+        compare(HL.frontDoor({ url: "https://somafm.com/hls/gs/program.m3u8",
+                               url_resolved: "https://ice2.somafm.com/gs-128-mp3" })[0],
+                "https://ice2.somafm.com/gs-128-mp3")
+        compare(HL.frontDoor({ url: "https://www.station.example/live", url_resolved: "https://cdn.example.net/s1" }),
+                ["https://cdn.example.net/s1", "https://www.station.example/live"], "another family")
+        compare(HL.frontDoor({ url: router, url_resolved: router }), [router])
+        compare(HL.frontDoor({ url: "", url_resolved: edge }), [edge])
+        compare(HL.frontDoor({ url: router }), [router])
+        compare(HL.frontDoor({ url: "file:///etc/passwd", url_resolved: "data:x" }), [])
+        compare(HL.frontDoor(null), [])
+    }
+
+    function test_the_identity_rung_auditions_the_router_first() {
+        var row = { url: "https://router.euddn.net/8103/elmar.aac",
+                    url_resolved: "https://le302.euddn.net/0e97/elmar.aac", lastcheckok: "1" }
+        var o = HL.uuidRung(_reply([row]), dead, false, _gate)
+        compare(o.length, 2)
+        compare(o[0].url, row.url)
+        compare(o[1].url, row.url_resolved)
+        o = HL.uuidRung(_reply([row]), dead, true, _gate)
+        compare(o.length, 1)
+        compare(o[0].url, row.url, "the wake-up's single door is the router too")
+        // A row that already saved the router and lost it still has the edge.
+        o = HL.uuidRung(_reply([row]), row.url, true, _gate)
+        compare(o.length, 1)
+        compare(o[0].url, row.url_resolved)
+    }
+
+    function test_the_name_rung_hands_out_the_router_too() {
+        var res = HL.ladder([{ name: "Raadio Elmar", lastcheckok: 1, url: "https://router.euddn.net/8103/elmar.aac",
+                               url_resolved: "https://le302.euddn.net/0e97/elmar.aac", countrycode: "EE" }],
+                            "https://le06.euddn.net/06c6/elmar.aac", "Raadio Elmar", "EE", false)
+        compare(res.cands.length, 1)
+        compare(res.cands[0].url, "https://router.euddn.net/8103/elmar.aac")
+        // The saved address is the router itself: the edge is offered instead.
+        res = HL.ladder([{ name: "Raadio Elmar", lastcheckok: 1, url: "https://router.euddn.net/8103/elmar.aac",
+                           url_resolved: "https://le302.euddn.net/0e97/elmar.aac", countrycode: "EE" }],
+                        "https://router.euddn.net/8103/elmar.aac", "Raadio Elmar", "EE", false)
+        compare(res.cands.length, 1)
+        compare(res.cands[0].url, "https://le302.euddn.net/0e97/elmar.aac")
+    }
+
     function test_the_uuid_records_country_comes_back_or_is_empty() {
         compare(HL.uuidCountry(_reply([{ countrycode: "EE" }])), "EE")
         compare(HL.uuidCountry(_reply([{}])), "")

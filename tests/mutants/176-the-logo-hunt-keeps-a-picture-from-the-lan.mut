@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The logo hunt keeps a picture whose answer Qt's own redirects brought from
+  a private host.
+
+history:
+  The address is judged before the request, but Qt follows redirects inside
+  the network layer: a station page answering "302 to
+  http://192.168.1.1/x.png" would hand an internal host's bytes to the
+  picture check, and the result would be saved as the station's logo. The
+  popup's backfill runs this with no click.
+
+target:
+  package/contents/ui/LogoHunt.qml
+
+find:
+                  && hunt._fromPublicHost(xhr, strict)) {
+
+replace:
+                  && xhr.responseType === "arraybuffer") {
+
+expect:
+  Killed by tests/test_invariants.py::test_the_popup_reads_a_homepage_only_through_the_guarded_hunt,
+  which the gate reaches first (unit tests run before the QML tests).
+  tests/qml/tst_logohunt.qml::test_a_picture_redirected_into_the_lan_is_not_kept
+  goes red on it as well. Line-neutral.

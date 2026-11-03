@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The settings pages find a row of their list in the popup's by its address,
+  not by its name and uuid.
+
+history:
+  The popup moves rows and never renames them. Keyed on the address, an
+  older heal's prev took another row's place, a heal onto an address another
+  saved row held dropped a station, and of two rows on one address the wrong
+  one took the change (measured on the page, 2026-11-02 and 2026-11-03).
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+      return String(r.name === undefined ? "" : r.name) + "\u0001" + String(r.uuid === undefined ? "" : r.uuid)
+
+replace:
+      return ""
+
+expect:
+  Killed by tst_reorderlogic::test_merge_follows_a_heal_onto_an_address_another_row_holds.
+  Line-neutral.

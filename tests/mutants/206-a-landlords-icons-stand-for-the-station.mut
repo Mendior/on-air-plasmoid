@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The logo hunt takes a landlord's page like the station's own, so the
+  landlord's icons become the station's logo.
+
+history:
+  laut.fm/mangoradio names laut.fm's own 180 px apple-touch-icon and has
+  the station's picture as og:image (measured 2026-11-03). Saved with no
+  click, the landlord's icon would have stood for good, since the hunt only
+  fills an empty logo.
+
+target:
+  package/contents/ui/FaviconLogic.js
+
+find:
+      if (landlordPage(home))
+
+replace:
+      if (false)
+
+expect:
+  Killed by tst_faviconlogic::test_a_landlords_page_offers_only_its_og_image.
+  Line-neutral.

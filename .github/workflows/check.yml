@@ -93,7 +93,7 @@ jobs:
       - name: Install Plasma toolchain
         run: >
           pacman -Syu --noconfirm --needed
-          git which gettext python python-pytest ttf-dejavu dbus
+          git which gettext python python-pytest python-requests openssl ttf-dejavu dbus
           qt6-declarative qt6-multimedia-ffmpeg
           plasma-sdk plasma-workspace plasma-desktop plasma5support knotifications
           breeze-icons

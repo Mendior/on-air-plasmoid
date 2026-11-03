@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The homepage reader looks into a tag of any length.
+
+history:
+  A homepage comes from a record anyone can file and the popup reads it with
+  no click. The old patterns ran over a head of "<meta/name='og:image'" with
+  no ">" for 139 s on Qt 6.12 and the shell froze with them; the reader now
+  takes one tag at a time, never past the next "<" and never longer than
+  MAX_TAG.
+
+target:
+  package/contents/ui/FaviconLogic.js
+
+find:
+      const tagRe = new RegExp("<(link|meta)\\b([^<>]{0," + MAX_TAG + "})>", "gi");
+
+replace:
+      const tagRe = new RegExp("<(link|meta)\\b([^<>]*)>", "gi");
+
+expect:
+  Killed by tst_faviconlogic::test_a_tag_past_the_cap_is_passed_over_and_the_next_one_read.
+  Line-neutral.

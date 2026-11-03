@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  "radio", "raadio" or "fm" anywhere in a word makes the segment a station's name.
+
+history:
+  The word has to end in one, as Kaaosradio and 181.fm do. Anywhere in it,
+  and a station saved as "Radiohead" or "Wolfmother" would cut the band off
+  its own song.
+
+target:
+  package/contents/ui/TrackLogic.js
+
+find:
+          return /(?:radio|raadio|fm)$/.test(w) || w === "24h" || w === "247";
+
+replace:
+          return /(?:radio|raadio|fm)/.test(w) || w === "24h" || w === "247";
+
+expect:
+  Killed by tests/qml/tst_tracklogic.qml::test_a_station_word_has_to_end_its_word.
+  Line-neutral.

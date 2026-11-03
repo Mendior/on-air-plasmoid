@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The Edit dialog's OK writes every field as the dialog showed it, whatever
+  the popup wrote to the row meanwhile.
+
+history:
+  Measured on the page on 2026-11-02: a rename put a healed station back on
+  its dead address and lost the logo the popup had found while the dialog
+  was open. Only the fields changed in the dialog are written now.
+
+target:
+  package/contents/ui/DoorLogic.js
+
+find:
+          if (shown[k] !== opened[k]) out[k] = clean[k];
+
+replace:
+          out[k] = clean[k];
+
+expect:
+  Killed by tst_doorlogic::test_a_rename_after_a_heal_keeps_what_the_popup_wrote.
+  Line-neutral.

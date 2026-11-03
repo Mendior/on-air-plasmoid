@@ -1,4 +1,5 @@
 import ".." as ARP
+import "../DoorLogic.js" as DoorLogic
 import "../FaviconLogic.js" as FaviconLogic
 import "../HealLogic.js" as HealLogic
 import "../HostGuard.js" as HostGuard
@@ -55,6 +56,8 @@ KCM.ScrollViewKCM {
     }
 
     property int dialogMode: -1
+    // The Edit dialog's fields as it filled them, for DoorLogic.editedRow.
+    property var _editOpened: ({})
 
     // "all" is the directory's own DNS round-robin over LIVE servers — every
     // fetch starts there deterministically; the named mirrors are only the
@@ -146,6 +149,8 @@ KCM.ScrollViewKCM {
         serverHostname.text = item.hostname;
         serverFavicon.text = item.favicon ? item.favicon : "";
         serverActive.checked = item.active;
+        _editOpened = { "name": serverName.text, "hostname": serverHostname.text,
+                        "favicon": serverFavicon.text, "active": serverActive.checked };
         serverDialog.visible = true;
     }
 
@@ -177,6 +182,12 @@ KCM.ScrollViewKCM {
         Timer { repeat: false }
     }
 
+    // The network half of the logo hunt, shared with the popup's backfill.
+    ARP.LogoHunt {
+        id: logoHunt
+        app: root
+    }
+
     function _armXhrTimeout(xhr, ms) {
         const t = xhrTimeoutGuard.createObject(root, { "interval": ms });
         t.triggered.connect(() => {
@@ -190,15 +201,6 @@ KCM.ScrollViewKCM {
     function _clearXhrTimeout(t) {
         if (!t) return;
         try { t.stop(); t.destroy() } catch(e) {}
-    }
-
-    // A logo source that is small by construction: bare /favicon.ico, an
-    // explicit 16/32-pixel variant, or the Google s2 service (64 px). Worth
-    // one upgrade attempt when the user asks for logos — a 16 px icon
-    // upscaled into the popup's cover panel reads as "broken logo".
-    function _tinyLogoUrl(u) {
-        return /(?:^|\/)favicon\.ico(?:$|\?)|favicon-(?:16|32)x(?:16|32)|google\.com\/s2\/favicons/i
-               .test(String(u || ""));
     }
 
     // All five counters, because the summary at the end subtracts the upgrade
@@ -225,10 +227,10 @@ KCM.ScrollViewKCM {
             if (fav === "" || fav === "null") {
                 _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
                                   "uuid": (it.uuid || "").toString() });
-            } else if (_tinyLogoUrl(fav)) {
+            } else if (FaviconLogic.tinyLogoUrl(fav)) {
                 // Upgrade job: hunt for a bigger variant, but never replace
                 // the working tiny logo with another tiny one or with itself
-                // (_probeNextCandidate filters those), and keep it whole
+                // (_probeCandidates filters those), and keep it whole
                 // when nothing better answers (_saveLogo only writes wins).
                 // The uuid rides along so upgrades take the identity road.
                 _logoQueue.push({ "index": i, "name": it.name, "hostname": it.hostname,
@@ -289,7 +291,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.41");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -320,12 +322,7 @@ KCM.ScrollViewKCM {
             if (home !== "") {
                 _scrapeHomepageAndProbe(job, fav, home);
             } else {
-                var candidates = [fav];
-                for (var u of _hostnameStdCandidates(job.hostname))
-                    if (candidates.indexOf(u) === -1) candidates.push(u);
-                for (var u of _googleFaviconCandidates(job.hostname))
-                    if (candidates.indexOf(u) === -1) candidates.push(u);
-                _probeNextCandidate(job, candidates, 0);
+                _probeCandidates(job, _ladder(job, fav, [], ""));
             }
         };
         guard = _armXhrTimeout(xhr, 8000);
@@ -340,7 +337,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.41");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -387,26 +384,12 @@ KCM.ScrollViewKCM {
                 _queryRadioBrowser(job, cleanName, retryCount + 1);
                 return;
             }
-            // Now we have the best-effort favicon and homepage. Build candidate list:
-            //   1. API favicon (if any) - validated below to avoid storing dead URLs
-            //   2. Homepage HTML scrape (extracts <link rel="icon|apple-touch-icon">)
-            //   3. Standard well-known favicon paths on homepage origin
-            //   4. Standard paths on the station's own hostname origin (streaming URL)
-            //   5. Google s2/favicons fallback (last resort)
+            // The favicon and homepage found above go into _ladder, the
+            // homepage read first when there is one.
             if (pickedHomepage !== "") {
                 _scrapeHomepageAndProbe(job, pickedFavicon, pickedHomepage);
             } else {
-                // No homepage: build candidates from API favicon + hostname origin + Google fallback
-                var candidates = [];
-                if (pickedFavicon !== "")
-                    candidates.push(pickedFavicon);
-                for (var u of _hostnameStdCandidates(job.hostname))
-                    if (candidates.indexOf(u) === -1)
-                        candidates.push(u);
-                for (var u of _googleFaviconCandidates(job.hostname))
-                    if (candidates.indexOf(u) === -1)
-                        candidates.push(u);
-                _probeNextCandidate(job, candidates, 0);
+                _probeCandidates(job, _ladder(job, pickedFavicon, [], ""));
             }
         };
         guard = _armXhrTimeout(xhr, 8000);
@@ -416,9 +399,9 @@ KCM.ScrollViewKCM {
     function _saveLogo(job, faviconUrl) {
         if (faviconUrl === "" || job.index >= stationsModel.count)
             return false;
-        // Same self-hosted-station exception as _probeNextCandidate: a LAN
-        // favicon is refused unless it is the user's own station origin.
-        if (_privateHostUrl(faviconUrl) && _originOf(faviconUrl) !== _originOf(job.hostname))
+        // LogoHunt asks no private host, so nothing from one can arrive
+        // here; refused again all the same.
+        if (_privateHostUrl(faviconUrl))
             return false;
         const cur = stationsModel.get(job.index);
         if (cur && cur.name === job.name) {
@@ -430,182 +413,57 @@ KCM.ScrollViewKCM {
         return false;
     }
 
-    function _originOf(url) {
-        const m = String(url).match(/^(https?:\/\/[^\/]+)/i);
-        return m ? m[1] : "";
+    // The homepage's own icons and og:image join the ladder, read by the
+    // same LogoHunt the popup's backfill uses.
+    function _scrapeHomepageAndProbe(job, apiFavicon, homepage) {
+        logoHunt.readPage(homepage, function(images, from) {
+            _probeCandidates(job, _ladder(job, apiFavicon, images, from || homepage));
+        });
     }
 
-    function _resolveUrl(href, baseUrl) {
-        if (!href)
-            return "";
-        href = String(href).trim();
-        if (href === "" || href.charAt(0) === "#" || href.indexOf("data:") === 0
-            || href.indexOf("javascript:") === 0)
-            return "";
-        if (href.indexOf("//") === 0)
-            return "https:" + href;
-        if (/^https?:\/\//i.test(href))
-            return href;
-        const origin = _originOf(baseUrl);
-        if (origin === "")
-            return "";
-        if (href.charAt(0) === "/")
-            return origin + href;
-        // relative path - resolve against base URL directory
-        const baseNoQuery = baseUrl.split("?")[0].split("#")[0];
-        const lastSlash = baseNoQuery.lastIndexOf("/");
-        const baseDir = lastSlash > 8 ? baseNoQuery.substring(0, lastSlash + 1) : (origin + "/");
-        return baseDir + href;
-    }
-
-    function _extractIconLinks(html, baseUrl) {
-        const out = [];
-        if (!html)
-            return out;
-        // Find all <link ...> tags
-        const linkRe = /<link\b([^>]*?)\/?>/gi;
-        let m;
-        while ((m = linkRe.exec(html)) !== null) {
-            const attrs = m[1];
-            // rel attribute
-            const relMatch = attrs.match(/\brel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
-            if (!relMatch)
-                continue;
-            const rel = (relMatch[1] || relMatch[2] || relMatch[3] || "").toLowerCase();
-            const isIcon = rel.indexOf("icon") !== -1 || rel.indexOf("apple-touch") !== -1
-                        || rel.indexOf("shortcut") !== -1 || rel.indexOf("mask-icon") !== -1
-                        || rel.indexOf("fluid-icon") !== -1;
-            if (!isIcon)
-                continue;
-            // href attribute
-            const hrefMatch = attrs.match(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
-            if (!hrefMatch)
-                continue;
-            const href = hrefMatch[1] || hrefMatch[2] || hrefMatch[3] || "";
-            const resolved = _resolveUrl(href, baseUrl);
-            if (resolved !== "" && out.indexOf(resolved) === -1)
-                out.push(resolved);
-        }
-        // Also <meta property="og:image" ...>
-        const ogRe = /<meta\b[^>]*?(?:property|name)\s*=\s*["']og:image["'][^>]*?content\s*=\s*["']([^"']+)["']/gi;
-        while ((m = ogRe.exec(html)) !== null) {
-            const resolved = _resolveUrl(m[1], baseUrl);
-            if (resolved !== "" && out.indexOf(resolved) === -1)
-                out.push(resolved);
-        }
+    // Everything the ladder may ask for one station, in the order the lists
+    // come: the directory's own logo, what the homepage names, the
+    // well-known paths on the homepage and on the stream's host, and
+    // Google's icon service. FaviconLogic.probeOrder decides who is asked
+    // first, and LogoHunt never asks one on a private host.
+    function _ladder(job, apiFavicon, images, homepage) {
+        var home = FaviconLogic.webUrlOrEmpty(homepage);
+        var out = apiFavicon !== "" ? [{ "url": apiFavicon, "kind": "page" }] : [];
+        var onHost = _hostnameStdCandidates(job.hostname);
+        var google = _googleFaviconCandidates(job.hostname, home);
+        out = out.concat(FaviconLogic.homepageCandidates(images, home));
+        for (var i = 0; i < onHost.length; i++)
+            out.push({ "url": onHost[i], "kind": "host" });
+        for (var g = 0; g < google.length; g++)
+            out.push({ "url": google[g], "kind": "guess" });
         return out;
     }
 
-    function _scrapeHomepageAndProbe(job, apiFavicon, homepage) {
-        if (_privateHostUrl(homepage)) {
-            // A loopback/LAN homepage never gets scraped — continue the
-            // ladder as if the catalogue had no homepage at all.
-            const candidates = [];
-            if (apiFavicon !== "")
-                candidates.push(apiFavicon);
-            for (const u of _hostnameStdCandidates(job.hostname))
-                if (candidates.indexOf(u) === -1)
-                    candidates.push(u);
-            for (const u of _googleFaviconCandidates(job.hostname))
-                if (candidates.indexOf(u) === -1)
-                    candidates.push(u);
-            _probeNextCandidate(job, candidates, 0);
-            return;
-        }
-        const xhr = new XMLHttpRequest();
-        var guard = null;
-        var keptPrefix = "";
-        xhr.open("GET", homepage);
-        xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.41)");
-        xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
-        _activeLogoXhr = xhr;
-        const stdCandidates = () => {
-            var out = [];
-            var origin = _originOf(homepage);
-            if (origin !== "") {
-                out.push(
-                    origin + "/apple-touch-icon.png",
-                    origin + "/apple-touch-icon-precomposed.png",
-                    origin + "/favicon-194x194.png",
-                    origin + "/favicon-192x192.png",
-                    origin + "/favicon-96x96.png",
-                    origin + "/favicon-32x32.png",
-                    origin + "/favicon.ico"
-                );
-            }
-            return out;
-        };
-        const fallback = () => {
-            var candidates = [];
-            if (apiFavicon !== "")
-                candidates.push(apiFavicon);
-            for (var u of stdCandidates()) {
-                if (candidates.indexOf(u) === -1)
-                    candidates.push(u);
-            }
-            _probeNextCandidate(job, candidates, 0);
-        };
-        xhr.onreadystatechange = () => {
-            // Only the first ~96 KiB get scraped anyway — a body that keeps
-            // streaming past 512 KiB must not buffer without bound. abort()
-            // clears responseText, so keep the head first (icons live in
-            // <head>, within the first 96 KiB) and fall back to it below.
-            if (xhr.readyState === xhr.LOADING && xhr.responseText
-                && xhr.responseText.length > 524288) {
-                keptPrefix = xhr.responseText.substring(0, 98304);
-                try { xhr.abort() } catch(e) {}
-                return;
-            }
-            if (xhr.readyState !== xhr.DONE)
-                return;
-            _clearXhrTimeout(guard);
-            if (_activeLogoXhr === xhr)
-                _activeLogoXhr = null;
-            // A homepage that redirects into the LAN gets its body dropped:
-            // scraping it would turn an internal page's <link> tags into the
-            // next round of candidates, and the first hop's gate cannot see
-            // a redirect Qt follows on its own.
-            if (!HostGuard.answerFromPublicHost(xhr)) {
-                fallback();
-                return;
-            }
-            var candidates = [];
-            if (apiFavicon !== "")
-                candidates.push(apiFavicon);
-            // IMPORTANT: many SPAs/React sites (e.g. pleier.ee uses react-helmet) return 404
-            // for unknown paths but the response body still contains the full HTML with icon
-            // <link> tags. So scrape whenever the body looks like HTML, regardless of status.
-            var body = xhr.responseText || keptPrefix;
-            var respLen = body.length;
-            var bodyLooksHtml = respLen > 200 && body.indexOf("<") !== -1;
-            if (bodyLooksHtml) {
-                var html = body.substring(0, 98304);
-                var finalUrl = xhr.responseURL || homepage;
-                var scraped = _extractIconLinks(html, finalUrl);
-                for (var u of scraped) {
-                    if (candidates.indexOf(u) === -1)
-                        candidates.push(u);
-                }
-            }
-            for (var u of stdCandidates()) {
-                if (candidates.indexOf(u) === -1)
-                    candidates.push(u);
-            }
-            // Final fallbacks: hostname origin std paths + Google s2/favicons
-            for (var u of _hostnameStdCandidates(job.hostname))
-                if (candidates.indexOf(u) === -1)
-                    candidates.push(u);
-            for (var u of _googleFaviconCandidates(job.hostname, homepage))
-                if (candidates.indexOf(u) === -1)
-                    candidates.push(u);
-            _probeNextCandidate(job, candidates, 0);
-        };
-        guard = _armXhrTimeout(xhr, 12000);
-        xhr.send();
+    // The best picture the ladder finds is saved, not the first: Raadio
+    // Kadi's page names a 16x16 favicon.ico ahead of its 1200x1200 logo, and
+    // the first real picture used to win. An upgrade job only looks for
+    // something better than the tiny logo it has, and keeps that one when
+    // the best it finds is tiny too, which no address tells of a 16 px
+    // logo.png.
+    function _probeCandidates(job, candidates) {
+        if (job.upgrade === true)
+            candidates = candidates.filter(c => !FaviconLogic.tinyLogoUrl(c.url) && c.url !== job.oldFavicon);
+        const cur = job.index < stationsModel.count ? stationsModel.get(job.index) : null;
+        const had = cur ? FaviconLogic.webUrlOrEmpty(cur.favicon) : "";
+        // The logo the row has is weighed with the finds and stays unless one
+        // beats it; a dead one never loads, so the best picture that does wins.
+        if (had !== "" && job.upgrade !== true)
+            candidates = [{ "url": had, "kind": "current" }].concat(candidates);
+        logoHunt.probe(candidates, function(best) {
+            if (FaviconLogic.keepsFind(best, had, job.upgrade === true))
+                _saveLogo(job, best.url);
+            _logoDone++;
+            _fetchNextLogo();
+        });
     }
 
     function _hostnameStdCandidates(hostname) {
-        const origin = _originOf(hostname);
+        const origin = FaviconLogic.originOf(hostname);
         if (origin === "")
             return [];
         // A landlord's own icon is nobody's logo: on a tenant's row zeno.fm's
@@ -653,111 +511,6 @@ KCM.ScrollViewKCM {
         return out;
     }
 
-    function _looksLikeImageBytes(buf) {
-        if (!buf || buf.length < 4)
-            return false;
-        // PNG: 89 50 4E 47
-        if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47)
-            return true;
-        // JPEG: FF D8 FF
-        if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF)
-            return true;
-        // GIF: 47 49 46 38
-        if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38)
-            return true;
-        // ICO: 00 00 01 00 (icon) or 00 00 02 00 (cursor)
-        if (buf[0] === 0x00 && buf[1] === 0x00 && (buf[2] === 0x01 || buf[2] === 0x02) && buf[3] === 0x00)
-            return true;
-        // BMP: 42 4D
-        if (buf[0] === 0x42 && buf[1] === 0x4D)
-            return true;
-        // WebP: RIFF....WEBP
-        if (buf.length >= 12
-            && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46
-            && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50)
-            return true;
-        // SVG/XML: '<' followed by '?xml' or '<svg'
-        if (buf[0] === 0x3C) {
-            let head = "";
-            for (let i = 0; i < Math.min(buf.length, 256); i++)
-                head += String.fromCharCode(buf[i]);
-            const lower = head.toLowerCase();
-            if (lower.indexOf("<svg") !== -1 || lower.indexOf("<?xml") !== -1)
-                return true;
-        }
-        return false;
-    }
-
-    function _probeNextCandidate(job, candidates, idx) {
-        // An upgrade hunt only considers candidates that would actually be
-        // an upgrade: the current tiny URL itself and the tiny-class
-        // sources (bare favicon.ico, 16/32 px variants, Google s2) are
-        // filtered out once, before the first probe.
-        if (job.upgrade === true && idx === 0)
-            candidates = candidates.filter(c => !_tinyLogoUrl(c) && c !== job.oldFavicon);
-        if (idx >= candidates.length) {
-            _logoDone++;
-            _fetchNextLogo();
-            return;
-        }
-        const url = candidates[idx];
-        // A LAN address is refused as an SSRF target, EXCEPT when it is
-        // the user's own station origin — a self-hosted stream's own
-        // favicon (from _hostnameStdCandidates) is legitimate intent,
-        // not a remote catalogue/homepage reaching for an internal host.
-        if (_privateHostUrl(url) && _originOf(url) !== _originOf(job.hostname)) {
-            _probeNextCandidate(job, candidates, idx + 1);
-            return;
-        }
-        const xhr = new XMLHttpRequest();
-        var guard = null;
-        xhr.open("GET", url);
-        xhr.responseType = "arraybuffer";
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.41");
-        _activeLogoXhr = xhr;
-        xhr.onreadystatechange = () => {
-            // A "logo" that streams past 512 KiB is not a logo — cap the
-            // buffer; abort() lands back here as DONE and the empty
-            // response fails the magic-byte check like any bad candidate.
-            if (xhr.readyState === xhr.LOADING) {
-                try {
-                    if (xhr.responseText && xhr.responseText.length > 524288)
-                        xhr.abort();
-                } catch(e) {}
-                return;
-            }
-            if (xhr.readyState !== xhr.DONE)
-                return;
-            _clearXhrTimeout(guard);
-            if (_activeLogoXhr === xhr)
-                _activeLogoXhr = null;
-            var ok = false;
-            // The candidate's host was judged before the request, but Qt
-            // follows redirects inside the network layer — a station page
-            // answering "302 → http://192.168.1.1/x.png" would otherwise
-            // hand an internal host's bytes to the logo check, and the
-            // result would be saved as this station's logo.
-            if (xhr.status >= 200 && xhr.status < 400 && xhr.response
-                && HostGuard.answerFromPublicHost(xhr)) {
-                try {
-                    var buf = new Uint8Array(xhr.response);
-                    ok = _looksLikeImageBytes(buf);
-                } catch (e) {
-                    ok = false;
-                }
-            }
-            if (ok) {
-                _saveLogo(job, url);
-                _logoDone++;
-                _fetchNextLogo();
-            } else {
-                _probeNextCandidate(job, candidates, idx + 1);
-            }
-        };
-        guard = _armXhrTimeout(xhr, 6000);
-        xhr.send();
-    }
-
     function refetchAllLogos() {
         if (_logoFetching)
             return;
@@ -794,7 +547,7 @@ KCM.ScrollViewKCM {
         catch (e) { console.warn("[ARP] settings: stored station list is not valid JSON —", e); }
         if (!Array.isArray(servers)) servers = [];
         for (const server of servers) {
-            stationsModel.append(server);
+            stationsModel.append(DoorLogic.normalize(server));
         }
         _lastSynced = _servers;
     }
@@ -816,7 +569,7 @@ KCM.ScrollViewKCM {
                 try {
                     const servers = JSON.parse(external);
                     stationsModel.clear();
-                    for (const server of servers) stationsModel.append(server);
+                    for (const server of servers) stationsModel.append(DoorLogic.normalize(server));
                     root._servers = external;
                     root._lastSynced = external;
                 } catch (e) {}
@@ -836,7 +589,7 @@ KCM.ScrollViewKCM {
                     // a model row drags wrapper internals along with the
                     // roles) and the wrapper's objectName is not an edit.
                     const norm = (o) => {
-                        const plain = JSON.parse(JSON.stringify(o));
+                        const plain = DoorLogic.normalize(JSON.parse(JSON.stringify(o)));
                         delete plain.objectName;
                         const keys = [];
                         for (const k in plain)
@@ -846,33 +599,11 @@ KCM.ScrollViewKCM {
                         for (const k of keys) flat[k] = plain[k];
                         return JSON.stringify(flat);
                     };
-                    const baseByHost = {};
-                    for (const b of base) baseByHost[b.hostname] = norm(b);
-                    const extByHost = {};
-                    for (const srv of ext) extByHost[srv.hostname] = srv;
-                    var changed = false;
-                    // Backwards: removals must not shift unvisited rows.
-                    for (var i = stationsModel.count - 1; i >= 0; i--) {
-                        const cur = stationsModel.get(i);
-                        const baseNorm = baseByHost[cur.hostname];
-                        if (baseNorm === undefined || norm(cur) !== baseNorm)
-                            continue; // locally added or edited — local wins
-                        const extRow = extByHost[cur.hostname];
-                        if (extRow === undefined) {
-                            // Externally deleted, untouched here — do not
-                            // resurrect it.
-                            stationsModel.remove(i);
-                            changed = true;
-                        } else if (norm(extRow) !== baseNorm) {
-                            stationsModel.set(i, extRow);
-                            changed = true;
-                        }
-                    }
-                    const have = {};
-                    for (var j = 0; j < stationsModel.count; j++)
-                        have[stationsModel.get(j).hostname] = true;
-                    for (const srv of ext) {
-                        if (!have[srv.hostname]) { stationsModel.append(srv); changed = true; }
+                    const merged = ReorderLogic.mergeExternal(base, ReorderLogic.savedRows(stationsModel), ext, norm);
+                    const changed = merged.changed;
+                    if (changed) {
+                        stationsModel.clear();
+                        for (const row of merged.rows) stationsModel.append(DoorLogic.normalize(row));
                     }
                     // The page already has edits of its own and has said so.
                     if (changed) root._servers = JSON.stringify(getServersArray());
@@ -1081,34 +812,33 @@ KCM.ScrollViewKCM {
                 faviconClean = "https://" + faviconClean;
             faviconClean = _webUrlOrEmpty(faviconClean);
             if (hostClean === "") return;
-            let itemObject;
-            if (dialogMode === -1) {
-                itemObject = {
-                    "name": nameClean !== "" ? nameClean : hostClean,
-                    "hostname": hostClean,
-                    "favicon": faviconClean,
-                    "active": serverActive.checked
-                };
-                stationsModel.append(itemObject);
-            } else {
-                const existing = stationsModel.get(dialogMode);
-                itemObject = {};
-                for (const key in existing) {
-                    itemObject[key] = existing[key];
+            const clean = { "name": nameClean !== "" ? nameClean : hostClean, "hostname": hostClean,
+                            "favicon": faviconClean, "active": serverActive.checked };
+            let itemObject = clean;
+            let rowAt = -1;
+            if (dialogMode !== -1) {
+                // The popup writes the list while the dialog is open, and this
+                // page follows it: the row is found again by the address it
+                // was opened on, and only what was changed here is written
+                // (DoorLogic.editedRow). An OK used to write the dialog's
+                // snapshot back, so a rename put a healed station back on its
+                // dead address and lost the logo the popup had just found.
+                // A row pointed at another station lets go of its uuid there:
+                // the heal trusts a uuid for good.
+                const rows = getServersArray();
+                rowAt = DoorLogic.editRowIndex(rows, dialogMode, _editOpened);
+                if (rowAt !== -1) {
+                    const shown = { "name": serverName.text, "hostname": serverHostname.text,
+                                    "favicon": serverFavicon.text, "active": serverActive.checked };
+                    itemObject = DoorLogic.editedRow(rows[rowAt], _editOpened, shown, clean);
+                    stationsModel.set(rowAt, DoorLogic.normalize(itemObject));
                 }
-                itemObject.name = nameClean !== "" ? nameClean : hostClean;
-                itemObject.hostname = hostClean;
-                itemObject.favicon = faviconClean;
-                itemObject.active = serverActive.checked;
-                // A row pointed at another station must let go of the first
-                // one's directory uuid. It used to ride along, and the heal
-                // then asked byuuid where "this" station lives, was handed
-                // the OLD station's address and saved it over the edit for
-                // good; logos and votes went the same way.
-                if (existing.uuid && !HealLogic.editKeepsIdentity(existing.name, existing.hostname,
-                                                                   itemObject.name, itemObject.hostname))
-                    itemObject.uuid = "";
-                stationsModel.set(dialogMode, itemObject);
+            }
+            // An Add, or an edit whose row was removed in the popup meanwhile:
+            // what was typed here is the listener's last word.
+            if (rowAt === -1) {
+                stationsModel.append(DoorLogic.normalize(itemObject));
+                rowAt = stationsModel.count - 1;
             }
             _edited();
             // A station saved without a logo gets one looked up right away —
@@ -1116,7 +846,7 @@ KCM.ScrollViewKCM {
             // user is present (they just pressed OK), so the deep road
             // including the homepage scrape is appropriate here.
             if (itemObject.favicon === "" && !_logoFetching) {
-                const rowIdx = dialogMode === -1 ? stationsModel.count - 1 : dialogMode;
+                const rowIdx = rowAt;
                 _logoQueue = [{ "index": rowIdx, "name": itemObject.name,
                                 "hostname": itemObject.hostname }];
                 _resetLogoCounters();
@@ -1260,7 +990,8 @@ KCM.ScrollViewKCM {
                             row.country = clip(srv.country);
                         if (srv.uuid !== undefined)
                             row.uuid = clip(srv.uuid);
-                        stationsModel.append(row);
+                        row.prev = srv.prev;
+                        stationsModel.append(DoorLogic.normalize(row));
                     }
                     _edited();
                     showMessage(true, i18n("Configuration has been loaded. Click 'Apply' to save changes."));

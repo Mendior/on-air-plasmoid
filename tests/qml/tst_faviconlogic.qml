@@ -311,6 +311,650 @@ TestCase {
         compare(FL.donorRows([{ name: "x" }], "x", norm, undefined, undefined).length, 1)
     }
 
+    // ── what a homepage says about its logo ───────────────────────────────
+
+    // Raadio Kadi's homepage as it answered on 2026-11-02, the tags that
+    // matter and one that does not.
+    readonly property string kadiHead:
+        '<link rel="shortcut icon" href="https://kadi.ee/wp-content/themes/raadio/img/favicon.ico">\n'
+        + '<meta property="og:image" content="https://kadi.ee/wp-content/uploads/2022/01/logo-og-1.jpg" />\n'
+        + '<meta property="og:image:width" content="1200" />\n'
+        + "<link rel='stylesheet' id='dashicons-css' href='https://kadi.ee/wp-includes/css/dashicons.min.css?ver=7.1.4' media='all' />\n"
+
+    function test_origin_is_scheme_host_and_port() {
+        compare(FL.originOf("https://kadi.ee/"), "https://kadi.ee")
+        compare(FL.originOf("https://edge06.cdn.bitflip.ee:8888/kadi"), "https://edge06.cdn.bitflip.ee:8888")
+        compare(FL.originOf("HTTP://A.B/x?y"), "HTTP://A.B")
+        compare(FL.originOf("kadi.ee/x"), "")
+        compare(FL.originOf("ftp://a.b/x"), "")
+        compare(FL.originOf(""), "")
+    }
+
+    function test_a_link_is_made_absolute_against_its_page() {
+        var page = "https://kadi.ee/raadio/index.php?x=1#top"
+        compare(FL.resolveUrl("https://cdn.kadi.ee/a.png", page), "https://cdn.kadi.ee/a.png")
+        compare(FL.resolveUrl("//cdn.kadi.ee/a.png", page), "https://cdn.kadi.ee/a.png")
+        compare(FL.resolveUrl("/img/a.png", page), "https://kadi.ee/img/a.png")
+        compare(FL.resolveUrl("img/a.png", page), "https://kadi.ee/raadio/img/a.png")
+        compare(FL.resolveUrl("  /img/a.png  ", page), "https://kadi.ee/img/a.png")
+        // A page address with no path keeps the link at its root.
+        compare(FL.resolveUrl("a.png", "https://kadi.ee"), "https://kadi.ee/a.png")
+    }
+
+    function test_a_link_that_is_no_address_resolves_to_nothing() {
+        var page = "https://kadi.ee/"
+        compare(FL.resolveUrl("#logo", page), "")
+        compare(FL.resolveUrl("data:image/png;base64,AAAA", page), "")
+        compare(FL.resolveUrl("javascript:alert(1)", page), "")
+        compare(FL.resolveUrl("", page), "")
+        compare(FL.resolveUrl(null, page), "")
+        compare(FL.resolveUrl(undefined, page), "")
+        // Nothing to resolve a relative link against.
+        compare(FL.resolveUrl("a.png", ""), "")
+        compare(FL.resolveUrl("/a.png", "kadi.ee"), "")
+    }
+
+    function test_the_icon_links_and_og_image_of_a_page_in_order() {
+        compare(FL.extractIconLinks(kadiHead, "https://kadi.ee/"), [
+            { url: "https://kadi.ee/wp-content/themes/raadio/img/favicon.ico", kind: "page" },
+            { url: "https://kadi.ee/wp-content/uploads/2022/01/logo-og-1.jpg", kind: "share" }
+        ])
+        var html = '<link rel=icon href=/a.png>'
+            + "<link href='/b.png' rel='apple-touch-icon' sizes='180x180'>"
+            + '<link rel="fluid-icon" href="c.png" />'
+            + '<link rel="stylesheet" href="/e.css">'
+            + '<link rel="preload" href="/f.png">'
+            + '<link rel="icon">'
+            + '<link rel="icon" href="/a.png">'
+            + '<meta name="og:image" content="/g.jpg">'
+            + '<meta property="og:image" content="/b.png">'
+        compare(FL.extractIconLinks(html, "https://r.ee/x/"), [
+            { url: "https://r.ee/a.png", kind: "page" }, { url: "https://r.ee/b.png", kind: "page" },
+            { url: "https://r.ee/x/c.png", kind: "page" }, { url: "https://r.ee/g.jpg", kind: "share" }
+        ])
+    }
+
+    function test_a_hostile_page_is_read_in_a_moment() {
+        // A homepage comes from a record anyone can file, and the popup reads
+        // it with no click. A 96 KiB head of "<meta/name='og:image'" and no
+        // ">" kept the old patterns busy for 125 s on Qt 6.12, the whole
+        // shell frozen with them (measured 2026-11-03).
+        var unit = "<meta/name='og:image'", body = ""
+        while (body.length < 98304) body += unit
+        var t0 = Date.now()
+        compare(FL.extractIconLinks(body, "https://r.ee/"), [])
+        var took = Date.now() - t0
+        verify(took < 2000, "the og:image flood took " + took + " ms")
+        body = ""
+        while (body.length < 98304) body += "<link "
+        t0 = Date.now()
+        compare(FL.extractIconLinks(body, "https://r.ee/"), [])
+        took = Date.now() - t0
+        verify(took < 2000, "the link flood took " + took + " ms")
+    }
+
+    function test_a_tag_past_the_cap_is_passed_over_and_the_next_one_read() {
+        var huge = '<link rel="icon" data-x="' + new Array(3000).join("y") + '" href="/huge.png">'
+        compare(FL.extractIconLinks(huge + '<link rel="icon" href="/small.png">', "https://r.ee/"),
+                [{ url: "https://r.ee/small.png", kind: "page" }])
+    }
+
+    function test_an_og_image_is_read_whichever_attribute_comes_first() {
+        compare(FL.extractIconLinks('<meta content="/og.jpg" property="og:image">', "https://r.ee/"),
+                [{ url: "https://r.ee/og.jpg", kind: "share" }])
+        // A self-closing tag with a bare address keeps its address whole.
+        compare(FL.extractIconLinks('<link rel=icon href=/x.png/>', "https://r.ee/"),
+                [{ url: "https://r.ee/x.png", kind: "page" }])
+    }
+
+    function test_a_pinned_tab_mask_is_no_logo() {
+        // Safari's mask-icon is one flat colour on transparency that the
+        // browser tints itself; as a logo it is a black shape.
+        compare(FL.extractIconLinks('<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">'
+                                    + '<link rel="icon" href="/favicon.svg">', "https://r.ee/"),
+                [{ url: "https://r.ee/favicon.svg", kind: "page" }])
+    }
+
+    function test_a_hunt_keeps_the_logo_a_row_has_unless_something_beats_it() {
+        // Re-fetch all asks the row's own logo first: the find that is that
+        // very logo changes nothing, and anything else beat it or found it dead.
+        var own = "https://r.ee/press/logo-1024.png"
+        var tiny = { url: "https://r.ee/favicon.ico", size: { width: 16, height: 16 } }
+        verify(!FL.keepsFind({ url: own, size: { width: 1024, height: 1024 } }, own, false))
+        verify(FL.keepsFind(tiny, own, false), "the row's own logo did not answer")
+        verify(FL.keepsFind(tiny, "", false), "a row with no logo takes what there is")
+        // An upgrade looks only for something larger than its tab-sized logo.
+        verify(!FL.keepsFind(tiny, "https://r.ee/favicon-16x16.png", true))
+        verify(FL.keepsFind({ url: "https://r.ee/logo.png", size: { width: 512, height: 512 } }, "https://r.ee/favicon-16x16.png", true))
+        verify(!FL.keepsFind(null, own, false))
+        // The row's own logo is asked first, whatever its kind of address.
+        compare(FL.probeOrder([{ url: "https://r.ee/a.png", kind: "page" },
+                               { url: "https://www.google.com/s2/favicons?domain=r.ee&sz=64", kind: "current" }])[0],
+                "https://www.google.com/s2/favicons?domain=r.ee&sz=64")
+    }
+
+    function test_a_landlords_page_offers_only_its_og_image() {
+        // laut.fm/mangoradio named laut.fm's own 180 px apple-touch-icon and
+        // had the station's picture as og:image (measured 2026-11-03).
+        verify(FL.landlordPage("https://laut.fm/mangoradio"))
+        verify(FL.landlordPage("https://zeno.fm/radio/x/"))
+        verify(!FL.landlordPage("https://kadi.ee/"))
+        verify(!FL.landlordPage(""))
+        var images = [{ url: "https://laut.fm/assets/apple-touch-icon.png", kind: "page" },
+                      { url: "https://assets.laut.fm/abc?t=_640x640", kind: "share" }]
+        compare(FL.homepageCandidates(images, "https://laut.fm/mangoradio"),
+                [{ url: "https://assets.laut.fm/abc?t=_640x640", kind: "share" }])
+        var own = FL.homepageCandidates([{ url: "https://kadi.ee/i.png", kind: "page" }], "https://kadi.ee/")
+        compare(own.length, 1 + 7)
+        compare(own[0].url, "https://kadi.ee/i.png")
+        compare(own[1].url, "https://kadi.ee/apple-touch-icon.png")
+        compare(FL.homepageCandidates(null, "https://kadi.ee/").length, 7)
+    }
+
+    function test_the_well_known_icon_paths_of_an_origin() {
+        compare(FL.wellKnownIcons("https://kadi.ee"), [
+            { url: "https://kadi.ee/apple-touch-icon.png", kind: "guess" },
+            { url: "https://kadi.ee/apple-touch-icon-precomposed.png", kind: "guess" },
+            { url: "https://kadi.ee/favicon-194x194.png", kind: "guess" },
+            { url: "https://kadi.ee/favicon-192x192.png", kind: "guess" },
+            { url: "https://kadi.ee/favicon-96x96.png", kind: "guess" },
+            { url: "https://kadi.ee/favicon-32x32.png", kind: "guess" },
+            { url: "https://kadi.ee/favicon.ico", kind: "guess" }
+        ])
+        compare(FL.wellKnownIcons(""), [])
+        compare(FL.wellKnownIcons(null), [])
+        compare(FL.wellKnownIcons(undefined), [])
+    }
+
+    function test_a_page_with_nothing_to_offer_offers_nothing() {
+        compare(FL.extractIconLinks("", "https://r.ee/"), [])
+        compare(FL.extractIconLinks(null, "https://r.ee/"), [])
+        compare(FL.extractIconLinks("<html><body>no icons</body></html>", "https://r.ee/"), [])
+        // An inline picture is not an address anybody can fetch.
+        compare(FL.extractIconLinks('<link rel="icon" href="data:image/png;base64,AAAA">', "https://r.ee/"), [])
+    }
+
+    function bytes(list) {
+        return new Uint8Array(list)
+    }
+
+    function test_the_picture_formats_qt_decodes_are_pictures() {
+        verify(FL.looksLikeImageBytes(bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A])))   // PNG
+        verify(FL.looksLikeImageBytes(bytes([0xFF, 0xD8, 0xFF, 0xE0])))               // JPEG
+        verify(FL.looksLikeImageBytes(bytes([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])))   // GIF
+        verify(FL.looksLikeImageBytes(bytes([0x00, 0x00, 0x01, 0x00])))               // ICO
+        verify(FL.looksLikeImageBytes(bytes([0x00, 0x00, 0x02, 0x00])))               // CUR
+        verify(FL.looksLikeImageBytes(bytes([0x42, 0x4D, 0x00, 0x00])))               // BMP
+        verify(FL.looksLikeImageBytes(bytes([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4,
+                                             0x57, 0x45, 0x42, 0x50])))               // WebP
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+        var a = []
+        for (var i = 0; i < svg.length; i++) a.push(svg.charCodeAt(i))
+        verify(FL.looksLikeImageBytes(bytes(a)))
+    }
+
+    function test_a_page_or_a_short_reply_is_no_picture() {
+        var html = "<!DOCTYPE html><html><head><title>404</title></head></html>"
+        var a = []
+        for (var i = 0; i < html.length; i++) a.push(html.charCodeAt(i))
+        verify(!FL.looksLikeImageBytes(bytes(a)))
+        verify(!FL.looksLikeImageBytes(bytes([0x89, 0x50, 0x4E])))
+        // RIFF that is not WebP (a WAV file).
+        verify(!FL.looksLikeImageBytes(bytes([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4,
+                                              0x57, 0x41, 0x56, 0x45])))
+        verify(!FL.looksLikeImageBytes(bytes([])))
+        verify(!FL.looksLikeImageBytes(null))
+        verify(!FL.looksLikeImageBytes(undefined))
+    }
+
+    function test_the_logo_addresses_that_are_small_by_construction() {
+        verify(FL.tinyLogoUrl("https://kadi.ee/favicon.ico"))
+        verify(FL.tinyLogoUrl("https://kadi.ee/wp-content/themes/raadio/img/favicon.ico"))
+        verify(FL.tinyLogoUrl("https://kadi.ee/favicon.ico?v=2"))
+        verify(FL.tinyLogoUrl("favicon.ico"))
+        verify(FL.tinyLogoUrl("https://r.ee/favicon-16x16.png"))
+        verify(FL.tinyLogoUrl("https://r.ee/favicon-32x32.png"))
+        verify(FL.tinyLogoUrl("https://www.google.com/s2/favicons?domain=kadi.ee&sz=128"))
+        verify(!FL.tinyLogoUrl("https://r.ee/favicon-192x192.png"))
+        verify(!FL.tinyLogoUrl("https://r.ee/apple-touch-icon.png"))
+        verify(!FL.tinyLogoUrl("https://r.ee/myfavicon.icon"))
+        verify(!FL.tinyLogoUrl(""))
+        verify(!FL.tinyLogoUrl(null))
+    }
+
+    // ── imageSize: what a picture's header says ───────────────────────────
+
+    function be16(n) { return [(n >>> 8) & 255, n & 255] }
+    function le16(n) { return [n & 255, (n >>> 8) & 255] }
+    function be32(n) { return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255] }
+    function le24(n) { return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255] }
+    // Payload bytes that never contain 0xFF, so nothing in them reads as a
+    // marker by accident.
+    function filler(n) {
+        var a = []
+        for (var i = 0; i < n; i++) a.push(i % 251)
+        return a
+    }
+    function ascii(s) {
+        var a = []
+        for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i))
+        return a
+    }
+    function size(w, h) { return { width: w, height: h } }
+
+    function pngHead(w, h) {
+        return [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]
+            .concat(ascii("IHDR"), be32(w), be32(h), [8, 6, 0, 0, 0])
+    }
+    function gifHead(w, h) { return ascii("GIF89a").concat(le16(w), le16(h), [0xF7, 0, 0]) }
+    // One directory entry per [width, height], in the order given; 256 is
+    // written as 0, the way the format spells it.
+    function icoHead(kind, sizes) {
+        var out = [0, 0, kind, 0].concat(le16(sizes.length))
+        for (var i = 0; i < sizes.length; i++)
+            out = out.concat([sizes[i][0] % 256, sizes[i][1] % 256, 0, 0, 1, 0, 32, 0],
+                             [0x68, 5, 0, 0], le16(6 + 16 * sizes.length + 1406 * i), [0, 0])
+        return out
+    }
+    function segment(marker, payload) { return [0xFF, marker].concat(be16(payload.length + 2), payload) }
+    function sof(marker, w, h) {
+        return segment(marker, [8].concat(be16(h), be16(w), [3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]))
+    }
+    function jpeg(parts) {
+        var out = [0xFF, 0xD8]
+        for (var i = 0; i < parts.length; i++) out = out.concat(parts[i])
+        return out
+    }
+    // Raadio Kadi's logo-og-1.jpg up to its first scan, segment for segment
+    // (JFIF, Ducky, Adobe, DQT, SOF2 at byte 213, DHT), with the payloads
+    // replaced by filler.
+    function kadiJpeg(w, h) {
+        return jpeg([segment(0xE0, filler(14)), segment(0xEC, filler(15)), segment(0xEE, filler(36)),
+                     segment(0xDB, filler(130)), sof(0xC2, w, h), segment(0xC4, filler(318)),
+                     segment(0xDA, filler(10))])
+    }
+    function webp(tag, chunk) {
+        return ascii("RIFF").concat([0x40, 0x0F, 0, 0], ascii("WEBP"), ascii(tag),
+                                    le16(chunk.length), [0, 0], chunk)
+    }
+    // VP8 frame tag, start code, then 14 bits of size and 2 of scale each.
+    function vp8(w, h, scale) {
+        return webp("VP8 ", [0x50, 0x0D, 0x00, 0x9D, 0x01, 0x2A]
+                    .concat(le16(w | (scale << 14)), le16(h | (scale << 14)), filler(8)))
+    }
+    // Above the two sizes sit the alpha flag (bit 28) and the version.
+    function vp8l(w, h, alpha) {
+        var bits = (w - 1) + (h - 1) * 16384 + (alpha ? 268435456 : 0)
+        return webp("VP8L", [0x2F, bits % 256, Math.floor(bits / 256) % 256,
+                             Math.floor(bits / 65536) % 256, Math.floor(bits / 16777216) % 256]
+                    .concat(filler(8)))
+    }
+    function vp8x(w, h) { return webp("VP8X", [0x10, 0, 0, 0].concat(le24(w - 1), le24(h - 1))) }
+
+    function test_a_png_says_its_size_in_ihdr() {
+        compare(FL.imageSize(bytes(pngHead(200, 100))), size(200, 100))
+        compare(FL.imageSize(bytes(pngHead(180, 180).concat(filler(40)))), size(180, 180))
+        // A line of a picture is reported as it is; the ranking judges it.
+        compare(FL.imageSize(bytes(pngHead(1, 10000))), size(1, 10000))
+        // Four bytes of width are read whole, never as a negative number.
+        compare(FL.imageSize(bytes(pngHead(4294967295, 1))), size(4294967295, 1))
+    }
+
+    function test_a_png_cut_short_or_out_of_shape_has_no_size() {
+        var head = pngHead(200, 100)
+        compare(FL.imageSize(bytes(head.slice(0, 24))), size(200, 100))
+        compare(FL.imageSize(bytes(head.slice(0, 23))), null)
+        // Apple's CgBI chunk ahead of IHDR is not a PNG Qt can show.
+        var cgbi = head.slice(0, 12).concat(ascii("CgBI"), head.slice(16))
+        compare(FL.imageSize(bytes(cgbi)), null)
+        compare(FL.imageSize(bytes(pngHead(0, 100))), null)
+        compare(FL.imageSize(bytes(pngHead(100, 0))), null)
+    }
+
+    function test_a_gif_says_its_logical_screen() {
+        compare(FL.imageSize(bytes(gifHead(64, 48))), size(64, 48))
+        compare(FL.imageSize(bytes(ascii("GIF87a").concat(le16(300), le16(2)))), size(300, 2))
+        compare(FL.imageSize(bytes(gifHead(64, 48).slice(0, 9))), null)
+        compare(FL.imageSize(bytes(gifHead(0, 48))), null)
+    }
+
+    function test_an_icon_is_as_big_as_the_entry_qt_paints() {
+        // Raadio Kadi's favicon.ico: one 16x16 entry.
+        compare(FL.imageSize(bytes(icoHead(1, [[16, 16]]))), size(16, 16))
+        // Several entries: the first, whatever comes after it.
+        compare(FL.imageSize(bytes(icoHead(1, [[16, 16], [256, 256]]))), size(16, 16))
+        compare(FL.imageSize(bytes(icoHead(1, [[48, 48], [32, 32], [16, 16]]))), size(48, 48))
+        compare(FL.imageSize(bytes(icoHead(1, [[256, 256], [16, 16]]))), size(256, 256))
+        compare(FL.imageSize(bytes(icoHead(1, [[256, 128]]))), size(256, 128))
+        // A cursor file has the same directory.
+        compare(FL.imageSize(bytes(icoHead(2, [[32, 32]]))), size(32, 32))
+    }
+
+    function test_an_icon_without_a_whole_first_entry_has_no_size() {
+        var head = icoHead(1, [[48, 48], [16, 16]])
+        compare(FL.imageSize(bytes(head.slice(0, 22))), size(48, 48))
+        compare(FL.imageSize(bytes(head.slice(0, 21))), null)
+        compare(FL.imageSize(bytes(icoHead(1, []).concat(filler(16)))), null)
+    }
+
+    function test_a_jpeg_says_its_size_in_the_first_frame_header() {
+        var kadi = kadiJpeg(1200, 1200)
+        // The fixture is Kadi's file in shape: the frame header at 213.
+        compare(kadi[213], 0xFF)
+        compare(kadi[214], 0xC2)
+        compare(FL.imageSize(bytes(kadi)), size(1200, 1200))
+        compare(FL.imageSize(bytes(jpeg([segment(0xE0, filler(14)), segment(0xDB, filler(65)),
+                                         sof(0xC0, 640, 480), segment(0xDA, filler(10))]))), size(640, 480))
+        // Width and height sit in that order on the wire: height first.
+        compare(FL.imageSize(bytes(jpeg([sof(0xC1, 300, 7000)]))), size(300, 7000))
+        // Fill bytes may stand before any marker, and a few markers carry
+        // no length at all.
+        compare(FL.imageSize(bytes([0xFF, 0xD8, 0xFF, 0xFF, 0xFF].concat(sof(0xC0, 96, 96).slice(1)))), size(96, 96))
+        compare(FL.imageSize(bytes(jpeg([[0xFF, 0xD0], [0xFF, 0x01], [0xFF, 0xD8], sof(0xC0, 96, 96)]))), size(96, 96))
+    }
+
+    function test_a_jpeg_thumbnail_is_not_the_picture() {
+        // An EXIF block carries a whole small JPEG of its own, frame header
+        // included, ahead of the real one. Reading byte by byte finds that
+        // one first.
+        var exif = ascii("Exif").concat([0, 0], filler(40), [0xFF, 0xD8], sof(0xC0, 160, 120),
+                                        [0xFF, 0xD9], filler(20))
+        compare(FL.imageSize(bytes(jpeg([segment(0xE1, exif), segment(0xDB, filler(65)),
+                                         sof(0xC0, 640, 640), segment(0xDA, filler(10))]))), size(640, 640))
+        // The tables that share the C0-CF range are no frame header.
+        compare(FL.imageSize(bytes(jpeg([segment(0xC4, filler(20)), segment(0xCC, filler(4)),
+                                         segment(0xC8, filler(6)), sof(0xC0, 200, 200)]))), size(200, 200))
+    }
+
+    function test_a_jpeg_that_stops_before_its_frame_header_has_no_size() {
+        var kadi = kadiJpeg(1200, 1200)
+        // The width's last byte is byte 221.
+        compare(FL.imageSize(bytes(kadi.slice(0, 222))), size(1200, 1200))
+        compare(FL.imageSize(bytes(kadi.slice(0, 221))), null)
+        compare(FL.imageSize(bytes(kadi.slice(0, 213))), null)
+        // A scan or the end of the image before any frame header.
+        compare(FL.imageSize(bytes(jpeg([segment(0xE0, filler(14)), segment(0xDA, filler(10)),
+                                         sof(0xC0, 64, 64)]))), null)
+        compare(FL.imageSize(bytes(jpeg([[0xFF, 0xD9, 0x00, 0x02], sof(0xC0, 64, 64)]))), null)
+        // Lost the chain of segments, or a length that cannot be one.
+        compare(FL.imageSize(bytes([0xFF, 0xD8, 0x00, 0x10].concat(sof(0xC0, 64, 64)))), null)
+        compare(FL.imageSize(bytes([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x01].concat(sof(0xC0, 64, 64)))), null)
+        // A frame whose height comes later (DNL) says nothing usable here.
+        compare(FL.imageSize(bytes(jpeg([sof(0xC0, 64, 0)]))), null)
+    }
+
+    function test_a_webp_says_its_size_in_each_of_its_three_headers() {
+        compare(FL.imageSize(bytes(vp8(300, 200, 0))), size(300, 200))
+        // The two scale bits above each size are not part of it.
+        compare(FL.imageSize(bytes(vp8(300, 200, 3))), size(300, 200))
+        compare(FL.imageSize(bytes(vp8l(1000, 750))), size(1000, 750))
+        compare(FL.imageSize(bytes(vp8l(16384, 1))), size(16384, 1))
+        compare(FL.imageSize(bytes(vp8l(1, 16384))), size(1, 16384))
+        // A lossless logo with transparency sets the alpha flag right
+        // above the height, measured on a PIL-encoded file.
+        compare(FL.imageSize(bytes(vp8l(1000, 5000, true))), size(1000, 5000))
+        compare(FL.imageSize(bytes(vp8x(2000, 1500))), size(2000, 1500))
+        compare(FL.imageSize(bytes(vp8x(70000, 300))), size(70000, 300))
+    }
+
+    function test_a_webp_cut_short_or_of_another_kind_has_no_size() {
+        var x = vp8x(512, 512)
+        compare(FL.imageSize(bytes(x.slice(0, 30))), size(512, 512))
+        compare(FL.imageSize(bytes(x.slice(0, 29))), null)
+        compare(FL.imageSize(bytes(vp8(300, 200, 0).slice(0, 29))), null)
+        // Cut before the byte that holds the top of the height.
+        compare(FL.imageSize(bytes(vp8l(1000, 5000))), size(1000, 5000))
+        compare(FL.imageSize(bytes(vp8l(1000, 5000).slice(0, 24))), null)
+        // A VP8 frame that is not a key frame has no start code.
+        var inter = vp8(300, 200, 0)
+        inter[23] = 0
+        compare(FL.imageSize(bytes(inter)), null)
+        var lossless = vp8l(1000, 750)
+        lossless[20] = 0x2E
+        compare(FL.imageSize(bytes(lossless)), null)
+        compare(FL.imageSize(bytes(webp("ALPH", filler(20)))), null)
+        // RIFX is the big-endian RIFF of other formats, never WebP.
+        var rifx = vp8x(512, 512)
+        rifx[3] = 0x58
+        compare(FL.imageSize(bytes(rifx)), null)
+    }
+
+    function test_what_is_no_picture_with_a_size_answers_null() {
+        compare(FL.imageSize(bytes(ascii('<svg xmlns="http://www.w3.org/2000/svg" width="512"></svg>'))), null)
+        compare(FL.imageSize(bytes([0x42, 0x4D].concat(filler(60)))), null)
+        compare(FL.imageSize(bytes(ascii("<!DOCTYPE html><html><head></head></html>"))), null)
+        compare(FL.imageSize(bytes([])), null)
+        compare(FL.imageSize(bytes([0x89, 0x50, 0x4E, 0x47])), null)
+        compare(FL.imageSize(null), null)
+        compare(FL.imageSize(undefined), null)
+    }
+
+    // ── which picture a logo hunt keeps ───────────────────────────────────
+
+    readonly property string kadiIcon: "https://kadi.ee/wp-content/themes/raadio/img/favicon.ico"
+    readonly property string kadiOg: "https://kadi.ee/wp-content/uploads/2022/01/logo-og-1.jpg"
+    readonly property string logo: "https://r.ee/img/logo.png"
+
+    function test_a_large_square_ranks_first() {
+        compare(FL.logoRank(kadiOg, size(1200, 1200)), 0)
+        compare(FL.logoRank(logo, size(96, 96)), 0)
+        compare(FL.logoRank(logo, size(95, 95)), 1)
+        compare(FL.logoRank(logo, size(33, 33)), 1)
+        compare(FL.logoRank(logo, size(32, 32)), 4)
+        compare(FL.logoRank(kadiIcon, size(16, 16)), 4)
+    }
+
+    function test_square_enough_is_five_to_four_either_way() {
+        compare(FL.logoRank(logo, size(120, 96)), 0)
+        compare(FL.logoRank(logo, size(121, 96)), 3)
+        compare(FL.logoRank(logo, size(96, 120)), 0)
+        compare(FL.logoRank(logo, size(96, 121)), 3)
+        compare(FL.logoRank(logo, size(50, 40)), 1)
+        compare(FL.logoRank(logo, size(51, 40)), 3)
+        // The sharing banner shape.
+        compare(FL.logoRank(logo, size(1200, 630)), 3)
+    }
+
+    function test_a_thin_strip_is_tiny_however_long() {
+        compare(FL.logoRank(logo, size(1, 10000)), 4)
+        compare(FL.logoRank(logo, size(10000, 32)), 4)
+        compare(FL.logoRank(logo, size(10000, 33)), 3)
+    }
+
+    function test_a_picture_without_a_size_ranks_between_shapes() {
+        compare(FL.logoRank("https://r.ee/logo.svg", null), 2)
+        compare(FL.logoRank("https://r.ee/favicon.ico", null), 4)
+        compare(FL.logoRank("https://r.ee/favicon-32x32.png", null), 4)
+    }
+
+    function test_google_ranks_tiny_whatever_it_answers() {
+        compare(FL.logoRank("https://www.google.com/s2/favicons?domain=kadi.ee&sz=128", size(128, 128)), 4)
+        compare(FL.logoRank("https://www.google.com/s2/favicons?domain=kadi.ee&sz=128", null), 4)
+        // A bare favicon.ico is judged by the picture Qt paints from it.
+        compare(FL.logoRank("https://r.ee/favicon.ico", size(48, 48)), 1)
+        compare(FL.logoRank("https://r.ee/favicon.ico", size(256, 256)), 0)
+    }
+
+    function test_the_best_of_raadio_kadi_is_its_og_image() {
+        var found = [{ url: kadiIcon, size: size(16, 16) }, { url: kadiOg, size: size(1200, 1200) }]
+        compare(FL.bestLogo(found).url, kadiOg)
+        compare(FL.bestLogo(found.slice().reverse()).url, kadiOg)
+    }
+
+    function test_the_best_is_by_rank_then_side_then_order() {
+        var banner = { url: "https://r.ee/share.jpg", size: size(1200, 630) }
+        var icon48 = { url: "https://r.ee/i48.png", size: size(48, 48) }
+        var icon64 = { url: "https://r.ee/i64.png", size: size(64, 64) }
+        var svg = { url: "https://r.ee/logo.svg", size: null }
+        var tiny = { url: "https://r.ee/favicon.ico", size: size(16, 16) }
+        compare(FL.bestLogo([banner, icon48]).url, icon48.url)
+        compare(FL.bestLogo([icon48, icon64]).url, icon64.url)
+        compare(FL.bestLogo([icon64, { url: "https://r.ee/other.png", size: size(64, 64) }]).url, icon64.url)
+        compare(FL.bestLogo([banner, svg]).url, svg.url)
+        compare(FL.bestLogo([tiny, banner]).url, banner.url)
+        compare(FL.bestLogo([tiny, svg]).url, svg.url)
+        // Two large squares: the longer shorter side.
+        compare(FL.bestLogo([{ url: "https://r.ee/a.png", size: size(180, 180) },
+                             { url: "https://r.ee/b.png", size: size(512, 500) }]).url, "https://r.ee/b.png")
+    }
+
+    function test_the_best_of_nothing_is_nothing() {
+        compare(FL.bestLogo([]), null)
+        compare(FL.bestLogo(null), null)
+        compare(FL.bestLogo(undefined), null)
+        compare(FL.bestLogo([null, undefined]), null)
+        compare(FL.bestLogo([null, { url: logo, size: size(16, 16) }]).url, logo)
+    }
+
+    function page(u) { return { url: u, kind: "page" } }
+    function share(u) { return { url: u, kind: "share" } }
+    function guess(u) { return { url: u, kind: "guess" } }
+    function host(u) { return { url: u, kind: "host" } }
+    function guesses(origin) {
+        return ["/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/favicon-194x194.png",
+                "/favicon-192x192.png", "/favicon-96x96.png", "/favicon-32x32.png", "/favicon.ico"]
+            .map(function(p) { return guess(origin + p) })
+    }
+
+    function test_raadio_kadi_is_asked_the_apple_path_then_its_og_image() {
+        var cands = [page(kadiIcon), share(kadiOg)].concat(guesses("https://kadi.ee"))
+        compare(FL.probeOrder(cands), [
+            "https://kadi.ee/apple-touch-icon.png",
+            kadiOg,
+            "https://kadi.ee/apple-touch-icon-precomposed.png",
+            "https://kadi.ee/favicon-194x194.png",
+            "https://kadi.ee/favicon-192x192.png",
+            "https://kadi.ee/favicon-96x96.png",
+            kadiIcon,
+            "https://kadi.ee/favicon-32x32.png",
+            "https://kadi.ee/favicon.ico"
+        ])
+    }
+
+    function test_what_the_page_names_goes_first_in_its_own_order() {
+        var cands = [guess("https://r.ee/apple-touch-icon.png"), share("https://r.ee/og.jpg"),
+                     page("https://r.ee/b.png"), page("https://r.ee/favicon-16x16.png"),
+                     page("https://r.ee/a.png"), guess("https://www.google.com/s2/favicons?domain=r.ee&sz=128"),
+                     guess("https://r.ee/favicon-192x192.png"), page("https://r.ee/apple-touch-icon.png")]
+        compare(FL.probeOrder(cands), [
+            "https://r.ee/b.png", "https://r.ee/a.png", "https://r.ee/apple-touch-icon.png",
+            "https://r.ee/og.jpg", "https://r.ee/favicon-192x192.png", "https://r.ee/favicon-16x16.png",
+            "https://www.google.com/s2/favicons?domain=r.ee&sz=128"
+        ])
+    }
+
+    function test_the_og_image_goes_ahead_of_the_guesses_wherever_it_was_listed() {
+        compare(FL.probeOrder([guess("https://r.ee/favicon-192x192.png"), share("https://r.ee/og.jpg"),
+                               guess("https://r.ee/apple-touch-icon.png")]),
+                ["https://r.ee/apple-touch-icon.png", "https://r.ee/og.jpg", "https://r.ee/favicon-192x192.png"])
+    }
+
+    function test_the_stream_hosts_paths_wait_behind_everything_the_homepage_offers() {
+        // Raadio Kadi through the settings page: its stream lives on a CDN
+        // whose own icon, if it has one, is the CDN's.
+        var edge = "https://edge06.cdn.bitflip.ee:8888"
+        var cands = [page(kadiIcon), share(kadiOg)].concat(guesses("https://kadi.ee"),
+            [host(edge + "/apple-touch-icon.png"), host(edge + "/favicon-192x192.png"),
+             host(edge + "/favicon-32x32.png"), host(edge + "/favicon.ico")])
+        compare(FL.probeOrder(cands), [
+            "https://kadi.ee/apple-touch-icon.png",
+            kadiOg,
+            "https://kadi.ee/apple-touch-icon-precomposed.png",
+            "https://kadi.ee/favicon-194x194.png",
+            "https://kadi.ee/favicon-192x192.png",
+            "https://kadi.ee/favicon-96x96.png",
+            edge + "/apple-touch-icon.png",
+            edge + "/favicon-192x192.png",
+            kadiIcon,
+            "https://kadi.ee/favicon-32x32.png",
+            "https://kadi.ee/favicon.ico",
+            edge + "/favicon-32x32.png",
+            edge + "/favicon.ico"
+        ])
+        // Listed first, still asked after the homepage's own guesses.
+        compare(FL.probeOrder([host(edge + "/favicon-192x192.png"), guess("https://kadi.ee/favicon-96x96.png")]),
+                ["https://kadi.ee/favicon-96x96.png", edge + "/favicon-192x192.png"])
+    }
+
+    function test_google_is_asked_last_wherever_it_was_listed() {
+        var g = "https://www.google.com/s2/favicons?domain=r.ee&sz=128"
+        compare(FL.probeOrder([guess(g), guess("https://r.ee/favicon.ico"), page("https://r.ee/favicon.ico?v=2")]),
+                ["https://r.ee/favicon.ico", "https://r.ee/favicon.ico?v=2", g])
+    }
+
+    function test_an_order_of_nothing_is_empty() {
+        compare(FL.probeOrder([]), [])
+        compare(FL.probeOrder(null), [])
+        compare(FL.probeOrder(undefined), [])
+        compare(FL.probeOrder([null, {}, { url: "" }, { kind: "page" }, { url: 42, kind: "page" }]), [])
+        compare(FL.probeOrder([page(logo), page(logo), guess(logo)]), [logo])
+    }
+
+    function test_a_large_square_ends_the_hunt_at_once() {
+        compare(FL.huntSettled([{ url: kadiOg, size: size(1200, 1200) }], 2), true)
+        compare(FL.huntSettled([{ url: logo, size: size(96, 96) }], 1), true)
+        compare(FL.huntSettled([{ url: logo, size: size(95, 95) }], 1), false)
+        compare(FL.huntSettled([{ url: "https://r.ee/logo.svg", size: null }], 1), false)
+    }
+
+    function test_a_real_picture_in_hand_stops_the_hunt_at_the_cap() {
+        var small = [{ url: kadiIcon, size: size(16, 16) }]
+        compare(FL.PROBE_CAP, 6)
+        compare(FL.huntSettled(small, 5), false)
+        compare(FL.huntSettled(small, 6), true)
+        compare(FL.huntSettled(small, 7), true)
+    }
+
+    function test_with_nothing_real_the_hunt_goes_on_to_the_limit() {
+        compare(FL.PROBE_LIMIT, 12)
+        compare(FL.huntSettled([], 0), false)
+        compare(FL.huntSettled([], 6), false)
+        compare(FL.huntSettled([], 11), false)
+        compare(FL.huntSettled([], 12), true)
+        compare(FL.huntSettled(null, 12), true)
+        compare(FL.huntSettled(undefined, 3), false)
+    }
+
+    // ── pickHomepage: whose page a name search may send the hunt to ───────
+
+    // Raadio Kadi's record as the directory gave it on 2026-11-02: no logo,
+    // a homepage.
+    readonly property var kadiRow: ({ name: "Raadio Kadi", countrycode: "EE",
+        url: "https://edge06.cdn.bitflip.ee:8888/kadi", url_resolved: "https://edge06.cdn.bitflip.ee:8888/kadi",
+        favicon: "", homepage: "https://kadi.ee/" })
+
+    function test_raadio_kadi_lends_its_own_homepage() {
+        compare(FL.pickFavicon([kadiRow], norm("Raadio Kadi"), norm, kadiRow.url, 30), "")
+        compare(FL.pickHomepage([kadiRow], norm("Raadio Kadi"), norm, kadiRow.url, 30), "https://kadi.ee/")
+    }
+
+    function test_a_name_from_three_countries_lends_nobody_its_homepage() {
+        compare(FL.pickHomepage(rock, norm("Rock FM"), norm, stranger, 30), "")
+    }
+
+    function test_the_own_record_lends_its_homepage_among_namesakes() {
+        var saved = "https://flucast26-h-cloud.flumotion.com/cope/rockfm-low.mp3/"
+        compare(FL.pickHomepage(rock, norm("Rock FM"), norm, saved, 30), "http://www.rockfm.fm/")
+    }
+
+    function test_a_homepage_on_a_private_host_is_lent_to_nobody() {
+        var own = { name: "Kodu", countrycode: "EE", url: "http://192.168.1.10:8000/kodu", favicon: "",
+                    homepage: "http://192.168.1.10/" }
+        var roof = { name: "Kodu", countrycode: "EE", url: "http://192.168.1.10:8000/kodu2", favicon: "",
+                     homepage: "https://kodu.example/" }
+        compare(FL.pickHomepage([own], norm("Kodu"), norm, own.url, 30), "")
+        compare(FL.pickHomepage([own, roof], norm("Kodu"), norm, own.url, 30), "https://kodu.example/")
+        compare(FL.pickHomepage([{ name: "Kodu", url: own.url, homepage: "file:///etc/" }], norm("Kodu"), norm, own.url, 30), "")
+    }
+
+    function test_pick_homepage_answers_garbage_with_nothing() {
+        compare(FL.pickHomepage(null, norm("Kadi"), norm, "", 30), "")
+        compare(FL.pickHomepage([], norm("Kadi"), norm, "", 30), "")
+        compare(FL.pickHomepage([kadiRow], "", norm, kadiRow.url, 30), "")
+        compare(FL.pickHomepage([kadiRow], norm("Raadio Kadi"), null, kadiRow.url, 30), "")
+        compare(FL.pickHomepage([null, { name: "Raadio Kadi" }], norm("Raadio Kadi"), norm, "", 0), "")
+    }
+
     // ── monogramText ──────────────────────────────────────────────────────
 
     function test_monogram_two_words() {

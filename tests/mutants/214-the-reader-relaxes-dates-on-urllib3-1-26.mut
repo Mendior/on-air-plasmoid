@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The title reader lets a certificate's dates go on urllib3 1.26 as well.
+
+history:
+  urllib3 1.26 hands no server name to the context for an address that is an
+  IP, and the context then refused every such station with a ValueError.
+  There the reader keeps requests' own checks.
+
+target:
+  package/contents/ui/reader.py
+
+find:
+      if int(str(getattr(urllib3, "__version__", "2")).split(".")[0] or "2") < 2:
+
+replace:
+      if False:
+
+expect:
+  Killed by tests/test_reader_tls.py::test_on_urllib3_1_26_the_reader_keeps_requests_own_checks.
+  Line-neutral.

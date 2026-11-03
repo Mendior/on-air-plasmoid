@@ -17,6 +17,7 @@ import org.kde.plasma.plasmoid
 
 import "AlarmLogic.js" as AlarmLogic
 import "ColorLogic.js" as ColorLogic
+import "DoorLogic.js" as DoorLogic
 import "ExecClass.js" as ExecClass
 import "FaviconLogic.js" as FaviconLogic
 import "EpisodeState.js" as EpisodeState
@@ -508,7 +509,7 @@ PlasmoidItem {
                 if (server.codec === undefined) server.codec = "";
                 if (server.bitrate === undefined) server.bitrate = 0;
                 if (server.active)
-                    stationsModel.append(server);
+                    stationsModel.append(DoorLogic.normalize(server));
             }
             // Favorites are name-based (deliberate). If a favorite's name is
             // gone but its previous hostname still exists under a new name,
@@ -753,6 +754,7 @@ PlasmoidItem {
         var xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
         // A real playlist is a few hundred bytes; a hostile server could
         // otherwise stream gigabytes into responseText and exhaust memory.
         // Abort the moment the body crosses a generous ceiling — a truncated
@@ -1839,9 +1841,11 @@ PlasmoidItem {
         });
     }
 
-    // Persist one station's fresh favicon — same identity-write pattern as
-    // _rbStoreUuid: value-identical writes bail early, and a real write
-    // must not read as an add/remove that stops playback.
+    // Persist one station's fresh favicon. A value-identical write bails
+    // early: the config skips it, serversChanged never fires, and an armed
+    // keep-playing flag would eat the stop of the next real add or remove (a
+    // click and a vote once raced to save one uuid that way). A real write
+    // must not read as an add or remove that stops playback.
     function _faviconStore(orig, fav) {
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
@@ -1978,11 +1982,11 @@ PlasmoidItem {
     // A station whose favicon field is EMPTY (the shipped defaults, a ⭐
     // add from a catalog row without one, a hand-added entry) used to stay
     // logo-less forever unless the user found the settings button. Ask the
-    // directory once per station per session — identity lookups only
-    // (byuuid, or a name search whose donor FaviconLogic.donorRows picks), the
-    // same class of request the heal ladder already declares is not a
-    // listen. All finds land in ONE config write; onServersChanged then
-    // runs syncFavicons, which caches the new logos as usual.
+    // directory once per station per session (byuuid, or a name search whose
+    // donor FaviconLogic.donorRows picks); a record with no logo but a
+    // homepage sends LogoHunt to that page. All finds land in ONE config
+    // write; onServersChanged then runs syncFavicons, which caches the new
+    // logos as usual.
     property var _favBackfillTried: ({})    // hostname → true, session-scoped
     property var _favBackfillQueue: []
     property bool _favBackfillBusy: false
@@ -1996,6 +2000,9 @@ PlasmoidItem {
         repeat: false
         onTriggered: root._favBackfillStart()
     }
+
+    // The settings page's homepage hunt: public hosts only, its caps.
+    LogoHunt { id: logoHunt; app: root }
 
     function _favBackfillStart() {
         if (_favBackfillBusy || !isConnected) return;
@@ -2034,17 +2041,25 @@ PlasmoidItem {
             }
             root._favBackfillNext();
         };
+        // A record with no logo but a homepage gets the best picture on that
+        // page (Raadio Kadi's: a 16 px favicon, and the 1200 px logo it gets
+        // now). Not on a metered link; the tried-map keeps it to once a session.
+        var found = function(fav, home) {
+            if (fav !== "" || home === "" || NetworkInformation.isMetered) done(fav);
+            else logoHunt.huntHomepage(home, done);
+        };
         if (st.uuid !== "") {
             // Identity road: the catalog's own record for THIS station.
             // encodeURIComponent: a hand-edited config uuid must stay a
             // path SEGMENT, never reshape the path.
             _rbFetch("/json/stations/byuuid/" + encodeURIComponent(st.uuid), 5000, function(xhr) {
-                var fav = "";
+                var fav = "", home = "";
                 try {
                     var row = (JSON.parse(xhr.responseText) || [])[0] || {};
                     fav = FaviconLogic.webUrlOrEmpty(row.favicon);
+                    home = FaviconLogic.webUrlOrEmpty(row.homepage);
                 } catch (e) {}
-                done(fav);
+                found(fav, home);
             });
             return;
         }
@@ -2052,12 +2067,13 @@ PlasmoidItem {
         if (norm === "") { done(""); return; }
         _rbFetch("/json/stations/search?name=" + SearchLogic.uriPart(st.name)
                  + "&limit=30&order=votes&reverse=true", 5000, function(xhr) {
-            var fav = "";
+            var fav = "", home = "";
             try {
                 var rows = JSON.parse(xhr.responseText) || [];
                 fav = FaviconLogic.pickFavicon(rows, norm, HealLogic.normName, st.host, 30);
+                home = FaviconLogic.pickHomepage(rows, norm, HealLogic.normName, st.host, 30);
             } catch (e) {}
-            done(fav);
+            found(fav, home);
         });
     }
 
@@ -2085,7 +2101,7 @@ PlasmoidItem {
             // Value-identical bail BEFORE arming the flag: a skipped config
             // write never fires serversChanged, and an armed keep-playing
             // flag would eat the stop of the next real add/remove (the
-            // _rbStoreUuid trap, documented there).
+            // trap _faviconStore describes).
             if (out === Plasmoid.configuration.servers) return;
             _reorderKeepPlaying = true;
             Plasmoid.configuration.servers = out;
@@ -2419,8 +2435,10 @@ PlasmoidItem {
                               ? stationsModel.get(lastPlay).hostname : "";
             const followName = (lastPlay >= 0 && lastPlay < stationsModel.count)
                                ? stationsModel.get(lastPlay).name : "";
+            const out = JSON.stringify(servers);
+            if (out === Plasmoid.configuration.servers) return false;
             _reorderKeepPlaying = true;
-            Plasmoid.configuration.servers = JSON.stringify(servers);
+            Plasmoid.configuration.servers = out;
             Qt.callLater(function() {
                 if (followUrl === "") return;
                 for (var k = 0; k < stationsModel.count; k++) {
@@ -2486,8 +2504,10 @@ PlasmoidItem {
                               ? stationsModel.get(lastPlay).hostname : "";
             const followName = (lastPlay >= 0 && lastPlay < stationsModel.count)
                                ? stationsModel.get(lastPlay).name : "";
+            const out = JSON.stringify(servers);
+            if (out === Plasmoid.configuration.servers) return false;
             _reorderKeepPlaying = true;
-            Plasmoid.configuration.servers = JSON.stringify(servers);
+            Plasmoid.configuration.servers = out;
             Qt.callLater(function() {
                 if (followUrl === "") return;
                 for (var k = 0; k < stationsModel.count; k++) {
@@ -2609,7 +2629,7 @@ PlasmoidItem {
                 // is the station's identity for clicks/votes, free at add time.
                 // The one gate every persisted favicon passes: file://, data:
                 // and scheme-less strings become "" (the backfill then fills).
-                servers.push({ "active": true, "hostname": url, "name": stName,
+                servers.push(DoorLogic.normalize({ "active": true, "hostname": url, "name": stName,
                                "favicon": FaviconLogic.webUrlOrEmpty(favicon),
                                // Kept because the address often cannot say:
                                // an Ogg-family stream has to reach the relay
@@ -2619,7 +2639,7 @@ PlasmoidItem {
                                // reports none (FLAC-family streams).
                                "codec": String(codec || "").toLowerCase().substring(0, 16),
                                "bitrate": parseInt(bitrate) || 0,
-                               "uuid": rbUuid || "" });
+                               "uuid": rbUuid || "" }));
                 // This triggers onServersChanged → reloadStationsModel (stop + reload),
                 // so we continue only after an event-loop cycle.
                 Plasmoid.configuration.servers = JSON.stringify(servers);
@@ -2795,7 +2815,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.41");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -3146,7 +3166,7 @@ PlasmoidItem {
     property alias _artLookupPendingRaw: artworkEngine._artLookupPendingRaw
     property alias _artPendingKey: artworkEngine._artPendingKey
     function lookupAlbumArt(trackString) { artworkEngine.lookupAlbumArt(trackString); }
-    function _artFromCache(query) { return artworkEngine._artFromCache(query); }
+    function _artFromCache(query, artist) { return artworkEngine._artFromCache(query, artist); }
 
     SyncEngine {
         id: syncEngine
@@ -4425,6 +4445,9 @@ PlasmoidItem {
         root._healRun = null;
         root._healRetryAttempts = 0;
         healRetryTimer.stop();
+        // The saved address answering again is no move: a record whose url is
+        // a .pls naming that very address unwraps back to it.
+        if (HealLogic.addrKey(newUrl) === HealLogic.addrKey(oldUrl)) return;
         var oldBase = _baseDomain(_hostOf(oldUrl));
         // May this address overwrite the saved one? Identity, not
         // similarity — HealLogic.commitVerdict holds the bar (uuid row,
@@ -4451,6 +4474,10 @@ PlasmoidItem {
             for (var i = 0; i < servers.length; i++) {
                 if ((servers[i].hostname || "") !== oldUrl) continue;
                 servers[i].hostname = newUrl;
+                // Where it was stays as prev. The row keeps its own uuid:
+                // a name twin's identity is weaker proof than the one the
+                // row already has, and byuuid moves are trusted for good.
+                servers[i].prev = oldUrl;
                 // Restore the invariant "_currentOrigUrl == the configured
                 // hostname of what is playing" — leaving it on the dead url
                 // would misfire the bitrate fallback on the NEXT error (600 ms
@@ -4472,8 +4499,10 @@ PlasmoidItem {
                 }
                 var stName = servers[i].name || "";
                 // A pure address swap — the reload must not stop playback.
+                var out = JSON.stringify(servers);
+                if (out === Plasmoid.configuration.servers) return;
                 _reorderKeepPlaying = true;
-                Plasmoid.configuration.servers = JSON.stringify(servers);
+                Plasmoid.configuration.servers = out;
                 Qt.callLater(function() {
                     for (var k = 0; k < stationsModel.count; k++) {
                         if (stationsModel.get(k).hostname === newUrl) {
@@ -4520,6 +4549,7 @@ PlasmoidItem {
     property var _voteLockMap: ({})      // orig url → epoch ms of last vote
     property string _voteStatus: ""      // ""|"busy"|"voted" for the CURRENT station
     property var _uuidFailed: ({})       // orig url → epoch ms of failed resolve
+    property var _uuidResolved: ({})     // orig url → uuid found this session
 
     // The config entry of the station playing NOW (by the configured URL).
     function _stationEntry() {
@@ -4532,8 +4562,9 @@ PlasmoidItem {
         return null;
     }
 
-    // radio-browser identity of the current station. Stored with the station
-    // on first resolve; stations added from the search carry it from birth.
+    // radio-browser identity of the current station, for a click or a vote.
+    // Stations added from the search carry it from birth; for the rest it is
+    // looked up by name and the address, and kept for the session only.
     // Mirrors fail over in order via _rbFetch, and only a mirror that
     // actually answered may negative-cache the station: one slow mirror
     // used to silently disable clicks AND votes for 24 hours.
@@ -4542,6 +4573,7 @@ PlasmoidItem {
         if (!entry) return;
         if (entry.uuid) { onUuid(entry.uuid); return; }
         var orig = entry.hostname;
+        if (_uuidResolved[orig] !== undefined) { onUuid(_uuidResolved[orig]); return; }
         var now = Date.now();
         if (_uuidFailed[orig] !== undefined && now - _uuidFailed[orig] < 86400000) return;
         var name = (entry.name || "").toString();
@@ -4565,30 +4597,12 @@ PlasmoidItem {
                 _uuidFailed[orig] = Date.now();
                 return;
             }
-            _rbStoreUuid(orig, uuid);
+            // Not saved with the station: a name and an address are no proof
+            // of which record is the station's, anyone can file a record that
+            // lists an address, and the heal trusts a saved uuid for good.
+            _uuidResolved[orig] = uuid;
             onUuid(uuid);
         });
-    }
-
-    function _rbStoreUuid(orig, uuid) {
-        try {
-            const servers = JSON.parse(Plasmoid.configuration.servers);
-            for (var i = 0; i < servers.length; i++) {
-                if ((servers[i].hostname || "") !== orig) continue;
-                // Two concurrent resolves (click + vote racing on a station
-                // without a stored uuid) both land here. The second write is
-                // value-identical, the config skips it, serversChanged never
-                // fires — and the keep-playing flag would stay armed and eat
-                // the NEXT real add/remove's stop. Bail before arming it.
-                if ((servers[i].uuid || "") === uuid) return;
-                servers[i].uuid = uuid;
-                var out = JSON.stringify(servers);
-                if (out === Plasmoid.configuration.servers) return;
-                _reorderKeepPlaying = true; // identity write must not stop playback
-                Plasmoid.configuration.servers = out;
-                return;
-            }
-        } catch (e) {}
     }
 
     // Anonymous "someone is listening" ping, at most once per station per 4 h.
@@ -4746,27 +4760,33 @@ PlasmoidItem {
         bitrateFallbackTimer.stop();
         bitrateFallbackTimer.fallbackUrl = "";
         const mySeq = ++_resolveCallSeq;
+        var home = (station.hostname || "").toString();
+        // The row as it is now. The list can be rewritten while a .pls or .m3u
+        // is unwrapped (a logo the popup found, a heal), and a ListModel row
+        // read after that answers empty: the station played with no name, and
+        // a click on its row started it again instead of stopping it.
+        var st = { "name": station.name, "favicon": station.favicon, "active": station.active };
         // Unwrap a .pls/.m3u first: everything downstream (bitrate resolve,
         // the player itself) wants the stream, not its wrapper.
-        _unwrapPlaylist((station.hostname || "").toString(), function(playUrl) {
+        _unwrapPlaylist(home, function(playUrl) {
             if (mySeq !== _resolveCallSeq) return;
             var finish = function(resolvedUrl) {
                 // Bail out if the user clicked another station while we were
                 // waiting for the radio-browser response.
                 if (mySeq !== _resolveCallSeq) return;
-                if (automated === true && _orderLapsed()) return;
+                if (automated === true && (!root._wantsPlaying || _orderLapsed())) return;
                 // A different station must not wear its predecessor's title
                 // until its first ICY line: the stopped edge used to clear it,
                 // but a park or a shifted reader keeps that edge quiet on purpose.
-                if ((station.hostname || "").toString() !== root._currentOrigUrl) root.metadata = "";
-                root._currentOrigUrl = (station.hostname || "").toString();
+                if (home !== root._currentOrigUrl) root.metadata = "";
+                root._currentOrigUrl = home;
                 root._currentUnwrappedUrl = playUrl;
                 root._currentResolvedUrl = resolvedUrl;
                 startWithFade({
-                    "name": station.name,
+                    "name": st.name,
                     "hostname": resolvedUrl,
-                    "favicon": station.favicon,
-                    "active": station.active
+                    "favicon": st.favicon,
+                    "active": st.active
                 });
             };
             // A preview row came out of the directory seconds ago — that row
@@ -4781,15 +4801,15 @@ PlasmoidItem {
             // the cache in the background; the upgrade applies on the next
             // play.
             if (_bitrateCache[playUrl] !== undefined) {
-                _autoSelectBitrate({ "name": station.name, "hostname": playUrl,
-                                     "favicon": station.favicon,
-                                     "active": station.active }, finish);
+                _autoSelectBitrate({ "name": st.name, "hostname": playUrl,
+                                     "favicon": st.favicon,
+                                     "active": st.active }, finish);
                 return;
             }
             finish(playUrl);
-            _autoSelectBitrate({ "name": station.name, "hostname": playUrl,
-                                 "favicon": station.favicon,
-                                 "active": station.active }, function(picked) {
+            _autoSelectBitrate({ "name": st.name, "hostname": playUrl,
+                                 "favicon": st.favicon,
+                                 "active": st.active }, function(picked) {
                 // Cache warmed inside _autoSelectBitrate — playback is
                 // deliberately not touched here.
             });
@@ -5178,7 +5198,7 @@ PlasmoidItem {
     }
 
     function _preCleanTrack(s) {
-        return TrackLogic.preCleanTrack(s);
+        return TrackLogic.preCleanTrack(s, root.currentStation);
     }
 
 
@@ -5525,7 +5545,7 @@ PlasmoidItem {
                     // debounce nor the network: paint it and stand down.
                     artSettled = Plasmoid.configuration.albumArtEnabled
                                  && artKey.length > 0
-                                 && root._artFromCache(artKey);
+                                 && root._artFromCache(artKey, parsed.artist);
                 }
                 if (artSettled) artworkEngine.debounceStop();
                 else artworkEngine.debounceRestart(firstTitle);

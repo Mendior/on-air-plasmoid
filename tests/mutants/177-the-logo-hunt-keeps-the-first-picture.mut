@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The logo hunt keeps the first real picture it was answered with, not the
+  best one.
+
+history:
+  Fetch missing logos used to do exactly that, and on Raadio Kadi's homepage
+  it saved the 16x16 favicon.ico the page names ahead of its 1200x1200 logo;
+  only a second press found the logo.
+
+target:
+  package/contents/ui/LogoHunt.qml
+
+find:
+                  Qt.callLater(function() { onDone(FaviconLogic.bestLogo(found)); });
+
+replace:
+                  Qt.callLater(function() { onDone(found.length ? found[0] : null); });
+
+expect:
+  Killed by tests/qml/tst_logohunt.qml::test_the_best_of_what_answered_is_kept_not_the_first.
+  Line-neutral.

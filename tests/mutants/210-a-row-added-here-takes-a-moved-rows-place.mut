@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A row added on the settings page at the address another row was moved
+  away from there takes that row's changes from the popup.
+
+history:
+  Page rows pair with the rows the page loaded first by their own name and
+  uuid; a base row whose name and uuid a page row still carries elsewhere is
+  that row's, not a newcomer's.
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+              if (used[idx[j]] || _keyHeldElsewhere(base[idx[j]], cur, out)) continue
+
+replace:
+              if (used[idx[j]]) continue
+
+expect:
+  Killed by tst_reorderlogic::test_merge_gives_a_row_added_here_nothing_of_one_moved_away_here.
+  Line-neutral.

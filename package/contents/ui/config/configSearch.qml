@@ -15,6 +15,7 @@ import QtMultimedia
 import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
 import ".." as ARP
+import "../DoorLogic.js" as DoorLogic
 import "../FaviconLogic.js" as FaviconLogic
 import "../ReorderLogic.js" as ReorderLogic
 import "../SearchLogic.js" as SearchLogic
@@ -179,7 +180,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.41")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.42")
     }
 
     function getStations(by, val) {
@@ -378,7 +379,7 @@ KCM.ScrollViewKCM {
             if (srv.codec === undefined) srv.codec = ""
             if (srv.bitrate === undefined) srv.bitrate = 0
             if (srv.uuid === undefined) srv.uuid = ""
-            stationsModel.append(srv)
+            stationsModel.append(DoorLogic.normalize(srv))
         }
         _lastSynced = _servers
         stat = 0
@@ -401,7 +402,7 @@ KCM.ScrollViewKCM {
                 try {
                     const servers = JSON.parse(external)
                     stationsModel.clear()
-                    for (const srv of servers) stationsModel.append(srv)
+                    for (const srv of servers) stationsModel.append(DoorLogic.normalize(srv))
                     root._servers = external
                     root._lastSynced = external
                 } catch (e) {}
@@ -423,7 +424,7 @@ KCM.ScrollViewKCM {
                     // a model row drags wrapper internals along with the
                     // roles) and the wrapper's objectName is not an edit.
                     const norm = (o) => {
-                        const plain = JSON.parse(JSON.stringify(o))
+                        const plain = DoorLogic.normalize(JSON.parse(JSON.stringify(o)))
                         delete plain.objectName
                         // Both sides get the shape the model rows were given
                         // on load. A station stored before codecs were saved
@@ -442,34 +443,13 @@ KCM.ScrollViewKCM {
                         for (const k of keys) flat[k] = plain[k]
                         return JSON.stringify(flat)
                     }
-                    const baseByHost = {}
-                    for (const b of base) baseByHost[b.hostname] = norm(b)
-                    const extByHost = {}
-                    for (const srv of ext) extByHost[srv.hostname] = srv
-                    var changed = false
-                    // Backwards: removals must not shift unvisited rows.
-                    for (var i = stationsModel.count - 1; i >= 0; i--) {
-                        const cur = stationsModel.get(i)
-                        const baseNorm = baseByHost[cur.hostname]
-                        if (baseNorm === undefined || norm(cur) !== baseNorm)
-                            continue // locally added or edited — local wins
-                        const extRow = extByHost[cur.hostname]
-                        if (extRow === undefined) {
-                            // Externally deleted, untouched here — do not
-                            // resurrect it.
-                            stationsModel.remove(i)
-                            changed = true
-                        } else if (norm(extRow) !== baseNorm) {
-                            stationsModel.set(i, extRow)
-                            changed = true
-                        }
+                    const merged = ReorderLogic.mergeExternal(base, ReorderLogic.savedRows(stationsModel), ext, norm)
+                    const changed = merged.changed
+                    if (changed) {
+                        stationsModel.clear()
+                        for (const row of merged.rows) stationsModel.append(DoorLogic.normalize(row))
                     }
-                    const have = {}
-                    for (var j = 0; j < stationsModel.count; j++)
-                        have[stationsModel.get(j).hostname] = true
-                    for (const srv of ext) {
-                        if (!have[srv.hostname]) { stationsModel.append(srv); changed = true }
-                    }
+                    // The page already has edits of its own and has said so.
                     if (changed) root._servers = JSON.stringify(getServersArray())
                     // The base advances to the state just merged — otherwise
                     // an adopted row reads as a local edit next time and a
@@ -677,14 +657,19 @@ KCM.ScrollViewKCM {
                             const src = searchModel.get(listItem.index)
                             // The popup's star refuses an address the list already
                             // holds and keeps the directory's codec, bitrate and
-                            // uuid; this road appended a bare twin instead.
+                            // uuid; this road appended a bare twin instead. A
+                            // saved row may sit at the station's own address
+                            // (url) after a heal, so that and the uuid count too.
                             var dupAt = -1
-                            for (var di = 0; di < stationsModel.count; di++)
-                                if (stationsModel.get(di).hostname === src.url_resolved) { dupAt = di; break }
+                            for (var di = 0; di < stationsModel.count; di++) {
+                                const held = stationsModel.get(di)
+                                if (held.hostname === src.url_resolved || held.hostname === src.url
+                                    || (src.stationuuid && held.uuid === src.stationuuid)) { dupAt = di; break }
+                            }
                             if (dupAt < 0) {
                                 // favicon and url_resolved were gated to http(s)
                                 // as the row entered the model (_appendRow).
-                                stationsModel.append({
+                                stationsModel.append(DoorLogic.normalize({
                                     "name": src.name,
                                     "hostname": src.url_resolved,
                                     "favicon": src.favicon || "",
@@ -693,7 +678,7 @@ KCM.ScrollViewKCM {
                                     "bitrate": parseInt(src.bitrate) || 0,
                                     "uuid": src.stationuuid || "",
                                     "active": true
-                                })
+                                }))
                                 _edited()
                             }
                             if (!message.visible) {

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The settings merge reads an empty field and a missing one as different,
+  so it takes the difference for a change made on the page.
+
+history:
+  A starred row is saved with prev empty and the page drops an empty prev:
+  the heal's prev was taken for a change made here and lost.
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+          var v = _blank(c[k]) === _blank(b[k]) ? x[k] : c[k]
+
+replace:
+          var v = c[k] === b[k] ? x[k] : c[k]
+
+expect:
+  Killed by tst_reorderlogic::test_merge_reads_an_empty_field_and_a_missing_one_alike.
+  Line-neutral.

@@ -382,6 +382,7 @@ PlasmaExtras.Representation {
             }
         }
         xhr.open("GET", url)
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.42")
         guard = root._armXhrTimeout(xhr, 6000)
         fullRepresentation._probeLiveXhrs.push(xhr)
         xhr.send()
@@ -421,12 +422,13 @@ PlasmaExtras.Representation {
     }
 
     // Every search road ends here. A directory that answered but left the
-    // list empty gets the stem retry: the query inflected ("Elmari" hunting
-    // "Elmar") or every hit already sitting in the user's own list — both
-    // read as "no results" without one more, shorter question.
+    // list empty gets one more question: a genre inside a place ("techno
+    // berlin"), a glued number spelled apart ("raadio2" as "raadio 2"), then
+    // the stems for an inflection ("Elmari" hunting "Elmar") or for every hit
+    // already sitting in the user's own list.
     function _webFinish(q, seq, tail, gotAnswer) {
         if (seq !== fullRepresentation._webSearchSeq) return
-        var stems = SearchLogic.stems(q)
+        var stems = SearchLogic.spellings(q).concat(SearchLogic.stems(q))
         var next = SearchLogic.emptyNext({
             count: webResultsModel.count, gotAnswer: gotAnswer,
             mode: fullRepresentation.webSearchMode,
@@ -448,6 +450,33 @@ PlasmaExtras.Representation {
             // where the directory had thirty. An empty pass has nothing
             // to protect — the stems start with the full page again.
             fullRepresentation.webResultCap = 30
+            // Asked only now that the cap is back: under the word pass's
+            // freeze the seventeen Berlin techno stations showed as one.
+            var gp = SearchLogic.genrePlace(q)
+            if (gp !== null) {
+                var gpQs = "/json/stations/search?tag=" + encodeURIComponent(gp.tag)
+                           + "&state=" + encodeURIComponent(gp.state)
+                root._rbFetch(gpQs + tail, 4000, function(xhr) {
+                    if (seq !== fullRepresentation._webSearchSeq) return
+                    _webAppendResults(xhr)
+                    if (webResultsModel.count > 0) {
+                        _webRememberQuery(fullRepresentation._webLastTyped || q)
+                        fullRepresentation._webLastQs = gpQs + tail
+                        fullRepresentation._webSkipAhead =
+                            fullRepresentation._webLastConsumed - webResultsModel.count
+                        _probeKick(seq)
+                    }
+                    // No mirror answered at all: the stems would only walk the
+                    // same dead chain. An empty answer goes on to them.
+                    if (webResultsModel.count > 0 || xhr === null) {
+                        fullRepresentation.webSearchFailed = webResultsModel.count === 0
+                        fullRepresentation.webSearching = false
+                        return
+                    }
+                    _webStemChain(q, stems, 0, seq, tail)
+                })
+                return
+            }
             _webStemChain(q, stems, 0, seq, tail)
             return
         }
@@ -2702,7 +2731,7 @@ PlasmaExtras.Representation {
                     // Chapters — the episode's own table of contents, read
                     // from the file at download time. A compact menu: pick a
                     // chapter, the needle jumps there.
-                    PlasmaComponents3.ComboBox {
+                    QQC2.ComboBox {
                         visible: root._podPlayingKey !== "" && root._podChaptersCur.length > 0
                         Layout.alignment: Qt.AlignVCenter
                         Layout.maximumWidth: Kirigami.Units.gridUnit * 11
@@ -5628,6 +5657,8 @@ PlasmaExtras.Representation {
                 Layout.alignment: Qt.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
+                wrapMode: Text.Wrap
+                maximumLineCount: 2
                 elide: Text.ElideRight
                 clip: true
                 color: {
@@ -5684,6 +5715,8 @@ PlasmaExtras.Representation {
                     else if (RetryLogic.betweenKnocks(root._wantsPlaying, root._healRetryAttempts))
                         // The player idles between knocks and this read as giving up (bench, 2026-09-23).
                         return i18n("Reconnecting…")
+                    else if (root._friendlyError !== "")
+                        return root._friendlyError  // a dead preview's word, until the next play or stop
                     else
                         return i18n("Choose station and enjoy…")
                 }
@@ -5984,7 +6017,7 @@ PlasmaExtras.Representation {
 
                         // Local output picker (Bluetooth speakers, HDMI,
                         // headphones…). Only shown when there is a choice.
-                        PlasmaComponents3.ComboBox {
+                        QQC2.ComboBox {
                             id: outputCombo
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5

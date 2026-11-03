@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Re-fetch all saves a 16 px favicon or Google's icon over a logo the row
+  already has.
+
+history:
+  The button promises to keep a logo it cannot better, and a tab-sized find
+  replaced a 1024 px logo the listener had set. A find of logoRank 4 never
+  replaces a logo now.
+
+target:
+  package/contents/ui/FaviconLogic.js
+
+find:
+      if (webUrlOrEmpty(current) !== "" && best.url === current) return false;
+
+replace:
+      if (false) return false;
+
+expect:
+  Killed by tst_faviconlogic::test_a_tab_icon_never_replaces_a_logo_a_row_has.
+  Line-neutral.

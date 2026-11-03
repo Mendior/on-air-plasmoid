@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A play takes the station's address from the live row after a .pls or .m3u
+  has been unwrapped.
+
+history:
+  A list write while the wrapper was unwrapped (a logo the popup found, a
+  heal) cleared and refilled the model, and the row read after it answered
+  empty: the station played with no name, and a click on its row started it
+  again instead of stopping it. The play now reads the row before the unwrap.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                  root._currentOrigUrl = home;
+
+replace:
+                  root._currentOrigUrl = (station.hostname || "").toString();
+
+expect:
+  Killed by test_invariants::test_a_play_reads_its_row_before_the_address_is_unwrapped.
+  Line-neutral.

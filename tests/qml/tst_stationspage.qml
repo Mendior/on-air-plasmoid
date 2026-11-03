@@ -22,6 +22,24 @@ TestCase {
         { name: "Alpha", hostname: "http://a.example/s", favicon: "", active: true },
         { name: "Beta", hostname: "http://b.example/s", favicon: "", active: true }])
 
+    readonly property string three: JSON.stringify([
+        { name: "Alpha", hostname: "http://a.example/s", favicon: "", active: true },
+        { name: "Beta", hostname: "http://b.example/edge", favicon: "", active: true,
+          uuid: "1ee96040-bfb6-4209-9ab8-14a26ff73ad0" },
+        { name: "Gamma", hostname: "http://g.example/s", favicon: "", active: true }])
+
+    // What the popup writes when a heal moves a station: new hostname, the
+    // old one kept as prev.
+    function moved(json, from, to) {
+        var list = JSON.parse(json)
+        for (var i = 0; i < list.length; i++)
+            if (list[i].hostname === from) { list[i].hostname = to; list[i].prev = from }
+        return JSON.stringify(list)
+    }
+    function hosts(page) {
+        return page.getServersArray().map(function(s) { return s.name + "@" + s.hostname }).join(",")
+    }
+
     // What the popup writes while the page is open: its logo backfill.
     function withLogo(json, host, logo) {
         var list = JSON.parse(json)
@@ -141,6 +159,48 @@ TestCase {
                         "shell " + k + ", row " + i)
             page.destroy()
         }
+    }
+
+    function test_a_station_removed_here_stays_removed_when_the_popup_writes() {
+        // Measured on the page (2026-11-02): with Beta removed here and Apply
+        // not yet pressed, any write from the popup (a logo, a door, an
+        // identity) brought Beta back, and Apply saved it.
+        var page = open(three)
+        page.view.model.remove(1)
+        page._edited()
+        plasmoid.configuration.servers = withLogo(three, "http://a.example/s", "https://a.example/l.png")
+        compare(names(page), "Alpha+logo,Gamma")
+        page.destroy()
+    }
+
+    function test_a_station_the_popup_moved_keeps_its_place() {
+        var page = open(three)
+        page.view.model.setProperty(2, "active", false)
+        page._edited()
+        plasmoid.configuration.servers = moved(three, "http://b.example/edge", "http://b.example/router")
+        compare(hosts(page), "Alpha@http://a.example/s,Beta@http://b.example/router,Gamma@http://g.example/s")
+        page.destroy()
+    }
+
+    function test_a_move_of_a_station_edited_here_is_no_second_row() {
+        var page = open(three)
+        page.view.model.setProperty(1, "name", "Beta Mine")
+        page._edited()
+        plasmoid.configuration.servers = moved(three, "http://b.example/edge", "http://b.example/router")
+        // The rename stays and the heal's move lands on it: kept on the old
+        // address, the popup's next load lost the station's favorite.
+        compare(hosts(page), "Alpha@http://a.example/s,Beta Mine@http://b.example/router,Gamma@http://g.example/s")
+        compare(page.getServersArray()[1].prev, "http://b.example/edge")
+        page.destroy()
+    }
+
+    function test_a_move_of_a_station_removed_here_does_not_bring_it_back() {
+        var page = open(three)
+        page.view.model.remove(1)
+        page._edited()
+        plasmoid.configuration.servers = moved(three, "http://b.example/edge", "http://b.example/router")
+        compare(hosts(page), "Alpha@http://a.example/s,Gamma@http://g.example/s")
+        page.destroy()
     }
 
     function test_an_edit_and_a_popup_change_are_both_kept() {

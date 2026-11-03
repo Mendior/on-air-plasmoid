@@ -91,7 +91,152 @@ function savedRows(model) {
     for (var i = 0; i < model.count; i++) {
         var row = JSON.parse(JSON.stringify(model.get(i)))
         delete row.objectName
+        // Every model row carries prev so the first row sets the role's
+        // shape (DoorLogic.normalize); an empty prev says nothing.
+        if (row.prev === "") delete row.prev
         out.push(row)
+    }
+    return out
+}
+
+// The popup wrote the station list (ext) while a settings page holds
+// unsaved edits (cur) made against the list it loaded (base). Rows this
+// page never touched follow the popup; a row edited here keeps what was
+// changed here and takes the rest from the popup, field by field; a row
+// added here stays, and one removed here stays removed, whatever the popup
+// did to it meanwhile; rows the popup added come along once.
+// The popup never writes a row's name or uuid: it moves a row (a heal
+// writes hostname and prev), fills a logo, turns a row on, reorders, adds
+// and removes. So a row of the page's list is found in the popup's by its
+// name and uuid, and only among rows sharing those by the same address, by
+// the address it moved from, and by order. Measured on the page on
+// 2026-11-02 and 2026-11-03: keyed on the address, a move landed at the
+// bottom or twice, a removed row came back, a rename kept the station on
+// the address the heal had left and the popup then lost its favorite, an
+// older heal's prev took another row's place, a heal onto an address
+// another saved row held dropped a station, and of two rows on one address
+// the wrong one took the change.
+// Contract: { rows, changed }; norm(row) is the page's comparable form.
+function mergeExternal(base, cur, ext, norm) {
+    var extOf = _pairBaseExt(base, ext), atAddr = {}, i, k
+    for (i = 0; i < base.length; i++) {
+        k = base[i].hostname
+        if (atAddr[k] === undefined) atAddr[k] = []
+        atAddr[k].push(i)
+    }
+    var baseOf = _pairCurBase(base, cur, atAddr)
+    var rows = [], changed = false
+    for (i = 0; i < cur.length; i++) {
+        var c = cur[i], bi = baseOf[i]
+        if (bi === -1) { rows.push(c); continue }
+        var b = base[bi], x = extOf[bi]
+        if (norm(c) !== norm(b)) {
+            if (x === undefined) { rows.push(c); continue }
+            var both = _fieldMerge(b, c, x)
+            rows.push(both)
+            if (norm(both) !== norm(c)) changed = true
+            continue
+        }
+        if (x === undefined) { changed = true; continue }
+        if (norm(x) !== norm(b)) { rows.push(x); changed = true } else rows.push(c)
+    }
+    var paired = extOf.filter(function(x) { return x !== undefined })
+    for (i = 0; i < ext.length; i++) {
+        var e = ext[i]
+        if (paired.indexOf(e) !== -1) continue
+        var twice = rows.some(function(r) { return r.hostname === e.hostname && r.name === e.name })
+        if (twice) continue
+        rows.push(e)
+        changed = true
+    }
+    return { rows: rows, changed: changed }
+}
+
+function _key(r) {
+    return String(r.name === undefined ? "" : r.name) + "\u0001" + String(r.uuid === undefined ? "" : r.uuid)
+}
+
+// For every base row its row in the popup's list, or undefined where the
+// popup removed it.
+function _pairBaseExt(base, ext) {
+    var pool = {}, taken = [], out = [], j
+    for (j = 0; j < ext.length; j++) {
+        var kj = _key(ext[j])
+        if (pool[kj] === undefined) pool[kj] = []
+        pool[kj].push(j)
+    }
+    var pass = function(fits) {
+        for (var i = 0; i < base.length; i++) {
+            if (out[i] !== undefined) continue
+            var cands = pool[_key(base[i])] || []
+            for (var c = 0; c < cands.length; c++) {
+                if (taken[cands[c]] || !fits(base[i], ext[cands[c]])) continue
+                taken[cands[c]] = true
+                out[i] = ext[cands[c]]
+                break
+            }
+        }
+    }
+    // A row the popup did not move keeps its address and its prev; a moved one
+    // carries a new prev, the address it left.
+    pass(function(b, x) { return x.hostname === b.hostname && _blank(x.prev) === _blank(b.prev) })
+    pass(function(b, x) { return !!x.prev && x.prev === b.hostname })
+    pass(function() { return true })
+    return out
+}
+
+// For every page row the base row it came from, -1 for one added here or
+// moved to an address of the page's choosing. Rows at one address pair up
+// with the rows the page loaded there: first every row with its own name and
+// uuid, then the rest in order, so a row renamed or moved here never takes
+// the place of one that kept both.
+function _pairCurBase(base, cur, atAddr) {
+    var out = [], used = [], i, j, idx
+    for (i = 0; i < cur.length; i++) {
+        out[i] = -1
+        idx = atAddr[cur[i].hostname] || []
+        for (j = 0; j < idx.length; j++) {
+            if (used[idx[j]] || _key(base[idx[j]]) !== _key(cur[i])) continue
+            used[idx[j]] = true
+            out[i] = idx[j]
+            break
+        }
+    }
+    for (i = 0; i < cur.length; i++) {
+        if (out[i] !== -1) continue
+        idx = atAddr[cur[i].hostname] || []
+        for (j = 0; j < idx.length; j++) {
+            if (used[idx[j]] || _keyHeldElsewhere(base[idx[j]], cur, out)) continue
+            used[idx[j]] = true
+            out[i] = idx[j]
+            break
+        }
+    }
+    return out
+}
+
+// Whether some page row still carries this base row's name and uuid and has
+// no base row yet: then it is that row's, not a stranger's to take.
+function _keyHeldElsewhere(b, cur, out) {
+    for (var i = 0; i < cur.length; i++)
+        if (out[i] === -1 && _key(cur[i]) === _key(b)) return true
+    return false
+}
+
+function _blank(v) {
+    return v === undefined || v === null ? "" : v
+}
+
+// A row changed on both sides: what this page changed wins, field by field,
+// and every other field follows the popup.
+function _fieldMerge(b, c, x) {
+    var keys = {}, out = {}, k
+    for (k in b) keys[k] = true
+    for (k in c) keys[k] = true
+    for (k in x) keys[k] = true
+    for (k in keys) {
+        var v = _blank(c[k]) === _blank(b[k]) ? x[k] : c[k]
+        if (v !== undefined) out[k] = v
     }
     return out
 }

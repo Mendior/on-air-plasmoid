@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A row edited on the settings page keeps itself whole, and nothing the
+  popup wrote to it meanwhile lands.
+
+history:
+  A rename on the page and a heal in the popup left the renamed station on
+  the address the heal had left, and the popup's next load lost its
+  favorite. What was changed on the page now wins field by field, and the
+  rest follows the popup.
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+              var both = _fieldMerge(b, c, x)
+
+replace:
+              var both = c
+
+expect:
+  Killed by tst_reorderlogic::test_merge_carries_a_move_onto_a_row_renamed_here.
+  Line-neutral.

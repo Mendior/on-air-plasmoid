@@ -9,6 +9,7 @@ won't deliver usable metadata, so the plasmoid stops respawning us.
 """
 import os
 import signal
+import ssl
 import sys
 import time
 import urllib.parse
@@ -95,6 +96,8 @@ if len(sys.argv) >= 3 and sys.argv[1] == "--oggbuf":
 
 try:
     import requests
+    import requests.adapters
+    import urllib3
 except ImportError:
     # python-requests is a third-party package a Store plasmoid can't declare.
     # The sentinel pins this source after ONE spawn instead of six crashing
@@ -102,6 +105,46 @@ except ImportError:
     print("reader.py: python-requests not installed — track titles disabled", file=sys.stderr)
     print("__NO_ICY__")
     sys.exit(0)
+
+# OpenSSL's X509_V_FLAG_NO_CHECK_TIME; Python's ssl module has no name for it.
+_NO_CHECK_TIME = 0x200000
+
+
+def _session():
+    """A session that checks a station's certificate as usual except for its
+    dates: the authority and the host still have to be right.
+
+    The player opens the stream without checking the certificate at all
+    (Qt's FFmpeg backend does not), so a station whose edge let it run out
+    keeps playing, and the title reader alone refused it. euddn's le0X edges
+    have been like that since 2026-10-23: measured on 2026-11-02, each failed
+    with OpenSSL's code 10, "certificate has expired", on a *.euddn.net
+    certificate a trusted authority issued, and Raadio Elmar, Kuku and Duo
+    lost their titles and covers.
+    """
+    # urllib3 1.26 hands no server name to the context for an address that is
+    # an IP, and a context that checks host names then refuses every such
+    # station with a ValueError (measured with urllib3 1.26.20 on
+    # 2026-11-03). There the reader keeps requests' own checks, dates
+    # included, as it did before.
+    if int(str(getattr(urllib3, "__version__", "2")).split(".")[0] or "2") < 2:
+        return requests.Session()
+    ctx = ssl.create_default_context()
+    ctx.verify_flags |= _NO_CHECK_TIME
+    # Python's default context still lets the subject's CN name the host when
+    # a certificate has no subjectAltName; requests' own does not, and this
+    # one stands in for it.
+    ctx.hostname_checks_common_name = False
+
+    class _Adapter(requests.adapters.HTTPAdapter):
+        def init_poolmanager(self, *args, **kwargs):
+            kwargs["ssl_context"] = ctx
+            return super().init_poolmanager(*args, **kwargs)
+
+    s = requests.Session()
+    s.mount("https://", _Adapter())
+    return s
+
 
 def resolve_url(arg):
     """The URL comes as a 0600 FILE in the runtime dir, not inline.
@@ -198,7 +241,9 @@ def main():
     signal.alarm(MAX_SECONDS + 10)
 
     try:
-        response = requests.get(url, headers=headers, stream=True, timeout=10)
+        # One connection, not a check and a retry: connection-capped Icecast
+        # answers a second one with 429.
+        response = _session().get(url, headers=headers, stream=True, timeout=10)
 
         if response.status_code != 200:
             print(f"reader.py: HTTP {response.status_code} for {log_host}", file=sys.stderr)

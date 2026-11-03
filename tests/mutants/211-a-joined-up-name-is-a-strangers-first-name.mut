@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A name the fold joined across its dots matches a stranger's plain first
+  name anywhere in a credit.
+
+history:
+  "will.i.am" folds to "william" and took William Orbit's and William Bell's
+  records; "t.A.T.u." folds to "tatu" and took Tatu Kantomaa's. A joined word
+  meeting a plain one now counts like a short name.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+          if (!mixed && letters(s) >= 4) return true;
+
+replace:
+          if (letters(s) >= 4) return true;
+
+expect:
+  Killed by tst_artpick::test_a_joined_up_name_is_no_strangers_first_name.
+  Line-neutral.

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The popup's backfill sends the logo hunt to a station's homepage on a
+  metered connection too.
+
+history:
+  A homepage hunt reads up to half a megabyte of page and up to twelve
+  pictures of as much again, with no click. The directory's own byuuid answer
+  is a few hundred bytes, which is why the backfill asked it on any link; the
+  hunt waits for one that is not metered.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (fav !== "" || home === "" || NetworkInformation.isMetered) done(fav);
+
+replace:
+              if (fav !== "" || home === "") done(fav);
+
+expect:
+  Killed by tests/test_invariants.py::test_the_popup_reads_a_homepage_only_through_the_guarded_hunt.
+  Line-neutral.

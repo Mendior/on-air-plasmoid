@@ -67,7 +67,7 @@ TestCase {
         tc.curKey = "artist|song";
         e._artFinish("artist|song", "", true);        // definitive: no art
         // _artFromCache returns true (settled) even for a fresh miss.
-        verify(e._artFromCache("artist|song"));
+        verify(e._artFromCache("artist|song", "artist"));
         compare(e.albumArtUrl, "");
         e.destroy();
     }
@@ -92,8 +92,8 @@ TestCase {
             e._artFinish("k" + i, "http://x/" + i + ".jpg", true);
         }
         // The oldest keys were evicted; the newest survive.
-        verify(!e._artFromCache("k0"));
-        verify(e._artFromCache("k249"));
+        verify(!e._artFromCache("k0", "artist"));
+        verify(e._artFromCache("k249", "artist"));
         e.destroy();
     }
 
@@ -134,15 +134,61 @@ TestCase {
         tc.curKey = "elsewhere";
         e._artFinish("Dance Wave!", "http://x/palm.jpg", true);
         tc.curKey = "Dance Wave!";
-        verify(e._artFromCache("Dance Wave!"));
+        verify(e._artFromCache("Dance Wave!", ""));
         compare(e.albumArtUrl, "");
         e.destroy();
-        // The same words on another station are a title like any other.
+        // On another station the same words are not the station talking, but
+        // with no artist they are no song either, so the sleeve stays unpainted.
         e = makeEngine(true, "Radio Elmar");
         tc.curKey = "elsewhere";
         e._artFinish("Dance Wave!", "http://x/palm.jpg", true);
-        verify(e._artFromCache("Dance Wave!"));
-        compare(e.albumArtUrl, "http://x/palm.jpg");
+        verify(e._artFromCache("Dance Wave!", ""));
+        compare(e.albumArtUrl, "");
+        // Give them an artist and they are a song like any other.
+        e._artFinish("DJ Mike Dance Wave!", "http://x/mix.jpg", true);
+        verify(e._artFromCache("DJ Mike Dance Wave!", "DJ Mike"));
+        compare(e.albumArtUrl, "http://x/mix.jpg");
+        e.destroy();
+    }
+
+    // Deutschlandfunk, 2026-11-02: the news hour is "Nachrichten", no artist,
+    // and the free-text search hung a Kraftwerk tribute sleeve on it.
+    function test_a_line_without_an_artist_asks_nobody_for_a_cover() {
+        var e = makeEngine(true, "Deutschlandfunk");
+        tc.curKey = "Nachrichten";
+        e.albumArtUrl = "http://x/previous-song.jpg";
+        e._albumArtKey = "previous song";
+        e.lookupAlbumArt("Nachrichten");
+        compare(tc.armed, 0);
+        compare(e.albumArtUrl, "");
+        e.destroy();
+    }
+
+    // A cover cached for an artist-less line stays in the cache and off the
+    // panel. The door still says settled, so no lookup starts behind it.
+    function test_a_cached_cover_is_not_painted_over_a_line_without_an_artist() {
+        var e = makeEngine(true, "Deutschlandfunk");
+        tc.curKey = "elsewhere";
+        e._artFinish("Nachrichten", "http://x/tribute.jpg", true);
+        tc.curKey = "Nachrichten";
+        verify(e._artFromCache("Nachrichten", ""));
+        compare(e.albumArtUrl, "");
+        verify(e._artFromCache("Nachrichten"));
+        compare(e.albumArtUrl, "");
+        verify(e._artFromCache("Nachrichten", null));
+        compare(e.albumArtUrl, "");
+        e.destroy();
+    }
+
+    // The station's own name split like a song: "Radio Paradise - Main Mix"
+    // parses with an artist, so only the station check keeps it off the
+    // network, and that check has to know which station is playing.
+    function test_the_station_name_split_like_a_song_asks_nobody_for_a_cover() {
+        var e = makeEngine(true, "Radio Paradise - Main Mix (EN)");
+        tc.curKey = "Radio Paradise Main Mix";
+        e.lookupAlbumArt("Radio Paradise - Main Mix");
+        compare(tc.armed, 0);
+        compare(e.albumArtUrl, "");
         e.destroy();
     }
 
@@ -152,6 +198,61 @@ TestCase {
         e.lookupAlbumArt("Tracklist: https://dancewave.online/");
         compare(tc.armed, 0);
         compare(e.albumArtUrl, "");
+        e.destroy();
+    }
+
+    function _svcs(plan) {
+        return plan.map(function(a) { return a.svc; });
+    }
+
+    // Elmari tantsuõhtu, 2026-11-02: "Anne Loho - Uus algus" is in no
+    // catalogue, and Deezer does not know her, but iTunes has her singles.
+    function test_the_artists_own_songs_are_asked_for_last() {
+        var e = makeEngine(true, "Elmari tantsuõhtu 24/7");
+        var plan = e._artPlan({ artist: "Anne Loho", title: "Uus algus" }, "Anne Loho Uus algus",
+                              "Anne Loho - Uus algus");
+        var last = plan[plan.length - 1];
+        compare(last.svc, "itunesArtist");
+        compare(last.q, "Anne Loho");
+        compare(plan[plan.length - 2].svc, "deezerArtist");
+        compare(_svcs(plan).filter(function(s) { return s === "itunesArtist"; }).length, 1);
+        // The whole credit goes out, guest and all.
+        plan = e._artPlan({ artist: "Frontliner feat. Ellie", title: "Lose The Style" },
+                          "Frontliner feat. Ellie Lose The Style", "Frontliner feat. Ellie - Lose The Style");
+        compare(plan[plan.length - 1].q, "Frontliner feat. Ellie");
+        e.destroy();
+    }
+
+    // The artist behind the station's own name gets neither the photo nor
+    // the artist's other songs: on Kaaosradio such names were namesakes.
+    function test_an_artist_found_behind_the_station_name_gets_no_last_resort() {
+        var e = makeEngine(true, "Kaaosradio - 24h Chill");
+        var plan = e._artPlan({ artist: "Organoid", title: "Metamorphosis" }, "Organoid Metamorphosis",
+                              "Kaaosradio 24h - Organoid - Metamorphosis");
+        compare(_svcs(plan).indexOf("deezerArtist"), -1);
+        compare(_svcs(plan).indexOf("itunesArtist"), -1);
+        verify(plan.length > 0);
+        e.destroy();
+    }
+
+    // Nothing after the first cover found is asked; a chain where everything
+    // answered "no" is a definitive miss, cached like any other.
+    function test_the_chain_stops_at_the_first_cover() {
+        var e = makeEngine();
+        tc.curKey = "anne loho uus algus";
+        var asked = [];
+        var hit = function(q, key, onResult) { asked.push(q); onResult("http://x/sleeve.jpg", true); };
+        var miss = function(q, key, onResult) { asked.push(q); onResult("", true); };
+        e._runAttempts([{ fn: miss, q: "a" }, { fn: hit, q: "b" }, { fn: miss, q: "last" }],
+                       "anne loho uus algus", { artist: "Anne Loho", title: "Uus algus" });
+        compare(asked, ["a", "b"]);
+        compare(e.albumArtUrl, "http://x/sleeve.jpg");
+        asked = [];
+        tc.curKey = "nobody has it";
+        e._runAttempts([{ fn: miss, q: "a" }, { fn: miss, q: "last" }], "nobody has it", {});
+        compare(asked, ["a", "last"]);
+        compare(e._artCache["nobody has it"].url, "");
+        verify(e._artFromCache("nobody has it", "Nobody"));
         e.destroy();
     }
 

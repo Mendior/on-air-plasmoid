@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The settings merge pairs a row with the popup's row at its address even
+  when that row moved there in this write.
+
+history:
+  The same station saved twice, and the heal moved the first onto the
+  second's address: the two were paired crosswise, and a twin removed on the
+  page took the healed station's place.
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+      pass(function(b, x) { return x.hostname === b.hostname && _blank(x.prev) === _blank(b.prev) })
+
+replace:
+      pass(function(b, x) { return x.hostname === b.hostname })
+
+expect:
+  Killed by tst_reorderlogic::test_merge_tells_a_healed_twin_from_the_one_it_landed_on.
+  Line-neutral.

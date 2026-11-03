@@ -1,5 +1,84 @@
 # Changelog
 
+## 2026.42
+
+- **Song titles and covers are back where a certificate ran out.** The
+  Estonian stations of Raadio Elmar, Kuku and Duo play from servers whose
+  certificate expired in October. The player never checked it and kept
+  playing, but the title reader refused those servers, so their songs had no
+  titles and no covers. The reader now lets a certificate past its date
+  through when everything else about it is right: who issued it and which
+  server it is for. On a system whose urllib3 is older than version 2 the
+  reader still checks the dates, and these stations stay without titles
+  there.
+
+- **A station that moves is followed to its own address.** When a saved
+  station's address dies and the widget finds the station again in the
+  directory, it now prefers the address the station gave the directory, when
+  that is a stream on the station's own domain, over the short-lived server
+  the directory last checked, so the station does not go quiet again when
+  that server is replaced. A station that only came back on the address it
+  already had is no longer reported as moved.
+
+- **A station without a logo gets the one on its homepage.** When the
+  directory has no logo for a saved station but knows its homepage, the
+  widget looks there once a session, never on a metered connection or a
+  local network address, and keeps the best picture it finds, a square one
+  before a banner. On a page of a service that hosts many stations it takes
+  only the station's own picture, not the service's icon. Raadio Kadi shows
+  its own logo now instead of its initials. Fetch missing logos in the
+  settings also keeps the best picture a homepage has rather than the first,
+  and Re-fetch all keeps a logo unless it finds a better one, or the old one
+  no longer loads.
+
+- **More songs find their cover, and fewer find the wrong one.** Stations
+  that send the title before the artist (the walmradio stations, Virgin
+  Radio Classic Rock) are read the right way round, and a song sent title
+  first elsewhere still finds its cover. A stray backtick or a missing full
+  stop no longer costs a cover. Kaaosradio's own name is no longer taken for
+  the artist, and a line that names no artist asks nobody for a cover. A
+  picture of the artist is only shown when it carries the artist's own name.
+  A song no catalogue knows can show a sleeve of the same artist instead of
+  the station logo.
+
+- **The settings and the popup no longer undo each other.** With the
+  settings open, a station removed there came back as soon as the popup
+  changed the list, a station the widget moved to a new address dropped to
+  the bottom of the list or showed up twice, and OK in the Edit dialog
+  wrote back what the dialog had first shown, undoing a move or a logo
+  found in the meantime. The settings now keep what you changed and take
+  the rest from the popup. Their search also knows a station you already
+  have by any of its addresses, so it is not added twice.
+
+- **Search results that play are no longer marked as not answering.** The
+  widget checks each result before you click it, and some servers (SomaFM's
+  among them) refused that check while playing fine, so working stations
+  were dimmed and sunk to the bottom of the list.
+
+- **Search understands a little more.** Country names in Finnish, Swedish
+  and German (Viro, Estland, Finnland) and the Estonian names for Greece,
+  Mexico and Czechia list that country's stations. "raadio2" finds Raadio 2,
+  "Raadio 2" no longer lists Vikerraadio and Raadio 4 for the 2 in their
+  "128 kbps", and "techno berlin" asks for techno stations in Berlin.
+
+- **A station that does not answer says so until you move on.** When a
+  search result does not play, the explanation now stays under the player
+  until the next play or stop, on two lines if it needs them, instead of
+  vanishing after five seconds half cut off.
+
+- **A station saved as a playlist file keeps its name.** If the station
+  list changed while a .pls or .m3u station was starting, it could play
+  with no name, and a click on its row started it again instead of
+  stopping it. Deleted while a retry was starting it, it no longer starts.
+
+- **The bundled stations.** Deep House Lounge stopped answering and is
+  replaced by SomaFM Beat Blender, and REYFM and Dance Wave use the
+  addresses the directory lists for them today. Every bundled station now carries
+  its directory identity, so it can be found again if it moves.
+
+- **Plasma 6.8.** The chapter and output pickers no longer trip a layout
+  loop in Plasma 6.8's combo box.
+
 ## 2026.41
 
 - **A radio left on overnight stays off, this time on every road.** 2026.40

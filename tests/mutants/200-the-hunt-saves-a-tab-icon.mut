@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The popup's logo hunt saves a 16 px icon as the station's logo.
+
+history:
+  Blown up in the list a tab icon reads as a broken logo, and once saved it
+  stands for good: the next hunt asks only for an empty logo. The station
+  keeps its initials instead.
+
+target:
+  package/contents/ui/LogoHunt.qml
+
+find:
+                  var tiny = best && FaviconLogic.logoRank(best.url, best.size) >= 4;
+
+replace:
+                  var tiny = false;
+
+expect:
+  Killed by tst_logohunt::test_a_bare_favicon_is_taken_when_it_is_more_than_a_tab_icon.
+  Line-neutral.

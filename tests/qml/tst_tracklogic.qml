@@ -58,6 +58,217 @@ TestCase {
         compare(TrackLogic.preCleanTrack("Artist – Title"), "Artist – Title")
     }
 
+    // The walmradio stations, live on 2026-11-02: "Title by Artist", then the
+    // station's tagline. Read as it came, the artist was the whole sentence.
+    function test_a_title_by_its_artist_over_a_station_tagline() {
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Chattanooga Choo Choo by Ray Conniff - Classic Vinyl on walmradio.com"))
+        compare(p.artist, "Ray Conniff")
+        compare(p.title, "Chattanooga Choo Choo")
+        p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "I Wish You Loved Me by B. Andrews Band - walmradio.com"))
+        compare(p.artist, "B. Andrews Band")
+        compare(p.title, "I Wish You Loved Me")
+        p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Deep Purple/Blue Velvet by Jackie Gleason - Classic Vinyl on walmradio.com"))
+        compare(p.artist, "Jackie Gleason")
+        compare(p.title, "Deep Purple/Blue Velvet")
+    }
+
+    // The artist follows the LAST " by ": the first one can be the song's.
+    function test_a_title_with_by_in_it_keeps_its_title() {
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Walk On By by Dionne Warwick - Classic Vinyl on walmradio.com"))
+        compare(p.artist, "Dionne Warwick")
+        compare(p.title, "Walk On By")
+        p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Stand by Me by Ben E. King - Classic Vinyl on walmradio.com"))
+        compare(p.artist, "Ben E. King")
+        compare(p.title, "Stand by Me")
+        compare(TrackLogic.preCleanTrack("Stand BY Me BY Ben E. King - walmradio.com"),
+                "Ben E. King - Stand BY Me")
+    }
+
+    function test_the_by_rule_leaves_other_lines_alone() {
+        // A www. address is the station talking (stationTalk), not a tagline.
+        compare(TrackLogic.preCleanTrack("Radio Swiss Classic - www.radioswissclassic.ch"),
+                "Radio Swiss Classic - www.radioswissclassic.ch")
+        // Even after a "by", or the address would vanish from the line it marks.
+        compare(TrackLogic.preCleanTrack("Song by Band - www.walmradio.com"),
+                "Song by Band - www.walmradio.com")
+        verify(TrackLogic.stationTalk(TrackLogic.preCleanTrack("Song by Band - www.walmradio.com"), "WALM HD"))
+        // Venice Classic's real line: the domain sits inside a longer aside.
+        var venice = "Ludwig Van Beethoven (1770-1827) - Sonata per pianoforte in la Maggiore No.28 Op.101 (AndrÃ¡s Schiff, pianoforte)  {+info: veniceclassicradio.eu}"
+        compare(TrackLogic.preCleanTrack(venice), venice)
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack("Stand by Me"))
+        compare(p.artist, "")
+        compare(p.title, "Stand by Me")
+        compare(TrackLogic.preCleanTrack("Ben E. King - Stand by Me"), "Ben E. King - Stand by Me")
+        // No " by " to split at, or nothing on one side of it: as it came.
+        compare(TrackLogic.preCleanTrack("Golden Oldies - walmradio.com"),
+                "Golden Oldies - walmradio.com")
+        compare(TrackLogic.preCleanTrack("Standby - walmradio.com"), "Standby - walmradio.com")
+        compare(TrackLogic.preCleanTrack("by Ray Conniff - walmradio.com"), "by Ray Conniff - walmradio.com")
+        // A tagline of five words before the address is not a tagline.
+        compare(TrackLogic.preCleanTrack("Song by Band - One Two Three Four Five walmradio.com"),
+                "Song by Band - One Two Three Four Five walmradio.com")
+        // A padded slash already splits artist from title: today's parse stays.
+        compare(TrackLogic.preCleanTrack("Medley / Song by Band - walmradio.com"),
+                "Medley / Song by Band - walmradio.com")
+        compare(TrackLogic.preCleanTrack(""), "")
+        compare(TrackLogic.preCleanTrack(null), "")
+    }
+
+    function test_an_overlong_by_line_still_reads_quickly() {
+        var title = ""
+        for (var i = 0; i < 400; i++) title += "word by word "
+        var t0 = Date.now()
+        compare(TrackLogic.preCleanTrack(title + "by Band - Classic Vinyl on walmradio.com"),
+                "Band - " + title.trim())
+        compare(TrackLogic.preCleanTrack(title + "- " + title + "walmradio.com"),
+                title + "- " + title + "walmradio.com")
+        verify(Date.now() - t0 < 1000)
+    }
+
+    // Virgin Radio Classic Rock, live on 2026-11-02: the record, not a title.
+    function test_a_virgin_radio_record_reads_as_artist_and_title() {
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Walk Of Life~Dire Straits~~1985~GBUM72102500~225~2026-11-02T17:05:05~2026-11-02T17:05:07~Virgin Radio Classic Rock~2.50~f0086e65-2d5c-4199-9ab8-e5346d08ca7d"))
+        compare(p.artist, "Dire Straits")
+        compare(p.title, "Walk Of Life")
+        p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Babe I'm Gonna Leave You~Led Zeppelin~~1969~~394~2026-11-02T16:53:37~2026-11-02T16:53:38~Virgin Radio Classic Rock~1.61~2d1a0910-bd40-44e3-ba31-9433fa916535"))
+        compare(p.artist, "Led Zeppelin")
+        compare(p.title, "Babe I'm Gonna Leave You")
+        // Eight fields are enough; the spaces around a field are not the song's.
+        compare(TrackLogic.preCleanTrack(" Space Oddity ~ David Bowie ~~1969~~273~2026-11-02T17:14:04~2026-11-02T17:14:07"),
+                "David Bowie - Space Oddity")
+        // A title with its own dash keeps the usual cut after the rewrite.
+        compare(TrackLogic.preCleanTrack("Layla - Unplugged~Eric Clapton~~1992~~280~2026-11-02T17:14:04~2026-11-02T17:18:44~Virgin Radio Classic Rock"),
+                "Eric Clapton - Layla")
+    }
+
+    function test_a_record_without_an_artist_or_the_shape_stays_as_it_came() {
+        // The station's ident and a news bulletin, both live: no artist field.
+        var ident = "Virgin Radio Classic Rock~~~~~14~2026-11-02T17:54:50~2026-11-02T17:54:51~Virgin Radio Classic Rock~1.30~92ea57b4-55c6-4979-b019-7460916f1660"
+        compare(TrackLogic.preCleanTrack(ident), ident)
+        var news = "TGcom24 Breaking News~~~~~125~2026-11-02T18:00:24~2026-11-02T18:00:54~Virgin Radio Classic Rock~30.32~750cf5c7-12dd-4d31-9b0c-60f801c6ac98"
+        compare(TrackLogic.preCleanTrack(news), news)
+        // A "~" inside the title shifts the fields, so no timestamp lines up.
+        var shifted = "Love ~ Peace~Some Band~~1990~~200~2026-11-02T17:05:05~2026-11-02T17:05:07~Virgin Radio Classic Rock~1.00~x"
+        compare(TrackLogic.preCleanTrack(shifted), shifted)
+        compare(TrackLogic.preCleanTrack("A~B~~1985~~225~2026-11-02T17:05:05"), "A~B~~1985~~225~2026-11-02T17:05:05")
+        compare(TrackLogic.preCleanTrack("Walk Of Life~Dire Straits~~1985~~225~2026-11-02 17:05:05~2026-11-02T17:05:07"),
+                "Walk Of Life~Dire Straits~~1985~~225~2026-11-02 17:05:05~2026-11-02T17:05:07")
+        compare(TrackLogic.preCleanTrack("~~~~~~~~"), "~~~~~~~~")
+        var many = "Walk Of Life~Dire Straits~~1985~~225~2026-11-02T17:05:05~2026-11-02T17:05:07"
+        for (var i = 0; i < 2000; i++) many += "~x"
+        compare(TrackLogic.preCleanTrack(many), "Dire Straits - Walk Of Life")
+    }
+
+    // Kaaosradio, live on 2026-11-02: its own name and channel come first.
+    function test_the_station_name_in_front_of_artist_and_title_goes() {
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Kaaosradio 24h - Fuji Kureta - Rope", "Kaaosradio - 24h Chill"))
+        compare(p.artist, "Fuji Kureta")
+        compare(p.title, "Rope")
+        p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Kaaosradio 24h Ma Hardstyle - D-Mind - I Love U (The Eternal Love Mix) [UA]",
+            "Kaaos Radio Techno Electro"))
+        compare(p.artist, "D-Mind")
+        compare(p.title, "I Love U (The Eternal Love Mix) [UA]")
+        // The whole station name, and a fourth segment as well.
+        compare(TrackLogic.preCleanTrack("Kiss FM - Dua Lipa - Levitating", "Kiss FM"),
+                "Dua Lipa - Levitating")
+        compare(TrackLogic.preCleanTrack("Radio Bob! Rockparty - Artist - Title - Extra", "Radio Bob! Rockparty"),
+                "Artist - Title")
+        verify(TrackLogic.stationDropped("Kaaosradio 24h - Fuji Kureta - Rope", "Kaaosradio - 24h Chill"))
+        verify(TrackLogic.stationDropped("NOW PLAYING: Kiss FM - Dua Lipa - Levitating", "Kiss FM"))
+    }
+
+    function test_an_artist_the_station_is_named_after_keeps_the_song() {
+        // The station's first two words ARE the segment: an artist, not a channel.
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Elvis Presley - Suspicious Minds - 1969", "Elvis Presley Radio"))
+        compare(p.artist, "Elvis Presley")
+        compare(p.title, "Suspicious Minds")
+        compare(TrackLogic.preCleanTrack("The Beatles - Help! - Remastered 2009", "The Beatles Radio"),
+                "The Beatles - Help!")
+        // Two segments are never cut, whatever the station is called.
+        compare(TrackLogic.preCleanTrack("Metallica - Enter Sandman", "Metallica Radio"),
+                "Metallica - Enter Sandman")
+        compare(TrackLogic.preCleanTrack("ABBA - SOS", "ABBA"), "ABBA - SOS")
+        compare(TrackLogic.preCleanTrack("ABBA - SOS", "ABBA - Greatest Hits"), "ABBA - SOS")
+        verify(!TrackLogic.stationDropped("Elvis Presley - Suspicious Minds - 1969", "Elvis Presley Radio"))
+        verify(!TrackLogic.stationDropped("ABBA - SOS", "ABBA"))
+    }
+
+    // The band behind the name, a station named after the artist, a station
+    // saved under the bare artist: the line reads as it did with no station.
+    function test_an_artist_in_front_is_never_taken_for_the_station() {
+        var p = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(
+            "Bob Marley & The Wailers - One Love - Exodus", "Bob Marley Radio"))
+        compare(p.artist, "Bob Marley & The Wailers")
+        compare(p.title, "One Love")
+        compare(TrackLogic.preCleanTrack("Elvis Presley & The Jordanaires - Teddy Bear - Loving You",
+                                         "Elvis Presley Radio"),
+                "Elvis Presley & The Jordanaires - Teddy Bear")
+        compare(TrackLogic.preCleanTrack("Bob Marley feat. Lauryn Hill - Turn Your Lights Down Low - Chant Down Babylon",
+                                         "Bob Marley Radio"),
+                "Bob Marley feat. Lauryn Hill - Turn Your Lights Down Low")
+        compare(TrackLogic.preCleanTrack("Queen - Bohemian Rhapsody - A Night at the Opera", "Queen - Greatest Hits"),
+                "Queen - Bohemian Rhapsody")
+        // "Radio" further on in the saved name does not make Queen a station.
+        compare(TrackLogic.preCleanTrack("Queen - Bohemian Rhapsody - A Night at the Opera", "Queen - Greatest Hits Radio"),
+                "Queen - Bohemian Rhapsody")
+        compare(TrackLogic.preCleanTrack("ABBA - SOS - Arrival", "ABBA"), "ABBA - SOS")
+        verify(!TrackLogic.stationDropped("Bob Marley & The Wailers - One Love - Exodus", "Bob Marley Radio"))
+        verify(!TrackLogic.stationDropped("Queen - Bohemian Rhapsody - A Night at the Opera", "Queen - Greatest Hits"))
+        verify(!TrackLogic.stationDropped("ABBA - SOS - Arrival", "ABBA"))
+        var band = ""
+        for (var i = 0; i < 300; i++) band += "Bob Marley & "
+        compare(TrackLogic.preCleanTrack(band + "The Wailers - One Love - Exodus", "Bob Marley Radio"),
+                band + "The Wailers - One Love")
+    }
+
+    // A station word counts alone or at the end of a word, never at its start
+    // or inside it.
+    function test_a_station_word_has_to_end_its_word() {
+        compare(TrackLogic.preCleanTrack("Radiohead - Creep - Pablo Honey", "Radiohead"), "Radiohead - Creep")
+        compare(TrackLogic.preCleanTrack("Wolfmother - Woman - Wolfmother", "Wolfmother"), "Wolfmother - Woman")
+        compare(TrackLogic.preCleanTrack("Bob Marley Radio - Bob Marley - One Love", "Bob Marley Radio"),
+                "Bob Marley - One Love")
+        compare(TrackLogic.preCleanTrack("Vikerraadio - Artist - Title", "Vikerraadio"), "Artist - Title")
+        compare(TrackLogic.preCleanTrack("181.fm - Guns N' Roses - Patience", "181.fm"), "Guns N' Roses - Patience")
+        compare(TrackLogic.preCleanTrack("Kaaos 24h - Artist - Title", "Kaaos 24h"), "Artist - Title")
+        compare(TrackLogic.preCleanTrack("Elmari tantsuõhtu 24/7 - Artist - Title", "Elmari tantsuõhtu 24/7"),
+                "Artist - Title")
+    }
+
+    function test_without_a_station_the_line_reads_as_before() {
+        compare(TrackLogic.preCleanTrack("Kaaosradio 24h - Fuji Kureta - Rope"),
+                "Kaaosradio 24h - Fuji Kureta")
+        compare(TrackLogic.preCleanTrack("Kaaosradio 24h - Fuji Kureta - Rope", ""),
+                "Kaaosradio 24h - Fuji Kureta")
+        compare(TrackLogic.preCleanTrack("Kaaosradio 24h - Fuji Kureta - Rope", null),
+                "Kaaosradio 24h - Fuji Kureta")
+        // A name of punctuation alone is no name to match.
+        compare(TrackLogic.preCleanTrack("• - Artist - Title", "•"), "• - Artist")
+        compare(TrackLogic.preCleanTrack("A - B - C - D", ""), "A - B")
+        // Seven letters of prefix are too few to tell a channel from a word.
+        compare(TrackLogic.preCleanTrack("Radio Xy 24 - Artist - Title", "Radio Xy Rock"),
+                "Radio Xy 24 - Artist")
+        compare(TrackLogic.preCleanTrack("Radio Xyz 24 - Artist - Title", "Radio Xyz Rock"),
+                "Artist - Title")
+        verify(!TrackLogic.stationDropped("Kaaosradio 24h - Fuji Kureta - Rope", ""))
+        verify(!TrackLogic.stationDropped("Fuji Kureta - Rope", "Kaaosradio - 24h Chill"))
+        verify(!TrackLogic.stationDropped("", "Kaaosradio - 24h Chill"))
+        verify(!TrackLogic.stationDropped(null, null))
+        var longName = ""
+        for (var i = 0; i < 300; i++) longName += "Kaaosradio "
+        compare(TrackLogic.preCleanTrack(longName + "- A - T", longName), "A - T")
+    }
+
     function test_the_split_takes_the_first_padded_separator() {
         var p = TrackLogic.parseTrackString("ABBA - Dancing Queen")
         compare(p.artist, "ABBA")
@@ -99,6 +310,29 @@ TestCase {
         compare(TrackLogic.primaryArtist("BEYONCÉ FEAT. JAY-Z"), "BEYONCÉ")
         compare(TrackLogic.primaryArtist("Queen"), "Queen")
         compare(TrackLogic.primaryArtist(""), "")
+    }
+
+    // The photo search asks for the band, not the first word of it.
+    function test_the_photo_search_keeps_the_whole_band_name() {
+        compare(TrackLogic.photoArtist("Love & Fate"), "Love & Fate")
+        compare(TrackLogic.photoArtist("Florence and the Machine"), "Florence and the Machine")
+        compare(TrackLogic.photoArtist("Simon & Garfunkel"), "Simon & Garfunkel")
+        compare(TrackLogic.photoArtist("Queen"), "Queen")
+        // Only a featuring credit is cut, wherever it sits.
+        compare(TrackLogic.photoArtist("Frontliner feat. Ellie"), "Frontliner")
+        compare(TrackLogic.photoArtist("Sia feat. Sean Paul & X"), "Sia")
+        compare(TrackLogic.photoArtist("A & B feat. C"), "A & B")
+        compare(TrackLogic.photoArtist("BEYONCÉ FT. JAY-Z"), "BEYONCÉ")
+        compare(TrackLogic.photoArtist("Alok feat Ellie Goulding"), "Alok")
+        compare(TrackLogic.photoArtist("Calvin Harris ft Dua Lipa"), "Calvin Harris")
+        // "Feat" inside a word, or with nothing before it, is no credit.
+        compare(TrackLogic.photoArtist("Featherstone"), "Featherstone")
+        compare(TrackLogic.photoArtist("Daft Punk feat."), "Daft Punk feat.")
+        compare(TrackLogic.photoArtist(""), "")
+        compare(TrackLogic.photoArtist(null), "")
+        var crowd = "Band"
+        for (var i = 0; i < 300; i++) crowd += " & Band " + i
+        compare(TrackLogic.photoArtist(crowd + " feat. Guest"), crowd)
     }
 
     // Dance Wave! on 2026-09-23: the title was "Dance Wave!" with no artist,

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The title reader takes a certificate whose subject's CN names the host and
+  which has no subjectAltName.
+
+history:
+  The context the dates are let go in is Python's default, which still lets
+  the CN stand in for a missing subjectAltName; requests' own context does
+  not. Without the line the reader accepted more than a lapsed date.
+
+target:
+  package/contents/ui/reader.py
+
+find:
+      ctx.hostname_checks_common_name = False
+
+replace:
+      ctx.hostname_checks_common_name = True
+
+expect:
+  Killed by tests/test_reader_tls.py::test_a_host_named_only_in_the_common_name_is_still_refused.
+  Line-neutral.

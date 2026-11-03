@@ -320,7 +320,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       if (cd "$REPO_DIR" && git ls-files \
             | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
             | grep -vE '\.(png|ogg)$' \
-            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem,nd' -q 3); then
+            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem,nd,hart,alph,rade' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi
@@ -358,6 +358,11 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
         echo "lychee OK"
       else echo "preflight FAILED: broken links"; fail=1; fi
     else echo "NB: lychee not installed — links unchecked"; fi
+
+    # Every bundled station must still be in the directory and pass its
+    # checker: Deep House Lounge shipped dead and unhealable for months.
+    if python3 "$REPO_DIR/scripts/defaults_check.py"; then echo "default stations OK"
+    else echo "preflight FAILED: a bundled station the directory does not vouch for"; fail=1; fi
 
     [ "$fail" -eq 0 ] || exit 1
     echo "preflight OK"

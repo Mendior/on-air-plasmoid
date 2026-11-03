@@ -66,7 +66,7 @@ jobs:
         # and turn the unmutated control run red, which aborts the whole suite.
         run: |
           pacman -Syu --noconfirm --needed \
-            git which gettext python python-pytest python-pip ttf-dejavu dbus \
+            git which gettext python python-pytest python-pip python-requests openssl ttf-dejavu dbus \
             qt6-declarative qt6-multimedia-ffmpeg \
             plasma-sdk plasma-workspace plasma-desktop plasma5support knotifications \
             breeze-icons

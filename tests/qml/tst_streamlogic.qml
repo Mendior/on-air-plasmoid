@@ -53,6 +53,24 @@ TestCase {
         compare(picked, "http://s2.radio.ee/hi.mp3")
     }
 
+    function test_a_station_saved_at_its_own_address_still_finds_its_floor() {
+        // A heal saves the address the station handed the directory (url)
+        // when it is a stream of the same family, while the directory's
+        // checker ended up on an edge (url_resolved). Matched on the edge
+        // alone, the saved row had no floor and never got its upgrade.
+        var own = "https://router.radio.ee/tok/live.aac"
+        var low = { name: "Jazz FM", url: own, url_resolved: "https://le06.radio.ee/h/live.aac", bitrate: 64 }
+        var high = { name: "Jazz FM", url: "https://router.radio.ee/tok/hq.aac",
+                     url_resolved: "https://le06.radio.ee/h/hq.aac", bitrate: 128 }
+        compare(StreamLogic.pickBitrateUpgrade([low, high], "Jazz FM", own), "https://le06.radio.ee/h/hq.aac")
+        // The edge itself still finds it, as before.
+        compare(StreamLogic.pickBitrateUpgrade([low, high], "Jazz FM", low.url_resolved),
+                "https://le06.radio.ee/h/hq.aac")
+        // Nothing saved finds nothing, even among rows with an empty field.
+        var bare = { name: "Jazz FM", url: "", url_resolved: "", bitrate: 64 }
+        compare(StreamLogic.pickBitrateUpgrade([bare, high], "Jazz FM", ""), "")
+    }
+
     function test_no_baseline_means_no_switch() {
         var orig = "http://s1.radio.ee/live.mp3"
         // The playing URL is not in the answer at all.

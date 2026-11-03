@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The popup's logo hunt, which runs with no click, keeps an answer whose
+  last hop Qt does not name, as the settings button does.
+
+history:
+  An empty responseURL cannot show that an answer came from a public host.
+  The settings button keeps the old leniency, where the listener asked for
+  the request; the hunt nobody clicked refuses such an answer.
+
+target:
+  package/contents/ui/LogoHunt.qml
+
+find:
+          return strict ? HostGuard.answerKnownPublic(xhr) : HostGuard.answerFromPublicHost(xhr);
+
+replace:
+          return HostGuard.answerFromPublicHost(xhr);
+
+expect:
+  Killed by tst_logohunt::test_a_hunt_nobody_clicked_trusts_no_answer_whose_end_is_unnamed.
+  Line-neutral.

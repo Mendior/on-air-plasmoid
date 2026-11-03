@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The Edit dialog finds its row by address alone, so of two rows on one
+  address it can take the other one.
+
+history:
+  A heal moved the row being edited off an address a second row also held,
+  or a removal shifted the rows: the OK was written onto the other twin.
+  The dialog prefers the row with the name it was opened with, which the
+  popup never writes.
+
+target:
+  package/contents/ui/DoorLogic.js
+
+find:
+      var tries = [["hostname", true], ["prev", true]];
+
+replace:
+      var tries = [["hostname", false], ["prev", false]];
+
+expect:
+  Killed by tst_doorlogic::test_the_dialog_knows_its_twin_by_the_name_it_opened_with.
+  Line-neutral.

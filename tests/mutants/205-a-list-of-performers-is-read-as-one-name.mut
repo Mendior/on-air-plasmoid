@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An artist credit is not split at its commas, so a list of performers
+  loses its first one.
+
+history:
+  Measured on 2026-11-03 against the recorded catalogue answers: with the
+  comma stuck to the first name, "Pritam, Arijit Singh" and "David Guetta,
+  Alphaville & Ava Max" no longer found the first artist's records.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      var parts = String(s === undefined || s === null ? "" : s).split(/\s*([,;\/\u00d7\u3001\uff06\uff0c])\s*/), out = [];
+
+replace:
+      var parts = String(s === undefined || s === null ? "" : s).split(/\s*([;\/\u00d7\u3001\uff06\uff0c])\s*/), out = [];
+
+expect:
+  Killed by tst_artpick::test_a_list_of_performers_still_holds_its_first_one.
+  Line-neutral.

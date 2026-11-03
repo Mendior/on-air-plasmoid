@@ -49,12 +49,20 @@ function askWord(q) {
     return longestWord(own.length > 0 ? own.join(" ") : q);
 }
 
-// Any-order containment: every query word appears somewhere in the name.
+// Any-order containment: every query word appears somewhere in the name, and
+// a word of digits alone has to be one of the name's whole numbers. Measured
+// 2026-11-02: under "Raadio 2" the word pass kept Vikerraadio and Raadio 4 on
+// the 2 in "128 kbps", and "BBC Radio 1" kept ten 128k streams of other
+// stations. Letters stay a plain substring however short they are: "big fm"
+// has to find "bigFM Deutschland" and "z 100" has to find "Z100". The price
+// is that "80" no longer finds "1980s".
 function matchesAllWords(name, ws) {
     if (!ws || ws.length === 0) return false;
-    var n = fold(name);
-    for (var i = 0; i < ws.length; i++)
-        if (n.indexOf(ws[i]) === -1) return false;
+    var n = fold(name), nums = n.match(/[0-9]+/g) || [];
+    for (var i = 0; i < ws.length; i++) {
+        var found = /^[0-9]+$/.test(ws[i]) ? nums.indexOf(ws[i]) !== -1 : n.indexOf(ws[i]) !== -1;
+        if (!found) return false;
+    }
     return true;
 }
 
@@ -72,8 +80,9 @@ function relevance(name, q) {
 // Inflected queries find nothing in a substring-only directory: an
 // Estonian listener types "Elmari" hunting "Raadio Elmar", and "Elmar"
 // does not contain "Elmari". The fallback stems shave one, then two
-// trailing letters — never below four left — and each runs only when
-// everything longer came back empty.
+// trailing letters — never below four left. They are the last retry:
+// each runs only when the spellings (below) and every longer stem came
+// back empty.
 function stems(q) {
     // The cut must not land between a surrogate pair: shaving one UTF-16
     // unit off a name ending in an emoji leaves a lone high surrogate and
@@ -95,6 +104,36 @@ function stems(q) {
         if (s.length >= 4 && out.indexOf(s) === -1) out.push(s);
     }
     return out;
+}
+
+// A number glued to a word: "raadio2", "bbc radio1", "rtl102.5". No name in
+// the directory contains "raadio2", and the stems then asked for "raadio":
+// thirty stations, Raadio 2 HQ the third of them. Asked for "raadio 2" the
+// three Raadio 2 streams are the answer (measured 2026-11-02). The space goes
+// in at every seam between a letter and a digit, in the listener's own case.
+// Not under five units: "nrj2" and "yle1" each found one station that had
+// nothing to do with them, and it went into the search history.
+// A letter is a folded unit in the class _nameTokens splits on. Not \p{L}:
+// Qt's V4 does not know it, and /\p{L}/u.test("a") answers false there.
+// Contract: spellings("raadio2") = ["raadio 2"]; spellings("Raadio2") =
+//   ["Raadio 2"]; spellings("104.6rtl") = ["104.6 rtl"]; spellings("1live") =
+//   ["1 live"]; spellings("nrj2") = spellings("jazz") = spellings(null) = [].
+function spellings(q) {
+    var t = String(q === undefined || q === null ? "" : q).trim();
+    if (t.length < 5) return [];
+    var out = "", was = 0, apart = false;
+    for (var i = 0; i < t.length; i++) {
+        var c = t.charAt(i);
+        // An accent typed as its own mark is part of the letter before it:
+        // fold() drops the mark, so on folded text the two are one letter.
+        if (/[\u0300-\u036f]/.test(c)) { out += c; continue; }
+        var kind = c >= "0" && c <= "9" ? 2
+                 : /^[a-z\u00c0-\u1fff\u2c00-\uffff]/.test(fold(c)) ? 1 : 0;
+        if (kind !== 0 && was !== 0 && kind !== was) { out += " "; apart = true; }
+        out += c;
+        was = kind;
+    }
+    return apart ? [out] : [];
 }
 
 // Whether the liveness probe may knock on this URL's host at all. The
@@ -300,6 +339,35 @@ function isGenreWord(q) {
     return GENRES[f] === true || decadeTag(f) !== "";
 }
 
+// "techno berlin": a genre and a place, and no station is named either way.
+// The directory files a city or a region in its state field, so the genre is
+// asked inside it. Measured 2026-11-02: "techno berlin" found nothing in five
+// requests, and tag=techno&state=berlin answered with seventeen Berlin techno
+// stations; "jazz paris" found 3, "jazz vienna" 5, "rock barcelona" 3 and
+// "pop tallinn" 19. Where the field says something else ("jazz wien", "techno
+// munich") it costs one request before the stems.
+// Two words, one a GENRES key. The other is the place: no digit, four letters
+// or more, no station word. The state filter is a case-blind substring, so a
+// shorter word lands in every region that holds it. A pair that is itself a
+// GENRES phrase ("smooth jazz") is the genre and nothing else.
+// Contract: genrePlace("techno berlin") = { tag: "techno", state: "berlin" };
+//   genrePlace("Berlin Techno") = { tag: "techno", state: "Berlin" }, the place
+//   as typed; genrePlace("rock 1live"), ("rock radio"), ("pop rio"),
+//   ("smooth jazz"), ("techno"), ("") and (null) are null.
+function genrePlace(q) {
+    var ws = words(q);
+    var typed = String(q === undefined || q === null ? "" : q).trim().split(/\s+/);
+    if (ws.length !== 2 || typed.length !== 2 || GENRES[ws.join(" ")] === true) return null;
+    for (var i = 0; i < 2; i++) {
+        var place = ws[1 - i];
+        var letters = (place.match(/[a-z\u00c0-\u1fff\u2c00-\uffff]/g) || []).length;
+        if (GENRES[ws[i]] === true && letters >= 4 && !/[0-9]/.test(place)
+            && !NAME_WORDS.hasOwnProperty(place))
+            return { tag: ws[i], state: typed[1 - i] };
+    }
+    return null;
+}
+
 // A name as bare words: folded, apostrophes out ("80's" is one word), a
 // frequency out whole, split on everything that is neither a letter nor a
 // digit in ANY script. Measured on name=90: three of the four leads were a
@@ -368,11 +436,15 @@ function leadRows(q) {
 // The hand-written country words: the Estonian names the directory has never
 // heard of, and the everyday names it files under something longer — it says
 // "The United Kingdom Of Great Britain And Northern Ireland" and "The United
-// States Of America", and nobody types either.
+// States Of America", and nobody types either. What the neighbours call us
+// is here too. Measured 2026-11-02: "Viro", "Estland", "Finnland", "Kreeka",
+// "Mehhiko" and "Tšehhi" each went out as a name, a tag and two stems and
+// found nothing in four requests; as a country each is one request and a
+// full page. "Island" stays out: Iceland in Estonian, but an English word.
 var COUNTRY_ALIASES = (function() {
     var src = {
-        "soome": "FI", "finland": "FI", "suomi": "FI",
-        "eesti": "EE", "estonia": "EE",
+        "soome": "FI", "finland": "FI", "suomi": "FI", "finnland": "FI",
+        "eesti": "EE", "estonia": "EE", "viro": "EE", "estland": "EE",
         "rootsi": "SE", "sweden": "SE", "sverige": "SE",
         "norra": "NO", "norway": "NO", "norge": "NO",
         "läti": "LV", "latvia": "LV",
@@ -401,6 +473,7 @@ var COUNTRY_ALIASES = (function() {
         "austraalia": "AU", "australia": "AU",
         "brasiilia": "BR", "brazil": "BR", "brasil": "BR",
         "türgi": "TR", "turkey": "TR",
+        "kreeka": "GR", "mehhiko": "MX", "tšehhi": "CZ",
         "korea": "KR", "south korea": "KR",
         "czech republic": "CZ", "uae": "AE", "emirates": "AE",
         "iran": "IR", "moldova": "MD", "north macedonia": "MK", "macedonia": "MK",
@@ -533,11 +606,60 @@ function nameAkin(a, b) {
 // have hung a karaoke sleeve on the song.
 var _ART_JUNK = /karaoke|tribute|made popular by|in the style of|originally performed|instrumental version|cover version|backing track|as made famous/i;
 
+// The spelling a station and a catalogue disagree on, folded away for the
+// cover choice only: fold(), then every apostrophe and backtick as one, "&"
+// and "+" as "and", and the punctuation _bare drops gone, commas excepted,
+// because nameAkin reads "Sia, Sean Paul" as a list. Measured 2026-11-02:
+// 181.fm sent "Guns N` Roses - Sweet Child O` Mine" and both services
+// filed it under the apostrophe, so it got no cover, and Jazz Radio Blues
+// writes "G LOVE AND SPECIAL SAUCE" for "G. Love & Special Sauce". An
+// artist is matched on this fold whole, never looked for inside another
+// name (artArtistScore): without its dots "t.A.T.u." is "tatu", and "art
+// tatum" contains that. The class is spelled out rather than \w, which in
+// V4 is ASCII and would wipe a Cyrillic name. A name of punctuation alone
+// comes back as fold() has it, so "!!!" never turns into no artist. fold()
+// itself stays as it is: the station search matches on it.
+// Contract: artFold("Guns N` Roses") = "guns n roses"; artFold("Florence +
+//   The Machine") = artFold("Florence and the Machine"); artFold("Кино") =
+//   "кино"; artFold("!!!") = "!!!"; artFold(null) = "".
+function artFold(s) {
+    var f = artSpelling(s)
+        .replace(/[!-+\--\/:-@\[-`{-~\u00a1-\u00bf\u2010-\u205e]/g, "")
+        .replace(/\s+/g, " ").trim();
+    return f === "" ? fold(s) : f;
+}
+
+// The first half of artFold on its own: fold(), every apostrophe and
+// backtick as one, "&" and "+" as "and", and no punctuation dropped.
+function artSpelling(s) {
+    return fold(s)
+        .replace(/[\u2018\u2019\u201a\u201b\u02bc\u00b4`\u2032]/g, "'")
+        .replace(/\s*[&+]\s*/g, " and ")
+        .replace(/\s+/g, " ").trim();
+}
+
+// Whether Deezer's first artist is the one we asked for, before its photo
+// stands in for a record nobody found. The name has to be the same: case,
+// accents, quote style and "&"/"+"/"and" aside, nothing contained and no
+// punctuation dropped. On 231 live titles (2026-11-02) the photo step
+// painted 18 pictures and 9 were of somebody else, among them "KLASSIK RADIO
+// POPS ORCHESTRA" for Klassik Radio and "NANCY & SIDOROV" for Nancy, both
+// let in by nameAkin's containment. The art fold's punctuation drop stays
+// out of it: on the 77 recorded artist answers it would also have taken
+// "EL–P" for ELP and "AURA..." for the trance act Aura.
+// Contract: artPhotoTakes("Love & Fate", "Love") = false;
+//   artPhotoTakes("Guns N` Roses", "Guns N' Roses") = true;
+//   artPhotoTakes("ELP", "EL–P") = false; artPhotoTakes("", "") = false.
+function artPhotoTakes(wantName, gotName) {
+    var want = artSpelling(wantName);
+    return want !== "" && want === artSpelling(gotName);
+}
+
 // A title without its bracketed tail: "(Radio Edit)", "[Remastered 2021]".
 // Both sides get this, or a station's "(Radio Edit)" would never match a
 // catalogue's plain title and vice versa.
 function artCoreTitle(t) {
-    return fold(String(t || "").replace(/\s*[\(\[][^\)\]]*[\)\]]/g, " "));
+    return artFold(String(t || "").replace(/\s*[\(\[][^\)\]]*[\)\]]/g, " "));
 }
 
 // The initials of a multi-word name: "Bodies Without Organs" → "bwo".
@@ -552,14 +674,80 @@ function artInitials(name) {
 }
 
 // How strongly a candidate's artist is OUR artist: 2 for the same name in
-// any spelling, 0 for a stranger.
+// any spelling, 0 for a stranger. On the art fold one name has to sit in the
+// other as whole words, in one run: "mary j blige" in a station's "Mary J
+// Blige feat. Drake", never "tatu" in "art tatum" or "y and t" in "bob
+// marley and the wailers". Taken letter by letter, the fold matched those
+// strangers, and taken whole only, it lost every credit with a guest
+// (measured 2026-11-03). A name under four letters is the artist only at
+// the start of a credit, before a word that joins performers, as nameAkin
+// has it. The initials are read off the names as written, not off the art
+// fold: that one turns "&" into a word and drops the apostrophe of N', and
+// "CSNY" or "GNR" would stop finding their bands.
 function artArtistScore(wantArtist, gotArtist) {
-    var wa = fold(wantArtist), ga = fold(gotArtist);
+    var wa = artFold(wantArtist), ga = artFold(gotArtist);
     if (wa === "" || ga === "") return 0;
-    if (nameAkin(wa, ga)) return 2;
-    if (ga.length >= 2 && artInitials(wa) === ga) return 2;
-    if (wa.length >= 2 && artInitials(ga) === wa) return 2;
+    if (wa.replace(/ /g, "") === ga.replace(/ /g, "") || _wordRun(_creditWords(wantArtist), _creditWords(gotArtist)))
+        return 2;
+    if (ga.length >= 2 && artInitials(wantArtist) === ga) return 2;
+    if (wa.length >= 2 && artInitials(gotArtist) === wa) return 2;
     return 0;
+}
+
+var _JOINS = { ",": true, "and": true, "feat": true, "ft": true, "featuring": true, "with": true, "vs": true, "x": true };
+
+// Letters on both sides of a dot, a hyphen, an apostrophe or a "!" inside one
+// word, which the art fold then joins: "will.i.am", "t.A.T.u.", "P!nk".
+var _LETTER = "0-9A-Za-z\u00c0-\u024f\u0370-\u03ff\u0400-\u04ff";
+var _JOINED = new RegExp("[" + _LETTER + "][.!$'\u2018\u2019\u2010-\u2015-][" + _LETTER + "]");
+
+// The words of an artist credit on the art fold, a list split where it is a
+// list: a comma, a semicolon, "×", "、" or a full-width ampersand is a word of
+// its own (a joining one), and so is a slash, which the fold would otherwise
+// drop and run two names together ("Santi/RUSSI"). A word the fold made by
+// joining letters across inner punctuation is marked. Measured on 2026-11-03
+// against the recorded answers: kept on the words, "Pritam, Arijit Singh"
+// lost Pritam's records.
+function _creditWords(s) {
+    var parts = String(s === undefined || s === null ? "" : s).split(/\s*([,;\/\u00d7\u3001\uff06\uff0c])\s*/), out = [];
+    for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === "/") { out.push({ w: "/", joined: false }); continue; }
+        if (/^[,;\u00d7\u3001\uff06\uff0c]$/.test(parts[i])) { out.push({ w: ",", joined: false }); continue; }
+        var raw = parts[i].split(/\s+/);
+        for (var r = 0; r < raw.length; r++) {
+            var f = artFold(raw[r]);
+            if (f === "") continue;
+            var ws = f.split(" "), joined = ws.length === 1 && _JOINED.test(raw[r]);
+            for (var k = 0; k < ws.length; k++) out.push({ w: ws[k], joined: joined });
+        }
+    }
+    return out;
+}
+
+// Whether the shorter of two credits is an unbroken run of the longer one's
+// words; one under four letters only at the start, followed by nothing or by
+// a word that joins performers ("AC/DC" is a name, not AC and company). A
+// word the fold joined meeting a plain one counts like a short name: the
+// "william" of will.i.am is no William Orbit, and the "tatu" of t.A.T.u. no
+// Tatu Kantomaa.
+function _wordRun(a, b) {
+    var letters = function(ws) {
+        return ws.filter(function(x) { return x.w !== "," && x.w !== "/"; })
+                 .map(function(x) { return x.w; }).join("").length;
+    };
+    var s = letters(a) <= letters(b) ? a : b, l = s === a ? b : a;
+    if (s.length === 0) return false;
+    for (var i = 0; i + s.length <= l.length; i++) {
+        var j = 0, mixed = false;
+        while (j < s.length && l[i + j].w === s[j].w) {
+            if (l[i + j].joined !== s[j].joined) mixed = true;
+            j++;
+        }
+        if (j < s.length) continue;
+        if (!mixed && letters(s) >= 4) return true;
+        if (i === 0 && (s.length === l.length || _JOINS[l[s.length].w] === true)) return true;
+    }
+    return false;
 }
 
 // Which of the covers a music service offered actually belongs to this
@@ -575,9 +763,11 @@ function artArtistScore(wantArtist, gotArtist) {
 // first song of theirs the catalogue happened to list. Karaoke and tribute
 // pressings are dropped before any of this. Only when the stream names no
 // artist at all does the title have to carry the decision alone.
-function artPick(wantArtist, wantTitle, cands) {
+// requireTitle (true) also refuses a row whose title does not match, so the
+// artist's other records no longer count: artPickEither needs that.
+function artPick(wantArtist, wantTitle, cands, requireTitle) {
     if (!cands || cands.length === 0) return -1;
-    var wa = fold(wantArtist);
+    var wa = artFold(wantArtist);
     var best = -1, bestScore = 0;
     for (var i = 0; i < cands.length; i++) {
         var c = cands[i] || {};
@@ -601,15 +791,60 @@ function artPick(wantArtist, wantTitle, cands) {
         var score;
         if (wa !== "") {
             var ae = artArtistScore(wantArtist, c.artist);
-            if (ae === 0) continue;
+            if (ae === 0 || (requireTitle === true && te === 0)) continue;
             score = ae + te;
         } else {
+            // Nothing in the widget reaches this branch since 2026-11-02:
+            // ArtworkEngine turns a line without an artist away before the
+            // network. A call with no artist is still decided on the title alone.
             if (te === 0) continue;
             score = te;
         }
         if (score > bestScore) { best = i; bestScore = score; }
     }
     return best;
+}
+
+// artPick, and when nothing matches, artPick again with artist and title
+// swapped, where both halves must match. Jazz Radio Blues and SWR3 send some
+// songs as "Title - ARTIST" or "Title / Artist": on 231 live titles
+// (2026-11-02) all six of those got no cover or the photo of a stranger
+// named like the song ("LENNY" for Stevie Ray Vaughan's "Lenny"). The free
+// text search already carries both words, so the right rows were in the
+// answer and only the reading was the wrong way round. The title has to
+// match in the swapped reading, or the artist's other records would let a
+// title such as "John Williams" pull any John Williams soundtrack.
+// Contract: artPickEither("A bar song (Tipsy)", "Shaboozey", [Shaboozey /
+//   A Bar Song (Tipsy)]) = 0; artPickEither("Goin' to chicago", "KURT
+//   ELLING", [Kurt Elling / Nature Boy]) = -1; with either half empty it is
+//   artPick's answer alone.
+function artPickEither(wantArtist, wantTitle, cands) {
+    var i = artPick(wantArtist, wantTitle, cands);
+    if (i >= 0 || artFold(wantArtist) === "" || artFold(wantTitle) === "") return i;
+    return artPick(wantTitle, wantArtist, cands, true);
+}
+
+// For the last resort, a song no catalogue has: the first row filed under
+// exactly our artist, art fold aside, that has a picture. cands are
+// {artist, title, art}. The whole credit has to match, so a guest spot
+// ("Rivo Rehe" with "Suvesaladus (feat. Anne Loho)"), a duo she is half of
+// and a namesake spelled one letter off ("Anne Loo") are all refused; the
+// title is not asked at all, because the song is the one thing missing.
+// Karaoke and tribute pressings are dropped as artPick drops them.
+// Contract: artPickByArtist("Anne Loho", [Roderic H & Anne Loho / Next To
+//   Me, Anne Loho / Hinges Prii]) = 1; artPickByArtist("Anne Loho", [Anne
+//   Loo / Perfect Rainy Day]) = -1; artPickByArtist("", rows) = -1.
+function artPickByArtist(wantArtist, cands) {
+    var want = artFold(wantArtist);
+    if (want === "" || !cands) return -1;
+    for (var i = 0; i < cands.length; i++) {
+        var c = cands[i] || {};
+        if (!c.art) continue;
+        if (_ART_JUNK.test(String(c.title || "")) || _ART_JUNK.test(String(c.artist || "")))
+            continue;
+        if (artFold(c.artist) === want) return i;
+    }
+    return -1;
 }
 
 // The form a typed country name must take on the wire. The directory's

@@ -21,5 +21,7 @@ replace:
           if (TrackLogic.stationTalk(query, "")) {
 
 expect:
-  Killed by tests/qml/tst_artworkengine.qml::test_the_station_saying_its_name_asks_nobody_for_a_cover.
+  Killed by tests/qml/tst_artworkengine.qml::test_the_station_name_split_like_a_song_asks_nobody_for_a_cover.
+  The plain "Dance Wave!" line no longer kills it: since 2026-11-02 a line
+  without an artist is turned away at the same door whatever the station.
   Line-neutral.

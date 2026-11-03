@@ -10,17 +10,17 @@ history:
   was handed the OLD station's address and saved it over the edit for good.
   The dialog now empties the uuid when the edit leaves the station; this
   turns the question inside out, so a rename loses it and a repointed row
-  keeps it.
+  keeps it. Moved with the rule into DoorLogic.editedRow on 2026-11-03.
 
 target:
-  package/contents/ui/config/configGeneral.qml
+  package/contents/ui/DoorLogic.js
 
 find:
-                  if (existing.uuid && !HealLogic.editKeepsIdentity(existing.name, existing.hostname,
+      if (out.uuid && !HealLogic.editKeepsIdentity(src.name, src.hostname, out.name, out.hostname))
 
 replace:
-                  if (existing.uuid && HealLogic.editKeepsIdentity(existing.name, existing.hostname,
+      if (out.uuid && HealLogic.editKeepsIdentity(src.name, src.hostname, out.name, out.hostname))
 
 expect:
-  Killed by test_invariants::test_a_repointed_station_row_lets_go_of_the_old_stations_uuid.
+  Killed by tst_doorlogic::test_a_rename_after_a_heal_keeps_what_the_popup_wrote.
   Line-neutral.

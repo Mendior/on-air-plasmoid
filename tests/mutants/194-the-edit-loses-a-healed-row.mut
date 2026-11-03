@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The Edit dialog looks for its row only by address, so a row a heal moved
+  while the dialog was open is not found.
+
+history:
+  A heal writes the old address as prev. The dialog finds its row by the
+  address it was opened on, and then by prev; without the second look the
+  OK added the station a second time instead of editing the moved one.
+
+target:
+  package/contents/ui/DoorLogic.js
+
+find:
+      var tries = [["hostname", true], ["prev", true]];
+
+replace:
+      var tries = [["hostname", true]];
+
+expect:
+  Killed by tst_doorlogic::test_the_dialog_follows_its_row_through_a_heal_and_a_removal.
+  Line-neutral.

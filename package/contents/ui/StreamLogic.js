@@ -74,15 +74,17 @@ function pickBitrateUpgrade(results, stationName, origUrl) {
     // First pass: find the user's exact URL in the results so we
     // know its reported bitrate. Without this floor, the first
     // same-bitrate candidate would be picked as a false "upgrade".
+    // Either of a row's addresses counts: a heal saves the one the
+    // station handed in (url) when the checker's (url_resolved) is a
+    // rotating edge of the same station.
+    const fold = (u) => (u || "").toString().replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
     let origBr = 0;
     let foundOrig = false;
     for (const r of results) {
         const rn = (r.name || "").replace(/\s+/g, " ").trim().toLowerCase();
         if (rn !== nameLower) continue;
-        const u = (r.url_resolved || r.url || "").toString();
-        if (!u) continue;
-        const uNoProto = u.replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
-        if (uNoProto !== origUrlNoProto) continue;
+        if (origUrlNoProto === "") break;
+        if (fold(r.url_resolved) !== origUrlNoProto && fold(r.url) !== origUrlNoProto) continue;
         origBr = _bitrateOf(r);
         foundOrig = true;
         break;

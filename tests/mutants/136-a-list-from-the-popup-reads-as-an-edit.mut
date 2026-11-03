@@ -15,11 +15,11 @@ target:
   package/contents/ui/config/configGeneral.qml
 
 find:
-                      for (const server of servers) stationsModel.append(server);
+                      for (const server of servers) stationsModel.append(DoorLogic.normalize(server));
                       root._servers = external;
 
 replace:
-                      for (const server of servers) stationsModel.append(server);
+                      for (const server of servers) stationsModel.append(DoorLogic.normalize(server));
                       root._edited();
 
 expect:

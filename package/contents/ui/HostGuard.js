@@ -129,6 +129,17 @@ function answerFromPublicHost(xhr) {
     return host !== "" && !isPrivateHost(host);
 }
 
+// The same verdict for a request nobody clicked: an answer whose last hop
+// Qt does not name is refused rather than trusted. Qt 6.12 names it in
+// responseURL from the first bytes on (measured); a Qt that leaves it empty
+// cannot show the answer came from a public host.
+function answerKnownPublic(xhr) {
+    var u = "";
+    try { u = (xhr && xhr.responseURL) ? String(xhr.responseURL) : ""; } catch (e) { u = ""; }
+    var host = u === "" ? "" : hostOf(u);
+    return host !== "" && !isPrivateHost(host);
+}
+
 // Whether a host (as returned by hostOf) targets the machine itself or
 // the private/link-local space — in ANY spelling. An unparseable bracket
 // literal counts as private: refusing a malformed address is the safe

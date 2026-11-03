@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The logo hunt judges a homepage by the address it was given, not by the
+  page Qt's redirects ended on.
+
+history:
+  A station's own address that forwards to a landlord's page lent the
+  landlord's icon, and the popup saved it with no click.
+
+target:
+  package/contents/ui/LogoHunt.qml
+
+find:
+              probe(FaviconLogic.homepageCandidates(images, from || homepage), function(best) {
+
+replace:
+              probe(FaviconLogic.homepageCandidates(images, homepage), function(best) {
+
+expect:
+  Killed by tst_logohunt::test_a_homepage_that_forwards_to_a_landlord_is_read_as_the_landlords.
+  Line-neutral.

@@ -274,6 +274,27 @@ TestCase {
         verify(!SL.matchesAllWords("anything", []));
     }
 
+    function test_a_number_in_the_word_pass_is_a_whole_number() {
+        // Measured 2026-11-02: "Raadio 2" kept Vikerraadio and Raadio 4 on the
+        // 2 in "128 kbps", and "BBC Radio 1" kept ten 128k streams of other stations.
+        verify(!SL.matchesAllWords("BBC Radio 4 (128k)", SL.words("BBC Radio 1")));
+        verify(!SL.matchesAllWords("Vikerraadio (128 kbps Ogg Opus) | Eesti Rahvusringhääling",
+                                   SL.words("Raadio 2")));
+        verify(!SL.matchesAllWords("RTL 102.5", SL.words("rtl 10")));
+        verify(!SL.matchesAllWords(null, SL.words("radio 2")));
+        verify(SL.matchesAllWords("Raadio 2 HQ", SL.words("Raadio 2")));
+        verify(SL.matchesAllWords("BBC Radio 1Xtra (128k)", SL.words("bbc radio 1")));
+        verify(SL.matchesAllWords("Yle Radio1HIFI", SL.words("yle radio 1")));
+        verify(SL.matchesAllWords("RTL 102.5", SL.words("rtl 102")));
+        // A frequency with its point is no whole number: it stays a substring.
+        verify(SL.matchesAllWords("104.6 RTL Berlin", SL.words("rtl 104.6")));
+        // Only digits are held whole. Short letters stay a substring, or "big fm"
+        // loses every bigFM station and "z 100" loses Z100.
+        verify(SL.matchesAllWords("bigFM Deutschland", SL.words("big fm")));
+        verify(SL.matchesAllWords("Z100 - New York's #1 Hit Music Station WHTZ", SL.words("z 100")));
+        verify(SL.matchesAllWords("北京音乐广播", SL.words("北京 音乐")));
+    }
+
     function test_relevance_exact_then_prefix_then_rest() {
         compare(SL.relevance("NRJ Suomi", "nrj suomi"), 0);   // the name IS the query
         compare(SL.relevance("NRJ Suomi Hits", "nrj suomi"), 1);
@@ -286,6 +307,51 @@ TestCase {
         compare(SL.stems("elmar"), ["elma"]);             // never below four left
         compare(SL.stems("nova"), []);                    // short queries stay whole
         compare(SL.stems("  "), []);
+    }
+
+    function test_a_number_glued_to_a_word_is_spelled_apart() {
+        // Measured 2026-11-02: "raadio2" found nothing, and its stem "raadio"
+        // put Raadio 2 HQ third among thirty; "raadio 2" is the three Raadio 2 streams.
+        compare(SL.spellings("raadio2"), ["raadio 2"]);
+        compare(SL.spellings(" Raadio2 "), ["Raadio 2"]);      // the listener's own case
+        compare(SL.spellings("BAYERN3"), ["BAYERN 3"]);        // a capital is a letter too
+        compare(SL.spellings("1live"), ["1 live"]);            // five units, the floor
+        compare(SL.spellings("hot97"), ["hot 97"]);
+        compare(SL.spellings("rtl102.5"), ["rtl 102.5"]);      // a point is no letter
+        compare(SL.spellings("104.6rtl"), ["104.6 rtl"]);
+        compare(SL.spellings("bbc radio1"), ["bbc radio 1"]);
+        compare(SL.spellings("mp3stream"), ["mp 3 stream"]);   // every seam
+        compare(SL.spellings("Rádio2"), ["Rádio 2"]);          // accents stay as typed
+        compare(SL.spellings("Радио2"), ["Радио 2"]);
+        compare(SL.spellings("北京音乐2"), ["北京音乐 2"]);
+        // An accent typed as its own mark belongs to the letter before it,
+        // the way fold() reads it.
+        compare(SL.spellings("Rade\u03012"), ["Rade\u0301 2"]);
+    }
+
+    function test_only_a_seam_long_enough_is_spelled_apart() {
+        compare(SL.spellings("nrj2"), []);                     // four units
+        compare(SL.spellings("  yle1  "), []);
+        compare(SL.spellings("1fm"), []);
+        compare(SL.spellings("jazz"), []);
+        compare(SL.spellings("radio 2"), []);                  // already apart
+        compare(SL.spellings("102.5"), []);                    // no letter
+        compare(SL.spellings("radio-2"), []);                  // a dash is no letter
+        compare(SL.spellings(""), []);
+        compare(SL.spellings(null), []);
+        compare(SL.spellings(undefined), []);
+        // The space never lands inside a surrogate pair: half an emoji makes
+        // encodeURIComponent throw, and the stems learned that the hard way.
+        var e = SL.spellings("abc\u{1F600}1");
+        compare(e, ["abc\u{1F600} 1"]);
+        compare(encodeURIComponent(e[0]), "abc%F0%9F%98%80%201");
+        // A long paste is read whole, every seam in it.
+        var many = "";
+        for (var i = 0; i < 200; i++) many += "a1";
+        var out = SL.spellings(many);
+        compare(out.length, 1);
+        compare(out[0].length, 799);
+        compare(out[0].substring(0, 9), "a 1 a 1 a");
     }
 
     function test_probe_safe_host_blocks_literal_private_addresses() {
@@ -515,6 +581,47 @@ TestCase {
         for (var j = 0; j < no.length; j++) verify(!SL.isGenreWord(no[j]), String(no[j]))
     }
 
+    // ── a genre and a place: "techno berlin" ────────────────────────────
+    function test_a_genre_beside_a_place_is_asked_inside_that_place() {
+        // Measured 2026-11-02: "techno berlin" found nothing in five requests,
+        // and the techno tag inside the state "berlin" is seventeen stations.
+        var r = SL.genrePlace("techno berlin")
+        verify(r !== null)
+        compare(r.tag, "techno"); compare(r.state, "berlin")
+        r = SL.genrePlace("  Berlin   Techno ")                 // any order, the place as typed
+        verify(r !== null)
+        compare(r.tag, "techno"); compare(r.state, "Berlin")
+        r = SL.genrePlace("Jazz Wien")                          // four letters are enough
+        compare(r.tag, "jazz"); compare(r.state, "Wien")
+        r = SL.genrePlace("hip-hop Köln")                       // accents go out as typed
+        compare(r.tag, "hip-hop"); compare(r.state, "Köln")
+        r = SL.genrePlace("r&b paris")
+        compare(r.tag, "r&b"); compare(r.state, "paris")
+        // GENRES knows only "classic rock", so the misspelt pair reads as rock
+        // in a place of that misspelled name. Harmless today: the word pass finds rows
+        // for it first, and this question is only asked of an empty list.
+        r = SL.genrePlace("clasic rock")  // codespell:ignore clasic
+        compare(r.tag, "rock"); compare(r.state, "clasic")  // codespell:ignore clasic
+        // Two genres: the first one typed is the genre. The tag pass has asked
+        // for both together long before an empty list gets here.
+        r = SL.genrePlace("jazz rock")
+        compare(r.tag, "jazz"); compare(r.state, "rock")
+        var far = "rock "
+        for (var i = 0; i < 300; i++) far += "a"
+        compare(SL.genrePlace(far).state.length, 300)
+    }
+
+    function test_no_place_without_a_genre_and_a_real_place_word() {
+        var no = ["techno", "berlin techno mitte", "nova radio", "deep purple",
+                  "smooth jazz", "classic rock",                // the pair is the genre
+                  "rock 1live", "pop 90s",                      // a digit is no place
+                  "rock radio", "rock online", "jazz fm",       // station words
+                  "pop rio", "jazz l.a.",                       // under four letters
+                  "", "   ", null, undefined]
+        for (var i = 0; i < no.length; i++)
+            compare(SL.genrePlace(no[i]), null, String(no[i]))
+    }
+
     function test_a_station_named_after_the_word_leads() {
         var yes = [["Rock", "rock"], ["ROCK FM", "rock"], ["Rock FM 104.6", "rock"], ["Radio 1 Rock", "rock"],
                    ["Radio ROCK", "rock"], ["Rock-FM!", "rock"], ["Jazz FM", "jazz"], ["Jazz Radio", "jazz"],
@@ -594,6 +701,26 @@ TestCase {
         compare(a["south korea"], "KR"); compare(a["soome"], "FI"); compare(a["turgi"], "TR")
         // Null-prototype, like the API map: "constructor" is no country.
         compare(a["constructor"], undefined)
+    }
+
+    function test_what_the_neighbours_call_a_country_is_that_country() {
+        // A Finn types "Viro", a German "Estland" or "Finnland", an Estonian
+        // "Kreeka", "Mehhiko" or "Tšehhi". Measured 2026-11-02: as a name, a
+        // tag and two stems each found nothing in four requests, and "Viro"
+        // found Viroqua and stations tagged "environment".
+        var want = [["Viro", "EE"], ["Estland", "EE"], ["Finnland", "FI"], ["Kreeka", "GR"],
+                    ["Mehhiko", "MX"], ["Tšehhi", "CZ"], ["tsehhi", "CZ"], ["VIRO ", "EE"]]
+        for (var i = 0; i < want.length; i++)
+            compare(_ccAll(want[i][0]), want[i][1], want[i][0])
+        // "Island" is Iceland in Estonian and an English word as well: typed
+        // alone it stays a search for the word in station names.
+        compare(_ccAll("Island"), "")
+        compare(_ccAll("Viroqua"), "")
+        compare(_ccAll(""), "")
+        // Beside a genre the word is the country the genre is asked inside.
+        var r = SL.facetQuery("rock viro", _ccAll)
+        verify(r !== null)
+        compare(r.tags, ["rock"]); compare(r.cc, "EE")
     }
 
     function test_a_row_shows_the_short_country_name() {

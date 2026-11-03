@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The title reader refuses a station whose certificate has only run out.
+
+history:
+  The player opens a station's address without checking its certificate, and
+  the reader refused it once the dates had passed, so euddn's le0X stations
+  played without titles or covers from 2026-10-23. The reader leaves only the
+  dates unchecked.
+
+target:
+  package/contents/ui/reader.py
+
+find:
+      ctx.verify_flags |= _NO_CHECK_TIME
+
+replace:
+      ctx.verify_flags |= 0
+
+expect:
+  Killed by tests/test_reader_tls.py::test_a_title_behind_a_lapsed_certificate_comes_through.
+  Line-neutral.

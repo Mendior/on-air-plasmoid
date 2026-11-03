@@ -2215,6 +2215,53 @@ def test_a_stale_country_chip_steps_aside_for_an_empty_answer():
         "a scope the text itself names would be dropped as if it were inherited")
 
 
+def test_a_glued_number_is_spelled_apart_before_the_stems():
+    """"raadio2" found nothing and its stem "raadio" put Raadio 2 HQ third
+    among thirty stations; "raadio 2" is the three Raadio 2 streams (measured
+    2026-11-02). SearchLogic.spellings puts the space in; this pins that the
+    empty answer's retry asks the spellings first and counts them with the
+    stems, so emptyNext still sees a retry to run."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webFinish"))
+    assert "var stems = SearchLogic.spellings(q).concat(SearchLogic.stems(q))" in body, (
+        "the empty answer's retry no longer spells a glued number apart first")
+    assert "stemCount: stems.length" in body
+
+
+def test_a_genre_beside_a_place_is_asked_before_the_stems():
+    """"techno berlin" found nothing in five requests, and the techno tag
+    inside the state "berlin" is seventeen stations (measured 2026-11-02).
+    SearchLogic.genrePlace reads the pair; this pins that an empty answer asks
+    it only once the cap is back at a full page (asked under the word pass's
+    frozen cap of count+1, the list showed one station of the seventeen),
+    and that its answer's own handler pages that question with "Show more",
+    ends the search when no mirror answered and goes on to the stems when the
+    answer was empty. The handler is cut out by its braces: the stems call
+    for a query that is no genre and place stands right after it."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    body = _code_only(_function_body(src, "_webFinish"))
+    branch = body[body.index('next === "stems"'):]
+    assert "SearchLogic.genrePlace(q)" in branch, "an empty genre-and-place answer goes straight to the stems"
+    ask = branch.index("SearchLogic.genrePlace(q)")
+    assert branch.index("fullRepresentation.webResultCap = 30") < ask, (
+        "the genre is asked inside the place under the word pass's frozen cap")
+    after = branch[ask:]
+    assert '"&state=" + encodeURIComponent(gp.state)' in after
+    opening = after.index("{", after.index("root._rbFetch(gpQs + tail"))
+    depth, end = 0, opening
+    for end in range(opening, len(after)):
+        depth += {"{": 1, "}": -1}.get(after[end], 0)
+        if depth == 0:
+            break
+    handler = after[opening:end + 1]
+    assert "fullRepresentation._webLastQs = gpQs + tail" in handler, (
+        "Show more pages the name query that found nothing")
+    assert "webSearchFailed = webResultsModel.count === 0" in handler, (
+        "no mirror answering the genre-and-place question reads as no results")
+    assert "_webStemChain(q, stems, 0, seq, tail)" in handler, (
+        "an empty genre-and-place answer no longer goes on to the stems")
+
+
 def test_a_result_row_shows_the_short_country_name():
     """The directory files Britain as "The United Kingdom Of Great Britain And
     Northern Ireland"; on a one-line row that pushed bitrate and codec off
@@ -2312,25 +2359,6 @@ def test_a_saved_new_address_reaches_the_alarm_and_the_scheduled_recording():
         assert body.index(call) > stopgap_return, call + " runs before identity is proven"
 
 
-def test_a_repointed_station_row_lets_go_of_the_old_stations_uuid():
-    """A row edited by hand kept its directory uuid whatever it was pointed
-    at. The heal then asked byuuid where "this" station lives, was handed the
-    OLD station's address, called it identity-proven and saved it over the
-    edit for good; logos and votes followed the same id. The verdict lives in
-    HealLogic.editKeepsIdentity under tst_heallogic; this holds the wire: the
-    dialog asks before it writes the row, and a no empties the uuid.
-    """
-    src = (UI / "config" / "configGeneral.qml").read_text(encoding="utf-8")
-    assert 'import "../HealLogic.js" as HealLogic' in src
-    code = re.sub(r"\s+", " ", _code_only(src))
-    # The whole guard as one sentence: a missing "!" turns it inside out — a
-    # rename would lose the uuid and a repointed row would keep it — and no
-    # test of the library can see that.
-    guard = ('if (existing.uuid && !HealLogic.editKeepsIdentity(existing.name, existing.hostname, '
-             'itemObject.name, itemObject.hostname)) itemObject.uuid = "";')
-    assert guard in code, "the edit dialog's uuid guard changed shape"
-    assert code.index(guard) < code.index("stationsModel.set(dialogMode, itemObject)", code.index(guard)), (
-        "the verdict comes after the row was already written")
 
 
 def test_a_logo_found_by_name_passes_the_donor_gate_at_both_doors():
@@ -2374,6 +2402,87 @@ def test_a_logo_found_by_name_passes_the_donor_gate_at_both_doors():
     assert "pickedHomepage = _extUrlOrEmpty(donors[d].homepage);" in query
     assert query.count("pickedFavicon = ") == 2 and query.count("pickedHomepage = ") == 2, (
         "something besides the donor loop assigns the page's pick")
+
+
+def test_the_popup_reads_a_homepage_only_through_the_guarded_hunt():
+    """The popup's backfill now reads a station's homepage and fetches what it
+    names with no click at all: Raadio Kadi's directory record had no logo and
+    a homepage whose og:image is the logo (2026-11-02). That ladder was the
+    settings button's alone because every address it fetches comes from a
+    publicly writable catalogue or from a stranger's page. So the popup may
+    only reach it through LogoHunt, the one copy of the private-host refusal,
+    the check of where Qt's own redirects ended, the timers and the caps, and
+    only through its homepage entry, which asks no stream host and no icon
+    service. tests/qml/tst_logohunt.qml drives those guards with stand-in
+    requests; what no QML test sees is whether the popup goes around them.
+    """
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    hunt = (UI / "LogoHunt.qml").read_text(encoding="utf-8")
+    backfill = _code_only(_function_body(main, "_favBackfillNext"))
+    flat = re.sub(r"\s+", " ", backfill)
+
+    # The backfill's only roads out are the directory and the hunt's
+    # homepage entry, taken when the record has no logo of its own and the
+    # connection is not metered.
+    assert "XMLHttpRequest" not in backfill and ".open(" not in backfill
+    assert re.findall(r"logoHunt\.\w+\(", backfill) == ["logoHunt.huntHomepage("], (
+        "the popup calls into LogoHunt somewhere other than its homepage entry")
+    assert ('if (fav !== "" || home === "" || NetworkInformation.isMetered) done(fav); '
+            "else logoHunt.huntHomepage(home, done);") in flat
+    # The homepage passes the favicon gate, and a name search lends only
+    # a donor's page, with the saved address and the page size it asked.
+    assert "home = FaviconLogic.webUrlOrEmpty(row.homepage);" in backfill
+    assert "home = FaviconLogic.pickHomepage(rows, norm, HealLogic.normName, st.host, 30);" in backfill
+    # Two start empty and those two assignments are the only others.
+    assert len(re.findall(r"\bhome = ", backfill)) == 4 and flat.count('home = ""') == 2
+    assert len(re.findall(r"^\s*LogoHunt \{ id: logoHunt; app: root \}$", main, re.M)) == 1
+
+    # The entry: the page, then what it names and the well-known paths on
+    # its own origin. Nothing else is added to the list.
+    entry = re.sub(r"\s+", " ", _code_only(_function_body(hunt, "huntHomepage")))
+    assert "probe(FaviconLogic.homepageCandidates(images, from || homepage), function(best) {" in entry
+    assert entry.count("probe(") == 1 and entry.count("readPage(") == 1
+    # Nobody clicked: both steps run strict, and a tab-sized icon is no logo.
+    assert entry.endswith("}, true); }, true); }"), "the popup's hunt is not strict"
+    assert "var tiny = best && FaviconLogic.logoRank(best.url, best.size) >= 4;" in entry
+    pick = re.sub(r"\s+", " ", _code_only(_function_body(hunt, "_fromPublicHost")))
+    assert pick == ("{ return strict ? HostGuard.answerKnownPublic(xhr) : "
+                    "HostGuard.answerFromPublicHost(xhr); }"), pick
+
+    # Every request the engine sends: gated before it is opened, its timer
+    # armed, its answer judged by where it came from, its body capped.
+    # Both public doors start nothing in their caller's handler.
+    door = re.sub(r"\s+", " ", _code_only(_function_body(hunt, "readPage")))
+    assert door == "{ Qt.callLater(function() { hunt._readPageNow(homepage, onDone, strict === true); }); }"
+    page = _code_only(_function_body(hunt, "_readPageNow"))
+    image = _code_only(_function_body(hunt, "_fetchImage"))
+    probe = _code_only(_function_body(hunt, "probe"))
+    assert re.sub(r"\s+", " ", probe).endswith("Qt.callLater(step); }") and probe.count("step();") == 1
+    assert page.index("var page = FaviconLogic.webUrlOrEmpty(homepage);") < page.index(
+        'if (page === "") {') < page.index("xhr.open(\"GET\", page);")
+    assert "target = FaviconLogic.webUrlOrEmpty(order[next++]);" in probe
+    assert probe.count("_fetchImage(") == 1 and "_fetchImage(target," in probe
+    assert "_fetchImage(" not in page and hunt.count("_fetchImage(") == 2
+    for body, timeout, cap in ((page, "hunt.pageTimeoutMs", "hunt.pageCap"),
+                               (image, "hunt.probeTimeoutMs", "hunt.imageCap")):
+        assert "guard = app._armXhrTimeout(xhr, %s);" % timeout in body
+        assert "hunt._fromPublicHost(xhr, strict)" in body
+        assert cap in body
+        # An abort from inside the reply's own handler has crashed
+        # plasmashell; every one here is deferred.
+        assert body.count("xhr.abort()") == body.count(
+            "Qt.callLater(function() { try { xhr.abort(); } catch (e) {} });")
+    assert hunt.count(".open(") == 2 and hunt.count("new XMLHttpRequest") == 1
+    for prop in ("pageCap", "pageKept", "imageCap", "pageTimeoutMs", "probeTimeoutMs"):
+        assert re.search(r"^\s*readonly property int %s: \d+$" % prop, hunt, re.M), (
+            prop + " is no longer read-only: a caller could loosen it")
+
+    # Looking for a logo starts no sound and touches no player.
+    player = re.compile(r"playMusic|_playStation|startWithFade|previewStation|refreshServer"
+                        r"|_wantsPlaying|tsPlayLive|\.play\(")
+    for body in (backfill, _code_only(_function_body(main, "_favBackfillCommit")),
+                 _code_only(hunt)):
+        assert player.search(body) is None
 
 
 def test_the_settings_list_asks_in_one_spelling_and_lists_a_station_once():
@@ -3106,7 +3215,7 @@ _MAIN_SOUND = {
 _DOOR_LINES = {
     "_tryHealStation": "if (_orderLapsed()) return;",
     "_healAdvance": "if (_orderLapsed()) return;",
-    "_playStation": "if (automated === true && _orderLapsed()) return;",
+    "_playStation": "if (automated === true && (!root._wantsPlaying || _orderLapsed())) return;",
     "stallTimer": "if (root._tsPaused || _orderLapsed()) return;",
     "bitrateFallbackTimer": 'if (!fallbackUrl || root._tsPaused || _orderLapsed()) { fallbackUrl = ""; return; }',
 }
@@ -3216,3 +3325,232 @@ def test_a_person_giving_the_order_dates_it_afresh():
         assert "_wantsPlaying = true" not in _function_body(src, fn), fn
     assert "_orderQuietSince = 0" in _function_body(src, "stopWithFade"), (
         "a stop leaves the quiet stamp behind for the next order")
+
+
+def test_no_plasma_combo_box_while_its_width_loops():
+    """libplasma 6.8 binds the ComboBox's implicitWidth to its own text
+    field, and every instance with a model reports a binding loop: a bare one
+    in a ColumnLayout did it on 6.8.2 (2026-11-02), and overriding
+    implicitWidth only moved the loop to implicitHeight. The public nightly
+    went red the day Arch shipped 6.8.0 (2026-10-16; 10-15 was green on
+    6.7.5). The runtime check sees the popup only, never the settings pages,
+    so the rule is held over the whole package. QQC2.ComboBox has no loop."""
+    hits = []
+    for path in sorted((ROOT / "package").rglob("*.qml")):
+        src = _code_only(path.read_text(encoding="utf-8"))
+        aliases = re.findall(r"^import org\.kde\.plasma\.components as (\w+)", src, re.M)
+        for alias in aliases:
+            for m in re.finditer(r"\b%s\.ComboBox\b" % re.escape(alias), src):
+                hits.append("%s:%d" % (path.relative_to(ROOT), src.count("\n", 0, m.start()) + 1))
+    assert not hits, hits
+
+
+def test_station_hosts_are_asked_with_the_widgets_own_name():
+    """Qt's request carries "Mozilla/5.0" unless told otherwise, and some
+    stream hosts refuse exactly that: SomaFM's ice servers answered 403 to it
+    and 206 to OnAir, Lavf and VLC alike, and a zeno.fm mount answered 401
+    (2026-11-02, 65 saved addresses scored against ffprobe; the three named
+    clients agreed on every one). The search's liveness probe then dimmed a
+    station that plays as "not answering" and sank it, and the playlist
+    unwrap asks the same hosts. Both go out under the widget's name, as the
+    directory requests already do."""
+    # Raw source: _code_only cuts "//" inside the unwrap's own URL regex and
+    # the body ends after its first line. A comment cannot pass the line test.
+    fr = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    for src, fn in ((fr, "_probeOne"), (main, "_unwrapPlaylist")):
+        body = _function_body(src, fn)
+        assert re.search(r'^\s*xhr\.setRequestHeader\("User-Agent", "OnAir/', body, re.M), (
+            "%s asks a station host as Mozilla/5.0" % fn)
+
+
+def test_every_station_row_enters_a_model_through_normalize():
+    """A ListModel locks a role's shape to the first row it is given, and
+    the settings pages write the model back as the stored list. A row that
+    went in without prev could take it out of every row after it on the next
+    save, so every road into a station model goes through
+    DoorLogic.normalize, and both sides of the settings merge compare the
+    same shape (a row read as edited is a row whose heal gets refused)."""
+    for name in ("main.qml", "config/configGeneral.qml", "config/configSearch.qml"):
+        src = _code_only((UI / name).read_text(encoding="utf-8"))
+        calls = re.findall(r"stationsModel\.append\(\s*([^\n]*)", src)
+        assert calls, name
+        for call in calls:
+            assert call.startswith("DoorLogic.normalize("), "%s: %s" % (name, call)
+    for name in ("config/configGeneral.qml", "config/configSearch.qml"):
+        src = _code_only((UI / name).read_text(encoding="utf-8"))
+        norms = re.findall(r"const norm = \(o\) => \{\n\s*const plain = ([^\n]*)", src)
+        assert norms, "%s has no merge norm" % name
+        for plain in norms:
+            assert plain.startswith("DoorLogic.normalize("), "%s: %s" % (name, plain)
+
+
+
+
+
+
+def test_the_edit_dialog_writes_only_what_was_changed_in_it():
+    """The popup writes the station list while the Edit dialog is open (a
+    heal's move, a logo found), and an OK wrote the dialog's snapshot back
+    over it: a rename put a healed station back on its dead address and lost
+    the logo (found 2026-11-02). The row is found again by the address the
+    dialog opened on, and only the fields changed in it are written; the
+    rules are DoorLogic's, under tst_doorlogic."""
+    src = _code_only((UI / "config" / "configGeneral.qml").read_text(encoding="utf-8"))
+    assert "_editOpened = {" in _function_body(src, "editServer"), "the dialog forgets what it opened with"
+    i = src.index("id: serverDialog")
+    ok = src[src.index("onAccepted: {", i):]
+    ok = ok[:ok.index("_edited();")]
+    assert "DoorLogic.editRowIndex(rows, dialogMode, _editOpened)" in ok
+    assert "DoorLogic.editedRow(rows[rowAt], _editOpened, shown, clean)" in ok
+    assert "in existing)" not in ok, "the dialog copies its snapshot over the row again"
+
+
+def test_a_uuid_looked_up_for_a_click_or_a_vote_is_not_saved():
+    """_rbResolveUuid finds a station's directory record by its name and the
+    address it plays, and used to save that uuid with the station. Neither
+    proves which record is the station's: anyone can file a record that
+    lists an address, and the heal trusts a saved uuid for good (it asks
+    byuuid where the station lives and saves the answer). The uuid now
+    serves the click or the vote and is kept for the session only."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    body = _function_body(src, "_rbResolveUuid")
+    assert "Plasmoid.configuration.servers" not in body, "the lookup writes the station list"
+    assert "_rbStoreUuid" not in src, "the uuid store is back"
+    assert "_uuidResolved[orig] = uuid;" in body, "the session does not keep what it found"
+
+
+def test_a_play_reads_its_row_before_the_address_is_unwrapped():
+    """_playStation is handed the live ListModel row, and a .pls or .m3u is
+    unwrapped asynchronously before the play starts. A list write in that
+    window (a logo the popup found, a heal) clears and refills the model, and
+    the row read after it answers empty: the station played with no name and
+    a click on its row started it again instead of stopping it (measured on
+    Qt 6.12 with a cleared and refilled model, 2026-11-02). Everything the
+    play needs is read from the row before the unwrap."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    body = _function_body(src, "_playStation")
+    after = body[body.index("_unwrapPlaylist(home"):]
+    assert "station." not in after, "the play reads the live row after the unwrap"
+
+
+def test_every_write_that_must_not_stop_playback_writes_something_new():
+    """A list write marked as not stopping playback arms _reorderKeepPlaying,
+    and the next serversChanged spends it. A write the config skips because
+    nothing changed fires no change, so the flag stayed armed and ate the stop
+    of the next real add or remove: a click and a vote once raced to save one
+    uuid that way, and a heal that "moved" a station onto its own address did
+    it again (found 2026-11-03). Every site bails on an unchanged list first."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    lines = src.splitlines()
+    sites = [i for i, line in enumerate(lines) if "_reorderKeepPlaying = true;" in line]
+    assert len(sites) >= 5, sites
+    for i in sites:
+        before = "\n".join(lines[max(0, i - 4):i])
+        assert "=== Plasmoid.configuration.servers) return" in before, (
+            "line %d arms the keep-playing flag without bailing on an unchanged list" % (i + 1))
+
+
+def test_a_heal_that_finds_the_saved_address_again_moves_nothing():
+    """A directory record whose url is a .pls naming the very address the row
+    has unwrapped back to it, and the heal's commit then "moved" the station
+    onto itself: a "found at a new address" notice and a write of the same
+    list (found 2026-11-03). The saved address answering again is no move."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    body = _function_body(src, "_healCommit")
+    same = "if (HealLogic.addrKey(newUrl) === HealLogic.addrKey(oldUrl)) return;"
+    assert same in body, "the heal commits the address the row already has"
+    assert body.index(same) < body.index("HealLogic.commitVerdict(")
+
+
+def test_an_automated_play_whose_order_went_meanwhile_does_not_start():
+    """The retry ladder's play of a .pls or .m3u station waits for the
+    playlist to unwrap. A delete of that station in the meantime retired the
+    order but nothing told the waiting play, and the deleted station started
+    when the playlist answered (found 2026-11-03). _orderLapsed answers false
+    for an order that is gone, so the play asks for the order itself."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    body = _function_body(src, "_playStation")
+    assert "if (automated === true && (!root._wantsPlaying || _orderLapsed())) return;" in body
+
+
+def test_the_popup_never_writes_a_saved_rows_name_or_uuid():
+    """The settings pages find a row of their list in the popup's by its name
+    and uuid (ReorderLogic.mergeExternal), because the popup never writes
+    either on a row it already has: it moves one, fills a logo, turns one on,
+    reorders, adds and removes. A popup write that renamed a row or gave it
+    another uuid would make an open settings page lose it."""
+    for name in ("main.qml", "FullRepresentation.qml"):
+        src = _code_only((UI / name).read_text(encoding="utf-8"))
+        hit = re.search(r"\b(servers|list|rows)\[\w+\]\.(name|uuid)\s*=[^=]", src)
+        assert hit is None, "%s writes a saved row's %s" % (name, hit.group(2) if hit else "")
+        assert not re.search(r"delete\s+\w+\[\w+\]\.(name|uuid)\b", src), name
+
+
+def test_a_heal_that_moves_a_station_keeps_where_it_was():
+    """A permanent heal overwrote the saved address and the old one was
+    gone; it now goes to prev. The row keeps its own uuid: a name twin is
+    weaker proof than the identity the row has, a byuuid move is trusted for
+    good, and so a twin's uuid would hand a stranger's record the station
+    (confirmed on 2026-11-02 against a record listing an attacker's
+    redirector)."""
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    body = _function_body(src, "_healCommit")
+    moved = body[body.index("servers[i].hostname = newUrl;"):]
+    assert "servers[i].prev = oldUrl;" in moved
+    assert "servers[i].uuid" not in moved, "the heal commit writes a uuid"
+
+
+
+def test_a_dead_previews_honest_word_stays_readable():
+    """The preview ladder's last word ("The station did not answer — it may
+    be offline or not available in your country...") lived only inside the
+    5 s error window, and the one-line footer cut it in half (seen
+    2026-11-02 on a dead search result: readable for 2-4 s, gone at 6 s).
+    It now stays until the next play or stop clears it, on up to two lines."""
+    fr = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    at = fr.index("id: subtext")
+    text = fr[fr.index("text: {", at):]
+    idle = text.index('return i18n("Choose station and enjoy…")')
+    word = text.index('else if (root._friendlyError !== "")\n                        return root._friendlyError')
+    assert text.index('i18n("Reconnecting…")') < word < idle, "the word does not sit just above the idle sentence"
+    i = fr.index("id: subtext")
+    label = fr[i:fr.index("text: {", i)]
+    assert "wrapMode: Text.Wrap" in label and "maximumLineCount: 2" in label
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    for fn in ("startWithFade", "stopWithFade"):
+        assert 'root._friendlyError = "";' in _function_body(main, fn), fn
+
+
+
+
+def test_both_settings_pages_merge_the_popups_writes_the_same_tested_way():
+    """The popup writes the station list while a settings page is open (a logo
+    found, a heal). Both pages decide
+    what to show through ReorderLogic.mergeExternal, which tst_reorderlogic
+    holds to: a row removed here stays removed, a moved row stays in its
+    place, and a local edit wins without a second row. The Stations page is
+    driven for real in tst_stationspage; this keeps the Search page on the
+    same road."""
+    for name in ("config/configGeneral.qml", "config/configSearch.qml"):
+        src = _code_only((UI / name).read_text(encoding="utf-8"))
+        assert "ReorderLogic.mergeExternal(base, ReorderLogic.savedRows(stationsModel), ext, norm)" in src, name
+        assert "stationsModel.remove(i)" not in src, "%s merges with its own loop again" % name
+
+
+
+
+
+
+def test_the_settings_search_knows_a_station_by_any_address_it_has():
+    """After a heal a saved row can sit at the station's own address (the
+    record's url), while the settings search lists the address its checker
+    resolved. Compared on that one alone, Search added a second Raadio Elmar
+    with the same uuid (found 2026-11-02). The popup's search already
+    compares both addresses; the settings page now does, and the uuid."""
+    src = _code_only((UI / "config" / "configSearch.qml").read_text(encoding="utf-8"))
+    i = src.index("var dupAt = -1")
+    loop = src[i:i + 600]
+    for need in ("held.hostname === src.url_resolved", "held.hostname === src.url",
+                 "held.uuid === src.stationuuid"):
+        assert need in loop, need

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Re-fetch all asks the row's own logo in its kind's place, not first.
+
+history:
+  The row's own logo goes first so it is weighed against every find and kept
+  on a tie; asked later, the hunt can stop before it is asked at all.
+
+target:
+  package/contents/ui/FaviconLogic.js
+
+find:
+          if (c.kind === "current") { lanes[0].push(u); continue; }
+
+replace:
+          if (c.kind === "current") { lanes[4].push(u); continue; }
+
+expect:
+  Killed by tst_faviconlogic::test_a_hunt_keeps_the_logo_a_row_has_unless_something_beats_it.
+  Line-neutral.

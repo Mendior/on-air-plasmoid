@@ -134,8 +134,7 @@ Item {
                             // The photo of SOME artist is not a fallback,
                             // it is a wrong picture with a friendly face —
                             // the name has to be the one we asked for.
-                            if (SearchLogic.nameAkin(SearchLogic.fold(artistName),
-                                                     SearchLogic.fold(artist.name || ""))) {
+                            if (SearchLogic.artPhotoTakes(artistName, artist.name || "")) {
                                 var artUrl = _deezerRealArt(artist.picture_big)
                                              || _deezerRealArt(artist.picture_medium);
                                 if (artUrl) {
@@ -144,6 +143,49 @@ Item {
                                 }
                             }
                         }
+                        onResult("", true);
+                        return;
+                    }
+                } catch(e) {}
+            }
+            onResult("", false);
+        };
+        guard = app._armXhrTimeout(xhr, 2500);
+        xhr.send();
+    }
+
+    // The artist's own sleeve for a song no catalogue has: the iTunes songs
+    // filed under the whole credit, and the first of them that is exactly
+    // the artist (SearchLogic.artPickByArtist). Measured 2026-11-02: Elmari
+    // tantsuõhtu played Anne Loho's "Uus algus", which Deezer, iTunes and
+    // MusicBrainz all lack, and Deezer's artist search does not know her,
+    // but iTunes lists her own singles. One request, after everything else
+    // came back empty; same host, timeout and one-at-a-time chain as the
+    // iTunes song search, and a miss is cached like any other.
+    function _queryItunesArtist(artistName, cacheKey, onResult) {
+        console.log("[ARP] iTunes artist query");
+        var xhr = new XMLHttpRequest;
+        var guard = null;
+        xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(artistName) + "&entity=song&limit=25");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== xhr.DONE) return;
+            app._clearXhrTimeout(guard);
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.results && data.results.length > 0) {
+                        var rows = [];
+                        for (var ri = 0; ri < data.results.length; ri++)
+                            rows.push({ "artist": (data.results[ri] || {}).artistName || "",
+                                        "title": (data.results[ri] || {}).trackName || "",
+                                        "art": (data.results[ri] || {}).artworkUrl100 || "" });
+                        var pick = SearchLogic.artPickByArtist(artistName, rows);
+                        if (pick >= 0) {
+                            onResult(rows[pick].art.replace("100x100bb", "300x300bb"), true);
+                            return;
+                        }
+                    }
+                    if (data.results !== undefined) {
                         onResult("", true);
                         return;
                     }
@@ -168,8 +210,21 @@ Item {
     // about itself is settled here too: no record, the logo shows. Measured
     // on Dance Wave! 2026-09-23: the title "Dance Wave!" found an album of
     // that name on iTunes, and the second time round it came from the cache.
-    function _artFromCache(query) {
+    //
+    // artist is what the line parsed to, and a line that names no artist is
+    // settled here the same way. Of 231 live titles (2026-11-02), 12 still
+    // parse without one: eleven slogans, shows, news items and adverts, and
+    // a song whose artist sits behind a "|". None of them got a right cover,
+    // "Nachrichten" on Deutschlandfunk got a sleeve off a Kraftwerk tribute
+    // album, and together they cost 36 requests. Both callers pass the
+    // parsed artist; a call without one asks nothing and paints nothing.
+    function _artFromCache(query, artist) {
         if (TrackLogic.stationTalk(query, app.currentStation)) {
+            albumArtUrl = "";
+            _albumArtKey = "";
+            return true;
+        }
+        if (!artist) {
             albumArtUrl = "";
             _albumArtKey = "";
             return true;
@@ -195,14 +250,14 @@ Item {
             albumArtUrl = "";
             return;
         }
-        var parsed = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(trackString));
+        var parsed = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(trackString, app.currentStation));
         var query = TrackLogic.normalizeQuery((parsed.artist + " " + parsed.title).trim() || trackString);
         if (query.length === 0) {
             albumArtUrl = "";
             _albumArtKey = "";
             return;
         }
-        if (_artFromCache(query)) return;
+        if (_artFromCache(query, parsed.artist)) return;
         // A NEW track's lookup begins: the old track's cover must not pose
         // over it while the network answers (or fails to).
         if (albumArtUrl !== "" && _albumArtKey !== query) {
@@ -210,33 +265,51 @@ Item {
             _albumArtKey = "";
         }
 
-        // One request at a time, Deezer first: its rate limit is far
-        // friendlier than iTunes' (~20 req/min per IP), so the common case
-        // costs a single Deezer call and iTunes only ever sees fallbacks.
-        // The old parallel-pair start burned both quotas on every track.
         // What the stream said it is playing — every candidate a music
         // service offers is judged against this, never accepted on faith.
         var want = { "artist": parsed.artist || "", "title": parsed.title || "" };
+        _runAttempts(_artPlan(parsed, query, trackString), query, want);
+    }
+
+    // The requests a lookup will try, in order, each {fn, q, svc}: svc names
+    // the service for the tests ("deezer", "itunes", "deezerArtist",
+    // "itunesArtist"). The chain stops at the first one that finds a cover,
+    // so a later entry only ever runs when every earlier one came back empty.
+    // One request at a time, Deezer first: its rate limit is far
+    // friendlier than iTunes' (~20 req/min per IP), so the common case
+    // costs a single Deezer call and iTunes only ever sees fallbacks.
+    // The old parallel-pair start burned both quotas on every track.
+    function _artPlan(parsed, query, trackString) {
         var attempts = [
-            {fn: _queryDeezer, q: query},
+            {fn: _queryDeezer, q: query, svc: "deezer"},
             // Deezer's field search, for the records filed under a name the
             // stream does not use: measured, "Bodies Without Organs" returns
             // three karaoke pressings by free text, while track:"Sunshine In
             // The Rain" has the real one — under "BWO". The picker's initial
             // matching recognizes the pair; free text alone never could.
-            {fn: _queryDeezer, q: 'track:"' + (parsed.title || "").replace(/"/g, " ") + '"'},
-            {fn: _queryItunes, q: query}
+            {fn: _queryDeezer, q: 'track:"' + (parsed.title || "").replace(/"/g, " ") + '"', svc: "deezer"},
+            {fn: _queryItunes, q: query, svc: "itunes"}
         ];
         var primary = _primaryArtist(parsed.artist);
         if (primary && parsed.title) {
-            attempts.push({fn: _queryDeezer, q: primary + " " + parsed.title});
-            attempts.push({fn: _queryItunes, q: primary + " " + parsed.title});
+            attempts.push({fn: _queryDeezer, q: primary + " " + parsed.title, svc: "deezer"});
+            attempts.push({fn: _queryItunes, q: primary + " " + parsed.title, svc: "itunes"});
         }
-        if (primary) {
-            attempts.push({fn: _queryDeezerArtist, q: primary});
-        } else if (parsed.title) {
-            attempts.push({fn: _queryDeezer, q: parsed.title});
-            attempts.push({fn: _queryItunes, q: parsed.title});
+        // An artist found behind the station's own name is trusted with a
+        // sleeve, which has to be one of their records, but not with a
+        // photo: on Kaaosradio two of the four photos it brought were of
+        // another act with the same name (2026-11-02). The photo search asks
+        // for the whole band, see photoArtist.
+        var stationCut = TrackLogic.stationDropped(trackString, app.currentStation);
+        var photo = TrackLogic.photoArtist(parsed.artist);
+        if (photo && !stationCut) {
+            attempts.push({fn: _queryDeezerArtist, q: photo, svc: "deezerArtist"});
+        }
+        // And last, a song of theirs from iTunes for a song no catalogue has,
+        // under the same trust as the photo and so not behind a station's
+        // name either. See _queryItunesArtist.
+        if (parsed.artist && !stationCut) {
+            attempts.push({fn: _queryItunesArtist, q: parsed.artist, svc: "itunesArtist"});
         }
 
         // Two of these repeat earlier ones byte for byte in the ordinary
@@ -260,8 +333,13 @@ Item {
             }
             if (!isDup) uniqAttempts.push(attempts[ai]);
         }
-        attempts = uniqAttempts;
+        return uniqAttempts;
+    }
 
+    // Runs the plan one request at a time for the lookup key query: the first
+    // cover found settles it and nothing after it is asked. Each fn is called
+    // as fn(q, query, onResult(url, definitive), want).
+    function _runAttempts(attempts, query, want) {
         var sawTransient = false;
 
         function runNext() {
@@ -310,7 +388,7 @@ Item {
                             for (var ci = 0; ci < data.data.length; ci++)
                                 cands.push({ "artist": ((data.data[ci] || {}).artist || {}).name || "",
                                              "title": (data.data[ci] || {}).title || "" });
-                            var pi = SearchLogic.artPick(want.artist, want.title, cands);
+                            var pi = SearchLogic.artPickEither(want.artist, want.title, cands);
                             if (pi >= 0) {
                                 var album = data.data[pi].album || {};
                                 var artUrl = _deezerRealArt(album.cover_big)
@@ -354,7 +432,7 @@ Item {
                         for (var ii = 0; ii < data.results.length; ii++)
                             icands.push({ "artist": data.results[ii].artistName || "",
                                           "title": data.results[ii].trackName || "" });
-                        var ip = SearchLogic.artPick(want.artist, want.title, icands);
+                        var ip = SearchLogic.artPickEither(want.artist, want.title, icands);
                         var artUrl = ip >= 0 ? (data.results[ip].artworkUrl100 || "") : "";
                         if (artUrl) {
                             onResult(artUrl.replace("100x100bb", "300x300bb"), true);

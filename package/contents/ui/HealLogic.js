@@ -32,7 +32,14 @@ var SHARED_STREAM_HOSTS = {
     "radioboss.fm": true, "airtime.pro": true, "live365.com": true,
     "cloudfront.net": true, "fastly.net": true, "zenolive.com": true,
     "radioking.com": true, "voscast.com": true, "torontocast.com": true,
-    "fluidstream.net": true, "mixlr.com": true, "yesstreaming.net": true
+    "fluidstream.net": true, "mixlr.com": true, "yesstreaming.net": true,
+    // Free dynamic-DNS names: anyone can take a.ddns.net next to yours, so
+    // the base proves nothing about who runs the stream.
+    "ddns.net": true, "duckdns.org": true, "no-ip.org": true, "no-ip.biz": true,
+    "no-ip.info": true, "noip.me": true, "hopto.org": true, "zapto.org": true,
+    "sytes.net": true, "myftp.org": true, "myftp.biz": true, "serveftp.com": true,
+    "servegame.com": true, "redirectme.net": true, "dynu.net": true,
+    "freeddns.org": true, "mooo.com": true, "dyndns.org": true, "homeip.net": true
 };
 // Left out on purpose: broadcaster-family CDNs (rndfnk.com is ARD's,
 // bitgravity.com carries All India Radio) and closed B2B relays — a
@@ -87,9 +94,8 @@ function addrKey(u) {
 // the row could have earned that write WITHOUT a uuid: the address left
 // alone (a rename), or a move the commit gate above would itself call
 // permanent — same own domain, same name. A new domain, a new name or a
-// shared landlord lets it go; the typed address then stays the one thing
-// the directory cannot overrule, and the next vote or click resolves a
-// fresh uuid from the name and the new address.
+// shared landlord lets it go; the address typed in then stays the one
+// thing the directory cannot overrule.
 // Contract: true = the uuid stays. Scheme, a trailing slash and letter
 // case are not a move. null and undefined are answered, never thrown on.
 function editKeepsIdentity(oldName, oldUrl, newName, newUrl) {
@@ -210,10 +216,10 @@ function ladder(results, savedUrl, savedName, knownCc, anySound) {
         // lastcheckok: the directory's own probe reached this address on
         // its latest sweep, which is the point of asking them.
         if (String(r.lastcheckok) !== "1") continue;
-        var cand = (r.url_resolved || r.url || "").toString();
-        // http(s) only. This address is auditioned straight into the
-        // player, and a file: or data: row must never become its source.
-        if (!/^https?:\/\//i.test(cand) || cand === saved) continue;
+        // http(s) only (frontDoor). This address is auditioned straight into
+        // the player, and a file: or data: row must never become its source.
+        var cand = frontDoor(r).filter(function(d) { return d !== saved; })[0] || "";
+        if (cand === "") continue;
         var fmt = StreamLogic.streamFormat(cand);
         if (fmt === "playlist") continue;
         var rowNorm = normName(r.name);
@@ -281,19 +287,39 @@ function strangerLabel(row, countryName) {
     return c === "" ? n : n + " (" + c + ")";
 }
 
+// A directory row's doors in the order worth trying. url_resolved is where
+// the checker ended up last time, url the address the station handed in.
+// The handed-in one leads when it is a stream of the same family, which is
+// what a CDN's router looks like: router.euddn.net kept one token for every
+// station from January to November 2026 while the edges it hands out
+// rotated and the old ones' certificate expired. A playlist or HLS list
+// stays second, because the alarm and the recorder play an address as it is.
+// Contract: up to two http(s) addresses, no repeats; [] for nothing usable.
+function frontDoor(row) {
+    var r = row || {};
+    var web = function(u) { var t = (u || "").toString(); return /^https?:\/\//i.test(t) ? t : ""; };
+    var url = web(r.url), res = web(r.url_resolved);
+    var fmt = url === "" ? "" : StreamLogic.streamFormat(url);
+    var kin = url !== "" && res !== "" && fmt !== "playlist" && fmt !== "hls"
+              && StreamLogic.baseDomain(StreamLogic.hostOf(url)) === StreamLogic.baseDomain(StreamLogic.hostOf(res));
+    var doors = kin ? [url, res] : [res, url];
+    return doors.filter(function(d, i) { return d !== "" && doors.indexOf(d) === i; });
+}
+
 // The identity rung's doors. byuuid answers with the station's own row, and
 // that row holds two addresses: url_resolved, where the directory's checker
 // ended up the last time it looked, and url, the one the station handed in.
 // They differ on one row in nine (59 of the 500 most-voted on 2026-09-21,
 // 54 of them a .pls or .m3u), because url is the station's playlist or a
 // redirector in front of several servers. A station added from the search
-// saves url_resolved, so that is usually also the address that just died:
-// the resolved door then drops out as the saved one, and the front door is
-// the only one left, and today nobody tries it.
+// saved url_resolved, so that is usually also the address that just died
+// and drops out as the saved one; frontDoor puts a same-family redirector
+// first anyway, so the next save is not another edge that rots.
 // Contract: null when nobody answered (no reply, not a 200, not a JSON
 // list); [] when the directory answered and has nothing to offer; else the
-// doors worth an audition, both marked byUuid and carrying the gated logo.
-// firstOnly is the wake-up's ladder: the single door it has always had.
+// doors worth an audition in frontDoor's order, all marked byUuid and
+// carrying the gated logo. firstOnly is the wake-up's ladder: one door,
+// the first one that is not the saved address.
 // The logo gate arrives as a function because FaviconLogic asks this file
 // about shared hosts, and two files cannot import each other.
 function uuidRung(reply, orig, firstOnly, logoGate) {
@@ -304,17 +330,11 @@ function uuidRung(reply, orig, firstOnly, logoGate) {
     var row = rows[0];
     if (!row || String(row.lastcheckok) !== "1") return [];
     var fav = logoGate(row.favicon);
-    var doors = [(row.url_resolved || row.url || "").toString()];
-    if (firstOnly !== true) doors.push((row.url || "").toString());
-    var out = [];
-    for (var i = 0; i < doors.length; i++) {
-        // http(s) only, as on the name rung: the catalogue is publicly
-        // writable and this address goes straight into the player.
-        if (!/^https?:\/\//i.test(doors[i]) || doors[i] === orig) continue;
-        if (out.length > 0 && out[0].url === doors[i]) continue;
-        out.push({ url: doors[i], byUuid: true, favicon: fav });
-    }
-    return out;
+    // http(s) only (frontDoor), as on the name rung: the catalogue is
+    // publicly writable and this address goes straight into the player.
+    var doors = frontDoor(row).filter(function(d) { return d !== orig; });
+    if (firstOnly === true) doors = doors.slice(0, 1);
+    return doors.map(function(d) { return { url: d, byUuid: true, favicon: fav }; });
 }
 
 // The country the uuid record files the station under, for the rung below.

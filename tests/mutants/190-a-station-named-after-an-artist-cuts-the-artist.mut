@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A first segment named like the station is cut even when it does not read as a station.
+
+history:
+  That was the rule on 2026-11-02, and a station named after an artist lost
+  the artist: "Bob Marley & The Wailers - One Love - Exodus" on "Bob Marley
+  Radio" read as "Exodus" by "One Love", and "Queen" went on "Queen -
+  Greatest Hits".
+
+target:
+  package/contents/ui/TrackLogic.js
+
+find:
+      if (a === "" || b === "" || !_stationWord(seg)) return false;
+
+replace:
+      if (a === "" || b === "") return false;
+
+expect:
+  Killed by tests/qml/tst_tracklogic.qml::test_an_artist_in_front_is_never_taken_for_the_station.
+  Line-neutral.
