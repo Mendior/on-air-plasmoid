@@ -10,11 +10,33 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
+import org.kde.plasma.components as PlasmaComponents3
 
 MouseArea {
     id: panelIconWidget
 
     property int wheelDelta: 0
+
+    // --- Now playing text in the panel -----------------------------------
+    readonly property bool horizontalPanel: Plasmoid.formFactor === PlasmaCore.Types.Horizontal
+    readonly property bool _active: isPlaying() || root._casting
+    readonly property string lineTop: root.trackArtist !== "" ? root.trackArtist
+        : (root.trackTitle !== "" ? root.trackTitle : root.currentStation)
+    readonly property string lineBottom: root.trackArtist !== "" ? root.trackTitle
+        : (root.trackTitle !== "" ? root.currentStation : "")
+    readonly property bool showTrackText: Plasmoid.configuration.panelShowTrack
+        && horizontalPanel && _active && lineTop !== ""
+    readonly property real textGap: Kirigami.Units.smallSpacing
+    readonly property real textWidth: Math.ceil(Math.min(
+        Plasmoid.configuration.panelTextWidth * Kirigami.Units.gridUnit,
+        Math.max(topMetrics.advanceWidth, bottomMetrics.advanceWidth)))
+
+    // Only a horizontal panel gets explicit width hints; vertical panels
+    // and the desktop keep the defaults the widget always had.
+    readonly property real _panelWidth: showTrackText ? height + textGap + textWidth : height
+    Layout.minimumWidth: horizontalPanel ? _panelWidth : 0
+    Layout.preferredWidth: horizontalPanel ? _panelWidth : -1
+    Layout.maximumWidth: horizontalPanel ? _panelWidth : Number.POSITIVE_INFINITY
 
     function setToolTip() {
         // Cast-only playback (local player idle, stream on a device) counts too
@@ -101,85 +123,134 @@ MouseArea {
         tooltip.showToolTip();
     }
 
-    Kirigami.Icon {
-        id: panelGlyph
-        // The panel icon is the widget's face and must not depend on the icon
-        // theme. Both names it defaults to — audio-radio-symbolic and
-        // radio-symbolic — are Breeze's own; neither is in the freedesktop
-        // naming spec, and a listener on openSUSE reported an empty panel
-        // after switching themes (GitHub #4). Measured here: of the icon
-        // themes installed on this desk, only breeze and breeze-dark carry
-        // the first name. So the last rung is a copy that ships inside the
-        // widget, which no theme can take away.
-        //
-        // The themed names still come first: on Breeze the panel keeps the
-        // system's own glyph and follows it when the theme is restyled.
-        readonly property url ownIcon: Qt.resolvedUrl("../icons/on-air.svg")
-        readonly property string wantedIcon: Plasmoid.configuration.icon
-        // One-way, and re-armed when the listener picks a different icon —
-        // otherwise a name fixed in settings would stay overridden forever.
-        property bool themeMissedIt: false
-        onWantedIconChanged: themeMissedIt = false
-        onStatusChanged: if (status === Kirigami.Icon.Error) themeMissedIt = true
-
-        source: themeMissedIt ? ownIcon : wantedIcon
-        fallback: themeMissedIt ? ownIcon : Plasmoid.configuration.iconFallback
-        anchors.fill: parent
-        isMask: true
-        color: (isPlaying() || root._casting) ? root.accent : Kirigami.Theme.textColor
-
-        Behavior on color { ColorAnimation { duration: 400 } }
-    }
-
-    // 2026: mini-equalizer in the corner of the panel icon while music is playing
-    EqBars {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: 1
-        visible: isPlaying() || root._casting
-        // Don't tick while the panel window isn't on screen at all
-        // (auto-hidden panel, screen off) — nobody is watching.
-        animating: visible && panelIconWidget.Window.visibility !== Window.Hidden
-                   // On battery the bars hold still: this is the one thing that
-                   // samples on the PANEL, so it runs whenever music plays even
-                   // with the popup shut — the exact shape of the 10% CPU report
-                   // that issue #2 was about.
-                   && !root.thrifty
-        bars: 3
-        barWidth: Math.max(2, Math.round(parent.width * 0.07))
-        minHeight: Math.max(2, parent.height * 0.1)
-        maxHeight: parent.height * 0.38
-        baseDuration: 300
-        barColor: root.accentBright
-    }
-
-    // Pulsing red dot while a recording is running — visible even when the
-    // popup is closed, so a recording is never forgotten.
-    Rectangle {
-        id: recDot
-        anchors.right: parent.right
+    // Square home for the glyph and its overlays. Without panel text it
+    // fills the whole widget exactly as before; with text it stays a
+    // square on the left and the two lines sit to its right.
+    Item {
+        id: iconBox
+        anchors.left: parent.left
         anchors.top: parent.top
-        anchors.margins: 1
-        width: Math.max(4, Math.round(parent.width * 0.22))
-        height: width
-        radius: width / 2
-        color: "#E0463C"
-        visible: root.recording
+        anchors.bottom: parent.bottom
+        width: panelIconWidget.showTrackText ? height : parent.width
 
-        SequentialAnimation on opacity {
-            loops: Animation.Infinite
-            // longDuration is 0 when animations are disabled system-wide.
-            // On battery the dot stays lit instead of breathing: a scheduled
-            // recording can run for hours with the popup shut, and a pulse
-            // nobody is watching is the panel repainting for nothing. Solid
-            // red still says "recording" — that is the part that matters.
-            running: recDot.visible && Kirigami.Units.longDuration > 0 && !root.thrifty
-            NumberAnimation { from: 1.0; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
-            NumberAnimation { from: 0.35; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
-            // Speed flipped to Instant mid-cycle: restore full dot, not a dim one
-            onStopped: recDot.opacity = 1.0
+        Kirigami.Icon {
+            id: panelGlyph
+            // The panel icon is the widget's face and must not depend on the icon
+            // theme. Both names it defaults to — audio-radio-symbolic and
+            // radio-symbolic — are Breeze's own; neither is in the freedesktop
+            // naming spec, and a listener on openSUSE reported an empty panel
+            // after switching themes (GitHub #4). Measured here: of the icon
+            // themes installed on this desk, only breeze and breeze-dark carry
+            // the first name. So the last rung is a copy that ships inside the
+            // widget, which no theme can take away.
+            //
+            // The themed names still come first: on Breeze the panel keeps the
+            // system's own glyph and follows it when the theme is restyled.
+            readonly property url ownIcon: Qt.resolvedUrl("../icons/on-air.svg")
+            readonly property string wantedIcon: Plasmoid.configuration.icon
+            // One-way, and re-armed when the listener picks a different icon —
+            // otherwise a name fixed in settings would stay overridden forever.
+            property bool themeMissedIt: false
+            onWantedIconChanged: themeMissedIt = false
+            onStatusChanged: if (status === Kirigami.Icon.Error) themeMissedIt = true
+
+            source: themeMissedIt ? ownIcon : wantedIcon
+            fallback: themeMissedIt ? ownIcon : Plasmoid.configuration.iconFallback
+            anchors.fill: parent
+            isMask: true
+            color: (isPlaying() || root._casting) ? root.accent : Kirigami.Theme.textColor
+
+            Behavior on color { ColorAnimation { duration: 400 } }
+        }
+
+        // 2026: mini-equalizer in the corner of the panel icon while music is playing
+        EqBars {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 1
+            visible: isPlaying() || root._casting
+            // Don't tick while the panel window isn't on screen at all
+            // (auto-hidden panel, screen off) — nobody is watching.
+            animating: visible && panelIconWidget.Window.visibility !== Window.Hidden
+                       // On battery the bars hold still: this is the one thing that
+                       // samples on the PANEL, so it runs whenever music plays even
+                       // with the popup shut — the exact shape of the 10% CPU report
+                       // that issue #2 was about.
+                       && !root.thrifty
+            bars: 3
+            barWidth: Math.max(2, Math.round(parent.width * 0.07))
+            minHeight: Math.max(2, parent.height * 0.1)
+            maxHeight: parent.height * 0.38
+            baseDuration: 300
+            barColor: root.accentBright
+        }
+
+        // Pulsing red dot while a recording is running — visible even when the
+        // popup is closed, so a recording is never forgotten.
+        Rectangle {
+            id: recDot
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 1
+            width: Math.max(4, Math.round(parent.width * 0.22))
+            height: width
+            radius: width / 2
+            color: "#E0463C"
+            visible: root.recording
+
+            SequentialAnimation on opacity {
+                loops: Animation.Infinite
+                // longDuration is 0 when animations are disabled system-wide.
+                // On battery the dot stays lit instead of breathing: a scheduled
+                // recording can run for hours with the popup shut, and a pulse
+                // nobody is watching is the panel repainting for nothing. Solid
+                // red still says "recording" — that is the part that matters.
+                running: recDot.visible && Kirigami.Units.longDuration > 0 && !root.thrifty
+                NumberAnimation { from: 1.0; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 0.35; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+                // Speed flipped to Instant mid-cycle: restore full dot, not a dim one
+                onStopped: recDot.opacity = 1.0
+            }
         }
     }
+
+    // Artist on the first line, title on the second. A stream that only
+    // sends a title gets title + station; one that sends nothing gets the
+    // station name alone.
+    ColumnLayout {
+        id: trackText
+        visible: panelIconWidget.showTrackText
+        anchors.left: iconBox.right
+        anchors.leftMargin: panelIconWidget.textGap
+        anchors.verticalCenter: parent.verticalCenter
+        width: panelIconWidget.textWidth
+        spacing: 0
+
+        PlasmaComponents3.Label {
+            Layout.fillWidth: true
+            text: panelIconWidget.lineTop
+            font.bold: true
+            font.pointSize: Kirigami.Theme.smallFont.pointSize
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            textFormat: Text.PlainText
+        }
+        PlasmaComponents3.Label {
+            Layout.fillWidth: true
+            visible: text !== ""
+            text: panelIconWidget.lineBottom
+            font.pointSize: Kirigami.Theme.smallFont.pointSize
+            opacity: 0.8
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            textFormat: Text.PlainText
+        }
+    }
+
+    // Measures the untruncated lines so the widget is only as wide as it
+    // needs to be (capped by the configured maximum).
+    TextMetrics { id: topMetrics; font.bold: true; font.pointSize: Kirigami.Theme.smallFont.pointSize; text: panelIconWidget.lineTop }
+    TextMetrics { id: bottomMetrics; font.pointSize: Kirigami.Theme.smallFont.pointSize; text: panelIconWidget.lineBottom }
 
     PlasmaCore.ToolTipArea {
         id: tooltip

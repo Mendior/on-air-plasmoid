@@ -2546,6 +2546,15 @@ msgstr "Der Stream konnte nicht weitergeleitet werden — direkter Versuch"
 msgid "Not enough free disk space"
 msgstr "Nicht genügend freier Speicherplatz"
 
+msgid "Now playing:"
+msgstr "Aktueller Titel:"
+
+msgid "Show artist and title next to the icon"
+msgstr "Künstler und Titel neben dem Symbol anzeigen"
+
+msgid "Maximum text width:"
+msgstr "Maximale Textbreite:"
+
 #~ msgid "Search and discovery row"
 #~ msgstr "Such- und Entdeckungszeile"
 

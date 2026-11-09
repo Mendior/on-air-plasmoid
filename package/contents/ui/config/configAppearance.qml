@@ -49,6 +49,8 @@ KCM.SimpleKCM {
     property alias cfg_showCoverArt: coverCheck.checked
     property string cfg_downloadFormat
     property string cfg_icon
+    property alias cfg_panelShowTrack: panelTrackCheck.checked
+    property alias cfg_panelTextWidth: panelTextWidthSpin.value
 
     // cfg_defaultVolume is a SNAPSHOT taken when the dialog opened. The
     // popup's volume knob writes the real key while this page sits here, and
@@ -68,6 +70,27 @@ KCM.SimpleKCM {
 
 
     Kirigami.FormLayout {
+        Item {
+            Kirigami.FormData.label: i18n("Panel")
+            Kirigami.FormData.isSection: true
+        }
+
+        // Artist on top, title below, right of the icon — only in a
+        // horizontal panel and only while something plays, so an idle
+        // widget keeps its usual square footprint.
+        QQC2.CheckBox {
+            id: panelTrackCheck
+            Kirigami.FormData.label: i18n("Now playing:")
+            text: i18n("Show artist and title next to the icon")
+        }
+        QQC2.SpinBox {
+            id: panelTextWidthSpin
+            Kirigami.FormData.label: i18n("Maximum text width:")
+            enabled: panelTrackCheck.checked
+            from: 4
+            to: 40
+        }
+
         Item {
             Kirigami.FormData.label: i18n("Colours")
             Kirigami.FormData.isSection: true

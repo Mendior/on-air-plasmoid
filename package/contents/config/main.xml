@@ -61,6 +61,16 @@
             <label>Fade duration in ms</label>
             <default>400</default>
         </entry>
+        <entry name="panelShowTrack" type="bool">
+            <label>Show artist and title next to the panel icon</label>
+            <default>false</default>
+        </entry>
+        <entry name="panelTextWidth" type="Int">
+            <label>Maximum width of the panel text (grid units)</label>
+            <default>10</default>
+            <min>4</min>
+            <max>40</max>
+        </entry>
         <entry name="albumArtEnabled" type="bool">
             <label>Lookup album art online (Deezer, iTunes)</label>
             <default>true</default>
