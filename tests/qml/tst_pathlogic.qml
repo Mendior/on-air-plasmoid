@@ -92,6 +92,63 @@ TestCase {
         compare(PathLogic.shownDir("/home/egon/Music/OnAir", ""), "/home/egon/Music/OnAir")
     }
 
+    // ── a path as the URL the folder model gives for it ───────────────────
+    // The right-hand sides are what FolderListModel's fileUrl read for a
+    // file of that name on Qt 6.12; tests/test_file_url_spelling.py asks a
+    // real one again on every run.
+
+    property url asThePlayerHoldsIt
+
+    readonly property var spelled: [
+        ["/m/Podcasts/Episode 12 [3f1c9a7e].mp3", "file:///m/Podcasts/Episode 12 %5B3f1c9a7e%5D.mp3"],
+        ["/m/100% pure #42 [aaaaaaaa].mp3", "file:///m/100%25 pure %2342 %5Baaaaaaaa%5D.mp3"],
+        ["/m/what? [bbbbbbbb].mp3", "file:///m/what%3F %5Bbbbbbbbb%5D.mp3"],
+        ["/m/a+b & c=d; e@f, g! (h) ~i $j *k l:m 'n.mp3", "file:///m/a+b & c=d; e@f, g! (h) ~i $j *k l:m 'n.mp3"],
+        ["/m/curly {x} ^caret.mp3", "file:///m/curly %7Bx%7D %5Ecaret.mp3"],
+        ["/m/back\\slash pipe| quote\" lt< gt> tick`.mp3",
+         "file:///m/back%5Cslash pipe%7C quote%22 lt%3C gt%3E tick%60.mp3"],
+        // A percent sign that already looks like an escape is still a percent sign.
+        ["/m/percent %41 %zz %5B.mp3", "file:///m/percent %2541 %25zz %255B.mp3"],
+        ["/m/Äö ж 語 🎧 é.mp3", "file:///m/Äö ж 語 🎧 é.mp3"],
+        ["/m/zero\u200Bwidth nb\u00A0sp bom\uFEFF c1\u0092.mp3",
+         "file:///m/zero\u200Bwidth nb\u00A0sp bom\uFEFF c1\u0092.mp3"],
+        ["/m/tab\there line\nfeed us\u001F del\u007F.mp3", "file:///m/tab%09here line%0Afeed us%1F del%7F.mp3"],
+        ["/my [music] 100%/Podcasts/a.mp3", "file:///my %5Bmusic%5D 100%25/Podcasts/a.mp3"],
+        ["/", "file:///"]
+    ]
+
+    function test_a_path_is_spelled_as_the_folder_model_spells_it() {
+        for (var i = 0; i < spelled.length; i++)
+            compare(PathLogic.fileUrl(spelled[i][0]), spelled[i][1])
+    }
+
+    function test_the_player_reads_the_url_back_unchanged() {
+        // MediaPlayer.source is a url property. What it hands back is what
+        // "is this one playing" gets compared with.
+        for (var i = 0; i < spelled.length; i++) {
+            asThePlayerHoldsIt = PathLogic.fileUrl(spelled[i][0])
+            compare(asThePlayerHoldsIt.toString(), spelled[i][1])
+        }
+    }
+
+    function test_no_path_is_no_url() {
+        compare(PathLogic.fileUrl(""), "")
+        compare(PathLogic.fileUrl(null), "")
+        compare(PathLogic.fileUrl(undefined), "")
+        // "file://" + a relative path names a host, so there is no such URL.
+        compare(PathLogic.fileUrl("Music/OnAir/a.mp3"), "")
+        compare(PathLogic.fileUrl("~/Music/a.mp3"), "")
+    }
+
+    function test_a_path_of_any_length_and_any_text_gets_its_url() {
+        var many = ""
+        var want = ""
+        for (var i = 0; i < 5000; i++) { many += "[x]"; want += "%5Bx%5D" }
+        compare(PathLogic.fileUrl("/m/" + many), "file:///m/" + want)
+        // Half a surrogate pair is broken text, not a reason to throw.
+        compare(PathLogic.fileUrl("/m/a\uD83Cb.mp3"), "file:///m/a\uD83Cb.mp3")
+    }
+
     function test_the_hint_typed_back_lands_in_the_default_folder() {
         // Somebody who copies the hint into the field must get the folder
         // they would have had by leaving it empty.

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The next page is asked from the number of rows on screen.
+
+history:
+  The offset was the row count plus a correction kept beside it. The count
+  moves with every star and stands behind the directory's own position by
+  every row the dedup dropped, so a page was asked from a place the list had
+  already passed. The popup keeps the place the last walk reached and asks
+  from there; SearchLogic.pageAfter moves it.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+          root._rbFetch(fullRepresentation._webLastQs + "&offset=" + from, 4000, function(xhr) {
+
+replace:
+          root._rbFetch(fullRepresentation._webLastQs + "&offset=" + webResultsModel.count, 4000, function(xhr) {
+
+expect:
+  Killed by tests/test_invariants.py::test_show_more_goes_by_the_directorys_page_and_not_by_the_rows_left.
+  Line-neutral.

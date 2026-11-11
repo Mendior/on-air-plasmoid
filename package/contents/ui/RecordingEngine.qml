@@ -77,6 +77,16 @@ Item {
     // own short command — putting it in the same string as the recording
     // would park the URL on THAT shell's argv for the whole session).
     property var _recPending: null
+    // The stop mark. A stop writes the running recording's token here before
+    // it looks for a pid, and the capture shell reads it twice: just before
+    // it asks for the stream, and again once the pid is written down.
+    // Measured with df held back: at Stop there was no pid file, nothing was
+    // signalled, and the shell went on to record what had been called off.
+    readonly property string _recStopFile: app._mprisRunDir + "/arp-rec-stop-" + app._mprisId
+    // Names one recording, in the mark and in its own capture command, so a
+    // mark the recording before left behind stops nothing. The counter
+    // starts over with the panel; the start time tells two sessions apart.
+    property string _recToken: ""
     property var recSchedules: []
 
     // Set when the user (or a station switch) asked the recording to stop —
@@ -84,6 +94,10 @@ Item {
     // Without this flag the completion handler can't tell a requested stop
     // from a stream that died on its own.
     property bool _recStopRequested: false
+    // Set when it was the schedule tick that asked, because the capture
+    // was still running after its window. The stop is handled like any
+    // other; the verdict must not call such a file saved.
+    property bool _recOverran: false
 
     // in the list for its whole window now (see below), so without this the
     // 30 s tick would repeat "skipped"/"failed" notifications until it closes.
@@ -182,13 +196,26 @@ Item {
             return;
         }
         var safePid = _recPidFile.replace(/'/g, "'\\''");
+        // The mark goes down before the pid is looked for. A capture shell
+        // still at its mkdir or df has no pid yet, and reads the mark when it
+        // gets to the stream; one that is past its last look at the mark has
+        // written its pid by then, and is found here.
+        //
         // The pid is the pipeline's ffmpeg — SIGINT (not KILL) is what lets it
         // finish the container. Verify it is really ours before signalling: a
         // hard-killed wrapper can leave a stale pid file, and after pid reuse
         // a blind kill would hit an unrelated process.
-        app.exec(": REC_STOP; p=$(cat '" + safePid + "' 2>/dev/null);"
-            + " [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'"
-            + " && kill -INT \"$p\" 2>/dev/null; true");
+        //
+        // An ffmpeg a few ms old still ignores SIGINT, as every background
+        // job of a shell does until it sets its own handlers. Measured: a
+        // stop sent as the pid file appeared met SigIgn 0x6 and the capture
+        // ran on; 50 ms later the handlers were in. SIGTERM is not ignored
+        // there, and ffmpeg with its handlers in closes the file on either.
+        app.exec(": REC_STOP; printf '%s' " + PodcastLogic.shQuote(_recToken)
+            + " > " + PodcastLogic.shQuote(_recStopFile) + "; p=$(cat '" + safePid + "' 2>/dev/null);"
+            + " [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0' && {"
+            + " if grep -q '^SigIgn:.*[2367abef]$' \"/proc/$p/status\" 2>/dev/null;"
+            + " then kill -TERM \"$p\"; else kill -INT \"$p\"; fi; } 2>/dev/null; true");
     }
 
     function _recStart(stationName, url, durationSec, scheduled) {
@@ -229,6 +256,7 @@ Item {
         recOnDisk = false;
         recCapturedSec = 0;
         _recGen++;
+        _recToken = _recGen + "." + d.getTime();
         _recProbeInFlight = false;
         _recDurationSec = Math.max(60, Math.floor(durationSec));
         _recUrl = url;
@@ -261,6 +289,7 @@ Item {
                                   : Math.min(30, Math.ceil(_recDurationSec / 60));
         var recNeedKiB = recEstMin * (ext === "wav" ? 10240 : 2048);
         var safeCfg = _recUrlFile.replace(/'/g, "'\\''");
+        var markQ = PodcastLogic.shQuote(_recStopFile);
         // A control character would smuggle a second directive into the curl
         // config — the same guard the podcast download applies to its own.
         if (/[\x00-\x1f\x7f]/.test(url)) {
@@ -274,13 +303,21 @@ Item {
         // recording shell's argv for the whole recording — the very leak.
         _recPending = {
             // Every early exit takes the config file with it — the address
-            // must not outlive the recording that never started.
-            "cmd": ": REC_START; cln() { rm -f '" + safeCfg + "'; }; "
+            // must not outlive the recording that never started. The stop
+            // mark goes the same way, on every way out.
+            "cmd": ": REC_START; cln() { rm -f '" + safeCfg + "' " + markQ + "; }; "
+                // Whether this recording has been called off: the mark holds
+                // its own token. Another recording's token, or none, is no.
+                + "off() { [ \"$(cat " + markQ + " 2>/dev/null)\" = "
+                + PodcastLogic.shQuote(_recToken) + " ]; }; "
                 + "if ! command -v ffmpeg >/dev/null 2>&1; then cln; echo __NO_FFMPEG__; exit 0; fi; "
                 + "if ! command -v curl >/dev/null 2>&1; then cln; echo __NO_CURL__; exit 0; fi; "
                 + "mkdir -p '" + safeDir + "' || { cln; echo __REC_EMPTY__; exit 0; }; "
                 + "avail=$(df -Pk '" + safeDir + "' 2>/dev/null | awk 'NR==2{print $4}'); "
                 + "if [ -n \"$avail\" ] && [ \"$avail\" -lt " + recNeedKiB + " ] 2>/dev/null; then cln; echo __REC_NOSPACE__; exit 0; fi; "
+                // The first look at the mark: after the slow steps, so a stop
+                // during any of them is seen, and before a byte is asked for.
+                + "if off; then cln; echo __REC_OFF__; exit 0; fi; "
                 // curl owns the network now, so its flags carry what ffmpeg's
                 // used to: -A is the VLC agent (some stations refuse ffmpeg's
                 // own), --retry replaces -reconnect, and --speed-time is the
@@ -318,19 +355,35 @@ Item {
                 + " -metadata artist='" + cleanName.replace(/'/g, "'\\''") + "'"
                 + " -n '" + safeOut + "'"
                 + " & pid=$!; echo $pid > '" + safePid + "'; "
-                + "wait $pid; rc=$?; rm -f '" + safePid + "' '" + safeCfg + "'; "
+                // The second look, with the pid already down: a stop that
+                // came after the first one either left its mark before this
+                // line or finds the pid. ffmpeg is microseconds old here and
+                // deaf to SIGINT, so the shell ends it with SIGTERM.
+                + "off && kill -TERM $pid 2>/dev/null; "
+                + "wait $pid; rc=$?; rm -f '" + safePid + "'; cln; "
                 // Report the exit code AND the file size — "file is not empty"
                 // alone reported half-dead recordings (disk full, stream died) as
                 // successes. The QML side combines rc with the elapsed time to tell
                 // a requested stop / duration cap from a mid-recording failure.
                 + "bytes=$(stat -c %s '" + safeOut + "' 2>/dev/null || echo 0); "
-                + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then echo \"__REC_DONE__ rc=$rc bytes=$bytes\"; "
+                // And the length the file itself gives, in whole seconds. It
+                // costs one ffprobe at the end, inside this shell: measured
+                // 26 ms on a three-hour MP3, since it reads headers and not
+                // the audio. Without ffprobe, or for a container that cannot
+                // say (a FLAC copied from a pipe answers N/A), secs= stays
+                // empty and the verdict falls back on the clock.
+                + "if [ \"$bytes\" -gt 0 ] 2>/dev/null; then "
+                + "secs=$(timeout 10 ffprobe -v error -show_entries format=duration -of csv=p=0 '"
+                + safeOut + "' 2>/dev/null); "
+                + "echo \"__REC_DONE__ rc=$rc bytes=$bytes secs=${secs%%.*}\"; "
                 + "else rm -f '" + safeOut + "' '" + safeTracks + "'; echo \"__REC_EMPTY__ rc=$rc\"; fi",
             "scheduled": scheduled,
             "station": stationName
         };
         var recCfgLine = 'url = "' + url.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
-        app.exec(": REC_URL; umask 077; printf '%s' "
+        // The write says which recording it is for, as the disk probe does,
+        // so its answer can be told from an earlier recording's.
+        app.exec(": REC_URL " + _recGen + "; umask 077; printf '%s' "
             + PodcastLogic.shQuote(recCfgLine)
             + " > " + PodcastLogic.shQuote(_recUrlFile)
             + " && echo __REC_URL_OK__ || echo __REC_URL_FAIL__; true # " + app.nextSeq());
@@ -377,7 +430,8 @@ Item {
     // heal road at all: after a station moved, ffmpeg was started on the dead
     // address every day and the programme was never recorded.
     // Contract: every schedule whose url IS oldUrl gets newUrl; true only
-    // when something was rewritten.
+    // when something was rewritten. What the engine remembers about a
+    // rewritten entry moves with it (_recSchedRefiled).
     function retargetStation(oldUrl, newUrl) {
         if (!oldUrl || !newUrl || oldUrl === newUrl) return false;
         var list = [], changed = false;
@@ -385,7 +439,9 @@ Item {
             var a = recSchedules[i];
             if ((a.url || "") === oldUrl) {
                 var b = {}; for (var k in a) b[k] = a[k];
-                b.url = newUrl; a = b; changed = true;
+                b.url = newUrl;
+                _recSchedRefiled(_recSchedKey(a), _recSchedKey(b));
+                a = b; changed = true;
             }
             list.push(a);
         }
@@ -394,6 +450,23 @@ Item {
             _saveRecSchedules();
         }
         return changed;
+    }
+
+    // An occurrence is filed under address@time, and so is everything kept
+    // about it. With the address rewritten and the filing left behind, a
+    // running capture was a stranger to its own entry: the tick called it
+    // skipped, and when it finished there was no entry to settle.
+    // Contract: the running capture and a word already said follow the entry
+    // from was to key. The failure backoff does not. It was earned by the
+    // address that went away, and the new one gets its first try at once.
+    function _recSchedRefiled(was, key) {
+        if (_recActiveSchedKey === was) _recActiveSchedKey = key;
+        if (_recSchedNotified[was]) {
+            delete _recSchedNotified[was];
+            _recSchedNotified[key] = true;
+        }
+        delete _recRetryCount[was];
+        delete _recRetryAfter[was];
     }
 
     function removeRecSchedule(index) {
@@ -461,7 +534,21 @@ Item {
             // it. This guard MUST precede the missed branch, or a tick in
             // that gap fires a false "missed" toast and advances the entry
             // out from under a recording that is seconds from finishing.
-            if (recording && _recActiveSchedKey === key) continue;
+            if (recording && _recActiveSchedKey === key) {
+                if (_recStopRequested || !RecLogic.captureOverran(now, endMs)) continue;
+                // Five minutes past the end: the machine slept through
+                // it, or the stream stalled that long. With the window 150
+                // minutes gone the tick used to pass the capture by, and
+                // the answer that came later was reported as saved.
+                if (_recPending === null) {
+                    _recOverran = true;
+                    recStop();
+                    continue;
+                }
+                // The capture itself never started, so there is nothing to
+                // signal and no file. It is a missed window, said below.
+                _recFinishAborted(false);
+            }
             if (now >= endMs) {
                 // The window closed without a completed recording (the machine
                 // was off, or every attempt failed) — only now is it missed.
@@ -569,12 +656,19 @@ Item {
         var safePid = _recPidFile.replace(/'/g, "'\\''");
         app.exec(": REC_CLEAN; p=$(cat '" + safePid + "' 2>/dev/null);"
             + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'; then"
-            + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "'; true");
+            + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "' "
+            + PodcastLogic.shQuote(_recStopFile) + "; true");
     }
 
     // The engine's half of the recording exec round-trips.
     function handleExec(cmd, stdout, stderr, exitCode) {
-            if (cmd.indexOf(": REC_URL;") === 0) {
+            if (cmd.indexOf(": REC_URL ") === 0) {
+            // An answer for a recording called off since, with another one
+            // waiting by now. Taken for that one's, a late yes started its
+            // capture before its own address was written and a late no
+            // reported it failed. The gap is one shell round trip, about
+            // 1 ms measured.
+            if (parseInt(cmd.substring(10), 10) !== _recGen) return true;
             var recJob = _recPending;
             _recPending = null;
             // Called off in the gap (a stop, a station switch): recStop
@@ -604,18 +698,20 @@ Item {
         }
             if (cmd.indexOf(": REC_START;") === 0) {
             var recFile = _recFilePath;
-            // The toast names what is in the file; the verdicts below judge
-            // on the wall clock, as they always have.
-            var recDur = RecLogic.elapsedText(recCapturedSec);
+            // The time since the file appeared, and whether it was seen to
+            // appear at all: a clock that never started is no witness.
+            var recClock = recOnDisk ? recCapturedSec : NaN;
             var recElapsed = recElapsedSec;
             var recWanted = _recDurationSec;
             var recWasScheduled = _recScheduled;
             var recSchedKey = _recActiveSchedKey;
             var recWasStopRequested = _recStopRequested;
+            var recOverran = _recOverran;
             recording = false;
             recOnDisk = false;
             _recScheduled = false;
             _recStopRequested = false;
+            _recOverran = false;
             _recActiveSchedKey = "";
             _recUrl = "";
             _recFilePath = "";
@@ -627,16 +723,28 @@ Item {
             //   • anything that ends the recording early on its own (stream
             //     died, disk full) is an interruption, whatever ffmpeg's rc;
             //   • a file far too small for its duration (< ~10 KB/min — real
-            //     audio is at least 60 KB/min) is a broken capture.
+            //     audio is at least 60 KB/min) is a broken capture;
+            //   • the time running out proves nothing by itself: a capture
+            //     that connected late, or stalled, ends on time with a
+            //     fraction of the audio, and that is an interruption too.
             var recDone = recOut.indexOf("__REC_DONE__") !== -1;
+            // The file's own length when the shell could read it. The toast
+            // names what is in the file, so it reads this before the clock.
+            var recMedia = RecLogic.mediaSeconds(recOut);
+            var recDur = RecLogic.elapsedText(RecLogic.heardSeconds(recMedia, recCapturedSec));
+            var recShort = RecLogic.fallsShort(recWanted, recMedia, recClock);
             var recBytesM = recOut.match(/__REC_DONE__ rc=(-?\d+) bytes=(\d+)/);
             var recRc = recBytesM ? parseInt(recBytesM[1], 10) : -1;
             var recBytes = recBytesM ? parseInt(recBytesM[2], 10) : 0;
             var recRanFull = recElapsed >= recWanted - 5;
             var recTooSmall = recBytes < Math.max(1, recElapsed / 60) * 10240;
-            var recOk = recDone && (recWasStopRequested || (recRanFull && recRc === 0)) && !recTooSmall;
+            // A capture the tick had to stop past its window is a file with
+            // a hole in it or with the next programme on its end: interrupted.
+            var recOk = recDone && !recOverran
+                        && (recWasStopRequested || (recRanFull && recRc === 0 && !recShort))
+                        && !recTooSmall;
             var recInterrupted = recDone && !recOk;
-            var recTitle, recText, recIcon;
+            var recTitle = "", recText, recIcon;
             if (recOut.indexOf("__NO_FFMPEG__") !== -1) {
                 recTitle = i18n("ffmpeg is not installed");
                 recText = i18n("Install ffmpeg to record radio.");
@@ -651,6 +759,10 @@ Item {
                 recTitle = i18n("Not enough disk space for this recording");
                 recText = i18n("Free some space in %1 and try again.", app.downloadDirPath);
                 recIcon = "dialog-warning";
+            } else if (RecLogic.calledOff(recWasStopRequested, recOverran, recDone)) {
+                // Stopped before anything was on disk, by the mark or by the
+                // signal. That is what was asked for, and there is no word
+                // for it: recTitle stays empty.
             } else if (recOk) {
                 recTitle = i18n("Recording saved ✓ (%1)", recDur);
                 recText = recName;
@@ -683,7 +795,7 @@ Item {
             // window, which is exactly what the backoff exists to stop.
             var recFailedFast = !recOk && !recWasStopRequested
                                 && (recNoFfmpeg || recElapsed < 5 || !recDone || recTooSmall);
-            app.notify(recTitle, recText, recIcon);
+            if (recTitle !== "") app.notify(recTitle, recText, recIcon);
             if (recWasScheduled && recSchedKey) {
                 if (recOk || recWasStopRequested) {
                     // The occurrence is done — move the entry forward (or

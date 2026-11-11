@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The bridge obeys SetPosition whatever track the caller names.
+
+history:
+  MPRIS hands out a track id with the metadata and wants it back with the
+  position, so a call made for a track that has ended can be told from one
+  meant for what plays now. The bridge never read it. Run on a private bus on
+  2026-11-10: a call naming /Track/999 moved the playing episode like any
+  other.
+
+target:
+  package/contents/ui/mpris.py
+
+find:
+      if not state.get("canSeek") or str(track_id) != playing_track:
+
+replace:
+      if not state.get("canSeek"):
+
+expect:
+  Killed by tests/test_mpris_setposition.py::test_a_call_for_a_track_that_is_over_moves_nothing.
+  Line-neutral.

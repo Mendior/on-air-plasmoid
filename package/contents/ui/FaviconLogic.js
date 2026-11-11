@@ -151,6 +151,43 @@ function resolveUrl(href, baseUrl) {
 // The longest tag the icon reader looks into; a longer one is passed over.
 var MAX_TAG = 2048;
 
+// The value of one attribute of a tag.
+// Contract: tagAttr(attrs, name) reads attrs, the text between a tag's name
+// and its ">", one attribute after another and gives the value of the first
+// one called name, letter case aside: "" when it has no value, null when
+// the tag has no such attribute. A name counts only where an attribute
+// starts, so data-href is not href and "href=" inside another value is no
+// attribute. Reading stops at the first thing that cannot start an
+// attribute, a value whose quote never closes among them. Text that is no
+// string has no attributes.
+function tagAttr(attrs, name) {
+    var want = "", m = null;
+    if (typeof attrs !== "string" || typeof name !== "string" || name === "") return null;
+    want = name.toLowerCase();
+    // One step is what stands before the first attribute, or one attribute
+    // (a name, then a value in either quote or bare, if it has one) with
+    // what stands after it, or one character that is neither. A step
+    // always starts where the last one ended, so nothing is searched for
+    // and a tag of MAX_TAG characters is read once. A bare value does not
+    // open with a quote: one that never closes leaves its attribute empty
+    // and ends the reading at the quote.
+    var step = /([\s\/]+)|([^\s=\/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"'][^\s>]*))?)?[\s\/]*|[\s\S]/g;
+    for (m = step.exec(attrs); m !== null; m = step.exec(attrs)) {
+        if (m[1] !== undefined) continue;
+        if (m[2] === undefined) return null;
+        if (m[2].toLowerCase() === want) return m[3] || m[4] || m[5] || "";
+    }
+    return null;
+}
+
+// An attribute value with its ampersands as a browser reads them: "&amp;"
+// (and "&AMP;"), "&#38;" and "&#x26;" with any zeros before the digits each
+// become "&", once, so "&amp;amp;" is "&amp;". Every other reference is
+// left as written. Contract: a string; "" for what is no string.
+function ampDecoded(s) {
+    return typeof s === "string" ? s.replace(/&(?:amp|AMP|#0*38|#[xX]0*26);/g, "&") : "";
+}
+
 // Every <link> whose rel names an icon, then every og:image, resolved and
 // without repeats, in page order, as {url, kind} candidates for
 // probeOrder: "page" for an icon link, "share" for an og:image.
@@ -161,12 +198,10 @@ function extractIconLinks(html, baseUrl) {
     const seen = {};
     if (!html)
         return [];
-    const attr = function(attrs, name) {
-        const m = attrs.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", "i"));
-        return m ? (m[1] || m[2] || m[3] || "") : null;
-    };
+    // An address is resolved as a browser would have it: "?x=1&amp;y=2"
+    // saved as written asked the host for a parameter called "amp;y".
     const keep = function(list, href, kind) {
-        const resolved = resolveUrl(href, baseUrl);
+        const resolved = resolveUrl(ampDecoded(href), baseUrl);
         if (resolved !== "" && !seen[resolved]) {
             seen[resolved] = true;
             list.push({ url: resolved, kind: kind });
@@ -182,18 +217,18 @@ function extractIconLinks(html, baseUrl) {
     while ((m = tagRe.exec(html)) !== null) {
         const attrs = m[2].replace(/\/\s*$/, "");
         if (m[1].toLowerCase() === "meta") {
-            const prop = attr(attrs, "property") || attr(attrs, "name") || "";
-            const content = attr(attrs, "content");
+            const prop = tagAttr(attrs, "property") || tagAttr(attrs, "name") || "";
+            const content = tagAttr(attrs, "content");
             if (prop.toLowerCase() === "og:image" && content)
                 keep(shares, content, "share");
             continue;
         }
-        const rel = (attr(attrs, "rel") || "").toLowerCase();
+        const rel = (tagAttr(attrs, "rel") || "").toLowerCase();
         const isIcon = rel.indexOf("icon") !== -1 || rel.indexOf("apple-touch") !== -1
                     || rel.indexOf("shortcut") !== -1 || rel.indexOf("fluid-icon") !== -1;
         if (!isIcon || rel.indexOf("mask-icon") !== -1)
             continue;
-        const href = attr(attrs, "href");
+        const href = tagAttr(attrs, "href");
         if (href)
             keep(icons, href, "page");
     }
@@ -214,12 +249,41 @@ function keepsFind(best, current, upgrade) {
     return !(upgrade === true && logoRank(best.url, best.size) === 4);
 }
 
-// Whether a homepage is a landlord's page, a station's page on a host that
-// rents to many (HealLogic.sharedBase: zeno.fm, laut.fm).
-// Contract: true only for a web address on such a host.
+// The services a directory names as a station's homepage when the station
+// has only a page there. The page's icons are the service's own. Measured on
+// tunein.com/radio/EROTICA-LOUNGE-s260655/: TuneIn's 180 px apple-touch-icon
+// was asked second and saved, and the station's og:image stood fourth.
+// The stream hosts' list knows only where streams are rented, so of all
+// these it held none.
+// Only TuneIn was measured. The last eight are here by kind alone, a
+// profile on a social service or a page in a radio catalogue, where the
+// icon is never the tenant's. Other site builders (wordpress.com and the
+// like) are left out: an owner often sets the icon there.
+var HOMEPAGE_PLATFORMS = {
+    "facebook.com": true, "instagram.com": true, "tunein.com": true,
+    "radio.net": true, "onlineradiobox.com": true, "streema.com": true,
+    "mytuner-radio.com": true, "mixcloud.com": true, "wixsite.com": true,
+    "weebly.com": true, "blogspot.com": true, "sites.google.com": true,
+    "twitter.com": true, "x.com": true, "youtube.com": true, "tiktok.com": true,
+    "vk.com": true, "soundcloud.com": true, "linktr.ee": true, "radio.de": true
+};
+
+// Whether a homepage is a landlord's page: a station's page on a service
+// from HOMEPAGE_PLATFORMS, or on a host that rents streams to many
+// (HealLogic.sharedBase: zeno.fm, laut.fm).
+// Contract: true only for a web address whose host is such a name or lies
+// under one, whole labels compared: myradio.net is not radio.net, and
+// maps.google.com is not sites.google.com.
 function landlordPage(u) {
+    // webUrlOrEmpty reads a list holding one address as that address.
+    if (typeof u !== "string") return false;
     var host = StreamLogic.hostOf(webUrlOrEmpty(u));
-    return host !== "" && HealLogic.sharedBase(StreamLogic.baseDomain(host));
+    if (host === "") return false;
+    if (HealLogic.sharedBase(StreamLogic.baseDomain(host))) return true;
+    var labels = host.split(".");
+    for (var i = 0; i < labels.length; i++)
+        if (HOMEPAGE_PLATFORMS[labels.slice(i).join(".")] === true) return true;
+    return false;
 }
 
 // What a homepage offers to look at for a station's logo: what the page
@@ -257,7 +321,11 @@ function wellKnownIcons(origin) {
 }
 
 // Whether a reply's first bytes are a picture: PNG, JPEG, GIF, ICO/CUR,
-// BMP, WebP or an SVG/XML document.
+// BMP, WebP or SVG. The first five are known by their opening bytes. A
+// bitmap and an SVG open with plain text ("BM", "<"), so they are asked
+// for more: an XHTML error page, an RSS feed, a page with a drawing in its
+// body and a sentence starting "BM" all passed here once, and the hunt
+// saved them as logos.
 function looksLikeImageBytes(buf) {
     if (!buf || buf.length < 4)
         return false;
@@ -273,24 +341,117 @@ function looksLikeImageBytes(buf) {
     // ICO: 00 00 01 00 (icon) or 00 00 02 00 (cursor)
     if (buf[0] === 0x00 && buf[1] === 0x00 && (buf[2] === 0x01 || buf[2] === 0x02) && buf[3] === 0x00)
         return true;
-    // BMP: 42 4D
+    // BMP: 42 4D, then a header whose fields agree
     if (buf[0] === 0x42 && buf[1] === 0x4D)
-        return true;
+        return _bmpHeader(buf);
     // WebP: RIFF....WEBP
     if (buf.length >= 12
         && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46
         && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50)
         return true;
-    // SVG/XML: '<' followed by '?xml' or '<svg'
-    if (buf[0] === 0x3C) {
-        let head = "";
-        for (let i = 0; i < Math.min(buf.length, 256); i++)
-            head += String.fromCharCode(buf[i]);
-        const lower = head.toLowerCase();
-        if (lower.indexOf("<svg") !== -1 || lower.indexOf("<?xml") !== -1)
-            return true;
+    // SVG: '<', and the document's root element is svg
+    if (buf[0] === 0x3C)
+        return _svgRoot(buf);
+    return false;
+}
+
+// How much of a reply is read for an SVG's root element. What drawing
+// programs write before it (a declaration, a generator comment, a doctype
+// with its entities) is a few hundred bytes.
+var SVG_HEAD = 4096;
+
+// Whether an XML document's root element is svg: declarations and other
+// processing instructions, comments and one doctype are passed over, with
+// white space between them, and the next thing has to be "<svg" ended by
+// white space, ">" or "/", all of it inside the first SVG_HEAD bytes.
+// Every construct is passed over once by a plain search for its end, so a
+// reply made of half a megabyte of openings costs one look at that head.
+// A doctype's own declarations end at its first "]". A reply this reads
+// wrongly is refused, never taken.
+function _svgRoot(b) {
+    var n = Math.min(b.length, SVG_HEAD), s = "", i = 0, end = 0, sub = 0, c = 0, doctypes = 0;
+    for (i = 0; i < n; i++) s += String.fromCharCode(b[i]);
+    i = 0;
+    while (i < n) {
+        c = s.charCodeAt(i);
+        if (c === 0x20 || c === 0x09 || c === 0x0A || c === 0x0D) {
+            i++;
+        } else if (s.substr(i, 4) === "<!--") {
+            end = s.indexOf("-->", i + 4);
+            if (end === -1) return false;
+            i = end + 3;
+        } else if (s.substr(i, 2) === "<?") {
+            end = s.indexOf("?>", i + 2);
+            if (end === -1) return false;
+            i = end + 2;
+        } else if (s.substr(i, 9) === "<!DOCTYPE") {
+            if (++doctypes > 1) return false;
+            end = s.indexOf(">", i + 9);
+            sub = s.indexOf("[", i + 9);
+            if (sub !== -1 && sub < end) {
+                end = s.indexOf("]", sub + 1);
+                if (end !== -1) end = s.indexOf(">", end + 1);
+            }
+            if (end === -1) return false;
+            i = end + 1;
+        } else {
+            c = s.charCodeAt(i + 4);
+            return s.substr(i, 4) === "<svg"
+                && (c === 0x3E || c === 0x2F || c === 0x20 || c === 0x09 || c === 0x0A || c === 0x0D);
+        }
     }
     return false;
+}
+
+// Whether the bytes open a Windows or OS/2 bitmap: "BM", both reserved
+// words zero, a header length the format has, the pixels placed after the
+// headers, one plane, a bit depth the format has, a width above zero and a
+// height that is not zero (below zero means the rows run top down). Text
+// cannot pass: the reserved words are four zero bytes.
+function _bmpHeader(b) {
+    var pixels = 0, dib = 0, w = 0, h = 0, planes = 0, bpp = 0;
+    if (!(b.length >= 26) || b[0] !== 0x42 || b[1] !== 0x4D) return false;
+    if (b[6] !== 0 || b[7] !== 0 || b[8] !== 0 || b[9] !== 0) return false;
+    pixels = _le32(b, 10);
+    dib = _le32(b, 14);
+    if (pixels < 14 + dib) return false;
+    if (dib === 12) {
+        w = b[18] + b[19] * 256;
+        h = b[20] + b[21] * 256;
+        planes = b[22] + b[23] * 256;
+        bpp = b[24] + b[25] * 256;
+    } else if (dib === 40 || dib === 52 || dib === 56 || dib === 64 || dib === 108 || dib === 124) {
+        if (b.length < 30) return false;
+        w = _le32(b, 18);
+        h = _le32(b, 22);
+        planes = b[26] + b[27] * 256;
+        bpp = b[28] + b[29] * 256;
+        // Signed in the file: a width with its top bit set is below zero.
+        if (w >= 0x80000000) return false;
+    } else {
+        return false;
+    }
+    return planes === 1 && w > 0 && h !== 0
+        && (bpp === 1 || bpp === 4 || bpp === 8 || bpp === 16 || bpp === 24 || bpp === 32);
+}
+
+// What the logo hunt makes of one reply.
+// Contract: { image, size }. image says whether a logo may be made of the
+// bytes, size is imageSize(buf) when it may and null when not. When the
+// listener asked for the hunt (strict is not true) every picture
+// looksLikeImageBytes knows will do. When nobody clicked (strict is true)
+// the picture must also say its size, or be an SVG or a bitmap, the two
+// formats imageSize does not read. Bytes that are no list give
+// { image: false, size: null }.
+function logoVerdict(buf, strict) {
+    var size = null;
+    if (!looksLikeImageBytes(buf)) return { image: false, size: null };
+    size = imageSize(buf);
+    // looksLikeImageBytes has vouched for the bytes, so "<" is an SVG and
+    // "BM" a bitmap, each held to a check as tight as a size.
+    if (strict === true && size === null && buf[0] !== 0x3C && !(buf[0] === 0x42 && buf[1] === 0x4D))
+        return { image: false, size: null };
+    return { image: true, size: size };
 }
 
 // The pixel size a picture's own header declares, { width, height }, or
@@ -355,6 +516,10 @@ function _be16(b, i) {
 // turns a width with its top bit set into a negative number.
 function _be32(b, i) {
     return ((b[i] * 256 + b[i + 1]) * 256 + b[i + 2]) * 256 + b[i + 3];
+}
+
+function _le32(b, i) {
+    return ((b[i + 3] * 256 + b[i + 2]) * 256 + b[i + 1]) * 256 + b[i];
 }
 
 function _size(w, h) {

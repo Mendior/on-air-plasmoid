@@ -29,8 +29,21 @@ function _row(s, idx) {
 // resolves each name against the stations (first index wins on duplicate
 // names — favorites are name-keyed by design) and silently skips
 // favorites whose station is not in the list (deactivated, not deleted).
-function buildFilteredRows(stations, favoriteNames, filterRaw, favOnly) {
+// named are the stations of this list the directory's answer to the text
+// held (SearchLogic.knownStation's third argument, and a row just starred).
+// The web rows leave those out as already saved, so they are shown here
+// whatever their names say: "Example FM", filed under Estonia and jazz, is a
+// row under "estonia" and under "jazz". Without text every row shows anyway,
+// and the favourites view still shows favourites alone.
+function buildFilteredRows(stations, favoriteNames, filterRaw, favOnly, named) {
     const filter = SearchLogic.fold(filterRaw)
+    // The indices of the named stations. Null-prototype like idxByName below.
+    const found = Object.create(null)
+    if (filter !== "" && Array.isArray(named))
+        for (var h = 0; h < named.length; h++) {
+            const at = SearchLogic.knownStationAt(stations, named[h])
+            if (at !== -1) found[at] = true
+        }
     const out = []
     if (favOnly) {
         // Null-prototype: a station named "constructor" must not read
@@ -43,7 +56,7 @@ function buildFilteredRows(stations, favoriteNames, filterRaw, favOnly) {
             const fi = idxByName[favoriteNames[f]]
             if (fi === undefined) continue
             const fs = stations[fi]
-            if (filter !== "" && SearchLogic.fold(fs.name).indexOf(filter) === -1)
+            if (filter !== "" && found[fi] !== true && SearchLogic.fold(fs.name).indexOf(filter) === -1)
                 continue
             out.push(_row(fs, fi))
         }
@@ -51,7 +64,7 @@ function buildFilteredRows(stations, favoriteNames, filterRaw, favOnly) {
     }
     for (var i = 0; i < stations.length; i++) {
         const s = stations[i]
-        if (filter !== "" && SearchLogic.fold(s.name).indexOf(filter) === -1)
+        if (filter !== "" && found[i] !== true && SearchLogic.fold(s.name).indexOf(filter) === -1)
             continue
         out.push(_row(s, i))
     }

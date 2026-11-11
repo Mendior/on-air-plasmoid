@@ -44,6 +44,27 @@ function localPath(url) {
     return s.indexOf("file://") === 0 && s.length > 7 ? s.substring(7) : ""
 }
 
+// An absolute path as the file:// URL Qt itself writes for it, "" for
+// anything that is not an absolute path.
+//
+// A file reaches the player by two roads. The folder model hands out
+// QUrl::fromLocalFile, and code that knows only a file name has to build
+// the URL from text. The two must come out as one string, because "is this
+// the file that is playing" is asked by comparing them.
+//
+// What Qt escapes was measured on 6.12 by listing a folder holding one file
+// per character: the control characters and " # % < > ? [ \ ] ^ ` { | }.
+// Everything else stays as typed, space and every non-ASCII character
+// tried included, and a url property reads such a string back unchanged.
+function fileUrl(path) {
+    var p = String(path || "")
+    if (p.charAt(0) !== "/") return ""
+    return "file://" + p.replace(/[\x00-\x1f\x7f"#%<>?\[\\\]^`{|}]/g, function(c) {
+        var hex = c.charCodeAt(0).toString(16).toUpperCase()
+        return "%" + (hex.length < 2 ? "0" : "") + hex
+    })
+}
+
 // The folder downloads go to when the field is left empty.
 // musicUrl: StandardPaths' MusicLocation as a string; fallback: the base to
 // use when there is none. Returns an absolute path ending in /OnAir.

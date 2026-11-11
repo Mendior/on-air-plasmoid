@@ -14,10 +14,10 @@ target:
   package/contents/ui/SearchLogic.js
 
 find:
-          if (!mixed && letters(s) >= 4) return true;
+          if (mixed || letters(s) < 4) continue;
 
 replace:
-          if (letters(s) >= 4) return true;
+          if (letters(s) < 4) continue;
 
 expect:
   Killed by tst_artpick::test_a_joined_up_name_is_no_strangers_first_name.

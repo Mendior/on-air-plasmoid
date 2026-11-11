@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A single playback error asks the directory at once, without one more open of
+  the saved address.
+
+history:
+  Until 2026.43 the heal asked the directory two and a half seconds after any
+  one error. An encoder restarting was enough: for a row with a uuid or its
+  own domain the first candidate that buffered was written over the saved
+  address, and a 320 kb/s row became its 96 kb/s mount for good. The saved
+  address gets one more open first.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (root._healRetryAttempts === 0 && HealLogic.knockFirst(_healKnocked[orig], now)) {
+
+replace:
+          if (false && HealLogic.knockFirst(_healKnocked[orig], now)) {
+
+expect:
+  Killed by tests/test_invariants.py::test_one_failure_knocks_on_the_saved_address_before_the_directory_is_asked.
+  Line-neutral.

@@ -63,6 +63,9 @@ TestCase {
             out = out.replace("%" + i, arguments[i])
         return out
     }
+    function i18np(one, many, n) {
+        return (n === 1 ? one : many).replace("%1", n)
+    }
 
     // The dialog's side of the contract, as far as a page can see it.
     property int dirty: 0
@@ -242,6 +245,208 @@ TestCase {
         page._edited()
         page._edited()
         verify(dirty <= 1, "the same list announced itself twice")
+        page.destroy()
+    }
+
+    // ── Import ───────────────────────────────────────────────────────────
+    // The page reads the picked file through its shell and takes the answer
+    // from the shell's exited signal; the test gives that answer itself.
+    function shell(page) {
+        var kids = page.contentData
+        for (var i = 0; i < kids.length; i++)
+            if (kids[i] && kids[i].exited !== undefined && kids[i].exec !== undefined) return kids[i]
+        return null
+    }
+    function importFile(page, text) {
+        var sh = shell(page)
+        verify(sh !== null, "the page has no shell to read a file through")
+        sh.exited("head -c 2097152 '/home/me/stations.arp'", 0, 0, text, "")
+    }
+    // The line under the list that says how the import went.
+    function notice(page) {
+        var todo = [page.footer]
+        while (todo.length) {
+            var it = todo.shift()
+            if (it.positive !== undefined && it.showCloseButton !== undefined) return it
+            var kids = it.children || []
+            for (var i = 0; i < kids.length; i++) todo.push(kids[i])
+        }
+        return null
+    }
+
+    function test_a_file_with_no_station_in_it_leaves_the_list_as_it_was() {
+        // Seen on the page with Alpha, Beta and Gamma in the list: each of
+        // these emptied it or left half of it, three of them said the
+        // configuration had been loaded, and the next Apply saved the loss.
+        var files = [
+            ["{}", "an object"],
+            [JSON.stringify({ "stations": JSON.parse(three) }), "a list wrapped in an object"],
+            ["[]", "an empty list"],
+            ["\"http://a.example/s\"", "a JSON string"],
+            [JSON.stringify([{ "title": "Jazz", "url": "http://j.example/s" }, { "id": 7 }]),
+             "another program's list"],
+            ["[null, null]", "a list of nothing"],
+            ["#EXTM3U\nhttp://a.example/s\n", "a playlist"],
+            ["", "an empty file"]
+        ]
+        var saves = [saveCfgFirst, savePageFirst]
+        for (var f = 0; f < files.length; f++) {
+            var page = open(three)
+            importFile(page, files[f][0])
+            compare(hosts(page), "Alpha@http://a.example/s,Beta@http://b.example/edge,Gamma@http://g.example/s",
+                    files[f][1] + " changed the list")
+            compare(dirty, 0, files[f][1] + " read as an edit")
+            var said = notice(page)
+            verify(said !== null, "the page has no line to say how the import went")
+            compare(said.positive, false, files[f][1] + " was reported as loaded")
+            compare(said.text, "Error loading configuration. Try choosing a different file.")
+            // And the next edit saves the whole list, not what was left of it.
+            page.view.model.setProperty(0, "active", false)
+            page._edited()
+            saves[f % 2](page)
+            compare(JSON.parse(plasmoid.configuration.servers).length, 3, files[f][1] + ": the save lost stations")
+            page.destroy()
+        }
+    }
+
+    function test_a_file_with_a_broken_row_brings_in_the_rest() {
+        var page = open(two)
+        importFile(page, JSON.stringify([
+            { name: "Delta", hostname: "http://d.example/s", favicon: "", active: true },
+            null,
+            { name: "No address" },
+            { name: "Epsilon", hostname: "http://e.example/s", favicon: "", active: false }]))
+        compare(hosts(page), "Delta@http://d.example/s,Epsilon@http://e.example/s")
+        compare(notice(page).positive, true)
+        // A backup that is partly broken looks whole in a list of hundreds.
+        // The line says how many rows did not make it.
+        compare(notice(page).text,
+                "Configuration has been loaded, but 2 rows of the file were left out. Click 'Apply' to save changes.")
+        verify(dirty > 0, "an import went unannounced")
+        page.destroy()
+    }
+
+    function test_the_import_line_counts_one_row_as_one_and_none_as_none() {
+        var page = open(two)
+        importFile(page, JSON.stringify([
+            { name: "Delta", hostname: "http://d.example/s", favicon: "", active: true }, null]))
+        compare(notice(page).text,
+                "Configuration has been loaded, but one row of the file was left out. Click 'Apply' to save changes.")
+        importFile(page, JSON.stringify([
+            { name: "Delta", hostname: "http://d.example/s", favicon: "", active: true }]))
+        compare(notice(page).text, "Configuration has been loaded. Click 'Apply' to save changes.")
+        page.destroy()
+    }
+
+    function test_the_pages_own_export_comes_back_as_it_left() {
+        // Read on the page: {"codec":"flac","bitrate":900} was gone after an
+        // export and an import, and with the codec the relay an Ogg stream
+        // needs to play past its first second.
+        var list = JSON.stringify([
+            { name: "Alpha", hostname: "http://a.example/s", favicon: "https://a.example/l.png", active: true,
+              country: "Estonia" },
+            { name: "Mast FLAC", hostname: "https://f.example/flac", favicon: "", active: false,
+              codec: "flac", bitrate: 900, uuid: "1ee96040-bfb6-4209-9ab8-14a26ff73ad0",
+              prev: "https://old.example/flac" },
+            { name: "Gamma", hostname: "http://g.example/s", favicon: "", active: true }])
+        var saves = [saveCfgFirst, savePageFirst]
+        for (var k = 0; k < saves.length; k++) {
+            var page = open(list)
+            // What Export writes is the list the page holds.
+            var exported = JSON.stringify(page.getServersArray())
+            page.destroy()
+            page = open(two)
+            importFile(page, exported)
+            compare(JSON.stringify(page.getServersArray()), exported, "shell " + k)
+            compare(notice(page).positive, true)
+            verify(dirty > 0, "shell " + k + ": an import went unannounced")
+            saves[k](page)
+            var saved = JSON.parse(plasmoid.configuration.servers)
+            compare(saved.length, 3)
+            compare(saved[1].codec, "flac", "shell " + k + " lost the codec")
+            compare(saved[1].bitrate, 900, "shell " + k + " lost the bitrate")
+            page.destroy()
+        }
+    }
+
+    // ── Fetch missing logos ──────────────────────────────────────────────
+    // What the run does with each picture it finds, without the network:
+    // _saveLogo is where a find lands on the page.
+    function found(page, row, logo) {
+        var it = page.view.model.get(row)
+        return page._saveLogo({ index: row, name: it.name, hostname: it.hostname }, logo)
+    }
+
+    function test_a_logo_found_here_outlives_what_the_popup_writes_meanwhile() {
+        // Seen on the page: a run gave Alpha its logo, the popup wrote the
+        // list before the run ended, and Alpha's logo was gone while the
+        // run's last line still counted it as updated. The find was on the
+        // page but not in what the page calls its own edits, so the popup's
+        // list was taken over whole.
+        var popupWrites = [
+            [withLogo(three, "http://g.example/s", "https://g.example/l.png"), "Alpha+logo,Beta,Gamma+logo",
+             "the popup found Gamma's logo"],
+            [moved(three, "http://b.example/edge", "http://b.example/new"), "Alpha+logo,Beta,Gamma",
+             "a heal moved Beta"],
+            [JSON.stringify(JSON.parse(three).concat([{ name: "Delta", hostname: "http://d.example/s",
+                                                        favicon: "", active: true }])),
+             "Alpha+logo,Beta,Gamma,Delta", "a station was added from a search"]
+        ]
+        var saves = [saveCfgFirst, savePageFirst]
+        for (var w = 0; w < popupWrites.length; w++) {
+            var page = open(three)
+            verify(found(page, 0, "https://a.example/l.png"), "the page refused a logo for its own row")
+            plasmoid.configuration.servers = popupWrites[w][0]
+            compare(names(page), popupWrites[w][1], popupWrites[w][2])
+            compare(page._logoFound, 1)
+            // And Apply saves what the page shows.
+            saves[w % 2](page)
+            var saved = JSON.parse(plasmoid.configuration.servers)
+            compare(saved[0].favicon, "https://a.example/l.png", popupWrites[w][2] + ": the save lost the logo")
+            compare(saved.length, JSON.parse(popupWrites[w][0]).length, popupWrites[w][2])
+            page.destroy()
+        }
+    }
+
+    function test_a_move_the_popup_made_during_a_run_is_kept_with_the_logo() {
+        var page = open(three)
+        verify(found(page, 1, "https://b.example/l.png"))
+        plasmoid.configuration.servers = moved(three, "http://b.example/edge", "http://b.example/new")
+        var rows = page.getServersArray()
+        compare(rows[1].hostname, "http://b.example/new", "the page kept the address the heal left")
+        compare(rows[1].favicon, "https://b.example/l.png")
+        compare(rows[1].prev, "http://b.example/edge")
+        page.destroy()
+    }
+
+    function test_a_logo_found_lights_apply_at_once() {
+        var page = open(three)
+        compare(dirty, 0)
+        verify(found(page, 0, "https://a.example/l.png"))
+        verify(dirty > 0, "a found logo is an edit, and the page did not say so")
+        var after = dirty
+        verify(found(page, 2, "https://g.example/l.png"))
+        verify(dirty > after, "the second find went unannounced")
+        compare(names(page), "Alpha+logo,Beta,Gamma+logo")
+        page.destroy()
+    }
+
+    function test_a_find_the_page_refuses_is_no_edit() {
+        var page = open(three)
+        compare(page._saveLogo({ index: 0, name: "Alpha" }, ""), false, "no address")
+        compare(page._saveLogo({ index: 3, name: "Alpha" }, "https://a.example/l.png"), false, "a row past the end")
+        compare(page._saveLogo({ index: 0, name: "Alpha" }, "http://192.168.1.1/l.png"), false,
+                "a logo on the listener's own network")
+        // The row the job was made for is somewhere else by now.
+        compare(page._saveLogo({ index: 0, name: "Beta" }, "https://b.example/l.png"), false, "another station's row")
+        compare(names(page), "Alpha,Beta,Gamma")
+        compare(dirty, 0, "a refused find read as an edit")
+        compare(page._logoFound, 0)
+        // So the page still follows the popup quietly.
+        var popup = withLogo(three, "http://g.example/s", "https://g.example/l.png")
+        plasmoid.configuration.servers = popup
+        compare(names(page), "Alpha,Beta,Gamma+logo")
+        compare(dirty, 0)
         page.destroy()
     }
 }

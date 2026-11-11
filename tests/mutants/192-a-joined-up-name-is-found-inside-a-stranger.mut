@@ -13,10 +13,10 @@ target:
   package/contents/ui/SearchLogic.js
 
 find:
-          while (j < s.length && l[i + j].w === s[j].w) {
+      return x.w === y.w || (_joins(x.w) && _joins(y.w));
 
 replace:
-          while (j < s.length && l[i + j].w.indexOf(s[j].w) !== -1) {
+      return x.w.indexOf(y.w) !== -1 || (_joins(x.w) && _joins(y.w));
 
 expect:
   Killed by tests/qml/tst_artpick.qml::test_a_name_joined_up_is_not_inside_a_strangers.

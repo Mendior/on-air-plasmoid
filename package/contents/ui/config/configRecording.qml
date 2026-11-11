@@ -10,6 +10,8 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 
+import "../RecLogic.js" as RecLogic
+
 KCM.SimpleKCM {
     id: root
     property alias cfg_recordMaxMinutes: recMaxSpin.value
@@ -51,11 +53,16 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: recMaxSpin
             Kirigami.FormData.label: i18n("Max length:")
-            from: 10
+            // Both ends sit on the step's own grid. From a floor of 10 the
+            // box walked 10, 40, 70 and never met the default of 180 again.
+            from: 30
             to: 24 * 60
             stepSize: 30
+            editable: true
             textFromValue: function(v) { return i18n("%1 min", v) }
-            valueFromText: function(t) { return parseInt(t) || 180 }
+            // Not parseInt: KDE groups the number from a thousand up, and
+            // "1,440 min" read back as 1 when the field merely lost focus.
+            valueFromText: function(t) { return RecLogic.typedMinutes(t, 180) }
         }
 
         QQC2.Label {

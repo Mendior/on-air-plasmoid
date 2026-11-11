@@ -797,6 +797,81 @@ Item {
         verify(r.mock.execLog.length > cmdsBefore);    // the re-arm went out
     }
 
+    // A relay with its tap up and the player drinking from it, plus the
+    // writer's command so a test can end it.
+    function relayPlaying(r) {
+        verify(r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000));
+        r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
+        r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__ port=34567", 1002000);
+        compare(r.mock.played.length, 1);
+        compare(r.mock.played[0].kind, "relay");
+        return r.mock.execLog[1];
+    }
+
+    function urlWrites(r) {
+        return r.mock.execLog.filter(function(c) { return c.indexOf(": TS_URL;") === 0; }).length;
+    }
+
+    function test_a_relay_nobody_is_listening_to_does_not_re_arm_at_its_cap() {
+        // Removing the playing station, adding one, or Apply in the settings
+        // stops the player with a bare stop(): no park flag, no disarm. The
+        // engine stayed armed behind a silent room, and when the writer
+        // reached its window cap an hour later the re-arm went out, the tap
+        // answered UP and the station played by itself.
+        var r = rig({ timeshiftEnabled: false });
+        var runCmd = relayPlaying(r);
+        // What the list's write leaves behind.
+        r.mock.playingNow = false;
+        r.mock._wantsPlaying = false;
+        var arms = urlWrites(r);
+        r.e.handleExec(runCmd, "__TS_EXIT__ rc=0 bytes=480000000", 1000000 + 60 * 60 * 1000);
+        compare(urlWrites(r), arms);                 // no new arm went out
+        compare(r.mock.played.length, 1);            // and nothing played
+        verify(!r.e.active);                         // the arm is given up
+        // The hour on disk still goes with the next teardown.
+        r.e.disarm();
+        verify(r.mock.execLog[r.mock.execLog.length - 1].indexOf(": TS_STOP;") === 0);
+    }
+
+    function test_an_upstream_drop_a_minute_in_re_arms_only_for_a_listener() {
+        // The other way a writer ends: the station drops the connection. One
+        // that lived its first minute earns a quiet re-arm, at exactly sixty
+        // seconds too, but only while somebody is listening.
+        var quiet = rig({ timeshiftEnabled: false });
+        var quietRun = relayPlaying(quiet);
+        quiet.mock.playingNow = false;
+        var arms = urlWrites(quiet);
+        quiet.e.handleExec(quietRun, "__TS_EXIT__ rc=1 bytes=1400000", 1000000 + 60000);
+        compare(urlWrites(quiet), arms);
+        compare(quiet.mock.played.length, 1);
+
+        var heard = rig({ timeshiftEnabled: false });
+        var heardRun = relayPlaying(heard);
+        arms = urlWrites(heard);
+        heard.e.handleExec(heardRun, "__TS_EXIT__ rc=1 bytes=1400000", 1000000 + 60000);
+        compare(urlWrites(heard), arms + 1);
+    }
+
+    function test_an_exit_line_without_a_usable_size_wakes_no_empty_room_data() {
+        return [
+            { tag: "no byte count", ack: "__TS_EXIT__" },
+            { tag: "a size that is not a number", ack: "__TS_EXIT__ rc=0 bytes=lots" },
+            { tag: "a size past any disk", ack: "__TS_EXIT__ rc=0 bytes=480000000000000000000000000000" }
+        ];
+    }
+
+    function test_an_exit_line_without_a_usable_size_wakes_no_empty_room(data) {
+        // Only a plain zero means a birth death. Every other exit line reaches
+        // the re-arm, so each of them has to meet the same question there.
+        var r = rig({ timeshiftEnabled: false });
+        var runCmd = relayPlaying(r);
+        r.mock.playingNow = false;
+        var arms = urlWrites(r);
+        r.e.handleExec(runCmd, data.ack, 1000000 + 60 * 60 * 1000);
+        compare(urlWrites(r), arms);
+        compare(r.mock.played.length, 1);
+    }
+
     function test_a_parked_room_is_not_woken_by_a_writers_death() {
         // A listener who parked the radio chose silence. The relay writer
         // dying behind that silence is bookkeeping, not a licence to start

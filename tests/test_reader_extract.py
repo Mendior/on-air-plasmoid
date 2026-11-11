@@ -68,6 +68,48 @@ def test_decode_meta_never_raises(reader_funcs):
     assert dm(b"\xff\xfe\x00garbage") != ""
 
 
+def test_a_windows_1252_dash_is_a_dash(reader_funcs):
+    """Windows-1252 has an en dash at 0x96, where Latin-1 has a control
+    character. Read as Latin-1 the line did not split into artist and
+    title."""
+    ef = reader_funcs["extract_field"]
+    raw = "StreamTitle='A – B';".encode("cp1252")
+    assert ef(raw, b"StreamTitle=") == "A – B"
+
+
+def test_windows_1252_quotes_and_the_euro_sign(reader_funcs):
+    dm = reader_funcs["decode_meta"]
+    assert dm("Don’t Stop “Believin’”".encode("cp1252")) == "Don’t Stop “Believin’”"
+    assert dm("Tõnis Mägi — Koit".encode("cp1252")) == "Tõnis Mägi — Koit"
+    assert dm(b"\x80 5") == "€ 5"
+
+
+def test_utf8_stays_first(reader_funcs):
+    """The same dash in UTF-8 is three bytes, each of which Windows-1252 would
+    read as a letter or a quote of its own."""
+    dm = reader_funcs["decode_meta"]
+    assert dm("A – B".encode("utf-8")) == "A – B"
+    assert dm(b"") == ""
+    assert dm(b"plain ascii") == "plain ascii"
+
+
+def test_a_byte_windows_1252_leaves_undefined_still_decodes(reader_funcs):
+    """Windows-1252 has no character at 0x81, 0x8d, 0x8f, 0x90 and 0x9d. A
+    title with one of those is read as Latin-1 from end to end, as before."""
+    dm = reader_funcs["decode_meta"]
+    for byte in (0x81, 0x8D, 0x8F, 0x90, 0x9D):
+        raw = b"Caf\xe9 " + bytes([byte])
+        assert dm(raw) == "Café " + chr(byte)
+    # The fallback is the whole line, not byte by byte.
+    assert dm(b"A \x96 B \x81") == "A \x96 B \x81"
+
+
+def test_a_full_metadata_block_of_dashes(reader_funcs):
+    """255 * 16 bytes is the largest block ICY can carry."""
+    dm = reader_funcs["decode_meta"]
+    assert dm(b"\x96" * 4080) == "–" * 4080
+
+
 def test_resolve_url_reads_token_url_from_file(reader_funcs, tmp_path):
     """The URL is handed over as a 0600 file (kept off /proc argv). resolve_url
     reads it back verbatim, including any per-listener token, minus whitespace."""

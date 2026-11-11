@@ -140,6 +140,23 @@ function answerKnownPublic(xhr) {
     return host !== "" && !isPrivateHost(host);
 }
 
+// The verdict for an address a row itself names, where the row may be the
+// listener's own server: asked is the address the request went to. A station
+// on the home network (http://192.168.1.5:8000/raadio.m3u) answers from
+// private space because that is where it was asked, and that is no redirect
+// into the LAN. So an answer from a private host passes when the question
+// went to that very host, on any port. A public address answered from
+// private space is refused as before, and so is one private host answering
+// for another. An end Qt does not name keeps answerFromPublicHost's verdict.
+// Hosts are compared as hostOf spells them: an address typed in a dialect Qt
+// rewrites ("127.1") reads as a different host and stays refused.
+function answerPublicOrAsked(asked, xhr) {
+    if (answerFromPublicHost(xhr)) return true;
+    // Refused there, so the end is named and is private or unreadable.
+    var from = hostOf(String(xhr.responseURL));
+    return from !== "" && from === hostOf(asked);
+}
+
 // Whether a host (as returned by hostOf) targets the machine itself or
 // the private/link-local space — in ANY spelling. An unparseable bracket
 // literal counts as private: refusing a malformed address is the safe

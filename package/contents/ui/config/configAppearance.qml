@@ -49,6 +49,8 @@ KCM.SimpleKCM {
     property alias cfg_showCoverArt: coverCheck.checked
     property string cfg_downloadFormat
     property string cfg_icon
+    property alias cfg_panelShowTrack: panelTrackCheck.checked
+    property alias cfg_panelTextWidth: panelTextWidthSpin.value
 
     // cfg_defaultVolume is a SNAPSHOT taken when the dialog opened. The
     // popup's volume knob writes the real key while this page sits here, and
@@ -252,6 +254,33 @@ KCM.SimpleKCM {
                 opacity: 0
                 width: Kirigami.Units.iconSizes.small
                 height: width
+            }
+        }
+
+        // Artist over title to the right of the icon (GitHub #14). Only on
+        // a horizontal panel and only while the widget is on, so an idle
+        // widget keeps the square it always had.
+        QQC2.CheckBox {
+            id: panelTrackCheck
+            Kirigami.FormData.label: i18n("Now playing:")
+            text: i18n("Show artist and title next to the icon")
+        }
+        RowLayout {
+            Kirigami.FormData.label: i18n("Maximum text width:")
+            enabled: panelTrackCheck.checked
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.SpinBox {
+                id: panelTextWidthSpin
+                from: 4
+                to: 40
+            }
+            // The setting counts in the theme's grid units, which follow
+            // the font. Pixels are what a person can hold against a panel.
+            QQC2.Label {
+                text: i18nc("@info a width in pixels, after a number box", "about %1 px",
+                            panelTextWidthSpin.value * Kirigami.Units.gridUnit)
+                opacity: 0.75
             }
         }
 

@@ -46,7 +46,8 @@ TestCase {
             nextSeq: function() { return ++tc.seq; },
             notify: function(t, x, i) { tc.notified.push(t + "|" + (x || "")); },
             downloadDirPath: "/home/x/Music/OnAir",
-            _sanitizeDeviceName: function(s) { return s; }
+            _sanitizeDeviceName: function(s) { return s; },
+            _hostOf: function(u) { return u; }
         };
         return engineComp.createObject(tc, { app: app, cfg: cfg });
     }
@@ -58,6 +59,104 @@ TestCase {
     function settleAll(e, seq, shows, episodes) {
         for (var i = 0; i < 3; i++) e._podSearchSettle(seq, shows[i], false)
         e._podSearchSettle(seq, episodes, true)
+    }
+
+    // ── The refresh nobody watches ────────────────────────────────────────
+
+    readonly property string feedXml: '<rss><channel><title>Show</title>'
+        + '<item><title>Ep 1</title><guid>g1</guid>'
+        + '<enclosure url="https://cdn.example/e1.mp3" type="audio/mpeg"/></item>'
+        + '</channel></rss>'
+
+    // An engine whose quiet refresh asks a stand-in request, and the
+    // request: what was asked of it, and step(state, text, landed) to
+    // answer the way Qt does.
+    function quietEngine() {
+        var e = makeEngine();
+        var req = {
+            readyState: 0, responseText: "", responseURL: "", onreadystatechange: null,
+            opened: [], sent: 0, aborts: 0, armed: [], cleared: [],
+            open: function(m, u) { req.opened.push(m + " " + u); },
+            setRequestHeader: function() {},
+            send: function() { req.sent++; },
+            abort: function() { req.aborts++; },
+            step: function(state, text, landed) {
+                req.readyState = state;
+                req.responseText = text;
+                req.responseURL = landed || "";
+                req.onreadystatechange();
+            }
+        };
+        e.app._armXhrTimeout = function(x, ms) { req.armed.push(ms); return "guard"; };
+        e.app._clearXhrTimeout = function(g) { req.cleared.push(g); };
+        e.makeRequest = function() { return req; };
+        return { e: e, req: req };
+    }
+
+    function test_the_quiet_refresh_reads_a_feed_and_puts_its_timer_away() {
+        var q = quietEngine(), got = [];
+        q.e._podFetchFeedSilent("https://feeds.example/show.rss", function(f) { got.push(f); });
+        compare(q.req.opened.join(), "GET https://feeds.example/show.rss");
+        compare(q.req.sent, 1);
+        compare(q.req.armed.join(), "15000");
+        q.req.step(4, tc.feedXml, "https://feeds.example/show.rss");
+        compare(got.length, 1);
+        compare(got[0].title, "Show");
+        compare(got[0].episodes.length, 1);
+        compare(q.req.cleared.join(), "guard");
+        // Qt can say DONE twice around an abort. One answer is one answer.
+        q.req.step(4, tc.feedXml, "https://feeds.example/show.rss");
+        compare(got.length, 1);
+        q.e.destroy();
+    }
+
+    function test_the_quiet_refresh_does_not_ask_a_private_address() {
+        var q = quietEngine(), got = [];
+        q.e._podFetchFeedSilent("http://192.168.1.5/feed.rss", function(f) { got.push(f); });
+        compare(q.req.opened.length, 0);
+        compare(got.length, 1);
+        compare(got[0], null);
+        q.e.destroy();
+    }
+
+    function test_a_feed_that_ends_inside_the_home_network_tells_the_refresh_nothing() {
+        var q = quietEngine(), got = [];
+        q.e._podFetchFeedSilent("https://feeds.example/show.rss", function(f) { got.push(f); });
+        q.req.step(4, tc.feedXml, "http://192.168.1.5/feed.rss");
+        compare(got.length, 1);
+        compare(got[0], null);
+        compare(q.req.cleared.join(), "guard");
+        q.e.destroy();
+    }
+
+    function test_a_request_cut_by_the_timer_ends_the_refresh_without_a_feed() {
+        // The timer aborts the request, and Qt answers an abort with DONE
+        // and nothing in it.
+        var q = quietEngine(), got = [];
+        q.e._podFetchFeedSilent("https://feeds.example/show.rss", function(f) { got.push(f); });
+        q.req.step(4, "", "");
+        compare(got.length, 1);
+        verify(!got[0].ok);
+        compare(got[0].episodes.length, 0);
+        q.e.destroy();
+    }
+
+    function test_an_endless_feed_is_cut_a_turn_later_and_read_as_far_as_it_came() {
+        var q = quietEngine(), got = [];
+        q.e._podFetchFeedSilent("https://feeds.example/show.rss", function(f) { got.push(f); });
+        var big = tc.feedXml + new Array(4 * 1024 * 1024 + 2).join(" ");
+        q.req.step(3, big, "https://feeds.example/show.rss");
+        // Not from inside the handler: that takes the shell down (Qt 6.11).
+        compare(q.req.aborts, 0);
+        tryCompare(q.req, "aborts", 1);
+        q.req.step(3, big + " ", "https://feeds.example/show.rss");
+        wait(0);
+        compare(q.req.aborts, 1);
+        // The abort empties the text. What had arrived is still a feed.
+        q.req.step(4, "", "https://feeds.example/show.rss");
+        compare(got.length, 1);
+        compare(got[0].episodes.length, 1);
+        q.e.destroy();
     }
 
     function test_a_search_nobody_answered_is_not_no_shows_found() {
@@ -436,6 +535,99 @@ TestCase {
         verify(e.downloads["ep.mp3"].sil !== undefined);
         compare(handed.length, 1);
         compare(handed[0], "ep.mp3");
+        e.destroy();
+    }
+
+    // A subscribed show with everything that is filed under its feed: the
+    // last episode seen, its speed and a downloaded file.
+    readonly property string deadFeed: "https://dead.example/rss"
+    readonly property string freshFeed: "https://new.example/rss"
+    property var movedFeeds: []
+
+    function subscribedEngine() {
+        var e = makeEngine({ podcastSubs: JSON.stringify([
+            { title: "Tech Talk", author: "A", art: "", feedUrl: deadFeed }]) });
+        e.loadSubs();
+        e.seen[deadFeed] = "seen-key";
+        e._podSpeeds = { "https://dead.example/rss": 1.5 };
+        e.downloads["Ep [0badf00d].mp3"] = { key: "k", feed: deadFeed };
+        tc.movedFeeds = [];
+        e.feedMoved.connect(function(from, to) { tc.movedFeeds.push(from + " -> " + to); });
+        return e;
+    }
+
+    function test_a_refused_feed_does_not_rewrite_the_subscription_data() {
+        return [
+            { tag: "403", status: 403 },
+            { tag: "401", status: 401 },
+            { tag: "a web page", status: 200 },
+            { tag: "400", status: 400 }
+        ];
+    }
+
+    function test_a_refused_feed_does_not_rewrite_the_subscription(data) {
+        // One 403 from a show's host, and iTunes knowing one show of that
+        // name elsewhere, used to move the subscription there for good.
+        var e = subscribedEngine();
+        var subsBefore = e.cfg.podcastSubs;
+        e._podFeedAdopt(deadFeed, freshFeed, data.status);
+        compare(e.subsModel.get(0).feedUrl, deadFeed);
+        compare(e.cfg.podcastSubs, subsBefore);
+        compare(e.seen[deadFeed], "seen-key");
+        compare(e.seen[freshFeed], undefined);
+        compare(e._podSpeeds[deadFeed], 1.5);
+        compare(e._podSpeeds[freshFeed], undefined);
+        compare(e.downloads["Ep [0badf00d].mp3"].feed, deadFeed);
+        compare(tc.movedFeeds.length, 0);
+        e.destroy();
+    }
+
+    function test_a_feed_that_is_gone_takes_the_subscription_with_it_data() {
+        return [{ tag: "404", status: 404 }, { tag: "410", status: 410 }];
+    }
+
+    function test_a_feed_that_is_gone_takes_the_subscription_with_it(data) {
+        var e = subscribedEngine();
+        e._podFeedAdopt(deadFeed, freshFeed, data.status);
+        compare(e.subsModel.get(0).feedUrl, freshFeed);
+        compare(JSON.parse(e.cfg.podcastSubs)[0].feedUrl, freshFeed);
+        compare(e.seen[freshFeed], "seen-key");
+        compare(e.seen[deadFeed], undefined);
+        compare(e._podSpeeds[freshFeed], 1.5);
+        compare(e._podSpeeds[deadFeed], undefined);
+        compare(e.downloads["Ep [0badf00d].mp3"].feed, freshFeed);
+        compare(tc.movedFeeds, [deadFeed + " -> " + freshFeed]);
+        e.destroy();
+    }
+
+    property url asThePlayerHoldsIt
+
+    function test_the_engine_spells_a_ledger_file_like_the_folder_model() {
+        // Every download is called "Title [8hex].ext". The folder model
+        // writes the brackets as %5B and %5D and the engine left them bare,
+        // so an episode the widget started by itself (the next one in a
+        // show, Up next, a podcast alarm) was not the one its own row and
+        // its own Play button were looking at.
+        var e = makeEngine();
+        var want = "file:///home/x/Music/OnAir/Podcasts/Episode 12 %5B3f1c9a7e%5D.mp3";
+        compare(e._podFileUrl("Episode 12 [3f1c9a7e].mp3"), want);
+        // The player hands the same string back.
+        asThePlayerHoldsIt = e._podFileUrl("Episode 12 [3f1c9a7e].mp3");
+        compare(asThePlayerHoldsIt.toString(), want);
+        compare(e._podFileUrl("100% #7 {a}^b [00c0ffee].mp3"),
+                "file:///home/x/Music/OnAir/Podcasts/100%25 %237 %7Ba%7D%5Eb %5B00c0ffee%5D.mp3");
+        e.destroy();
+    }
+
+    function test_a_playing_url_in_either_spelling_finds_its_ledger_row() {
+        var names = ["Episode 12 [3f1c9a7e].mp3", "100% #7 {a}^b [00c0ffee].mp3"];
+        var e = makeEngine();
+        for (var i = 0; i < names.length; i++) e.downloads[names[i]] = { key: "k" + i };
+        for (var j = 0; j < names.length; j++)
+            compare(e._podFileOfUrl(e._podFileUrl(names[j])), names[j]);
+        // A URL written before this, brackets bare, is still that file.
+        compare(e._podFileOfUrl("file:///home/x/Music/OnAir/Podcasts/Episode 12 [3f1c9a7e].mp3"),
+                "Episode 12 [3f1c9a7e].mp3");
         e.destroy();
     }
 

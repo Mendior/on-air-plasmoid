@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A capture whose time ran out with exit code 0 is called saved, however
+  little audio its file holds.
+
+history:
+  The verdict asked the wall clock, the exit code and a floor of 10 KB a
+  minute. Reported 2026-11-10: asked for 300 s, 302 s gone, the file 7 s old,
+  rc=0, 112000 bytes, and the notice read "Recording saved". Measured the same
+  day with the real command: a station that sent ten seconds and then held
+  the socket silent kept a one-minute capture going for its whole 360 s cap
+  and the shell answered rc=0 with 9.98 s in the file. The verdict now asks
+  how much audio there is.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+                          && (recWasStopRequested || (recRanFull && recRc === 0 && !recShort))
+
+replace:
+                          && (recWasStopRequested || (recRanFull && recRc === 0 && recDone))
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_a_capture_far_short_of_its_length_is_not_called_saved
+  and tests/qml/tst_recordingengine.qml::test_a_short_scheduled_capture_leaves_its_window_to_the_tick.
+  Line-neutral.

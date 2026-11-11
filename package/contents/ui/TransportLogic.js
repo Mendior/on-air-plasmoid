@@ -64,3 +64,71 @@ function stopOffered(playing, casting, wantsPlaying, tsPaused, tsShifted, pauseA
     var bigIsStop = audible && !((pauseAvailable === true) || (tsShifted === true));
     return !bigIsStop;
 }
+
+// Is anything on at all? playing/casting: audible now. wantsPlaying: a
+// standing order holds, audible or not. tsPaused/tsShifted: parked in or
+// moved inside the buffer.
+//
+// This is the sentence stopOffered opens with, for a caller that asks
+// nothing more. The panel text is one: between two knocks of a reconnect
+// nothing is audible for half a minute, and text that left and came back
+// with the sound would shove every neighbour on the panel twice.
+function held(playing, casting, wantsPlaying, tsPaused, tsShifted) {
+    return (playing === true) || (casting === true) || (wantsPlaying === true)
+        || (tsPaused === true) || (tsShifted === true);
+}
+
+// The level one notch of the wheel asks for, 0..1.
+//
+// shown: what the output plays right now. fadeFrom: the level the sleep
+// timer's fade started from, below zero while no fade runs. pendingPct: the
+// listener's last gesture still waiting to be saved, in percent, below zero
+// when there is none. notch: the step, up or down.
+//
+// The step used to be counted from shown alone, and for its last thirty
+// seconds the sleep timer is what moves shown. A notch at a level faded from
+// 60 % to 30 % asked for 35 %, the wheel's gesture is saved as the default
+// volume, and the radio came on at 35 % in the morning. During a fade the
+// notch counts from the level the fade started at, and a second notch of the
+// same burst from the one before it, which is still pending for a second.
+// What is heard does not change: the fade writes its own level again on its
+// next frame, as it did before.
+//
+// Anything that is not a finite number counts as absent, and the answer
+// never leaves 0..1.
+function wheelLevel(shown, fadeFrom, pendingPct, notch) {
+    var base = Number.isFinite(shown) ? shown : 0;
+    if (Number.isFinite(fadeFrom) && fadeFrom >= 0)
+        base = (Number.isFinite(pendingPct) && pendingPct >= 0) ? pendingPct / 100 : fadeFrom;
+    return Math.max(0, Math.min(1, base + (Number.isFinite(notch) ? notch : 0)));
+}
+
+// Does a list write made by the star or the trash leave the sound alone?
+//
+// The write stops the player, and what was a row of the list or an audition
+// is started again by whoever wrote. A My Music file or a podcast episode is
+// neither. It was cut off by a change to a list it is not in, and nothing
+// brought it back. Those two play on through the write; everything else
+// keeps the road it had.
+//
+// p.audible   the local player is playing
+// p.preview   a search result is being auditioned
+// p.source    the address the player holds
+// p.episode   the playing episode's address, "" when none plays; an episode
+//             can be a stream, so the address alone does not say
+// p.tone      the wake-up tone's address: a file too, and the alarm's own
+// p.bufferPath  the timeshift buffer's path on disk, "" while there is none
+// p.shifted   the listener is inside that buffer, which is a station's
+//
+// Every fact has to be readable for the answer to be yes: audible exactly
+// true, preview and shifted exactly false, the source a string. A state
+// nobody can read stops the sound as it always did.
+function listWriteKeepsSound(p) {
+    if (!p || p.audible !== true || p.preview !== false || p.shifted !== false) return false;
+    var src = p.source;
+    if (typeof src !== "string" || src === "") return false;
+    if (src === p.tone) return false;
+    if (typeof p.bufferPath === "string" && p.bufferPath !== "" && src === "file://" + p.bufferPath) return false;
+    if (typeof p.episode === "string" && p.episode !== "" && src === p.episode) return true;
+    return src.indexOf("file://") === 0;
+}

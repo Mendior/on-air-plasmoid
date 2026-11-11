@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: plasma_applet_io.github.mendior.onair\n"
 "Report-Msgid-Bugs-To: https://github.com/Mendior/on-air-plasmoid/issues\n"
-"POT-Creation-Date: 2026-09-23 22:42+0300\n"
+"POT-Creation-Date: 2026-11-10 23:23+0200\n"
 "PO-Revision-Date: 2026-07-10 18:00+0300\n"
 "Last-Translator: Egon Greenberg\n"
 "Language-Team: Spanish\n"
@@ -16,8 +16,8 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: package/contents/config/config.qml:13
-#: package/contents/ui/config/configAppearance.qml:111
-#: package/contents/ui/FullRepresentation.qml:5478
+#: package/contents/ui/config/configAppearance.qml:113
+#: package/contents/ui/FullRepresentation.qml:5525
 msgid "Stations"
 msgstr "Emisoras"
 
@@ -26,12 +26,12 @@ msgid "Appearance"
 msgstr "Apariencia"
 
 #: package/contents/config/config.qml:23
-#: package/contents/ui/FullRepresentation.qml:2875
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "Recording"
 msgstr "Grabación"
 
 #: package/contents/config/config.qml:28
-#: package/contents/ui/config/configSearch.qml:539
+#: package/contents/ui/config/configSearch.qml:532
 msgid "Search"
 msgstr "Búsqueda"
 
@@ -52,9 +52,10 @@ msgstr "%1 estaba puesta para las %2 — el equipo estaba apagado o suspendido e
 #: package/contents/ui/AlarmEngine.qml:376
 #: package/contents/ui/AlarmEngine.qml:378
 #: package/contents/ui/AlarmEngine.qml:425
-#: package/contents/ui/AlarmEngine.qml:432
-#: package/contents/ui/AlarmEngine.qml:507
-#: package/contents/ui/AlarmEngine.qml:510
+#: package/contents/ui/AlarmEngine.qml:439
+#: package/contents/ui/AlarmEngine.qml:441
+#: package/contents/ui/AlarmEngine.qml:516
+#: package/contents/ui/AlarmEngine.qml:519
 msgid "Wake-up alarm"
 msgstr "Alarma de despertador"
 
@@ -62,331 +63,348 @@ msgstr "Alarma de despertador"
 msgid "%1 came due at the same time — playing %2 instead."
 msgstr "%1 vencía a la misma hora — en su lugar suena %2."
 
-#: package/contents/ui/AlarmEngine.qml:434
+#: package/contents/ui/AlarmEngine.qml:443
 msgid "the show"
 msgstr "el programa"
 
-#: package/contents/ui/AlarmEngine.qml:433
+#: package/contents/ui/AlarmEngine.qml:442
 msgid "No downloaded episode of %1 was on disk — waking with the chime."
 msgstr "No había ningún episodio descargado de %1 en el disco: despertando con el timbre."
 
-#: package/contents/ui/AlarmEngine.qml:511
+#: package/contents/ui/AlarmEngine.qml:520
 msgid "The station could not start — playing the built-in tone instead."
 msgstr "La emisora no pudo iniciarse — en su lugar suena el tono integrado."
 
-#: package/contents/ui/CompactRepresentation.qml:56
+#: package/contents/ui/CompactRepresentation.qml:89
 msgid "%1 — recording"
 msgstr "%1 — grabando"
 
-#: package/contents/ui/CompactRepresentation.qml:58
+#: package/contents/ui/CompactRepresentation.qml:91
 msgid "%1 — playing %2"
 msgstr "%1 — reproduciendo %2"
 
-#: package/contents/ui/CompactRepresentation.qml:96
-#: package/contents/ui/config/configAppearance.qml:259
+#: package/contents/ui/CompactRepresentation.qml:133
+#: package/contents/ui/config/configAppearance.qml:288
 msgid "Audio"
 msgstr "Sonido"
 
-#: package/contents/ui/CompactRepresentation.qml:96
-#: package/contents/ui/FullRepresentation.qml:4997
-#: package/contents/ui/FullRepresentation.qml:5931
+#: package/contents/ui/CompactRepresentation.qml:133
+#: package/contents/ui/FullRepresentation.qml:5043
+#: package/contents/ui/FullRepresentation.qml:5982
 msgid "Volume"
 msgstr "Volumen"
 
-#: package/contents/ui/CompactRepresentation.qml:97
+#: package/contents/ui/CompactRepresentation.qml:134
 msgid "Muted"
 msgstr "Silenciado"
 
-#: package/contents/ui/config/configAppearance.qml:72
+#: package/contents/ui/config/configAppearance.qml:74
 msgid "Colours"
 msgstr "Colores"
 
-#: package/contents/ui/config/configAppearance.qml:81
+#: package/contents/ui/config/configAppearance.qml:83
 msgid "Accent:"
 msgstr "Acento:"
 
-#: package/contents/ui/config/configAppearance.qml:82
+#: package/contents/ui/config/configAppearance.qml:84
 msgid "On Air green"
 msgstr "Verde de On Air"
 
-#: package/contents/ui/config/configAppearance.qml:82
+#: package/contents/ui/config/configAppearance.qml:84
 msgid "System accent colour"
 msgstr "Color de acento del sistema"
 
-#: package/contents/ui/config/configAppearance.qml:82
+#: package/contents/ui/config/configAppearance.qml:84
 msgid "Plain — no colour of its own"
 msgstr "Sencillo: sin color propio"
 
-#: package/contents/ui/config/configAppearance.qml:94
+#: package/contents/ui/config/configAppearance.qml:96
 msgid "Tabs"
 msgstr "Pestañas"
 
-#: package/contents/ui/config/configAppearance.qml:110
-#: package/contents/ui/config/configAppearance.qml:143
-#: package/contents/ui/config/configAppearance.qml:167
+#: package/contents/ui/config/configAppearance.qml:112
+#: package/contents/ui/config/configAppearance.qml:145
+#: package/contents/ui/config/configAppearance.qml:169
 msgid "Show:"
 msgstr "Mostrar:"
 
-#: package/contents/ui/config/configAppearance.qml:115
-#: package/contents/ui/FullRepresentation.qml:5500
-#: package/contents/ui/FullRepresentation.qml:5659
+#: package/contents/ui/config/configAppearance.qml:117
+#: package/contents/ui/FullRepresentation.qml:5547
+#: package/contents/ui/FullRepresentation.qml:5708
 msgid "Playing"
 msgstr "Reproduciendo"
 
-#: package/contents/ui/config/configAppearance.qml:119
-#: package/contents/ui/FullRepresentation.qml:3383
-#: package/contents/ui/FullRepresentation.qml:5525
-#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2274
+#: package/contents/ui/config/configAppearance.qml:121
+#: package/contents/ui/FullRepresentation.qml:3426
+#: package/contents/ui/FullRepresentation.qml:5572
+#: package/contents/ui/Heading.qml:24 package/contents/ui/main.qml:2318
 msgid "My Music"
 msgstr "Mi música"
 
-#: package/contents/ui/config/configAppearance.qml:123
+#: package/contents/ui/config/configAppearance.qml:125
 #: package/contents/ui/config/configAutomation.qml:52
-#: package/contents/ui/FullRepresentation.qml:5550
+#: package/contents/ui/FullRepresentation.qml:5597
 #: package/contents/ui/Heading.qml:25
 msgid "Podcasts"
 msgstr "Pódcasts"
 
-#: package/contents/ui/config/configAppearance.qml:127
-#: package/contents/ui/FullRepresentation.qml:5575
+#: package/contents/ui/config/configAppearance.qml:129
+#: package/contents/ui/FullRepresentation.qml:5622
 #: package/contents/ui/Heading.qml:26
 msgid "Timers"
 msgstr "Temporizadores"
 
-#: package/contents/ui/config/configAppearance.qml:131
+#: package/contents/ui/config/configAppearance.qml:133
 msgid "Stations page"
 msgstr "Página de emisoras"
 
-#: package/contents/ui/config/configAppearance.qml:144
+#: package/contents/ui/config/configAppearance.qml:146
 msgid "Search field"
 msgstr "Campo de búsqueda"
 
-#: package/contents/ui/config/configAppearance.qml:148
+#: package/contents/ui/config/configAppearance.qml:150
 msgid "Discovery row (Trending, country, genres)"
 msgstr "Fila de descubrimiento (Tendencias, país, géneros)"
 
-#: package/contents/ui/config/configAppearance.qml:152
+#: package/contents/ui/config/configAppearance.qml:154
 msgid "Reorder and remove controls on each row"
 msgstr "Controles de reordenar y eliminar en cada fila"
 
-#: package/contents/ui/config/configAppearance.qml:156
+#: package/contents/ui/config/configAppearance.qml:158
 msgid "Layout:"
 msgstr "Disposición:"
 
-#: package/contents/ui/config/configAppearance.qml:157
+#: package/contents/ui/config/configAppearance.qml:159
 msgid "Compact rows (three-quarter height)"
 msgstr "Filas compactas (tres cuartos de altura)"
 
-#: package/contents/ui/config/configAppearance.qml:161
+#: package/contents/ui/config/configAppearance.qml:163
 msgid "Playing page"
 msgstr "Página de reproducción"
 
-#: package/contents/ui/config/configAppearance.qml:168
+#: package/contents/ui/config/configAppearance.qml:170
 msgid "Cover picture"
 msgstr "Imagen de portada"
 
-#: package/contents/ui/config/configAppearance.qml:172
+#: package/contents/ui/config/configAppearance.qml:174
 msgid "Bitrate badge"
 msgstr "Insignia de tasa de bits"
 
-#: package/contents/ui/config/configAppearance.qml:176
+#: package/contents/ui/config/configAppearance.qml:178
 msgid "On opening:"
 msgstr "Al abrir:"
 
-#: package/contents/ui/config/configAppearance.qml:177
+#: package/contents/ui/config/configAppearance.qml:179
 msgid "Return to the tab I was last on"
 msgstr "Volver a la pestaña donde estaba"
 
-#: package/contents/ui/config/configAppearance.qml:181
+#: package/contents/ui/config/configAppearance.qml:183
 msgid "While playing:"
 msgstr "Al reproducir:"
 
-#: package/contents/ui/config/configAppearance.qml:182
+#: package/contents/ui/config/configAppearance.qml:184
 msgid "Jump to Playing soon after a station starts"
 msgstr "Saltar a Reproducción poco después de que empiece una emisora"
 
-#: package/contents/ui/config/configAppearance.qml:186
+#: package/contents/ui/config/configAppearance.qml:188
 msgid "Everything back:"
 msgstr "Todo de vuelta:"
 
-#: package/contents/ui/config/configAppearance.qml:188
+#: package/contents/ui/config/configAppearance.qml:190
 msgid "Show all of it again"
 msgstr "Mostrarlo todo de nuevo"
 
-#: package/contents/ui/config/configAppearance.qml:206
+#: package/contents/ui/config/configAppearance.qml:208
 msgid "Panel"
 msgstr "Panel"
 
-#: package/contents/ui/config/configAppearance.qml:211
+#: package/contents/ui/config/configAppearance.qml:213
 msgid "Panel icon:"
 msgstr "Icono del panel:"
 
-#: package/contents/ui/config/configAppearance.qml:226
+#: package/contents/ui/config/configAppearance.qml:228
 msgid "Reset"
 msgstr "Restablecer"
 
-#: package/contents/ui/config/configAppearance.qml:239
+#: package/contents/ui/config/configAppearance.qml:241
 msgid "Your icon theme does not have this icon — the widget is using its own."
 msgstr "Tu tema de iconos no tiene este icono: el widget está usando el suyo."
 
-#: package/contents/ui/config/configAppearance.qml:264
+#: package/contents/ui/config/configAppearance.qml:265
+msgid "Now playing:"
+msgstr "Reproduciendo ahora:"
+
+#: package/contents/ui/config/configAppearance.qml:266
+msgid "Show artist and title next to the icon"
+msgstr "Mostrar el artista y el título junto al icono"
+
+#: package/contents/ui/config/configAppearance.qml:269
+msgid "Maximum text width:"
+msgstr "Anchura máxima del texto:"
+
+#: package/contents/ui/config/configAppearance.qml:281
+msgctxt "@info a width in pixels, after a number box"
+msgid "about %1 px"
+msgstr "unos %1 px"
+
+#: package/contents/ui/config/configAppearance.qml:293
 msgid "Default volume:"
 msgstr "Volumen predeterminado:"
 
-#: package/contents/ui/config/configAppearance.qml:283
+#: package/contents/ui/config/configAppearance.qml:312
 msgid "Smooth fade:"
 msgstr "Fundido suave:"
 
-#: package/contents/ui/config/configAppearance.qml:284
+#: package/contents/ui/config/configAppearance.qml:313
 msgid "Fade volume when changing stations"
 msgstr "Fundir el volumen al cambiar de emisora"
 
-#: package/contents/ui/config/configAppearance.qml:289
+#: package/contents/ui/config/configAppearance.qml:318
 msgid "Fade duration (ms):"
 msgstr "Duración del fundido (ms):"
 
-#: package/contents/ui/config/configAppearance.qml:298
+#: package/contents/ui/config/configAppearance.qml:327
 msgid "Stream quality:"
 msgstr "Calidad de la emisión:"
 
-#: package/contents/ui/config/configAppearance.qml:299
+#: package/contents/ui/config/configAppearance.qml:328
 msgid "Automatically switch to the highest-bitrate variant of a station"
 msgstr "Cambiar automáticamente a la variante de la emisora con mayor tasa de bits"
 
-#: package/contents/ui/config/configAppearance.qml:302
+#: package/contents/ui/config/configAppearance.qml:331
 msgid "Looks the station up on radio-browser.info and picks the best-quality stream URL"
 msgstr "Busca la emisora en radio-browser.info y elige la URL de emisión de mejor calidad"
 
-#: package/contents/ui/config/configAppearance.qml:307
+#: package/contents/ui/config/configAppearance.qml:336
 msgid "Find a station's new address when its stream dies"
 msgstr "Buscar la nueva dirección de una emisora cuando su flujo muere"
 
-#: package/contents/ui/config/configAppearance.qml:310
+#: package/contents/ui/config/configAppearance.qml:339
 msgid "Stations move servers; when playback fails, the station is looked up on radio-browser.info and the address it is reachable at now is saved to your list"
 msgstr "Las emisoras cambian de servidor; si la reproducción falla, la emisora se busca en radio-browser.info y la dirección que funciona ahora se guarda en tu lista"
 
-#: package/contents/ui/config/configAppearance.qml:315
+#: package/contents/ui/config/configAppearance.qml:344
 msgid "Count my listening in the worldwide station catalog"
 msgstr "Contar mi escucha en el catálogo mundial de emisoras"
 
-#: package/contents/ui/config/configAppearance.qml:318
+#: package/contents/ui/config/configAppearance.qml:347
 msgid "When a station starts playing, a click is reported to radio-browser.info — the request carries the station id only, no account or personal data is added; popular stations become easier to find for everyone"
 msgstr "Cuando una emisora empieza a sonar, se notifica un clic a radio-browser.info; la petición solo lleva el identificador de la emisora, sin cuenta ni datos personales; las emisoras populares resultan más fáciles de encontrar para todos"
 
-#: package/contents/ui/config/configAppearance.qml:326
+#: package/contents/ui/config/configAppearance.qml:355
 msgid "Visuals"
 msgstr "Aspecto"
 
-#: package/contents/ui/config/configAppearance.qml:332
+#: package/contents/ui/config/configAppearance.qml:361
 msgid "Album art:"
 msgstr "Carátula:"
 
-#: package/contents/ui/config/configAppearance.qml:333
+#: package/contents/ui/config/configAppearance.qml:362
 msgid "Look up cover art online (Deezer, iTunes)"
 msgstr "Buscar carátulas en línea (Deezer, iTunes)"
 
-#: package/contents/ui/config/configAppearance.qml:338
+#: package/contents/ui/config/configAppearance.qml:367
 msgid "Backdrop:"
 msgstr "Fondo:"
 
-#: package/contents/ui/config/configAppearance.qml:339
+#: package/contents/ui/config/configAppearance.qml:368
 msgid "Blurred album art behind now playing"
 msgstr "Carátula difuminada detrás de la vista de reproducción"
 
-#: package/contents/ui/config/configAppearance.qml:345
+#: package/contents/ui/config/configAppearance.qml:374
 msgid "Accent color:"
 msgstr "Color de acento:"
 
-#: package/contents/ui/config/configAppearance.qml:346
+#: package/contents/ui/config/configAppearance.qml:375
 msgid "Follow the system accent color instead of the built-in emerald"
 msgstr "Seguir el color de acento del sistema en lugar del esmeralda integrado"
 
-#: package/contents/ui/config/configAppearance.qml:357
+#: package/contents/ui/config/configAppearance.qml:386
 msgid "On battery:"
 msgstr "Con batería:"
 
-#: package/contents/ui/config/configAppearance.qml:358
+#: package/contents/ui/config/configAppearance.qml:387
 msgid "Hold the animations still and check less often"
 msgstr "Detener las animaciones y comprobar con menos frecuencia"
 
-#: package/contents/ui/config/configAppearance.qml:364
+#: package/contents/ui/config/configAppearance.qml:393
 msgid "Unplugged, the record stops spinning and the equalizer bars hold still; background checks slow down. Sound and every control work exactly as before. The system's power-saver profile counts too."
 msgstr "Sin enchufe, el disco deja de girar y las barras del ecualizador se detienen; las comprobaciones en segundo plano se espacian. El sonido y todos los controles funcionan igual que antes. El perfil de ahorro de energía del sistema también cuenta."
 
-#: package/contents/ui/config/configAppearance.qml:375
+#: package/contents/ui/config/configAppearance.qml:404
 msgid "Integration"
 msgstr "Integración"
 
-#: package/contents/ui/config/configAppearance.qml:381
+#: package/contents/ui/config/configAppearance.qml:410
 msgid "System integration:"
 msgstr "Integración con el sistema:"
 
-#: package/contents/ui/config/configAppearance.qml:382
+#: package/contents/ui/config/configAppearance.qml:411
 msgid "Allow control via media keys (MPRIS)"
 msgstr "Permitir el control con las teclas multimedia (MPRIS)"
 
-#: package/contents/ui/config/configAppearance.qml:390
+#: package/contents/ui/config/configAppearance.qml:419
 msgid "Downloads"
 msgstr "Descargas"
 
-#: package/contents/ui/config/configAppearance.qml:396
-#: package/contents/ui/config/configRecording.qml:27
+#: package/contents/ui/config/configAppearance.qml:425
+#: package/contents/ui/config/configRecording.qml:29
 msgid "Format:"
 msgstr "Formato:"
 
-#: package/contents/ui/config/configAppearance.qml:398
+#: package/contents/ui/config/configAppearance.qml:427
 msgid "Best quality (no re-encode)"
 msgstr "Mejor calidad (sin recodificar)"
 
-#: package/contents/ui/config/configAppearance.qml:399
+#: package/contents/ui/config/configAppearance.qml:428
 msgid "MP3"
 msgstr "MP3"
 
-#: package/contents/ui/config/configAppearance.qml:400
+#: package/contents/ui/config/configAppearance.qml:429
 msgid "Opus"
 msgstr "Opus"
 
-#: package/contents/ui/config/configAppearance.qml:401
+#: package/contents/ui/config/configAppearance.qml:430
 msgid "MP4 (video)"
 msgstr "MP4 (vídeo)"
 
-#: package/contents/ui/config/configAppearance.qml:411
+#: package/contents/ui/config/configAppearance.qml:440
 msgid "Save to folder:"
 msgstr "Guardar en la carpeta:"
 
-#: package/contents/ui/config/configAppearance.qml:426
+#: package/contents/ui/config/configAppearance.qml:455
 msgid "Title cleanup:"
 msgstr "Limpieza de títulos:"
 
-#: package/contents/ui/config/configAppearance.qml:427
+#: package/contents/ui/config/configAppearance.qml:456
 msgid "Use Claude CLI to clean up messy titles before download (optional)"
 msgstr "Usar Claude CLI para limpiar títulos desordenados antes de descargar (opcional)"
 
-#: package/contents/ui/config/configAppearance.qml:435
+#: package/contents/ui/config/configAppearance.qml:464
 msgid "Behavior"
 msgstr "Comportamiento"
 
-#: package/contents/ui/config/configAppearance.qml:440
+#: package/contents/ui/config/configAppearance.qml:469
 msgid "Marquee speed:"
 msgstr "Velocidad del texto en movimiento:"
 
-#: package/contents/ui/config/configAppearance.qml:458
+#: package/contents/ui/config/configAppearance.qml:487
 msgid "Slower"
 msgstr "Más lento"
 
-#: package/contents/ui/config/configAppearance.qml:460
+#: package/contents/ui/config/configAppearance.qml:489
 msgid "Faster"
 msgstr "Más rápido"
 
-#: package/contents/ui/config/configAppearance.qml:466
+#: package/contents/ui/config/configAppearance.qml:495
 msgid "Panel click:"
 msgstr "Clic en el panel:"
 
-#: package/contents/ui/config/configAppearance.qml:467
+#: package/contents/ui/config/configAppearance.qml:496
 msgid "Middle click to toggle last station"
 msgstr "Clic central reproduce/detiene la última emisora"
 
-#: package/contents/ui/config/configAppearance.qml:471
+#: package/contents/ui/config/configAppearance.qml:500
 msgid "Middle-click the panel icon to play or stop the last station"
 msgstr "Clic central en el icono del panel para reproducir o detener la última emisora"
 
@@ -455,7 +473,7 @@ msgid "Auto-care:"
 msgstr "Autocuidado:"
 
 #: package/contents/ui/config/configAutomation.qml:120
-#: package/contents/ui/FullRepresentation.qml:6250
+#: package/contents/ui/FullRepresentation.qml:6301
 msgid "Keep sync tuned automatically"
 msgstr "Mantener la sincronización ajustada automáticamente"
 
@@ -469,27 +487,27 @@ msgstr "Radio en directo"
 
 #: package/contents/ui/config/configAutomation.qml:137
 msgid "When a stream dies:"
-msgstr ""
+msgstr "Cuando un flujo se corta:"
 
 #: package/contents/ui/config/configAutomation.qml:138
 msgid "Try to get it back"
-msgstr ""
+msgstr "Intentar recuperarlo"
 
 #: package/contents/ui/config/configAutomation.qml:141
 msgid "A station that goes quiet is tried again at widening intervals: half a minute, then a minute, then two. A stream that really dropped is back well inside that. If it is still silent afterwards the widget lets it go and stays quiet — it will not put the station on again by itself when your connection returns later, and that part is the whole point. Turn this off and a dead stream stops at once, the way most players behave. An alarm is bound by none of it: a wake-up keeps trying."
-msgstr ""
+msgstr "Una emisora que se queda en silencio se vuelve a probar a intervalos cada vez más largos: medio minuto, luego un minuto, luego dos. Un flujo que de verdad se cortó vuelve mucho antes. Si después sigue en silencio, el widget lo suelta y se queda callado: no volverá a poner la emisora por su cuenta cuando tu conexión regrese más tarde, y de eso se trata. Desactívalo y un flujo muerto se detiene al instante, como hacen la mayoría de los reproductores. Una alarma no está sujeta a nada de esto: un despertador sigue intentándolo."
 
 #: package/contents/ui/config/configAutomation.qml:152
 msgid "Tries:"
-msgstr ""
+msgstr "Intentos:"
 
 #: package/contents/ui/config/configAutomation.qml:156
 msgid "Until it answers"
-msgstr ""
+msgstr "Hasta que responda"
 
 #: package/contents/ui/config/configAutomation.qml:158
 msgid "How many times a quiet station is tried again"
-msgstr ""
+msgstr "Cuántas veces se vuelve a probar una emisora en silencio"
 
 #: package/contents/ui/config/configAutomation.qml:179
 msgid "Timeshift:"
@@ -508,183 +526,189 @@ msgid "Buffer up to:"
 msgstr "Búfer de hasta:"
 
 #: package/contents/ui/config/configAutomation.qml:197
-#: package/contents/ui/config/configRecording.qml:57
-#: package/contents/ui/FullRepresentation.qml:4535
-#: package/contents/ui/FullRepresentation.qml:4795
-#: package/contents/ui/FullRepresentation.qml:5100
-#: package/contents/ui/FullRepresentation.qml:5182
+#: package/contents/ui/config/configRecording.qml:62
+#: package/contents/ui/FullRepresentation.qml:4581
+#: package/contents/ui/FullRepresentation.qml:4841
+#: package/contents/ui/FullRepresentation.qml:5146
+#: package/contents/ui/FullRepresentation.qml:5228
 msgid "%1 min"
 msgstr "%1 min"
 
-#: package/contents/ui/config/configGeneral.qml:247
+#: package/contents/ui/config/configGeneral.qml:246
 msgid "All stations already have a logo."
 msgstr "Todas las emisoras ya tienen logotipo."
 
-#: package/contents/ui/config/configGeneral.qml:265
+#: package/contents/ui/config/configGeneral.qml:264
 msgid "Logo fetch complete: %1 / %2 stations updated. Click Apply to save."
 msgstr "Búsqueda de logotipos terminada: %1 / %2 emisoras actualizadas. Pulse Aplicar para guardar."
 
-#: package/contents/ui/config/configGeneral.qml:267
+#: package/contents/ui/config/configGeneral.qml:266
 msgid "Logo fetch complete: %1 / %2 stations updated (%3 could not be found automatically). Click Apply to save."
 msgstr "Búsqueda de logotipos terminada: %1 / %2 emisoras actualizadas (%3 no se encontraron automáticamente). Pulse Aplicar para guardar."
 
-#: package/contents/ui/config/configGeneral.qml:778
+#: package/contents/ui/config/configGeneral.qml:533
 msgid "No stations to refresh."
 msgstr "No hay emisoras que actualizar."
 
-#: package/contents/ui/config/configGeneral.qml:917
+#: package/contents/ui/config/configGeneral.qml:650
 msgid "Edit"
 msgstr "Editar"
 
-#: package/contents/ui/config/configGeneral.qml:925
+#: package/contents/ui/config/configGeneral.qml:658
 msgid "Hide"
 msgstr "Ocultar"
 
-#: package/contents/ui/config/configGeneral.qml:925
+#: package/contents/ui/config/configGeneral.qml:658
 msgid "Show"
 msgstr "Mostrar"
 
-#: package/contents/ui/config/configGeneral.qml:935
+#: package/contents/ui/config/configGeneral.qml:668
 msgid "Remove"
 msgstr "Eliminar"
 
-#: package/contents/ui/config/configGeneral.qml:1060
-#: package/contents/ui/config/configSearch.qml:662
-#: package/contents/ui/config/configSearch.qml:666
+#: package/contents/ui/config/configGeneral.qml:793
+#: package/contents/ui/config/configSearch.qml:651
+#: package/contents/ui/config/configSearch.qml:655
 msgid "Add Station"
 msgstr "Añadir emisora"
 
-#: package/contents/ui/config/configGeneral.qml:1060
+#: package/contents/ui/config/configGeneral.qml:793
 msgid "Edit station"
 msgstr "Editar emisora"
 
-#: package/contents/ui/config/configGeneral.qml:1137
-#: package/contents/ui/config/configSearch.qml:864
+#: package/contents/ui/config/configGeneral.qml:869
+#: package/contents/ui/config/configSearch.qml:856
 msgid "Name:"
 msgstr "Nombre:"
 
-#: package/contents/ui/config/configGeneral.qml:1143
+#: package/contents/ui/config/configGeneral.qml:875
 msgid "URL:"
 msgstr "URL:"
 
-#: package/contents/ui/config/configGeneral.qml:1150
+#: package/contents/ui/config/configGeneral.qml:882
 msgid "Logo URL:"
 msgstr "URL del logotipo:"
 
-#: package/contents/ui/config/configGeneral.qml:1151
+#: package/contents/ui/config/configGeneral.qml:883
 msgid "e.g. https://example.com/logo.png"
 msgstr "p. ej. https://example.com/logo.png"
 
-#: package/contents/ui/config/configGeneral.qml:1159
+#: package/contents/ui/config/configGeneral.qml:891
 msgid "Active"
 msgstr "Activa"
 
-#: package/contents/ui/config/configGeneral.qml:1175
-#: package/contents/ui/config/configGeneral.qml:1186
+#: package/contents/ui/config/configGeneral.qml:907
+#: package/contents/ui/config/configGeneral.qml:918
 msgid "On Air stations backup (*.arp)"
 msgstr "Copia de seguridad de emisoras de On Air (*.arp)"
 
-#: package/contents/ui/config/configGeneral.qml:1175
-#: package/contents/ui/FullRepresentation.qml:3830
+#: package/contents/ui/config/configGeneral.qml:907
+#: package/contents/ui/FullRepresentation.qml:3873
 msgid "All files (*)"
 msgstr "Todos los archivos (*)"
 
-#: package/contents/ui/config/configGeneral.qml:1269
-msgid "Configuration has been loaded. Click 'Apply' to save changes."
-msgstr "La configuración se ha cargado. Pulse «Aplicar» para guardar los cambios."
-
-#: package/contents/ui/config/configGeneral.qml:1271
+#: package/contents/ui/config/configGeneral.qml:985
 msgid "Error loading configuration. Try choosing a different file."
 msgstr "Error al cargar la configuración. Pruebe con otro archivo."
 
-#: package/contents/ui/config/configGeneral.qml:1275
+#: package/contents/ui/config/configGeneral.qml:993
+msgid "Configuration has been loaded. Click 'Apply' to save changes."
+msgstr "La configuración se ha cargado. Pulse «Aplicar» para guardar los cambios."
+
+#: package/contents/ui/config/configGeneral.qml:994
+msgid "Configuration has been loaded, but one row of the file was left out. Click 'Apply' to save changes."
+msgid_plural "Configuration has been loaded, but %1 rows of the file were left out. Click 'Apply' to save changes."
+msgstr[0] "La configuración se ha cargado, pero se omitió %1 fila del archivo. Pulse «Aplicar» para guardar los cambios."
+msgstr[1] "La configuración se ha cargado, pero se omitieron %1 filas del archivo. Pulse «Aplicar» para guardar los cambios."
+
+#: package/contents/ui/config/configGeneral.qml:1000
 msgid "Your configuration was saved successfully."
 msgstr "Su configuración se ha guardado correctamente."
 
-#: package/contents/ui/config/configGeneral.qml:1277
+#: package/contents/ui/config/configGeneral.qml:1002
 msgid "Error, make sure the selected directory is writable!"
 msgstr "Error: asegúrese de que el directorio seleccionado permite la escritura."
 
-#: package/contents/ui/config/configGeneral.qml:1337
+#: package/contents/ui/config/configGeneral.qml:1062
 msgid "Add…"
 msgstr "Añadir…"
 
-#: package/contents/ui/config/configGeneral.qml:1346
+#: package/contents/ui/config/configGeneral.qml:1071
 msgid "Fetching… %1 / %2"
 msgstr "Obteniendo… %1 / %2"
 
-#: package/contents/ui/config/configGeneral.qml:1347
+#: package/contents/ui/config/configGeneral.qml:1072
 msgid "Fetch missing logos"
 msgstr "Obtener los logotipos que faltan"
 
-#: package/contents/ui/config/configGeneral.qml:1356
+#: package/contents/ui/config/configGeneral.qml:1081
 msgid "Re-fetch all"
 msgstr "Volver a obtener todos"
 
-#: package/contents/ui/config/configGeneral.qml:1361
+#: package/contents/ui/config/configGeneral.qml:1086
 msgid "Fetch fresh logos for all stations; existing logos are kept if nothing better is found"
 msgstr "Obtener logotipos nuevos para todas las emisoras; los actuales se conservan si no se encuentra nada mejor"
 
-#: package/contents/ui/config/configGeneral.qml:1376
+#: package/contents/ui/config/configGeneral.qml:1101
 msgid "Import…"
 msgstr "Importar…"
 
-#: package/contents/ui/config/configGeneral.qml:1382
+#: package/contents/ui/config/configGeneral.qml:1107
 msgid "Export…"
 msgstr "Exportar…"
 
-#: package/contents/ui/config/configGeneral.qml:1398
+#: package/contents/ui/config/configGeneral.qml:1123
 msgid "Report an issue"
 msgstr "Informar de un problema"
 
-#: package/contents/ui/config/configGeneral.qml:1404
+#: package/contents/ui/config/configGeneral.qml:1129
 msgid "Suggest a feature"
 msgstr "Sugerir una función"
 
-#: package/contents/ui/config/configRecording.qml:21
+#: package/contents/ui/config/configRecording.qml:23
 msgid "Stream recording"
 msgstr "Grabación de la emisión"
 
-#: package/contents/ui/config/configRecording.qml:29
+#: package/contents/ui/config/configRecording.qml:31
 msgid "Original stream (bit-exact copy, recommended)"
 msgstr "Emisión original (copia exacta bit a bit, recomendado)"
 
-#: package/contents/ui/config/configRecording.qml:30
+#: package/contents/ui/config/configRecording.qml:32
 msgid "MP3 (re-encode — max compatibility)"
 msgstr "MP3 (recodificación — máxima compatibilidad)"
 
-#: package/contents/ui/config/configRecording.qml:31
+#: package/contents/ui/config/configRecording.qml:33
 msgid "WAV (uncompressed — very large files)"
 msgstr "WAV (sin comprimir — archivos muy grandes)"
 
-#: package/contents/ui/config/configRecording.qml:40
+#: package/contents/ui/config/configRecording.qml:42
 msgid "Radio streams are already compressed — the bit-exact copy IS the maximum quality. Re-encoding (MP3) or unpacking (WAV) can never add quality; choose them only for device compatibility or editing."
 msgstr "Las emisiones de radio ya están comprimidas: la copia exacta bit a bit ES la calidad máxima. Recodificar (MP3) o desempaquetar (WAV) nunca añade calidad; elíjalos solo por compatibilidad de dispositivos o para edición."
 
-#: package/contents/ui/config/configRecording.qml:53
+#: package/contents/ui/config/configRecording.qml:55
 msgid "Max length:"
 msgstr "Duración máxima:"
 
-#: package/contents/ui/config/configRecording.qml:62
+#: package/contents/ui/config/configRecording.qml:69
 msgid "A hard safety cap for one recording — protects the disk if you forget to stop."
 msgstr "Límite de seguridad estricto para una grabación: protege el disco si olvida detenerla."
 
-#: package/contents/ui/config/configRecording.qml:75
-#: package/contents/ui/FullRepresentation.qml:5069
+#: package/contents/ui/config/configRecording.qml:82
+#: package/contents/ui/FullRepresentation.qml:5115
 msgid "Scheduled recordings"
 msgstr "Grabaciones programadas"
 
-#: package/contents/ui/config/configRecording.qml:80
+#: package/contents/ui/config/configRecording.qml:87
 msgid "Schedules are managed in the widget itself: open the popup and go to the Timers tab. Pick a station, start time, duration and repeat (once / daily / weekly) — the widget records in the background, even while nothing is playing. Schedules fire only while the widget is running — they pause while you are logged out or the computer is off or asleep; missed ones are reported when it returns."
 msgstr "Las programaciones se gestionan en el propio widget: abre el panel y ve a la pestaña Temporizadores. Elige emisora, hora de inicio, duración y repetición (una vez / diaria / semanal); el widget graba en segundo plano, incluso sin reproducir nada. Las programaciones solo se ejecutan mientras el widget está activo: se pausan si cierras la sesión o el equipo está apagado o suspendido; al volver se informará de las perdidas."
 
-#: package/contents/ui/config/configRecording.qml:87
+#: package/contents/ui/config/configRecording.qml:94
 msgid "Recordings are saved to your music folder and are for personal use only — do not redistribute them."
 msgstr "Las grabaciones se guardan en su carpeta de música y son solo para uso personal; no las redistribuya."
 
-#: package/contents/ui/config/configSearch.qml:198
-#: package/contents/ui/config/configSearch.qml:255
-#: package/contents/ui/config/configSearch.qml:777
+#: package/contents/ui/config/configSearch.qml:212
+#: package/contents/ui/config/configSearch.qml:269
+#: package/contents/ui/config/configSearch.qml:769
 msgid ""
 "Get list of stations\n"
 "Please wait…"
@@ -692,7 +716,7 @@ msgstr ""
 "Obteniendo la lista de emisoras\n"
 "Espere, por favor…"
 
-#: package/contents/ui/config/configSearch.qml:254
+#: package/contents/ui/config/configSearch.qml:268
 msgid ""
 "Nothing found\n"
 "Try changing your query"
@@ -700,135 +724,136 @@ msgstr ""
 "No se encontró nada\n"
 "Pruebe a cambiar la búsqueda"
 
-#: package/contents/ui/config/configSearch.qml:267
-#: package/contents/ui/config/configSearch.qml:280
+#: package/contents/ui/config/configSearch.qml:281
+#: package/contents/ui/config/configSearch.qml:294
 msgid "Error: Could not connect to API servers"
 msgstr "Error: no se pudo conectar con los servidores de la API"
 
-#: package/contents/ui/config/configSearch.qml:485
+#: package/contents/ui/config/configSearch.qml:478
 msgid "Search Station"
 msgstr "Buscar emisora"
 
-#: package/contents/ui/config/configSearch.qml:491
-#: package/contents/ui/config/configSearch.qml:495
+#: package/contents/ui/config/configSearch.qml:484
+#: package/contents/ui/config/configSearch.qml:488
 msgid "Search by"
 msgstr "Buscar por"
 
-#: package/contents/ui/config/configSearch.qml:499
+#: package/contents/ui/config/configSearch.qml:492
 msgid "name"
 msgstr "nombre"
 
-#: package/contents/ui/config/configSearch.qml:500
+#: package/contents/ui/config/configSearch.qml:493
 msgid "country"
 msgstr "país"
 
-#: package/contents/ui/config/configSearch.qml:501
+#: package/contents/ui/config/configSearch.qml:494
 msgid "language"
 msgstr "idioma"
 
-#: package/contents/ui/config/configSearch.qml:502
+#: package/contents/ui/config/configSearch.qml:495
 msgid "tags"
 msgstr "etiquetas"
 
-#: package/contents/ui/config/configSearch.qml:632
-#: package/contents/ui/config/configSearch.qml:970
+#: package/contents/ui/config/configSearch.qml:621
+#: package/contents/ui/config/configSearch.qml:961
 msgid "%1 kBit/s"
 msgstr "%1 kbit/s"
 
-#: package/contents/ui/config/configSearch.qml:645
-#: package/contents/ui/config/configSearch.qml:646
+#: package/contents/ui/config/configSearch.qml:634
+#: package/contents/ui/config/configSearch.qml:635
 msgid "Info"
 msgstr "Información"
 
-#: package/contents/ui/config/configSearch.qml:701
+#: package/contents/ui/config/configSearch.qml:693
 msgid "Station is added. Click 'Apply' to save changes."
 msgstr "La emisora se ha añadido. Pulse «Aplicar» para guardar los cambios."
 
-#: package/contents/ui/config/configSearch.qml:702
+#: package/contents/ui/config/configSearch.qml:694
 msgid "Station is already in the list."
 msgstr "La emisora ya está en la lista."
 
-#: package/contents/ui/config/configSearch.qml:714
-#: package/contents/ui/config/configSearch.qml:720
+#: package/contents/ui/config/configSearch.qml:706
+#: package/contents/ui/config/configSearch.qml:712
 #: package/contents/ui/EpisodeListItem.qml:370
-#: package/contents/ui/FullRepresentation.qml:2551
-#: package/contents/ui/FullRepresentation.qml:6415
+#: package/contents/ui/FullRepresentation.qml:2572
+#: package/contents/ui/FullRepresentation.qml:2624
+#: package/contents/ui/FullRepresentation.qml:6466
 msgid "Stop"
 msgstr "Detener"
 
-#: package/contents/ui/config/configSearch.qml:714
-#: package/contents/ui/config/configSearch.qml:720
-#: package/contents/ui/FullRepresentation.qml:2552
+#: package/contents/ui/config/configSearch.qml:706
+#: package/contents/ui/config/configSearch.qml:712
+#: package/contents/ui/FullRepresentation.qml:2573
 msgid "Play"
 msgstr "Reproducir"
 
-#: package/contents/ui/config/configSearch.qml:823
+#: package/contents/ui/config/configSearch.qml:815
 msgid "Search…"
 msgstr "Buscar…"
 
-#: package/contents/ui/config/configSearch.qml:833
+#: package/contents/ui/config/configSearch.qml:825
 msgid "Clear Results"
 msgstr "Borrar resultados"
 
-#: package/contents/ui/config/configSearch.qml:858
+#: package/contents/ui/config/configSearch.qml:850
 msgid "Station Info"
 msgstr "Información de la emisora"
 
-#: package/contents/ui/config/configSearch.qml:876
+#: package/contents/ui/config/configSearch.qml:868
 msgid "Favicon:"
 msgstr "Logotipo:"
 
-#: package/contents/ui/config/configSearch.qml:888
+#: package/contents/ui/config/configSearch.qml:880
 msgid "Homepage:"
 msgstr "Página web:"
 
-#: package/contents/ui/config/configSearch.qml:898
+#: package/contents/ui/config/configSearch.qml:890
 msgid "Stream URL:"
 msgstr "URL de la emisión:"
 
-#: package/contents/ui/config/configSearch.qml:912
+#: package/contents/ui/config/configSearch.qml:904
 msgid "OK"
 msgstr "Correcto"
 
-#: package/contents/ui/config/configSearch.qml:914
+#: package/contents/ui/config/configSearch.qml:906
 msgid "Error"
 msgstr "Error"
 
-#: package/contents/ui/config/configSearch.qml:921
+#: package/contents/ui/config/configSearch.qml:913
 msgid "Server status:"
 msgstr "Estado del servidor:"
 
-#: package/contents/ui/config/configSearch.qml:932
+#: package/contents/ui/config/configSearch.qml:924
 msgid "%1 (last check: %2)"
 msgstr "%1 (última comprobación: %2)"
 
-#: package/contents/ui/config/configSearch.qml:953
+#: package/contents/ui/config/configSearch.qml:945
 msgid "Codec:"
 msgstr "Códec:"
 
-#: package/contents/ui/config/configSearch.qml:964
+#: package/contents/ui/config/configSearch.qml:955
 msgid "Bitrate:"
 msgstr "Tasa de bits:"
 
-#: package/contents/ui/config/configSearch.qml:982
+#: package/contents/ui/config/configSearch.qml:973
 msgid "Country:"
 msgstr "País:"
 
-#: package/contents/ui/config/configSearch.qml:991
+#: package/contents/ui/config/configSearch.qml:982
 msgid "Language:"
 msgstr "Idioma:"
 
-#: package/contents/ui/config/configSearch.qml:1000
+#: package/contents/ui/config/configSearch.qml:991
 msgid "Tags:"
 msgstr "Etiquetas:"
 
-#: package/contents/ui/config/configSearch.qml:1039
-#: package/contents/ui/FullRepresentation.qml:5650
+#: package/contents/ui/config/configSearch.qml:1030
+#: package/contents/ui/FullRepresentation.qml:5699
 msgid "Error: %1"
 msgstr "Error: %1"
 
 #: package/contents/ui/EpisodeListItem.qml:63
-#: package/contents/ui/FullRepresentation.qml:3682
+#: package/contents/ui/FullRepresentation.qml:3725
 msgid "Episode"
 msgstr "Episodio"
 
@@ -849,12 +874,12 @@ msgid "Play next (add to the queue)"
 msgstr "Reproducir a continuación (añadir a la cola)"
 
 #: package/contents/ui/EpisodeListItem.qml:326
-#: package/contents/ui/FullRepresentation.qml:2904
+#: package/contents/ui/FullRepresentation.qml:2947
 msgid "Mark as unplayed"
 msgstr "Marcar como no reproducido"
 
 #: package/contents/ui/EpisodeListItem.qml:327
-#: package/contents/ui/FullRepresentation.qml:2905
+#: package/contents/ui/FullRepresentation.qml:2948
 msgid "Mark as played"
 msgstr "Marcar como reproducido"
 
@@ -878,561 +903,561 @@ msgstr "Reproducir episodio"
 msgid "Download episode for offline listening"
 msgstr "Descargar episodio para escucharlo sin conexión"
 
-#: package/contents/ui/FullRepresentation.qml:1278
+#: package/contents/ui/FullRepresentation.qml:1297
 msgid "Search station or country… (e.g. Finland, jazz)"
 msgstr "Buscar emisora o país… (p. ej. España, jazz)"
 
-#: package/contents/ui/FullRepresentation.qml:1327
+#: package/contents/ui/FullRepresentation.qml:1346
 msgid "Show all stations"
 msgstr "Mostrar todas las emisoras"
 
-#: package/contents/ui/FullRepresentation.qml:1327
+#: package/contents/ui/FullRepresentation.qml:1346
 msgid "Show only favorites"
 msgstr "Mostrar solo los favoritos"
 
-#: package/contents/ui/FullRepresentation.qml:1362
+#: package/contents/ui/FullRepresentation.qml:1381
 msgid "Searching only in %1 — tap to search everywhere"
 msgstr "Buscando solo en %1 — toca para buscar en todas partes"
 
-#: package/contents/ui/FullRepresentation.qml:1366
+#: package/contents/ui/FullRepresentation.qml:1385
 msgid "Results are limited to %1 — tap to search everywhere again"
 msgstr "Los resultados se limitan a %1 — toca para volver a buscar en todas partes"
 
-#: package/contents/ui/FullRepresentation.qml:1397
+#: package/contents/ui/FullRepresentation.qml:1416
 msgid "All"
 msgstr "Todo"
 
-#: package/contents/ui/FullRepresentation.qml:1398
+#: package/contents/ui/FullRepresentation.qml:1417
 msgid "Genre"
 msgstr "Género"
 
-#: package/contents/ui/FullRepresentation.qml:1399
+#: package/contents/ui/FullRepresentation.qml:1418
 msgid "Country"
 msgstr "País"
 
-#: package/contents/ui/FullRepresentation.qml:1400
+#: package/contents/ui/FullRepresentation.qml:1419
 msgid "Language"
 msgstr "Idioma"
 
-#: package/contents/ui/FullRepresentation.qml:1421
+#: package/contents/ui/FullRepresentation.qml:1440
 msgid "Top voted"
 msgstr "Más votadas"
 
-#: package/contents/ui/FullRepresentation.qml:1422
+#: package/contents/ui/FullRepresentation.qml:1441
 msgid "Trending"
 msgstr "Tendencias"
 
-#: package/contents/ui/FullRepresentation.qml:1423
+#: package/contents/ui/FullRepresentation.qml:1442
 msgid "Bitrate"
 msgstr "Tasa de bits"
 
-#: package/contents/ui/FullRepresentation.qml:1442
+#: package/contents/ui/FullRepresentation.qml:1461
 msgid "Trending now"
 msgstr "Tendencias ahora"
 
-#: package/contents/ui/FullRepresentation.qml:1453
+#: package/contents/ui/FullRepresentation.qml:1472
 msgid "Popular in %1"
 msgstr "Popular en %1"
 
-#: package/contents/ui/FullRepresentation.qml:1483
+#: package/contents/ui/FullRepresentation.qml:1504
 msgid "Search again — right-click removes this entry"
 msgstr "Buscar de nuevo — clic derecho elimina la entrada"
 
-#: package/contents/ui/FullRepresentation.qml:1496
-#: package/contents/ui/FullRepresentation.qml:1497
+#: package/contents/ui/FullRepresentation.qml:1517
+#: package/contents/ui/FullRepresentation.qml:1518
 msgid "Clear search history"
 msgstr "Borrar historial de búsqueda"
 
-#: package/contents/ui/FullRepresentation.qml:1667
+#: package/contents/ui/FullRepresentation.qml:1688
 msgid "Searching the web…"
 msgstr "Buscando en la web…"
 
-#: package/contents/ui/FullRepresentation.qml:1668
+#: package/contents/ui/FullRepresentation.qml:1689
 msgid "From the web"
 msgstr "De la web"
 
-#: package/contents/ui/FullRepresentation.qml:1668
-#: package/contents/ui/FullRepresentation.qml:3159
-#: package/contents/ui/FullRepresentation.qml:3383
+#: package/contents/ui/FullRepresentation.qml:1689
+#: package/contents/ui/FullRepresentation.qml:3202
+#: package/contents/ui/FullRepresentation.qml:3426
 msgid "%1 (%2)"
 msgstr "%1 (%2)"
 
-#: package/contents/ui/FullRepresentation.qml:1707
+#: package/contents/ui/FullRepresentation.qml:1728
 msgid "Stop preview: %1"
 msgstr "Detener la escucha: %1"
 
-#: package/contents/ui/FullRepresentation.qml:1708
+#: package/contents/ui/FullRepresentation.qml:1729
 msgid "Preview: %1"
 msgstr "Escuchar: %1"
 
-#: package/contents/ui/FullRepresentation.qml:1840
+#: package/contents/ui/FullRepresentation.qml:1861
 msgid "not answering"
 msgstr "no responde"
 
-#: package/contents/ui/FullRepresentation.qml:1854
-#: package/contents/ui/FullRepresentation.qml:2408
+#: package/contents/ui/FullRepresentation.qml:1875
+#: package/contents/ui/FullRepresentation.qml:2429
 msgid "%1 kb/s"
 msgstr "%1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:1903
-#: package/contents/ui/FullRepresentation.qml:2767
+#: package/contents/ui/FullRepresentation.qml:1924
+#: package/contents/ui/FullRepresentation.qml:2810
 msgid "Add to my stations + favorites"
 msgstr "Añadir a mis emisoras y favoritos"
 
-#: package/contents/ui/FullRepresentation.qml:1915
+#: package/contents/ui/FullRepresentation.qml:1936
 msgid "Click = stop preview"
 msgstr "Clic = detener la escucha"
 
-#: package/contents/ui/FullRepresentation.qml:1916
+#: package/contents/ui/FullRepresentation.qml:1937
 msgid "Click = preview · ⭐ = add to my stations"
 msgstr "Clic = escuchar · ⭐ = añadir a mis emisoras"
 
-#: package/contents/ui/FullRepresentation.qml:1926
+#: package/contents/ui/FullRepresentation.qml:1947
 msgid "Show more results"
 msgstr "Mostrar más resultados"
 
-#: package/contents/ui/FullRepresentation.qml:1951
-#: package/contents/ui/FullRepresentation.qml:1981
-#: package/contents/ui/main.qml:4217
+#: package/contents/ui/FullRepresentation.qml:1972
+#: package/contents/ui/FullRepresentation.qml:2004
+#: package/contents/ui/main.qml:4352
 msgid "The station directory is not reachable"
 msgstr "El directorio de emisoras no está disponible"
 
-#: package/contents/ui/FullRepresentation.qml:1979
+#: package/contents/ui/FullRepresentation.qml:2003
 msgid "No favorite stations yet"
 msgstr "Aún no hay emisoras favoritas"
 
-#: package/contents/ui/FullRepresentation.qml:1982
+#: package/contents/ui/FullRepresentation.qml:2005
 msgid "No matching stations"
 msgstr "No hay emisoras coincidentes"
 
-#: package/contents/ui/FullRepresentation.qml:1982
+#: package/contents/ui/FullRepresentation.qml:2005
 msgid "No stations"
 msgstr "No hay emisoras"
 
-#: package/contents/ui/FullRepresentation.qml:1995
+#: package/contents/ui/FullRepresentation.qml:2017
 msgid "Tap the star on a station to add it here"
 msgstr "Toque la estrella de una emisora para añadirla aquí"
 
-#: package/contents/ui/FullRepresentation.qml:1997
+#: package/contents/ui/FullRepresentation.qml:2018
 msgid "Check the connection and type to search again"
 msgstr "Comprueba la conexión y escribe para buscar de nuevo"
 
-#: package/contents/ui/FullRepresentation.qml:1998
+#: package/contents/ui/FullRepresentation.qml:2019
 msgid "Try a different search term"
 msgstr "Pruebe con otro término de búsqueda"
 
-#: package/contents/ui/FullRepresentation.qml:2339
+#: package/contents/ui/FullRepresentation.qml:2360
 msgid "LIVE"
 msgstr "EN DIRECTO"
 
-#: package/contents/ui/FullRepresentation.qml:2379
+#: package/contents/ui/FullRepresentation.qml:2400
 msgid "Paused · %1 behind live"
 msgstr "En pausa · %1 tras el directo"
 
-#: package/contents/ui/FullRepresentation.qml:2380
+#: package/contents/ui/FullRepresentation.qml:2401
 msgid "%1 behind live — tap to catch up"
 msgstr "%1 tras el directo — toca para alcanzarlo"
 
-#: package/contents/ui/FullRepresentation.qml:2390
+#: package/contents/ui/FullRepresentation.qml:2411
 msgid "Back to live"
 msgstr "Volver al directo"
 
-#: package/contents/ui/FullRepresentation.qml:2501
+#: package/contents/ui/FullRepresentation.qml:2522
 msgid "Nothing playing"
 msgstr "No se reproduce nada"
 
-#: package/contents/ui/FullRepresentation.qml:2523
+#: package/contents/ui/FullRepresentation.qml:2544
 msgid "Previous station"
 msgstr "Emisora anterior"
 
-#: package/contents/ui/FullRepresentation.qml:2551
+#: package/contents/ui/FullRepresentation.qml:2572
 msgid "Pause"
 msgstr "Pausa"
 
-#: package/contents/ui/FullRepresentation.qml:2578
+#: package/contents/ui/FullRepresentation.qml:2599
 msgid "Next station"
 msgstr "Emisora siguiente"
 
-#: package/contents/ui/FullRepresentation.qml:2610
+#: package/contents/ui/FullRepresentation.qml:2651
 msgid "Seek"
 msgstr "Posición"
 
-#: package/contents/ui/FullRepresentation.qml:2643
+#: package/contents/ui/FullRepresentation.qml:2684
 msgid "Skip back 15 seconds"
 msgstr "Retroceder 15 segundos"
 
-#: package/contents/ui/FullRepresentation.qml:2655
+#: package/contents/ui/FullRepresentation.qml:2696
 msgid "Playback speed"
 msgstr "Velocidad de reproducción"
 
-#: package/contents/ui/FullRepresentation.qml:2658
+#: package/contents/ui/FullRepresentation.qml:2699
 msgid "Playback speed — tap to change"
 msgstr "Velocidad de reproducción: toca para cambiar"
 
-#: package/contents/ui/FullRepresentation.qml:2677
+#: package/contents/ui/FullRepresentation.qml:2718
 msgid "Skip forward 30 seconds"
 msgstr "Avanzar 30 segundos"
 
-#: package/contents/ui/FullRepresentation.qml:2688
-#: package/contents/ui/FullRepresentation.qml:2689
+#: package/contents/ui/FullRepresentation.qml:2729
+#: package/contents/ui/FullRepresentation.qml:2730
 msgid "Chapters"
 msgstr "Capítulos"
 
-#: package/contents/ui/FullRepresentation.qml:2728
+#: package/contents/ui/FullRepresentation.qml:2769
 msgid "Skipping silences — tap to keep them"
 msgstr "Saltando silencios — toca para conservarlos"
 
-#: package/contents/ui/FullRepresentation.qml:2729
+#: package/contents/ui/FullRepresentation.qml:2770
 msgid "Skip silences in this episode"
 msgstr "Saltar los silencios de este episodio"
 
-#: package/contents/ui/FullRepresentation.qml:2753
+#: package/contents/ui/FullRepresentation.qml:2794
 msgid "Search this track on YouTube"
 msgstr "Buscar esta pista en YouTube"
 
-#: package/contents/ui/FullRepresentation.qml:2768
-#: package/contents/ui/MediaListItem.qml:540
+#: package/contents/ui/FullRepresentation.qml:2811
+#: package/contents/ui/MediaListItem.qml:549
 msgid "Remove from favorites"
 msgstr "Eliminar de favoritos"
 
-#: package/contents/ui/FullRepresentation.qml:2768
-#: package/contents/ui/MediaListItem.qml:540
+#: package/contents/ui/FullRepresentation.qml:2811
+#: package/contents/ui/MediaListItem.qml:549
 msgid "Add to favorites"
 msgstr "Añadir a favoritos"
 
-#: package/contents/ui/FullRepresentation.qml:2802
-#: package/contents/ui/FullRepresentation.qml:3304
+#: package/contents/ui/FullRepresentation.qml:2845
+#: package/contents/ui/FullRepresentation.qml:3347
 msgid "Remove from liked songs"
 msgstr "Quitar de las canciones que me gustan"
 
-#: package/contents/ui/FullRepresentation.qml:2803
+#: package/contents/ui/FullRepresentation.qml:2846
 msgid "Like this song (saved to My Music)"
 msgstr "Me gusta esta canción (se guarda en Mi música)"
 
-#: package/contents/ui/FullRepresentation.qml:2826
+#: package/contents/ui/FullRepresentation.qml:2869
 msgid "Vote sent — thank you for supporting the station!"
 msgstr "Voto enviado — ¡gracias por apoyar la emisora!"
 
-#: package/contents/ui/FullRepresentation.qml:2827
+#: package/contents/ui/FullRepresentation.qml:2870
 msgid "Sending the vote…"
 msgstr "Enviando el voto…"
 
-#: package/contents/ui/FullRepresentation.qml:2828
+#: package/contents/ui/FullRepresentation.qml:2871
 msgid "Vote for this station in the worldwide catalog"
 msgstr "Vota por esta emisora en el catálogo mundial"
 
-#: package/contents/ui/FullRepresentation.qml:2847
-#: package/contents/ui/FullRepresentation.qml:5633
-#: package/contents/ui/MediaListItem.qml:570
+#: package/contents/ui/FullRepresentation.qml:2890
+#: package/contents/ui/FullRepresentation.qml:5682
+#: package/contents/ui/MediaListItem.qml:579
 msgid "Downloading…"
 msgstr "Descargando…"
 
-#: package/contents/ui/FullRepresentation.qml:2848
-#: package/contents/ui/MediaListItem.qml:572
+#: package/contents/ui/FullRepresentation.qml:2891
+#: package/contents/ui/MediaListItem.qml:581
 msgid "Download this track (for offline listening)"
 msgstr "Descargar esta pista (para escucharla sin conexión)"
 
-#: package/contents/ui/FullRepresentation.qml:2873
+#: package/contents/ui/FullRepresentation.qml:2916
 msgid "A scheduled recording is running (%1)"
 msgstr "Hay una grabación programada en curso (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:2875
+#: package/contents/ui/FullRepresentation.qml:2918
 msgid "Recording %1 — click to stop"
 msgstr "Grabando: %1 — clic para detener"
 
-#: package/contents/ui/FullRepresentation.qml:2875
-#: package/contents/ui/FullRepresentation.qml:6648
+#: package/contents/ui/FullRepresentation.qml:2918
+#: package/contents/ui/FullRepresentation.qml:6699
 msgid "%1 — connecting…"
 msgstr "%1 — conectando…"
 
-#: package/contents/ui/FullRepresentation.qml:2877
-#: package/contents/ui/FullRepresentation.qml:5229
+#: package/contents/ui/FullRepresentation.qml:2920
+#: package/contents/ui/FullRepresentation.qml:5275
 msgid "This source cannot be recorded"
 msgstr "Esta fuente no se puede grabar"
 
-#: package/contents/ui/FullRepresentation.qml:2878
+#: package/contents/ui/FullRepresentation.qml:2921
 msgid "Record this station (personal use only)"
 msgstr "Grabar esta emisora (solo para uso personal)"
 
-#: package/contents/ui/FullRepresentation.qml:2916
+#: package/contents/ui/FullRepresentation.qml:2959
 msgid "Go to this show"
 msgstr "Ir a este programa"
 
-#: package/contents/ui/FullRepresentation.qml:2981
-#: package/contents/ui/FullRepresentation.qml:3002
+#: package/contents/ui/FullRepresentation.qml:3024
+#: package/contents/ui/FullRepresentation.qml:3045
 msgid "Podcast downloads (%1)"
 msgstr "Descargas de pódcast (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:3083
+#: package/contents/ui/FullRepresentation.qml:3126
 msgid "Downloading: %1"
 msgstr "Descargando: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3136
+#: package/contents/ui/FullRepresentation.qml:3179
 msgid "Stop recording"
 msgstr "Detener la grabación"
 
-#: package/contents/ui/FullRepresentation.qml:3160
+#: package/contents/ui/FullRepresentation.qml:3203
 msgid "Liked songs"
 msgstr "Canciones que me gustan"
 
-#: package/contents/ui/FullRepresentation.qml:3160
+#: package/contents/ui/FullRepresentation.qml:3203
 msgid "Recently played"
 msgstr "Reproducido recientemente"
 
-#: package/contents/ui/FullRepresentation.qml:3175
+#: package/contents/ui/FullRepresentation.qml:3218
 msgid "Show play history"
 msgstr "Mostrar historial de reproducción"
 
-#: package/contents/ui/FullRepresentation.qml:3176
+#: package/contents/ui/FullRepresentation.qml:3219
 msgid "Show liked songs"
 msgstr "Mostrar canciones que me gustan"
 
-#: package/contents/ui/FullRepresentation.qml:3186
+#: package/contents/ui/FullRepresentation.qml:3229
 msgid "Clear history"
 msgstr "Borrar el historial"
 
-#: package/contents/ui/FullRepresentation.qml:3216
+#: package/contents/ui/FullRepresentation.qml:3259
 msgid "Search YouTube for %1"
 msgstr "Buscar %1 en YouTube"
 
-#: package/contents/ui/FullRepresentation.qml:3293
+#: package/contents/ui/FullRepresentation.qml:3336
 msgid "Download this track"
 msgstr "Descargar esta pista"
 
-#: package/contents/ui/FullRepresentation.qml:3317
+#: package/contents/ui/FullRepresentation.qml:3360
 msgid "Click = search on YouTube · ⬇ = download"
 msgstr "Clic = buscar en YouTube · ⬇ = descargar"
 
-#: package/contents/ui/FullRepresentation.qml:3392
+#: package/contents/ui/FullRepresentation.qml:3435
 msgid "Open folder in file manager"
 msgstr "Abrir la carpeta en el gestor de archivos"
 
-#: package/contents/ui/FullRepresentation.qml:3434
+#: package/contents/ui/FullRepresentation.qml:3477
 msgid "Stop: %1"
 msgstr "Detener: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3434
+#: package/contents/ui/FullRepresentation.qml:3477
 msgid "Play: %1"
 msgstr "Reproducir: %1"
 
-#: package/contents/ui/FullRepresentation.qml:3519
+#: package/contents/ui/FullRepresentation.qml:3562
 msgid "Click again to confirm delete"
 msgstr "Haga clic de nuevo para confirmar el borrado"
 
-#: package/contents/ui/FullRepresentation.qml:3519
+#: package/contents/ui/FullRepresentation.qml:3562
 msgid "Delete file"
 msgstr "Borrar el archivo"
 
-#: package/contents/ui/FullRepresentation.qml:3575
+#: package/contents/ui/FullRepresentation.qml:3618
 msgid "Nothing here yet"
 msgstr "Aún no hay nada aquí"
 
-#: package/contents/ui/FullRepresentation.qml:3586
+#: package/contents/ui/FullRepresentation.qml:3629
 msgid "When a good song plays on the radio, press ⬇ — it will be saved here for offline listening"
 msgstr "Cuando suene una buena canción en la radio, pulse ⬇: se guardará aquí para escucharla sin conexión"
 
-#: package/contents/ui/FullRepresentation.qml:3725
+#: package/contents/ui/FullRepresentation.qml:3768
 msgid "Back to shows"
 msgstr "Volver a los programas"
 
-#: package/contents/ui/FullRepresentation.qml:3736
+#: package/contents/ui/FullRepresentation.qml:3779
 msgid "Search podcasts, or paste a feed URL…"
 msgstr "Busca pódcasts o pega la URL de un feed…"
 
-#: package/contents/ui/FullRepresentation.qml:3756
-#: package/contents/ui/FullRepresentation.qml:3797
+#: package/contents/ui/FullRepresentation.qml:3799
+#: package/contents/ui/FullRepresentation.qml:3840
 msgid "Back to my shows"
 msgstr "Volver a mis programas"
 
-#: package/contents/ui/FullRepresentation.qml:3757
+#: package/contents/ui/FullRepresentation.qml:3800
 msgid "Popular now — the top charts"
 msgstr "Popular ahora — las listas de éxitos"
 
-#: package/contents/ui/FullRepresentation.qml:3779
+#: package/contents/ui/FullRepresentation.qml:3822
 msgid "Up next (%1) — tap to play: %2"
 msgstr "A continuación (%1): toca para reproducir: %2"
 
-#: package/contents/ui/FullRepresentation.qml:3798
+#: package/contents/ui/FullRepresentation.qml:3841
 msgid "Downloaded episodes (%1)"
 msgstr "Episodios descargados (%1)"
 
-#: package/contents/ui/FullRepresentation.qml:3813
+#: package/contents/ui/FullRepresentation.qml:3856
 msgid "Import subscriptions (OPML)"
 msgstr "Importar suscripciones (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:3824
+#: package/contents/ui/FullRepresentation.qml:3867
 msgid "Export subscriptions (OPML)"
 msgstr "Exportar suscripciones (OPML)"
 
-#: package/contents/ui/FullRepresentation.qml:3829
+#: package/contents/ui/FullRepresentation.qml:3872
 msgid "Import subscriptions"
 msgstr "Importar suscripciones"
 
-#: package/contents/ui/FullRepresentation.qml:3830
+#: package/contents/ui/FullRepresentation.qml:3873
 msgid "OPML files (*.opml *.xml)"
 msgstr "Archivos OPML (*.opml *.xml)"
 
-#: package/contents/ui/FullRepresentation.qml:3836
-#: package/contents/ui/FullRepresentation.qml:4059
+#: package/contents/ui/FullRepresentation.qml:3879
+#: package/contents/ui/FullRepresentation.qml:4105
 msgid "Episodes"
 msgstr "Episodios"
 
-#: package/contents/ui/FullRepresentation.qml:3864
+#: package/contents/ui/FullRepresentation.qml:3907
 msgid "Waking up with this show at %1 — tap to remove"
 msgstr "Despertar con este programa a las %1 — toca para quitar"
 
-#: package/contents/ui/FullRepresentation.qml:3867
+#: package/contents/ui/FullRepresentation.qml:3910
 msgid "Wake up with this show"
 msgstr "Despertar con este programa"
 
-#: package/contents/ui/FullRepresentation.qml:3883
+#: package/contents/ui/FullRepresentation.qml:3929
 msgid "Wake up with this show, daily"
 msgstr "Despertar con este programa, a diario"
 
-#: package/contents/ui/FullRepresentation.qml:3892
+#: package/contents/ui/FullRepresentation.qml:3938
 msgid "Hour"
 msgstr "Hora"
 
-#: package/contents/ui/FullRepresentation.qml:3900
+#: package/contents/ui/FullRepresentation.qml:3946
 msgid "Minute"
 msgstr "Minuto"
 
-#: package/contents/ui/FullRepresentation.qml:3903
+#: package/contents/ui/FullRepresentation.qml:3949
 msgid "Set"
 msgstr "Establecer"
 
-#: package/contents/ui/FullRepresentation.qml:3905
+#: package/contents/ui/FullRepresentation.qml:3951
 msgid "Podcast"
 msgstr "Pódcast"
 
-#: package/contents/ui/FullRepresentation.qml:3916
+#: package/contents/ui/FullRepresentation.qml:3962
 msgid "Plays the newest unheard downloaded episode — works with no network at all."
 msgstr "Reproduce el episodio descargado más reciente sin escuchar; funciona sin ninguna red."
 
-#: package/contents/ui/FullRepresentation.qml:3935
+#: package/contents/ui/FullRepresentation.qml:3981
 msgid "Showing unplayed — tap for all"
 msgstr "Mostrando no reproducidos: toca para todos"
 
-#: package/contents/ui/FullRepresentation.qml:3936
+#: package/contents/ui/FullRepresentation.qml:3982
 msgid "Show only unplayed"
 msgstr "Mostrar solo no reproducidos"
 
-#: package/contents/ui/FullRepresentation.qml:3951
+#: package/contents/ui/FullRepresentation.qml:3997
 msgid "Mark all as played"
 msgstr "Marcar todos como reproducidos"
 
-#: package/contents/ui/FullRepresentation.qml:3981
+#: package/contents/ui/FullRepresentation.qml:4027
 msgid "Unsubscribe from this show"
 msgstr "Cancelar la suscripción a este programa"
 
-#: package/contents/ui/FullRepresentation.qml:3982
+#: package/contents/ui/FullRepresentation.qml:4028
 msgid "Subscribe to this show"
 msgstr "Suscribirse a este programa"
 
-#: package/contents/ui/FullRepresentation.qml:3999
+#: package/contents/ui/FullRepresentation.qml:4045
 msgid "Refresh episodes"
 msgstr "Actualizar episodios"
 
-#: package/contents/ui/FullRepresentation.qml:4015
-#: package/contents/ui/FullRepresentation.qml:4026
+#: package/contents/ui/FullRepresentation.qml:4061
+#: package/contents/ui/FullRepresentation.qml:4072
 msgid "Open this feed"
 msgstr "Abrir este feed"
 
-#: package/contents/ui/FullRepresentation.qml:4055
+#: package/contents/ui/FullRepresentation.qml:4101
 msgid "Shows"
 msgstr "Programas"
 
-#: package/contents/ui/FullRepresentation.qml:4086
+#: package/contents/ui/FullRepresentation.qml:4132
 msgid "Loading episodes…"
 msgstr "Cargando episodios…"
 
-#: package/contents/ui/FullRepresentation.qml:4087
+#: package/contents/ui/FullRepresentation.qml:4133
 msgid "Searching…"
 msgstr "Buscando…"
 
-#: package/contents/ui/FullRepresentation.qml:4088
+#: package/contents/ui/FullRepresentation.qml:4134
 msgid "Loading the charts…"
 msgstr "Cargando las listas…"
 
-#: package/contents/ui/FullRepresentation.qml:4234
+#: package/contents/ui/FullRepresentation.qml:4280
 msgid "resume at %1"
 msgstr "continuar en %1"
 
-#: package/contents/ui/FullRepresentation.qml:4256
+#: package/contents/ui/FullRepresentation.qml:4302
 msgid "Tap again to delete the file"
 msgstr "Toca de nuevo para eliminar el archivo"
 
-#: package/contents/ui/FullRepresentation.qml:4257
+#: package/contents/ui/FullRepresentation.qml:4303
 msgid "Delete the downloaded file"
 msgstr "Eliminar el archivo descargado"
 
-#: package/contents/ui/FullRepresentation.qml:4424
+#: package/contents/ui/FullRepresentation.qml:4470
 msgid "Unsubscribe"
 msgstr "Cancelar suscripción"
 
-#: package/contents/ui/FullRepresentation.qml:4425
+#: package/contents/ui/FullRepresentation.qml:4471
 msgid "Subscribe"
 msgstr "Suscribirse"
 
-#: package/contents/ui/FullRepresentation.qml:4468
+#: package/contents/ui/FullRepresentation.qml:4514
 msgid "The podcast directories could not be reached"
 msgstr "No se pudo acceder a los directorios de pódcasts"
 
-#: package/contents/ui/FullRepresentation.qml:4469
+#: package/contents/ui/FullRepresentation.qml:4515
 msgid "No shows found"
 msgstr "No se encontraron programas"
 
-#: package/contents/ui/FullRepresentation.qml:4470
+#: package/contents/ui/FullRepresentation.qml:4516
 msgid "The charts did not answer — try again in a moment"
 msgstr "Las listas no respondieron: inténtalo de nuevo en un momento"
 
-#: package/contents/ui/FullRepresentation.qml:4471
+#: package/contents/ui/FullRepresentation.qml:4517
 msgid "No subscriptions yet"
 msgstr "Aún no hay suscripciones"
 
-#: package/contents/ui/FullRepresentation.qml:4479
-#: package/contents/ui/FullRepresentation.qml:4683
+#: package/contents/ui/FullRepresentation.qml:4525
+#: package/contents/ui/FullRepresentation.qml:4729
 msgid "Try again"
 msgstr "Intentar de nuevo"
 
-#: package/contents/ui/FullRepresentation.qml:4490
+#: package/contents/ui/FullRepresentation.qml:4536
 msgid "Search for a show above, star it, and its episodes download here for offline listening"
 msgstr "Busca un programa arriba y márcalo con una estrella: sus episodios se descargan aquí para escucharlos sin conexión"
 
-#: package/contents/ui/FullRepresentation.qml:4644
+#: package/contents/ui/FullRepresentation.qml:4690
 msgid "Open the show"
 msgstr "Abrir el programa"
 
-#: package/contents/ui/FullRepresentation.qml:4674
+#: package/contents/ui/FullRepresentation.qml:4720
 msgid "The episode directory could not be reached"
 msgstr "No se pudo acceder al directorio de episodios"
 
-#: package/contents/ui/FullRepresentation.qml:4675
+#: package/contents/ui/FullRepresentation.qml:4721
 msgid "No episodes found"
 msgstr "No se encontraron episodios"
 
-#: package/contents/ui/FullRepresentation.qml:4724
+#: package/contents/ui/FullRepresentation.qml:4770
 msgid "All caught up — no unplayed episodes"
 msgstr "Todo al día: no hay episodios sin reproducir"
 
-#: package/contents/ui/FullRepresentation.qml:4775
+#: package/contents/ui/FullRepresentation.qml:4821
 msgid "Sleep timer"
 msgstr "Temporizador de apagado"
 
-#: package/contents/ui/FullRepresentation.qml:4781
-#: package/contents/ui/FullRepresentation.qml:5630
+#: package/contents/ui/FullRepresentation.qml:4827
+#: package/contents/ui/FullRepresentation.qml:5679
 msgid "Sleeping in %1"
 msgstr "Se apaga en %1"
 
-#: package/contents/ui/FullRepresentation.qml:4801
+#: package/contents/ui/FullRepresentation.qml:4847
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: package/contents/ui/FullRepresentation.qml:4809
+#: package/contents/ui/FullRepresentation.qml:4855
 msgid "Playback fades out and stops when the timer ends."
 msgstr "La reproducción se desvanece y se detiene cuando termina el temporizador."
 
-#: package/contents/ui/FullRepresentation.qml:4844
+#: package/contents/ui/FullRepresentation.qml:4890
 msgid "Wake-up alarms"
 msgstr "Alarmas de despertador"
 
@@ -1444,795 +1469,793 @@ msgstr "Alarmas de despertador"
 #. keeps them in the widget's language, while the
 #. system locale may be something else entirely.
 #. i18n — same language as the rest of the UI
-#: package/contents/ui/FullRepresentation.qml:4869
-#: package/contents/ui/FullRepresentation.qml:4978
-#: package/contents/ui/FullRepresentation.qml:5094
-#: package/contents/ui/FullRepresentation.qml:5202
+#: package/contents/ui/FullRepresentation.qml:4915
+#: package/contents/ui/FullRepresentation.qml:5024
+#: package/contents/ui/FullRepresentation.qml:5140
+#: package/contents/ui/FullRepresentation.qml:5248
 msgid "Sun"
 msgstr "dom"
 
-#: package/contents/ui/FullRepresentation.qml:4869
-#: package/contents/ui/FullRepresentation.qml:4978
-#: package/contents/ui/FullRepresentation.qml:5094
-#: package/contents/ui/FullRepresentation.qml:5202
+#: package/contents/ui/FullRepresentation.qml:4915
+#: package/contents/ui/FullRepresentation.qml:5024
+#: package/contents/ui/FullRepresentation.qml:5140
+#: package/contents/ui/FullRepresentation.qml:5248
 msgid "Mon"
 msgstr "lun"
 
-#: package/contents/ui/FullRepresentation.qml:4869
-#: package/contents/ui/FullRepresentation.qml:4978
-#: package/contents/ui/FullRepresentation.qml:5094
-#: package/contents/ui/FullRepresentation.qml:5202
+#: package/contents/ui/FullRepresentation.qml:4915
+#: package/contents/ui/FullRepresentation.qml:5024
+#: package/contents/ui/FullRepresentation.qml:5140
+#: package/contents/ui/FullRepresentation.qml:5248
 msgid "Tue"
 msgstr "mar"
 
-#: package/contents/ui/FullRepresentation.qml:4869
-#: package/contents/ui/FullRepresentation.qml:4978
-#: package/contents/ui/FullRepresentation.qml:5094
-#: package/contents/ui/FullRepresentation.qml:5202
+#: package/contents/ui/FullRepresentation.qml:4915
+#: package/contents/ui/FullRepresentation.qml:5024
+#: package/contents/ui/FullRepresentation.qml:5140
+#: package/contents/ui/FullRepresentation.qml:5248
 msgid "Wed"
 msgstr "mié"
 
-#: package/contents/ui/FullRepresentation.qml:4870
-#: package/contents/ui/FullRepresentation.qml:4979
-#: package/contents/ui/FullRepresentation.qml:5095
-#: package/contents/ui/FullRepresentation.qml:5203
+#: package/contents/ui/FullRepresentation.qml:4916
+#: package/contents/ui/FullRepresentation.qml:5025
+#: package/contents/ui/FullRepresentation.qml:5141
+#: package/contents/ui/FullRepresentation.qml:5249
 msgid "Thu"
 msgstr "jue"
 
-#: package/contents/ui/FullRepresentation.qml:4870
-#: package/contents/ui/FullRepresentation.qml:4979
-#: package/contents/ui/FullRepresentation.qml:5095
-#: package/contents/ui/FullRepresentation.qml:5203
+#: package/contents/ui/FullRepresentation.qml:4916
+#: package/contents/ui/FullRepresentation.qml:5025
+#: package/contents/ui/FullRepresentation.qml:5141
+#: package/contents/ui/FullRepresentation.qml:5249
 msgid "Fri"
 msgstr "vie"
 
-#: package/contents/ui/FullRepresentation.qml:4870
-#: package/contents/ui/FullRepresentation.qml:4979
-#: package/contents/ui/FullRepresentation.qml:5095
-#: package/contents/ui/FullRepresentation.qml:5203
+#: package/contents/ui/FullRepresentation.qml:4916
+#: package/contents/ui/FullRepresentation.qml:5025
+#: package/contents/ui/FullRepresentation.qml:5141
+#: package/contents/ui/FullRepresentation.qml:5249
 msgid "Sat"
 msgstr "sáb"
 
-#: package/contents/ui/FullRepresentation.qml:4872
-#: package/contents/ui/FullRepresentation.qml:4970
-#: package/contents/ui/FullRepresentation.qml:5097
-#: package/contents/ui/FullRepresentation.qml:5195
+#: package/contents/ui/FullRepresentation.qml:4918
+#: package/contents/ui/FullRepresentation.qml:5016
+#: package/contents/ui/FullRepresentation.qml:5143
+#: package/contents/ui/FullRepresentation.qml:5241
 msgid "Daily"
 msgstr "A diario"
 
-#: package/contents/ui/FullRepresentation.qml:4873
-#: package/contents/ui/FullRepresentation.qml:5098
+#: package/contents/ui/FullRepresentation.qml:4919
+#: package/contents/ui/FullRepresentation.qml:5144
 msgid "Every %1"
 msgstr "Cada %1"
 
-#: package/contents/ui/FullRepresentation.qml:4888
+#: package/contents/ui/FullRepresentation.qml:4934
 msgid "Remove this alarm"
 msgstr "Quitar esta alarma"
 
-#: package/contents/ui/FullRepresentation.qml:4896
+#: package/contents/ui/FullRepresentation.qml:4942
 msgid "No alarms yet — add one below."
 msgstr "Aún no hay alarmas — añade una abajo."
 
-#: package/contents/ui/FullRepresentation.qml:4911
-#: package/contents/ui/FullRepresentation.qml:5136
+#: package/contents/ui/FullRepresentation.qml:4957
+#: package/contents/ui/FullRepresentation.qml:5182
 msgid "Station:"
 msgstr "Emisora:"
 
-#: package/contents/ui/FullRepresentation.qml:4919
-#: package/contents/ui/FullRepresentation.qml:5143
+#: package/contents/ui/FullRepresentation.qml:4965
+#: package/contents/ui/FullRepresentation.qml:5189
 msgid "Station"
 msgstr "Emisora"
 
-#: package/contents/ui/FullRepresentation.qml:4929
+#: package/contents/ui/FullRepresentation.qml:4975
 msgid "Wake with the built-in tone (no station)"
 msgstr "Despertar con el tono integrado (sin emisora)"
 
-#: package/contents/ui/FullRepresentation.qml:4934
-#: package/contents/ui/FullRepresentation.qml:5147
+#: package/contents/ui/FullRepresentation.qml:4980
+#: package/contents/ui/FullRepresentation.qml:5193
 msgid "Start:"
 msgstr "Inicio:"
 
-#: package/contents/ui/FullRepresentation.qml:4945
-#: package/contents/ui/FullRepresentation.qml:5158
+#: package/contents/ui/FullRepresentation.qml:4991
+#: package/contents/ui/FullRepresentation.qml:5204
 msgid "Start hour"
 msgstr "Hora de inicio"
 
-#: package/contents/ui/FullRepresentation.qml:4958
-#: package/contents/ui/FullRepresentation.qml:5169
+#: package/contents/ui/FullRepresentation.qml:5004
+#: package/contents/ui/FullRepresentation.qml:5215
 msgid "Start minute"
 msgstr "Minuto de inicio"
 
-#: package/contents/ui/FullRepresentation.qml:4963
-#: package/contents/ui/FullRepresentation.qml:5188
+#: package/contents/ui/FullRepresentation.qml:5009
+#: package/contents/ui/FullRepresentation.qml:5234
 msgid "Repeat:"
 msgstr "Repetición:"
 
-#: package/contents/ui/FullRepresentation.qml:4970
-#: package/contents/ui/FullRepresentation.qml:5195
+#: package/contents/ui/FullRepresentation.qml:5016
+#: package/contents/ui/FullRepresentation.qml:5241
 msgid "Once"
 msgstr "Una vez"
 
-#: package/contents/ui/FullRepresentation.qml:4970
-#: package/contents/ui/FullRepresentation.qml:5195
+#: package/contents/ui/FullRepresentation.qml:5016
+#: package/contents/ui/FullRepresentation.qml:5241
 msgid "Weekly"
 msgstr "Semanal"
 
-#: package/contents/ui/FullRepresentation.qml:4972
-#: package/contents/ui/FullRepresentation.qml:5196
+#: package/contents/ui/FullRepresentation.qml:5018
+#: package/contents/ui/FullRepresentation.qml:5242
 msgid "Repeat"
 msgstr "Repetición"
 
-#: package/contents/ui/FullRepresentation.qml:4981
-#: package/contents/ui/FullRepresentation.qml:5205
+#: package/contents/ui/FullRepresentation.qml:5027
+#: package/contents/ui/FullRepresentation.qml:5251
 msgid "Weekday"
 msgstr "Día de la semana"
 
-#: package/contents/ui/FullRepresentation.qml:4986
+#: package/contents/ui/FullRepresentation.qml:5032
 msgid "Volume:"
 msgstr "Volumen:"
 
-#: package/contents/ui/FullRepresentation.qml:5008
+#: package/contents/ui/FullRepresentation.qml:5054
 msgid "Keep the computer awake until the alarm"
 msgstr "Mantener el equipo despierto hasta la alarma"
 
-#: package/contents/ui/FullRepresentation.qml:5014
-#: package/contents/ui/FullRepresentation.qml:5241
+#: package/contents/ui/FullRepresentation.qml:5060
+#: package/contents/ui/FullRepresentation.qml:5287
 msgid "Add"
 msgstr "Añadir"
 
-#: package/contents/ui/FullRepresentation.qml:5021
+#: package/contents/ui/FullRepresentation.qml:5067
 msgid "Wake-up tone"
 msgstr "Tono de despertador"
 
-#: package/contents/ui/FullRepresentation.qml:5113
+#: package/contents/ui/FullRepresentation.qml:5159
 msgid "Remove this schedule"
 msgstr "Eliminar esta programación"
 
-#: package/contents/ui/FullRepresentation.qml:5121
+#: package/contents/ui/FullRepresentation.qml:5167
 msgid "No scheduled recordings yet — add one below."
 msgstr "Aún no hay grabaciones programadas; añada una abajo."
 
-#: package/contents/ui/FullRepresentation.qml:5174
+#: package/contents/ui/FullRepresentation.qml:5220
 msgid "Duration:"
 msgstr "Duración:"
 
-#: package/contents/ui/FullRepresentation.qml:5184
+#: package/contents/ui/FullRepresentation.qml:5230
 msgid "Duration in minutes"
 msgstr "Duración en minutos"
 
-#: package/contents/ui/FullRepresentation.qml:5216
+#: package/contents/ui/FullRepresentation.qml:5262
 msgid "Recordings are for personal use only."
 msgstr "Las grabaciones son solo para uso personal."
 
-#: package/contents/ui/FullRepresentation.qml:5432
-#: package/contents/ui/FullRepresentation.qml:5433
+#: package/contents/ui/FullRepresentation.qml:5479
+#: package/contents/ui/FullRepresentation.qml:5480
 msgid "Keep open"
 msgstr "Mantener abierto"
 
-#: package/contents/ui/FullRepresentation.qml:5636
-#: package/contents/ui/main.qml:238
+#: package/contents/ui/FullRepresentation.qml:5685
+#: package/contents/ui/main.qml:239
 msgid "Casting to %1"
 msgstr "Enviando a %1"
 
-#: package/contents/ui/FullRepresentation.qml:5642
+#: package/contents/ui/FullRepresentation.qml:5691
 msgid "Paused — the station keeps recording"
 msgstr "En pausa — la emisora se sigue grabando"
 
-#: package/contents/ui/FullRepresentation.qml:5644
+#: package/contents/ui/FullRepresentation.qml:5693
 msgid "Check internet connection…"
 msgstr "Compruebe la conexión a internet…"
 
-#: package/contents/ui/FullRepresentation.qml:5651
+#: package/contents/ui/FullRepresentation.qml:5700
 msgid "The stream stopped sending data"
 msgstr "La emisión dejó de enviar datos"
 
-#: package/contents/ui/FullRepresentation.qml:5654
+#: package/contents/ui/FullRepresentation.qml:5703
 msgid "Bitrate: %1 kb/s"
 msgstr "Tasa de bits: %1 kb/s"
 
-#: package/contents/ui/FullRepresentation.qml:5659
-#: package/contents/ui/FullRepresentation.qml:5662
-#: package/contents/ui/RecordingEngine.qml:106
+#: package/contents/ui/FullRepresentation.qml:5708
+#: package/contents/ui/FullRepresentation.qml:5711
+#: package/contents/ui/RecordingEngine.qml:110
 msgid "Connecting…"
 msgstr "Conectando…"
 
-#: package/contents/ui/FullRepresentation.qml:5665
+#: package/contents/ui/FullRepresentation.qml:5714
 msgid "Reconnecting…"
 msgstr "Reconectando…"
 
-#: package/contents/ui/FullRepresentation.qml:5667
+#: package/contents/ui/FullRepresentation.qml:5718
 msgid "Choose station and enjoy…"
 msgstr "Elija una emisora y disfrute…"
 
-#: package/contents/ui/FullRepresentation.qml:5697
+#: package/contents/ui/FullRepresentation.qml:5748
 msgid "Casting to %1 — click to choose or stop"
 msgstr "Enviando a %1 — haga clic para elegir o detener"
 
-#: package/contents/ui/FullRepresentation.qml:5699
+#: package/contents/ui/FullRepresentation.qml:5750
 msgid "Volume, output and devices (Chromecast, TV, speaker)"
 msgstr "Volumen, salida y dispositivos (Chromecast, TV, altavoz)"
 
-#: package/contents/ui/FullRepresentation.qml:5700
+#: package/contents/ui/FullRepresentation.qml:5751
 msgid "Volume and audio output"
 msgstr "Volumen y salida de audio"
 
-#: package/contents/ui/FullRepresentation.qml:5864
+#: package/contents/ui/FullRepresentation.qml:5915
 msgid "Play on"
 msgstr "Reproducir en"
 
-#: package/contents/ui/FullRepresentation.qml:5911
+#: package/contents/ui/FullRepresentation.qml:5962
 msgid "Unmute"
 msgstr "Activar sonido"
 
-#: package/contents/ui/FullRepresentation.qml:5911
+#: package/contents/ui/FullRepresentation.qml:5962
 msgid "Mute"
 msgstr "Silenciar"
 
-#: package/contents/ui/FullRepresentation.qml:5949
+#: package/contents/ui/FullRepresentation.qml:6000
 msgid "This computer"
 msgstr "Este equipo"
 
-#: package/contents/ui/FullRepresentation.qml:5973
+#: package/contents/ui/FullRepresentation.qml:6024
 msgid "System default output"
 msgstr "Salida predeterminada del sistema"
 
-#: package/contents/ui/FullRepresentation.qml:6000
+#: package/contents/ui/FullRepresentation.qml:6051
 msgid "All local outputs, in sync"
 msgstr "Todas las salidas locales, sincronizadas"
 
-#: package/contents/ui/FullRepresentation.qml:6049
+#: package/contents/ui/FullRepresentation.qml:6100
 msgid "Plays on every connected speaker at the same time — wired outputs are delayed to stay in step with Bluetooth."
 msgstr "Reproduce en todos los altavoces conectados a la vez — las salidas con cable se retrasan para mantenerse al compás del Bluetooth."
 
-#: package/contents/ui/FullRepresentation.qml:6063
+#: package/contents/ui/FullRepresentation.qml:6114
 msgid "Keep it in tune by itself"
 msgstr "Mantenerlo afinado solo"
 
-#: package/contents/ui/FullRepresentation.qml:6080
+#: package/contents/ui/FullRepresentation.qml:6131
 msgid "Listens now and then while music plays and puts the speakers back in step on its own. Nothing is audible and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you."
 msgstr "Escucha de vez en cuando mientras suena la música y vuelve a poner los altavoces a la par por sí solo. No se oye nada y la música nunca se interrumpe — si alguna vez no puede corregir el desajuste por su cuenta, lo dice y te deja la medición a ti."
 
-#: package/contents/ui/FullRepresentation.qml:6096
-#: package/contents/ui/FullRepresentation.qml:6113
+#: package/contents/ui/FullRepresentation.qml:6147
+#: package/contents/ui/FullRepresentation.qml:6164
 msgid "Sync fine-tune"
 msgstr "Ajuste fino de sincronía"
 
-#: package/contents/ui/FullRepresentation.qml:6106
+#: package/contents/ui/FullRepresentation.qml:6157
 msgid "How far behind the Bluetooth speaker runs — the other outputs are held back by this much to match it. The automatic check below reports something else: how far apart they still land."
 msgstr "Cuánto se retrasa el altavoz Bluetooth: las demás salidas se retienen otro tanto para igualarlo. La comprobación automática de abajo informa de otra cosa: cuánta diferencia queda todavía."
 
-#: package/contents/ui/FullRepresentation.qml:6145
+#: package/contents/ui/FullRepresentation.qml:6196
 msgid "If the Bluetooth speaker still trails the wired ones, raise this until they play together."
 msgstr "Si el altavoz Bluetooth aún va detrás de los cableados, sube esto hasta que suenen juntos."
 
-#: package/contents/ui/FullRepresentation.qml:6157
+#: package/contents/ui/FullRepresentation.qml:6208
 msgid "Sync delay in milliseconds"
 msgstr "Retardo de sincronización en milisegundos"
 
-#: package/contents/ui/FullRepresentation.qml:6179
+#: package/contents/ui/FullRepresentation.qml:6230
 msgid "Type an exact delay in milliseconds — the slider moves in steps of ten."
 msgstr "Escribe un retardo exacto en milisegundos — el deslizador se mueve en pasos de diez."
 
-#: package/contents/ui/FullRepresentation.qml:6183
+#: package/contents/ui/FullRepresentation.qml:6234
 msgid "ms"
 msgstr "ms"
 
-#: package/contents/ui/FullRepresentation.qml:6198
+#: package/contents/ui/FullRepresentation.qml:6249
 msgid "Calibrate with the microphone"
 msgstr "Calibrar con el micrófono"
 
-#: package/contents/ui/FullRepresentation.qml:6210
+#: package/contents/ui/FullRepresentation.qml:6261
 msgid "Measures with a tone too high to hear how far the Bluetooth speaker trails, and sets the delay automatically. Speaker balance is left as it is — matching loudness needs a sound you would hear."
 msgstr "Mide con un tono demasiado agudo para oírlo cuánto se retrasa el altavoz Bluetooth y ajusta el retardo automáticamente. El balance se deja como está: igualar volúmenes necesita un sonido audible."
 
-#: package/contents/ui/FullRepresentation.qml:6211
+#: package/contents/ui/FullRepresentation.qml:6262
 msgid "Plays a few loud clicks through each speaker and measures with the microphone how far the Bluetooth speaker trails — the delay is set automatically."
 msgstr "Reproduce unos clics fuertes por cada altavoz y mide con el micrófono cuánto se retrasa el altavoz Bluetooth — el retardo se ajusta automáticamente."
 
-#: package/contents/ui/FullRepresentation.qml:6224
+#: package/contents/ui/FullRepresentation.qml:6275
 msgid "Calibration needs a Bluetooth speaker in the group — connect one and the button wakes up."
 msgstr "La calibración necesita un altavoz Bluetooth en el grupo: conecta uno y el botón despierta."
 
-#: package/contents/ui/FullRepresentation.qml:6253
+#: package/contents/ui/FullRepresentation.qml:6304
 msgid "Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only — never stored, never sent anywhere."
 msgstr "Reproduce cada pocos minutos un tono demasiado agudo para oírlo por cada altavoz y vuelve a comprobar la sincronización cuando se desajustan. El audio se procesa solo en este equipo: nunca se guarda ni se envía a ninguna parte."
 
-#: package/contents/ui/FullRepresentation.qml:6294
+#: package/contents/ui/FullRepresentation.qml:6345
 msgid "Tuned automatically — %1"
 msgstr "Ajustado automáticamente — %1"
 
-#: package/contents/ui/FullRepresentation.qml:6319
+#: package/contents/ui/FullRepresentation.qml:6370
 msgid "Set the delay by ear (no microphone)"
 msgstr "Ajustar el retardo de oído (sin micrófono)"
 
-#: package/contents/ui/FullRepresentation.qml:6322
+#: package/contents/ui/FullRepresentation.qml:6373
 msgid "Hides the microphone measurement and the automatic checks, and never listens to the room. Use the fine-tune slider above until the speakers sound together."
 msgstr "Oculta la medición con micrófono y las comprobaciones automáticas, y nunca escucha la sala. Usa el control de ajuste fino de arriba hasta que los altavoces suenen juntos."
 
-#: package/contents/ui/FullRepresentation.qml:6338
+#: package/contents/ui/FullRepresentation.qml:6389
 msgid "Measure with a tone too high to hear"
 msgstr "Medir con un tono demasiado agudo para oírlo"
 
-#: package/contents/ui/FullRepresentation.qml:6341
+#: package/contents/ui/FullRepresentation.qml:6392
 msgid "Measures with an 18–19 kHz sweep, which most adults cannot hear and music does not reach, so the room can stay noisy. Younger ears often can hear it, and dogs and cats certainly do — turn it off and measurement uses a short audible click instead, which needs a quiet room."
 msgstr "Mide con un barrido de 18–19 kHz que la mayoría de los adultos no oye y al que la música no llega, así que la sala puede seguir con ruido. Los oídos jóvenes suelen oírlo, y los perros y los gatos sin duda. Si lo desactivas, la medición usa un clic audible corto que necesita una sala en silencio."
 
-#: package/contents/ui/FullRepresentation.qml:6370
+#: package/contents/ui/FullRepresentation.qml:6421
 msgid "%1 is remembered for the sync — connect it and it rejoins automatically."
 msgstr "%1 está recordado para la sincronización: conéctelo y se reincorporará automáticamente."
 
-#: package/contents/ui/FullRepresentation.qml:6395
+#: package/contents/ui/FullRepresentation.qml:6446
 msgid "Round 1 of 2 — clicks through every speaker…"
 msgstr "Ronda 1 de 2 — clics por cada altavoz…"
 
-#: package/contents/ui/FullRepresentation.qml:6396
+#: package/contents/ui/FullRepresentation.qml:6447
 msgid "Round 2 of 2 — quiet, checking the result…"
 msgstr "Ronda 2 de 2 — silencio, comprobando el resultado…"
 
-#: package/contents/ui/FullRepresentation.qml:6418
+#: package/contents/ui/FullRepresentation.qml:6469
 msgid "Stops the measurement, unmutes every speaker and gives the music back."
 msgstr "Detiene la medición, quita el silencio a todos los altavoces y devuelve la música."
 
-#: package/contents/ui/FullRepresentation.qml:6447
+#: package/contents/ui/FullRepresentation.qml:6498
 msgid "%1 plays in the group"
 msgstr "%1 suena en el grupo"
 
-#: package/contents/ui/FullRepresentation.qml:6460
+#: package/contents/ui/FullRepresentation.qml:6511
 msgid "Whether this speaker plays in the group — untick to leave it out without disconnecting it. Remembered for the device."
 msgstr "Si este altavoz suena en el grupo — desmárcalo para dejarlo fuera sin desconectarlo. Se recuerda para el dispositivo."
 
-#: package/contents/ui/FullRepresentation.qml:6469
+#: package/contents/ui/FullRepresentation.qml:6520
 msgid "%1 (nothing plugged in)"
 msgstr "%1 (nada conectado)"
 
-#: package/contents/ui/FullRepresentation.qml:6483
+#: package/contents/ui/FullRepresentation.qml:6534
 msgid "Balance of %1"
 msgstr "Balance de %1"
 
-#: package/contents/ui/FullRepresentation.qml:6492
+#: package/contents/ui/FullRepresentation.qml:6543
 msgid "This speaker's share of the volume — the balance follows every master move and is remembered for the device. It scales only what this widget plays; the per-device volume in the system's audio settings is a separate, untouched layer — which is why those numbers differ from these sliders."
 msgstr "La parte de este altavoz en el volumen: el balance sigue cada movimiento del control maestro y se recuerda para el dispositivo. Solo afecta a lo que reproduce este widget; el volumen por dispositivo en los ajustes de sonido del sistema es una capa aparte e intacta — por eso esos números difieren de estos deslizadores."
 
-#: package/contents/ui/FullRepresentation.qml:6509
+#: package/contents/ui/FullRepresentation.qml:6560
 msgctxt "compact: speaker plays the left channel"
 msgid "L"
 msgstr "L"
 
-#: package/contents/ui/FullRepresentation.qml:6510
+#: package/contents/ui/FullRepresentation.qml:6561
 msgctxt "compact: speaker plays the right channel"
 msgid "R"
 msgstr "R"
 
-#: package/contents/ui/FullRepresentation.qml:6511
+#: package/contents/ui/FullRepresentation.qml:6562
 msgctxt "compact: speaker plays a mono mix"
 msgid "M"
 msgstr "M"
 
-#: package/contents/ui/FullRepresentation.qml:6512
+#: package/contents/ui/FullRepresentation.qml:6563
 msgctxt "compact: speaker plays plain stereo"
 msgid "ST"
 msgstr "ST"
 
-#: package/contents/ui/FullRepresentation.qml:6517
+#: package/contents/ui/FullRepresentation.qml:6568
 msgid "Which channels this speaker plays: stereo, left only, right only, or a mono mix of both. Set one speaker to L and another to R for a true stereo pair — remembered for the device."
 msgstr "Qué canales reproduce este altavoz: estéreo, solo izquierdo, solo derecho o una mezcla mono de ambos. Pon un altavoz en L y otro en R para un verdadero par estéreo — se recuerda para el dispositivo."
 
-#: package/contents/ui/FullRepresentation.qml:6548
+#: package/contents/ui/FullRepresentation.qml:6599
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
-#: package/contents/ui/FullRepresentation.qml:6563
+#: package/contents/ui/FullRepresentation.qml:6614
 msgid "Bluetooth is off or no adapter is available — check System Settings."
 msgstr "El Bluetooth está apagado o no hay adaptador disponible — revisa las Preferencias del sistema."
 
-#: package/contents/ui/FullRepresentation.qml:6574
+#: package/contents/ui/FullRepresentation.qml:6625
 msgid "No paired Bluetooth audio devices — use \"Pair a new speaker…\" below, or pair once in System Settings."
 msgstr "No hay dispositivos de audio Bluetooth emparejados: use «Emparejar un altavoz nuevo…» abajo, o empareje una vez en Preferencias del sistema."
 
-#: package/contents/ui/FullRepresentation.qml:6616
+#: package/contents/ui/FullRepresentation.qml:6667
 msgid "Tap again to forget — pairing again is the only way back"
 msgstr "Toca de nuevo para olvidar: la única vuelta es emparejar otra vez"
 
-#: package/contents/ui/FullRepresentation.qml:6617
+#: package/contents/ui/FullRepresentation.qml:6668
 msgid "Forget this device (unpair)"
 msgstr "Olvidar este dispositivo (desemparejar)"
 
-#: package/contents/ui/FullRepresentation.qml:6650
+#: package/contents/ui/FullRepresentation.qml:6701
 msgid "%1 — linked, no sound yet"
 msgstr "%1 — enlazado, aún sin sonido"
 
-#: package/contents/ui/FullRepresentation.qml:6682
+#: package/contents/ui/FullRepresentation.qml:6733
 msgid "%1 — pairing…"
 msgstr "%1 — emparejando…"
 
-#: package/contents/ui/FullRepresentation.qml:6683
+#: package/contents/ui/FullRepresentation.qml:6734
 msgid "%1 — new, click to pair"
 msgstr "%1 — nuevo, haz clic para emparejar"
 
-#: package/contents/ui/FullRepresentation.qml:6693
+#: package/contents/ui/FullRepresentation.qml:6744
 msgid "Pair a new speaker…"
 msgstr "Emparejar un altavoz nuevo…"
 
-#: package/contents/ui/FullRepresentation.qml:6709
+#: package/contents/ui/FullRepresentation.qml:6760
 msgid "Searching — put the speaker in pairing mode…"
 msgstr "Buscando — pon el altavoz en modo de emparejamiento…"
 
-#: package/contents/ui/FullRepresentation.qml:6732
+#: package/contents/ui/FullRepresentation.qml:6783
 msgid "WiFi & network"
 msgstr "WiFi y red"
 
-#: package/contents/ui/FullRepresentation.qml:6764
+#: package/contents/ui/FullRepresentation.qml:6815
 msgid "%1 (speaker group)"
 msgstr "%1 (grupo de altavoces)"
 
-#: package/contents/ui/FullRepresentation.qml:6792
+#: package/contents/ui/FullRepresentation.qml:6843
 msgid "Balance"
 msgstr "Balance"
 
-#: package/contents/ui/FullRepresentation.qml:6806
+#: package/contents/ui/FullRepresentation.qml:6857
 msgid "This device's share of the volume — the balance follows every master move and is remembered for the device."
 msgstr "La parte de este dispositivo en el volumen: el balance sigue cada movimiento del control maestro y se recuerda para el dispositivo."
 
-#: package/contents/ui/FullRepresentation.qml:6828
+#: package/contents/ui/FullRepresentation.qml:6879
 msgid "Each device buffers on its own, so rooms may play a few seconds apart. For perfectly synced speakers, group them in the Google Home app — the group appears here as a single device."
 msgstr "Cada dispositivo almacena el flujo en su propio búfer, por lo que las habitaciones pueden sonar con unos segundos de diferencia. Para altavoces perfectamente sincronizados, agrúpalos en la aplicación Google Home: el grupo aparece aquí como un solo dispositivo."
 
-#: package/contents/ui/FullRepresentation.qml:6838
+#: package/contents/ui/FullRepresentation.qml:6889
 msgid "Stop casting everywhere"
 msgstr "Detener la emisión en todos los dispositivos"
 
-#: package/contents/ui/FullRepresentation.qml:6856
+#: package/contents/ui/FullRepresentation.qml:6907
 msgid "Searching for devices…"
 msgstr "Buscando dispositivos…"
 
-#: package/contents/ui/FullRepresentation.qml:6865
+#: package/contents/ui/FullRepresentation.qml:6916
 msgid "No devices found on your network"
 msgstr "No se encontraron dispositivos en su red"
 
-#: package/contents/ui/main.qml:541
+#: package/contents/ui/main.qml:542
 msgid "Station list could not be read"
 msgstr "No se pudo leer la lista de emisoras"
 
-#: package/contents/ui/main.qml:542
+#: package/contents/ui/main.qml:543
 msgid "The saved station configuration is malformed. Your data was not changed; fix the servers entry or use Settings → Import."
 msgstr "La configuración de emisoras guardada está dañada. Tus datos no se han modificado; corrige la entrada servers o usa Ajustes → Importar."
 
-#: package/contents/ui/main.qml:957
+#: package/contents/ui/main.qml:960
 msgid "The station did not answer — it may be offline or not available in your country. Try another result."
 msgstr "La emisora no respondió: puede estar fuera de línea o no disponible en tu país. Prueba con otro resultado."
 
-#: package/contents/ui/main.qml:1030
+#: package/contents/ui/main.qml:1033
 msgid "Download gave no answer"
 msgstr "La descarga no respondió"
 
-#: package/contents/ui/main.qml:1031
+#: package/contents/ui/main.qml:1034
 msgid "Nothing came back from the downloader — try again."
 msgstr "No llegó nada del descargador — inténtalo de nuevo."
 
-#: package/contents/ui/main.qml:2866
+#: package/contents/ui/main.qml:2928
 msgid "%1 devices"
 msgstr "%1 dispositivos"
 
-#: package/contents/ui/main.qml:3745
+#: package/contents/ui/main.qml:3815
 msgid "The Bluetooth speaker"
 msgstr "El altavoz Bluetooth"
 
-#: package/contents/ui/main.qml:3744
+#: package/contents/ui/main.qml:3814
 msgid "%1 is connected, but its sound never arrived"
 msgstr "%1 está conectado, pero su sonido nunca llegó"
 
-#: package/contents/ui/main.qml:3746
+#: package/contents/ui/main.qml:3816
 msgid "Turn the speaker off and on again, then reconnect it."
 msgstr "Apaga y enciende el altavoz y vuelve a conectarlo."
 
-#: package/contents/ui/main.qml:4218
+#: package/contents/ui/main.qml:4353
 msgid "%1 is not answering, and the directory could not be asked whether it has moved. It stays in your list."
-msgstr ""
+msgstr "%1 no responde, y no se pudo preguntar al directorio si se ha mudado. Se mantiene en tu lista."
 
-#: package/contents/ui/main.qml:4235
+#: package/contents/ui/main.qml:4370
 msgid "Station seems to be off the air"
 msgstr "La emisora parece estar fuera del aire"
 
-#: package/contents/ui/main.qml:4237
-#, fuzzy
+#: package/contents/ui/main.qml:4372
 msgid "%1 is not answering at any address the directory knows. It stays in your list."
-msgstr "%1 no responde en ninguna dirección conocida por el directorio. Se mantiene en tu lista — se seguirá intentando en segundo plano."
+msgstr "%1 no responde en ninguna dirección conocida por el directorio. Se mantiene en tu lista."
 
-#: package/contents/ui/main.qml:4239
-#, fuzzy
+#: package/contents/ui/main.qml:4374
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again for a few minutes, then leaving it be."
-msgstr "%1 no responde en ninguna dirección conocida por el directorio. Se mantiene en tu lista — se seguirá intentando en segundo plano."
+msgstr "%1 no responde en ninguna dirección conocida por el directorio. Se mantiene en tu lista — se seguirá intentando unos minutos y luego se dejará."
 
-#: package/contents/ui/main.qml:4240
+#: package/contents/ui/main.qml:4375
 msgid "%1 is not answering at any address the directory knows. It stays in your list — trying again in the background."
 msgstr "%1 no responde en ninguna dirección conocida por el directorio. Se mantiene en tu lista — se seguirá intentando en segundo plano."
 
-#: package/contents/ui/main.qml:4358
+#: package/contents/ui/main.qml:4566
 msgid "Playing from a backup address"
 msgstr "Reproduciendo desde una dirección de respaldo"
 
-#: package/contents/ui/main.qml:4360
+#: package/contents/ui/main.qml:4568
 msgid "The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept."
 msgstr "La dirección guardada de la emisora no responde; por ahora suena la coincidencia más cercana del directorio. Tu dirección guardada se conservó."
 
-#: package/contents/ui/main.qml:4361
+#: package/contents/ui/main.qml:4569
 msgid "The station's saved address is not answering — playing %1 from the directory for now. It may be a different station. Your saved address was kept."
-msgstr ""
+msgstr "La dirección guardada de la emisora no responde; por ahora suena %1 del directorio. Puede ser otra emisora. Tu dirección guardada se conservó."
 
-#: package/contents/ui/main.qml:4404
+#: package/contents/ui/main.qml:4636
 msgid "Station found at a new address"
 msgstr "Emisora encontrada en una nueva dirección"
 
-#: package/contents/ui/main.qml:4405
+#: package/contents/ui/main.qml:4637
 msgid "%1 moved — the new address was saved to your list."
 msgstr "%1 se mudó — la nueva dirección se guardó en tu lista."
 
-#: package/contents/ui/main.qml:5891
+#: package/contents/ui/main.qml:6114
 msgid "Casting needs pychromecast"
 msgstr "El envío necesita pychromecast"
 
-#: package/contents/ui/main.qml:5892
+#: package/contents/ui/main.qml:6115
 msgid "Install the pychromecast library to cast to your devices."
 msgstr "Instale la biblioteca pychromecast para enviar a sus dispositivos."
 
-#: package/contents/ui/main.qml:5913
+#: package/contents/ui/main.qml:6136
 msgid "the device"
 msgstr "el dispositivo"
 
-#: package/contents/ui/main.qml:5913
+#: package/contents/ui/main.qml:6136
 msgid "Could not cast to %1"
 msgstr "No se pudo enviar a %1"
 
-#: package/contents/ui/main.qml:5914
+#: package/contents/ui/main.qml:6137
 msgid "The device could not play this station."
 msgstr "El dispositivo no pudo reproducir esta emisora."
 
-#: package/contents/ui/main.qml:5960
+#: package/contents/ui/main.qml:6183
 msgid "Casting"
 msgstr "Transmitiendo"
 
-#: package/contents/ui/main.qml:5961
+#: package/contents/ui/main.qml:6184
 msgid "The device did not stop — it may still be playing."
 msgstr "El dispositivo no se detuvo; puede que siga reproduciendo."
 
-#: package/contents/ui/main.qml:6039
+#: package/contents/ui/main.qml:6262
 msgid "Bluetooth is switched off"
 msgstr "El Bluetooth está apagado"
 
-#: package/contents/ui/main.qml:6040
+#: package/contents/ui/main.qml:6263
 msgid "The adapter would not turn on — check the system tray's Bluetooth switch or System Settings."
 msgstr "El adaptador no se encendió: revisa el interruptor Bluetooth de la bandeja del sistema o Preferencias del sistema."
 
-#: package/contents/ui/main.qml:6059 package/contents/ui/main.qml:6177
+#: package/contents/ui/main.qml:6282 package/contents/ui/main.qml:6400
 msgid "the Bluetooth device"
 msgstr "el dispositivo Bluetooth"
 
-#: package/contents/ui/main.qml:6058
+#: package/contents/ui/main.qml:6281
 msgid "Could not connect to %1"
 msgstr "No se pudo conectar con %1"
 
-#: package/contents/ui/main.qml:6060
+#: package/contents/ui/main.qml:6283
 msgid "Make sure the speaker is switched on and in range."
 msgstr "Asegúrate de que el altavoz esté encendido y dentro del alcance."
 
-#: package/contents/ui/main.qml:6176
+#: package/contents/ui/main.qml:6399
 msgid "Could not pair with %1"
 msgstr "No se pudo emparejar con %1"
 
-#: package/contents/ui/main.qml:6178
+#: package/contents/ui/main.qml:6401
 msgid "Put the speaker in pairing mode (hold its Bluetooth button) and try again."
 msgstr "Pon el altavoz en modo de emparejamiento (mantén pulsado su botón Bluetooth) e inténtalo de nuevo."
 
-#: package/contents/ui/main.qml:6276 package/contents/ui/main.qml:6350
+#: package/contents/ui/main.qml:6499 package/contents/ui/main.qml:6573
 msgid "yt-dlp is not installed"
 msgstr "yt-dlp no está instalado"
 
-#: package/contents/ui/main.qml:6277 package/contents/ui/main.qml:6351
+#: package/contents/ui/main.qml:6500 package/contents/ui/main.qml:6574
 msgid "Install yt-dlp (and ffmpeg) to download tracks."
 msgstr "Instale yt-dlp (y ffmpeg) para descargar pistas."
 
-#: package/contents/ui/main.qml:6300 package/contents/ui/main.qml:6370
+#: package/contents/ui/main.qml:6523 package/contents/ui/main.qml:6593
 msgid "Nothing found to download"
 msgstr "No se encontró nada para descargar"
 
-#: package/contents/ui/main.qml:6301
+#: package/contents/ui/main.qml:6524
 msgid "yt-dlp could not search: %1"
 msgstr "yt-dlp no pudo buscar: %1"
 
-#: package/contents/ui/main.qml:6302 package/contents/ui/main.qml:6371
+#: package/contents/ui/main.qml:6525 package/contents/ui/main.qml:6594
 msgid "No track matched \"%1\" — a show or album title often has no single track to find."
 msgstr "Ningún tema coincidió con \"%1\" — un nombre de programa o álbum a menudo no tiene un solo tema que encontrar."
 
-#: package/contents/ui/main.qml:6314
+#: package/contents/ui/main.qml:6537
 msgid "Found only a different show — skipped"
 msgstr "Solo se encontró un programa distinto — omitido"
 
-#: package/contents/ui/main.qml:6315
+#: package/contents/ui/main.qml:6538
 msgid "Best match for \"%1\" was \"%2\". Not downloading the wrong one."
 msgstr "La mejor coincidencia para \"%1\" fue \"%2\". No se descarga la equivocada."
 
-#: package/contents/ui/main.qml:6337
+#: package/contents/ui/main.qml:6560
 msgid "Downloading again without the cover"
 msgstr "Descargando de nuevo sin la carátula"
 
-#: package/contents/ui/main.qml:6338
+#: package/contents/ui/main.qml:6561
 msgid "Embedding tags needs the python-mutagen package — install it to get covers in your files."
 msgstr "Para incrustar las etiquetas se necesita el paquete python-mutagen — instálalo para tener carátulas en tus archivos."
 
-#: package/contents/ui/main.qml:6366
+#: package/contents/ui/main.qml:6589
 msgid "Track downloaded ✓"
 msgstr "Pista descargada ✓"
 
-#: package/contents/ui/main.qml:6367
+#: package/contents/ui/main.qml:6590
 msgid "Saved as \"%1\" — newest first in My Music"
 msgstr "Guardado como \"%1\" — lo más nuevo primero en Mi música"
 
-#: package/contents/ui/main.qml:6375
+#: package/contents/ui/main.qml:6598
 msgid "Download failed"
 msgstr "La descarga ha fallado"
 
-#: package/contents/ui/main.qml:6376
+#: package/contents/ui/main.qml:6599
 msgid "Unknown error"
 msgstr "Error desconocido"
 
-#: package/contents/ui/main.qml:6841
+#: package/contents/ui/main.qml:7068
 msgid "Audio output changed"
 msgstr "Salida de audio cambiada"
 
-#: package/contents/ui/main.qml:6842
+#: package/contents/ui/main.qml:7069
 msgid "The chosen output device disappeared — using the system default instead."
 msgstr "El dispositivo de salida elegido desapareció; se usa la salida predeterminada del sistema."
 
-#: package/contents/ui/MediaListItem.qml:498
+#: package/contents/ui/MediaListItem.qml:507
 msgid "Click again to confirm removal"
 msgstr "Haga clic de nuevo para confirmar la eliminación"
 
-#: package/contents/ui/MediaListItem.qml:499
+#: package/contents/ui/MediaListItem.qml:508
 msgid "Remove station from list"
 msgstr "Eliminar la emisora de la lista"
 
-#: package/contents/ui/MediaListItem.qml:573
+#: package/contents/ui/MediaListItem.qml:582
 msgid "Waiting for track info…"
 msgstr "Esperando la información de la pista…"
 
-#: package/contents/ui/PodcastEngine.qml:209
+#: package/contents/ui/PodcastEngine.qml:213
 msgid "Subscriptions exported"
 msgstr "Suscripciones exportadas"
 
-#: package/contents/ui/PodcastEngine.qml:211
+#: package/contents/ui/PodcastEngine.qml:215
 msgid "Export failed"
 msgstr "Falló la exportación"
 
-#: package/contents/ui/PodcastEngine.qml:212
+#: package/contents/ui/PodcastEngine.qml:216
 msgid "Could not write the subscriptions file."
 msgstr "No se pudo escribir el archivo de suscripciones."
 
-#: package/contents/ui/PodcastEngine.qml:251
+#: package/contents/ui/PodcastEngine.qml:255
 msgid "Episode downloaded"
 msgstr "Episodio descargado"
 
-#: package/contents/ui/PodcastEngine.qml:256
-#: package/contents/ui/PodcastEngine.qml:1187
+#: package/contents/ui/PodcastEngine.qml:260
+#: package/contents/ui/PodcastEngine.qml:1193
 msgid "Episode download failed"
 msgstr "Falló la descarga del episodio"
 
-#: package/contents/ui/PodcastEngine.qml:422
+#: package/contents/ui/PodcastEngine.qml:426
 msgid "Nothing to export"
 msgstr "Nada que exportar"
 
-#: package/contents/ui/PodcastEngine.qml:422
+#: package/contents/ui/PodcastEngine.qml:426
 msgid "Subscribe to a show first."
 msgstr "Primero suscríbete a un programa."
 
-#: package/contents/ui/PodcastEngine.qml:454
+#: package/contents/ui/PodcastEngine.qml:458
 msgid "Subscriptions imported"
 msgstr "Suscripciones importadas"
 
-#: package/contents/ui/PodcastEngine.qml:455
+#: package/contents/ui/PodcastEngine.qml:459
 msgid "%1 show added"
 msgid_plural "%1 shows added"
 msgstr[0] "%1 programa añadido"
 msgstr[1] "%1 programas añadidos"
 
-#: package/contents/ui/PodcastEngine.qml:457
+#: package/contents/ui/PodcastEngine.qml:461
 msgid "Nothing imported"
 msgstr "No se importó nada"
 
-#: package/contents/ui/PodcastEngine.qml:458
+#: package/contents/ui/PodcastEngine.qml:462
 msgid "No new podcast feeds were found in that file."
 msgstr "No se encontraron nuevos feeds de pódcast en ese archivo."
 
-#: package/contents/ui/PodcastEngine.qml:890
-#: package/contents/ui/PodcastEngine.qml:932
+#: package/contents/ui/PodcastEngine.qml:894
+#: package/contents/ui/PodcastEngine.qml:936
 msgid "This feed address is not allowed."
 msgstr "Esta dirección de feed no está permitida."
 
-#: package/contents/ui/PodcastEngine.qml:959
-#: package/contents/ui/PodcastEngine.qml:1008
+#: package/contents/ui/PodcastEngine.qml:964
+#: package/contents/ui/PodcastEngine.qml:1002
 msgid "The feed could not be reached — check the connection and try again."
 msgstr "No se pudo acceder al feed — comprueba la conexión e inténtalo de nuevo."
 
-#: package/contents/ui/PodcastEngine.qml:961
-#: package/contents/ui/PodcastEngine.qml:1010
+#: package/contents/ui/PodcastEngine.qml:966
+#: package/contents/ui/PodcastEngine.qml:1004
 msgid "The feed did not answer (error %1)."
 msgstr "El feed no respondió (error %1)."
 
-#: package/contents/ui/PodcastEngine.qml:962
-#: package/contents/ui/PodcastEngine.qml:1011
+#: package/contents/ui/PodcastEngine.qml:967
+#: package/contents/ui/PodcastEngine.qml:1005
 msgid "This address is not a podcast feed."
 msgstr "Esta dirección no es un feed de pódcast."
 
-#: package/contents/ui/PodcastEngine.qml:974
+#: package/contents/ui/PodcastEngine.qml:979
 msgid "No playable episodes in this feed."
 msgstr "No hay episodios reproducibles en este feed."
 
-#: package/contents/ui/PodcastEngine.qml:1373
+#: package/contents/ui/PodcastEngine.qml:1379
 msgid "%1 — the newest episodes are downloading."
 msgstr "%1: los episodios más recientes se están descargando."
 
-#: package/contents/ui/PodcastEngine.qml:1375
+#: package/contents/ui/PodcastEngine.qml:1381
 msgid "New podcast episodes"
 msgstr "Nuevos episodios de pódcast"
 
-#: package/contents/ui/RecordingEngine.qml:267
-#: package/contents/ui/RecordingEngine.qml:585
-#: package/contents/ui/RecordingEngine.qml:665
+#: package/contents/ui/RecordingEngine.qml:271
+#: package/contents/ui/RecordingEngine.qml:631
+#: package/contents/ui/RecordingEngine.qml:716
 msgid "Recording failed"
 msgstr "La grabación ha fallado"
 
-#: package/contents/ui/RecordingEngine.qml:468
+#: package/contents/ui/RecordingEngine.qml:508
 msgid "Scheduled recording missed"
 msgstr "Grabación programada perdida"
 
-#: package/contents/ui/RecordingEngine.qml:474
+#: package/contents/ui/RecordingEngine.qml:514
 msgid "Scheduled recording skipped"
 msgstr "Grabación programada omitida"
 
-#: package/contents/ui/RecordingEngine.qml:475
+#: package/contents/ui/RecordingEngine.qml:515
 msgid "%1 — another recording is already running."
 msgstr "%1 — ya hay otra grabación en curso."
 
-#: package/contents/ui/RecordingEngine.qml:591
+#: package/contents/ui/RecordingEngine.qml:637
 msgid "Scheduled recording started"
 msgstr "Grabación programada iniciada"
 
-#: package/contents/ui/RecordingEngine.qml:641
+#: package/contents/ui/RecordingEngine.qml:692
 msgid "ffmpeg is not installed"
 msgstr "ffmpeg no está instalado"
 
-#: package/contents/ui/RecordingEngine.qml:642
+#: package/contents/ui/RecordingEngine.qml:693
 msgid "Install ffmpeg to record radio."
 msgstr "Instale ffmpeg para grabar la radio."
 
-#: package/contents/ui/RecordingEngine.qml:647
+#: package/contents/ui/RecordingEngine.qml:698
 msgid "curl is not installed"
 msgstr "curl no está instalado"
 
-#: package/contents/ui/RecordingEngine.qml:648
+#: package/contents/ui/RecordingEngine.qml:699
 msgid "Install curl to record radio."
 msgstr "Instale curl para grabar la radio."
 
-#: package/contents/ui/RecordingEngine.qml:651
+#: package/contents/ui/RecordingEngine.qml:702
 msgid "Not enough disk space for this recording"
 msgstr "No hay suficiente espacio en disco para esta grabación"
 
-#: package/contents/ui/RecordingEngine.qml:652
+#: package/contents/ui/RecordingEngine.qml:703
 msgid "Free some space in %1 and try again."
 msgstr "Libera espacio en %1 e inténtalo de nuevo."
 
-#: package/contents/ui/RecordingEngine.qml:655
+#: package/contents/ui/RecordingEngine.qml:706
 msgid "Recording saved ✓ (%1)"
 msgstr "Grabación guardada ✓ (%1)"
 
-#: package/contents/ui/RecordingEngine.qml:659
+#: package/contents/ui/RecordingEngine.qml:710
 msgid "Recording interrupted (%1 captured)"
 msgstr "Grabación interrumpida (%1 capturado)"
 
-#: package/contents/ui/RecordingEngine.qml:661
+#: package/contents/ui/RecordingEngine.qml:712
 msgid "%1 — the file is much smaller than expected."
 msgstr "%1 — el archivo es mucho más pequeño de lo esperado."
 
-#: package/contents/ui/RecordingEngine.qml:666
+#: package/contents/ui/RecordingEngine.qml:717
 msgid "The stream could not be captured."
 msgstr "No se pudo capturar la emisión."
 
@@ -2538,11 +2561,11 @@ msgstr "El altavoz está conectado, pero no se pudo incorporar al grupo — apag
 msgid "The speaker is connected but its audio output never appeared — switch the speaker off and on, then connect it again."
 msgstr "El altavoz está conectado, pero su salida de audio nunca apareció — apaga y enciende el altavoz y vuelve a conectarlo."
 
-#: package/contents/ui/TimeshiftEngine.qml:513
+#: package/contents/ui/TimeshiftEngine.qml:515
 msgid "The stream could not be relayed — trying it directly"
 msgstr "No se pudo retransmitir la emisión — se intenta en directo"
 
-#: package/contents/ui/TimeshiftEngine.qml:559
+#: package/contents/ui/TimeshiftEngine.qml:567
 msgid "Not enough free disk space"
 msgstr "No hay suficiente espacio libre en el disco"
 

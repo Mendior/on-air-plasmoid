@@ -86,4 +86,68 @@ TestCase {
         // security one — no caller splits on it.
         compare(NG.sanitize("A" + ch(0x2028) + "B"), "A" + ch(0x2028) + "B")
     }
+
+    // The notice text. Nothing is taken out of it, unlike above: the three
+    // characters are spelled so that the notification shows them.
+    function test_a_station_name_is_shown_in_a_notice_as_written() {
+        compare(NG.escapeMarkup("<3 & co"), "&lt;3 &amp; co")
+        compare(NG.escapeMarkup("Rock & Pop"), "Rock &amp; Pop")
+        compare(NG.escapeMarkup("R&B > Soul"), "R&amp;B &gt; Soul")
+        compare(NG.escapeMarkup("Radio Tallinn"), "Radio Tallinn")
+        compare(NG.escapeMarkup("Öö Raadio 100.5"), "Öö Raadio 100.5")
+    }
+
+    function test_a_tag_in_a_name_cannot_open_in_a_notice() {
+        compare(NG.escapeMarkup("<a href=\"http://x.example\">tap</a>"),
+                "&lt;a href=\"http://x.example\"&gt;tap&lt;/a&gt;")
+        compare(NG.escapeMarkup("<b>Kino</b>"), "&lt;b&gt;Kino&lt;/b&gt;")
+        compare(NG.escapeMarkup("<img src=x>"), "&lt;img src=x&gt;")
+        var out = NG.escapeMarkup("a<b>c&d<<>>&&")
+        compare(out.indexOf("<"), -1)
+        compare(out.indexOf(">"), -1)
+        // Every & left is the start of one of the three spellings.
+        compare(out.replace(/&(amp|lt|gt);/g, "").indexOf("&"), -1)
+    }
+
+    function test_a_text_already_spelled_out_is_spelled_again() {
+        // Applied exactly once, by notify(): what arrives is what is shown.
+        compare(NG.escapeMarkup("&amp;"), "&amp;amp;")
+        compare(NG.escapeMarkup("&lt;3"), "&amp;lt;3")
+        compare(NG.escapeMarkup(NG.escapeMarkup("<3 & co")), "&amp;lt;3 &amp;amp; co")
+    }
+
+    function test_the_three_characters_alone_and_at_the_edges() {
+        compare(NG.escapeMarkup("&"), "&amp;")
+        compare(NG.escapeMarkup("<"), "&lt;")
+        compare(NG.escapeMarkup(">"), "&gt;")
+        compare(NG.escapeMarkup("&x"), "&amp;x")
+        compare(NG.escapeMarkup("x&"), "x&amp;")
+        compare(NG.escapeMarkup("<>"), "&lt;&gt;")
+    }
+
+    function test_what_is_not_markup_is_left_alone() {
+        compare(NG.escapeMarkup("\"quoted\" 'name'"), "\"quoted\" 'name'")
+        compare(NG.escapeMarkup("two\nlines"), "two\nlines")
+        compare(NG.escapeMarkup("a ; # / = b"), "a ; # / = b")
+    }
+
+    function test_no_notice_text_reads_as_empty() {
+        compare(NG.escapeMarkup(""), "")
+        compare(NG.escapeMarkup(null), "")
+        compare(NG.escapeMarkup(undefined), "")
+    }
+
+    function test_a_text_that_is_not_a_string_is_shown_as_it_prints() {
+        compare(NG.escapeMarkup(5), "5")
+        compare(NG.escapeMarkup(0), "0")
+        compare(NG.escapeMarkup(false), "false")
+    }
+
+    function test_a_very_long_notice_text_is_escaped_whole() {
+        var raw = new Array(4001).join("<&>")              // 12000 characters
+        var out = NG.escapeMarkup(raw)
+        compare(out.length, 4000 * 13)
+        compare(out.substring(0, 13), "&lt;&amp;&gt;")
+        compare(out.indexOf("<"), -1)
+    }
 }

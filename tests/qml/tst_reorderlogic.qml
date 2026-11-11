@@ -84,6 +84,107 @@ TestCase {
         compare(rows[0].name, "Jazz FM")
     }
 
+    // ── buildFilteredRows: stations the directory's answer named ─────────
+    // "Example FM" is saved; the directory files it under Estonia and jazz.
+    function _example() {
+        return { name: "Example FM", hostname: "https://example.fm/live", favicon: "", active: true, uuid: "ex-1", prev: "" }
+    }
+    readonly property var _exampleNamed: ({ url_resolved: "https://example.fm/live", url: "", stationuuid: "ex-1" })
+    function _names(rows) { return rows.map(function(r) { return r.name }) }
+
+    function test_a_saved_station_the_directory_named_shows_whatever_its_name_says() {
+        var list = [_st("Alpha"), _example(), _st("Jazz FM")]
+        // By its country, its language and its genre the text is not in the name.
+        compare(_names(RL.buildFilteredRows(list, [], "estonia", false, [_exampleNamed])), ["Example FM"])
+        compare(_names(RL.buildFilteredRows(list, [], "estonian", false, [_exampleNamed])), ["Example FM"])
+        // The saved order stands, and the row knows its place in the list.
+        var rows = RL.buildFilteredRows(list, [], "jazz", false, [_exampleNamed])
+        compare(_names(rows), ["Example FM", "Jazz FM"])
+        compare(rows[0].originalIndex, 1)
+        compare(rows[0].hostname, "https://example.fm/live")
+        compare(rows[1].originalIndex, 2)
+    }
+
+    function test_a_station_nothing_named_is_still_found_by_its_name_alone() {
+        var list = [_st("Alpha"), _example(), _st("Jazz FM")]
+        compare(_names(RL.buildFilteredRows(list, [], "jazz", false, [])), ["Jazz FM"])
+        compare(_names(RL.buildFilteredRows(list, [], "example", false, [])), ["Example FM"])
+        // Named and matching by name is one row, not two.
+        compare(_names(RL.buildFilteredRows(list, [], "example", false, [_exampleNamed, _exampleNamed])), ["Example FM"])
+        // What the answer named and the list does not hold changes nothing.
+        compare(_names(RL.buildFilteredRows(list, [], "jazz", false,
+                    [{ url_resolved: "https://gone.example/x", url: "", stationuuid: "gone" }])), ["Jazz FM"])
+    }
+
+    function test_a_named_station_is_found_under_another_address() {
+        // The directory moved the record to another server under the same uuid.
+        var moved = { url_resolved: "https://cdn2.example.fm/live", url: "", stationuuid: "ex-1" }
+        compare(_names(RL.buildFilteredRows([_example()], [], "jazz", false, [moved])), ["Example FM"])
+        // A heal moved the saved row, and the answer names where it was.
+        var healed = { name: "Example FM", hostname: "https://new.example.fm/live", favicon: "", active: true,
+                       uuid: "", prev: "http://example.fm/live/" }
+        compare(_names(RL.buildFilteredRows([healed], [], "jazz", false,
+                    [{ url_resolved: "https://example.fm/live", url: "", stationuuid: "" }])), ["Example FM"])
+        // The row a star has just added: known by the address it was starred at.
+        compare(_names(RL.buildFilteredRows([_st("Alpha"), _st("Fresh", "https://fresh.example/s")], [], "jazz", false,
+                    [{ url_resolved: "http://fresh.example/s/", url: "", stationuuid: "" }])), ["Fresh"])
+        // The same uuid twice in the list: the first row is the one shown.
+        var twin = _example(); twin.name = "Example FM 2"; twin.hostname = "https://other.example/live"
+        compare(_names(RL.buildFilteredRows([_example(), twin], [], "jazz", false, [_exampleNamed])), ["Example FM"])
+    }
+
+    function test_named_stations_do_not_break_into_the_favourites_view() {
+        var list = [_st("Jazz FM"), _st("Alpha"), _example()]
+        // A favourite the answer named shows there, in the favourites' order
+        // and not the list's.
+        compare(_names(RL.buildFilteredRows(list, ["Example FM", "Jazz FM"], "jazz", true, [_exampleNamed])),
+                ["Example FM", "Jazz FM"])
+        // The star taken away again: saved, named, and no favourite.
+        compare(_names(RL.buildFilteredRows(list, ["Jazz FM"], "jazz", true, [_exampleNamed])), ["Jazz FM"])
+        // Out of the favourites view the star makes no difference to it.
+        compare(_names(RL.buildFilteredRows(list, ["Jazz FM"], "jazz", false, [_exampleNamed])), ["Jazz FM", "Example FM"])
+    }
+
+    function test_without_text_every_station_shows_named_or_not() {
+        var list = [_st("Alpha"), _example(), _st("Jazz FM")]
+        compare(_names(RL.buildFilteredRows(list, [], "", false, [_exampleNamed])), ["Alpha", "Example FM", "Jazz FM"])
+        compare(_names(RL.buildFilteredRows(list, [], "   ", false, [_exampleNamed])), ["Alpha", "Example FM", "Jazz FM"])
+        compare(_names(RL.buildFilteredRows(list, ["Alpha"], "", true, [_exampleNamed])), ["Alpha"])
+    }
+
+    function test_a_list_of_named_stations_that_is_none_names_nothing() {
+        var list = [_st("Alpha"), _example(), _st("Jazz FM")]
+        var none = [undefined, null, "", "https://example.fm/live", 7, {}, { length: 1, 0: _exampleNamed }]
+        for (var i = 0; i < none.length; i++)
+            compare(_names(RL.buildFilteredRows(list, [], "jazz", false, none[i])), ["Jazz FM"])
+        compare(_names(RL.buildFilteredRows(list, [], "jazz", false)), ["Jazz FM"])
+        // Entries that are no rows are stepped over and the good one counts.
+        compare(_names(RL.buildFilteredRows(list, [], "jazz", false,
+                    [null, 7, "ex-1", {}, { url_resolved: 5, url: [], stationuuid: {} }, _exampleNamed])),
+                ["Example FM", "Jazz FM"])
+        // An empty address and an empty uuid name no station, a station without them neither.
+        compare(_names(RL.buildFilteredRows([{ name: "Bare", hostname: "", active: true }, _st("Jazz FM")], [], "jazz", false,
+                    [{ url_resolved: "", url: "", stationuuid: "" }])), ["Jazz FM"])
+    }
+
+    function test_many_named_stations_in_a_long_list_keep_the_list_order() {
+        var list = [], named = [], want = []
+        for (var i = 0; i < 400; i++) {
+            list.push({ name: "Station " + i, hostname: "https://s" + i + ".example/live", favicon: "", active: true,
+                        uuid: "u-" + i, prev: "" })
+            if (i % 3 === 0) {
+                // Named back to front, twice over: the order on screen is the list's.
+                named.unshift({ url_resolved: "", url: "http://S" + i + ".example:80/live/", stationuuid: "" })
+                named.push({ url_resolved: "https://elsewhere.example/" + i, url: "", stationuuid: "u-" + i })
+                want.push("Station " + i)
+            }
+        }
+        var rows = RL.buildFilteredRows(list, [], "zzz", false, named)
+        compare(rows.length, 134)
+        compare(_names(rows), want)
+        compare(rows[133].originalIndex, 399)
+    }
+
     // ── syncModelToRows ──────────────────────────────────────────────────
 
     function test_identical_sequence_patches_nothing_and_skips_rebuild() {

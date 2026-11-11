@@ -1,5 +1,108 @@
 # Changelog
 
+## 2026.43
+
+- **The panel can show what is playing.** A new option under Appearance,
+  in the Panel section, writes the artist and the title next to the panel
+  icon: on two lines where the panel is tall enough, on one where it is not.
+  You choose how wide the text may get. The text stays put through a
+  reconnect instead of jumping in and out. The option is off unless you turn
+  it on, and with it off the widget takes exactly the room it always took.
+  Contributed by DarthRidar on GitHub. Thank you!
+
+- **A stream that moved to another server is found where it went.** Some
+  networks move a station's stream between their own servers. The saved
+  address then answers "not found" while the station plays on next door,
+  and the directory does not know yet. The widget now looks for the same
+  stream on the station's own network before it gives up. Retro FM and the
+  other Sky Media stations that went quiet for this reason play again
+  without anything being changed by hand.
+
+- **One failure no longer moves a station.** A saved address that fails is
+  tried once more before anybody is asked where the station went: an encoder
+  restarting looks like a dead stream for a few seconds. When another
+  address has to stand in, the list is rewritten only once the old address
+  is proven gone, which means its server says so five minutes on, or nobody
+  has answered there for fifteen. An address that answers again keeps its
+  place. Alarms and scheduled recordings follow a station that really moved,
+  and a recording that is running when it moves keeps its schedule.
+
+- **Search keeps to what you asked.** "rock in the uk" stays inside the UK,
+  and "uk" and "usa" are understood in the settings search too. A station
+  whose name holds a country word is found when the country itself has
+  nothing. The first search after a start reads a country the way every
+  later one does. A station you already have is recognised by its directory
+  record, not only by its address, so it is not offered a second time after
+  it moved. A saved station that the directory finds by its country or its
+  genre now stays on the list; it used to drop out of the results and out
+  of sight. "Show more" no longer goes missing when part of a page was
+  stations you already have. Typing a query again dims the stations already
+  found dead. A
+  search among the favourites that finds nothing says "No matching
+  stations" instead of "No favorite stations yet", a chip for "r&b" reads
+  r&b, and with the search field switched off, typed letters no longer
+  filter the list where you cannot see it.
+
+- **Covers arrive sooner and miss less.** A new song's cover no longer
+  waits out a pause that was only meant for titles that flicker; on the
+  station it was measured on, the cover now follows the title by about half
+  a second where it took close to two. A lookup that timed out is asked once
+  more while the song plays. A one-word artist no longer takes a longer
+  namesake's sleeve, "feat." on the air and "&" in the catalogue count as the
+  same performers, and a year or a mix in brackets no longer hides the
+  record. Opening the popup asks for the title at once. Ogg and FLAC
+  stations that spell their title fields in lower case, or name the album's
+  artist too, show the right title and artist.
+
+- **Alarms on the night the clocks change.** An alarm set for a time inside
+  the hour that spring skips rings that day, an hour later by the clock,
+  instead of the next day. A weekly alarm just after midnight keeps its day
+  in countries that change their clocks at midnight. A podcast alarm with no
+  episode on disk rings the chime, also over something that is playing.
+
+- **Recording.** A scheduled recording the machine slept through is stopped
+  at the end of its window and reported as interrupted, not left running
+  and called saved. One that was slow to connect still runs its full
+  length. A recording stopped in the first moment of starting up no longer
+  begins anyway, and one whose time ran out with only a fraction of the
+  audio is reported as interrupted, with the length it really has. A late
+  answer from a recording you cancelled is no longer taken for the next
+  one's. The length box steps in half hours again and takes a typed value.
+
+- **Podcasts.** Episodes with long Cyrillic or CJK titles can be downloaded.
+  Episodes keep their date when the feed names its time zone, and a feed
+  that lists oldest first shows its newest episodes. One bad answer from a
+  feed no longer moves the subscription to a show of the same name. The
+  wake-up popup of a show opens inside the window on a narrow widget.
+
+- **Playback.** Starring a search result or removing a station no longer
+  stops a My Music file or a podcast episode that is playing. A station
+  playing through the local relay that was stopped by a change to the list
+  no longer starts again by itself. A connection cut while a title was being
+  fetched no longer switches that station's titles off. A playlist station
+  on the home network plays. A wheel step during the sleep timer's fade no
+  longer saves the faded level as your volume. A seek sent by the desktop's
+  media controls for an episode that has just ended no longer moves the
+  next one, and a DLNA speaker that refuses to stop is reported instead of
+  being called stopped.
+
+- **The station list and its logos.** Importing a file that is not a station
+  list no longer empties the list, and an import that had to leave rows out
+  says how many. A station's page on TuneIn or Facebook no longer gives it
+  that service's icon, and an error page is no longer saved as a logo. Logos
+  found by "Fetch missing logos" survive a change the popup makes to the
+  list meanwhile.
+
+- **Small things in the popup.** Escape closes the popup also with the
+  Stations tab switched off. A station name too long for its row passes
+  whole under the pointer. A dragged station shows the place it has reached.
+  A station's name is shown in a notification exactly as written, "<" and
+  "&" included. A file playing from disk no longer shows the red "Check
+  internet connection…".
+
+- **Translations.** All thirteen languages are complete again. Some of the
+  retry settings and two notices had been in English since 2026.42.
+
 ## 2026.42
 
 - **Song titles and covers are back where a certificate ran out.** The

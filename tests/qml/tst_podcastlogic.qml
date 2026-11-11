@@ -164,6 +164,321 @@ TestCase {
         compare(PL.decodeEntities("&#0;&#xFFFFFFFF;x"), "x")
     }
 
+    // ── a dead feed and the directory's idea of where the show went ───────
+
+    function hit(name, feed) {
+        return { collectionName: name, feedUrl: feed }
+    }
+
+    function test_a_title_shared_by_three_shows_heals_nothing() {
+        // What iTunes answers for "Tech Talk": three shows of exactly that
+        // name, three feeds. The first one used to be taken.
+        var res = [hit("Tech Talk", "https://one.example/rss"),
+                   hit("tech talk", "https://two.example/rss"),
+                   hit("TECH  TALK", "https://three.example/feed")]
+        compare(PL.pickHealedFeed(res, "Tech Talk", "https://dead.example/rss"), "")
+        // Two are already one too many.
+        compare(PL.pickHealedFeed(res.slice(0, 2), "Tech Talk", "https://dead.example/rss"), "")
+    }
+
+    function test_one_exact_match_heals() {
+        var res = [hit("Tech Talk Daily", "https://daily.example/rss"),
+                   hit("Tech Talk", "https://new.example/rss"),
+                   hit("Talk Tech", "https://other.example/rss")]
+        compare(PL.pickHealedFeed(res, "Tech Talk", "https://dead.example/rss"),
+                "https://new.example/rss")
+        // Case and spacing are not part of a name.
+        compare(PL.pickHealedFeed(res, "  tech   TALK ", "https://dead.example/rss"),
+                "https://new.example/rss")
+        compare(PL.pickHealedFeed([hit(" Tech  Talk ", " https://new.example/rss ")],
+                                  "Tech Talk", "https://dead.example/rss"),
+                "https://new.example/rss")
+        // One show listed twice, under two spellings of one address, is one show.
+        compare(PL.pickHealedFeed([hit("Tech Talk", "https://new.example/rss"),
+                                   hit("Tech Talk", "http://NEW.example:80/rss/")],
+                                  "Tech Talk", "https://dead.example/rss"),
+                "https://new.example/rss")
+    }
+
+    function test_a_name_that_only_resembles_the_title_heals_nothing() {
+        var res = [hit("Tech Talk Daily", "https://daily.example/rss"),
+                   hit("The Tech Talk", "https://the.example/rss")]
+        compare(PL.pickHealedFeed(res, "Tech Talk", "https://dead.example/rss"), "")
+    }
+
+    function test_the_dead_feed_itself_is_never_the_answer() {
+        var dead = "https://dead.example/rss"
+        compare(PL.pickHealedFeed([hit("Tech Talk", dead)], "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed([hit("Tech Talk", "http://DEAD.example:80/rss/")], "Tech Talk", dead), "")
+        // The directory still has the show where it was, so it knows of no
+        // move. The other "Tech Talk" is somebody else's.
+        compare(PL.pickHealedFeed([hit("Tech Talk", dead), hit("Tech Talk", "https://two.example/rss")],
+                                  "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed([hit("Tech Talk", "https://two.example/rss"), hit("Tech Talk", dead)],
+                                  "Tech Talk", dead), "")
+        // Also when the show has since been renamed there.
+        compare(PL.pickHealedFeed([hit("Tech Talk Weekly", dead), hit("Tech Talk", "https://two.example/rss")],
+                                  "Tech Talk", dead), "")
+    }
+
+    function test_results_without_a_usable_feed_are_passed_over() {
+        var dead = "https://dead.example/rss"
+        var res = [{ collectionName: "Tech Talk" },
+                   hit("Tech Talk", ""),
+                   hit("Tech Talk", "http://192.168.1.5/rss"),
+                   hit("Tech Talk", "file:///etc/passwd"),
+                   hit("Tech Talk", "https://new.example/rss")]
+        compare(PL.pickHealedFeed(res, "Tech Talk", dead), "https://new.example/rss")
+        compare(PL.pickHealedFeed(res.slice(0, 4), "Tech Talk", dead), "")
+    }
+
+    function test_an_answer_that_is_no_list_heals_nothing() {
+        var dead = "https://dead.example/rss"
+        compare(PL.pickHealedFeed(null, "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed(undefined, "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed("Tech Talk", "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed({ collectionName: "Tech Talk", feedUrl: "https://new.example/rss" },
+                                  "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed(42, "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed([], "Tech Talk", dead), "")
+        compare(PL.pickHealedFeed([null, 7, "x", {}, []], "Tech Talk", dead), "")
+        // Junk around the one good row does not hide it.
+        compare(PL.pickHealedFeed([null, 7, hit("Tech Talk", "https://new.example/rss"), "x"],
+                                  "Tech Talk", dead), "https://new.example/rss")
+        // No title asks for nothing, even from a result with no name.
+        compare(PL.pickHealedFeed([hit("", "https://new.example/rss")], "", dead), "")
+        compare(PL.pickHealedFeed([hit("", "https://new.example/rss")], "   ", dead), "")
+        compare(PL.pickHealedFeed([hit(undefined, "https://new.example/rss")], undefined, dead), "")
+    }
+
+    function test_a_long_answer_is_read_to_its_end() {
+        var dead = "https://dead.example/rss"
+        var res = []
+        for (var i = 0; i < 1000; i++) res.push(hit("Tech Talk " + i, "https://n" + i + ".example/rss"))
+        res.push(hit("Tech Talk", "https://new.example/rss"))
+        compare(PL.pickHealedFeed(res, "Tech Talk", dead), "https://new.example/rss")
+        // A namesake at the very end still makes it ambiguous.
+        res.push(hit("Tech Talk", "https://late.example/rss"))
+        compare(PL.pickHealedFeed(res, "Tech Talk", dead), "")
+    }
+
+    function test_only_gone_answers_move_a_subscription_for_good() {
+        compare(PL.feedGoneForGood(404), true)
+        compare(PL.feedGoneForGood(410), true)
+        compare(PL.feedGoneForGood(403), false)
+        compare(PL.feedGoneForGood(401), false)
+        compare(PL.feedGoneForGood(400), false)
+        compare(PL.feedGoneForGood(200), false)   // a web page where the feed was
+        compare(PL.feedGoneForGood(0), false)
+        compare(PL.feedGoneForGood(429), false)
+        compare(PL.feedGoneForGood(500), false)
+        compare(PL.feedGoneForGood(undefined), false)
+        compare(PL.feedGoneForGood(NaN), false)
+    }
+
+    // ── which end of the feed is the new one ──────────────────────────────
+
+    // Episode n of a show that publishes daily, starting 1 January 2026.
+    // dated=false leaves the pubDate out.
+    function feedItem(n, dated) {
+        var d = new Date(Date.UTC(2026, 0, n, 8, 0, 0))
+        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        var date = d.getUTCDate() + " " + months[d.getUTCMonth()] + " " + d.getUTCFullYear()
+                   + " 08:00:00 GMT"
+        return "<item><title>Ep " + n + "</title><guid>g" + n + "</guid>"
+               + (dated === false ? "" : "<pubDate>" + date + "</pubDate>")
+               + '<enclosure url="https://a.fm/' + n + '.mp3" type="audio/mpeg"/></item>'
+    }
+
+    function feedOf(items) {
+        return "<rss><channel><title>Show</title>" + items.join("") + "</channel></rss>"
+    }
+
+    function titles(feed) {
+        var out = []
+        for (var i = 0; i < feed.episodes.length; i++) out.push(feed.episodes[i].title)
+        return out
+    }
+
+    function test_a_feed_that_lists_oldest_first_shows_its_newest_episodes() {
+        // Sixty episodes, the first in the file the oldest. The first fifty
+        // in file order were Ep 1 to Ep 50, and Ep 51 to 60 never showed.
+        var items = []
+        for (var n = 1; n <= 60; n++) items.push(feedItem(n))
+        var f = PL.parseFeed(feedOf(items), 50)
+        compare(f.episodes.length, 50)
+        compare(f.episodes[0].title, "Ep 60")
+        compare(f.episodes[1].title, "Ep 59")
+        compare(f.episodes[49].title, "Ep 11")
+        // The row is whole, not only its title.
+        compare(f.episodes[0].guid, "g60")
+        compare(f.episodes[0].url, "https://a.fm/60.mp3")
+        compare(f.episodes[0].pubMs, Date.UTC(2026, 0, 60, 8, 0, 0))
+    }
+
+    function test_a_short_oldest_first_feed_is_turned_round_too() {
+        compare(titles(PL.parseFeed(feedOf([feedItem(1), feedItem(2), feedItem(3)]), 50)),
+                ["Ep 3", "Ep 2", "Ep 1"])
+        compare(titles(PL.parseFeed(feedOf([feedItem(1), feedItem(2)]), 50)), ["Ep 2", "Ep 1"])
+        // Two episodes out on the same day do not break the run.
+        compare(titles(PL.parseFeed(feedOf([feedItem(1), feedItem(2), feedItem(2), feedItem(4)]), 3)),
+                ["Ep 4", "Ep 2", "Ep 2"])
+        // Exactly as many as the cap.
+        compare(titles(PL.parseFeed(feedOf([feedItem(1), feedItem(2), feedItem(3)]), 3)),
+                ["Ep 3", "Ep 2", "Ep 1"])
+    }
+
+    function test_a_newest_first_feed_is_returned_as_it_is() {
+        var items = []
+        for (var n = 60; n >= 1; n--) items.push(feedItem(n))
+        var f = PL.parseFeed(feedOf(items), 50)
+        compare(f.episodes.length, 50)
+        compare(f.episodes[0].title, "Ep 60")
+        compare(f.episodes[49].title, "Ep 11")
+        compare(titles(PL.parseFeed(feedOf([feedItem(3), feedItem(2), feedItem(1)]), 50)),
+                ["Ep 3", "Ep 2", "Ep 1"])
+    }
+
+    function test_a_feed_whose_order_cannot_be_told_stays_in_file_order() {
+        // One episode without a date, anywhere: nothing is turned.
+        var items = []
+        for (var n = 1; n <= 60; n++) items.push(feedItem(n, n !== 57))
+        var f = PL.parseFeed(feedOf(items), 50)
+        compare(f.episodes.length, 50)
+        compare(f.episodes[0].title, "Ep 1")
+        compare(f.episodes[49].title, "Ep 50")
+        // No dates at all.
+        compare(titles(PL.parseFeed(feedOf([feedItem(1, false), feedItem(2, false)]), 50)),
+                ["Ep 1", "Ep 2"])
+        // One out of place past the fiftieth is enough to leave it alone.
+        items = []
+        for (n = 1; n <= 60; n++) items.push(feedItem(n === 55 ? 3 : n))
+        f = PL.parseFeed(feedOf(items), 50)
+        compare(f.episodes[0].title, "Ep 1")
+        compare(f.episodes[49].title, "Ep 50")
+        // Neither up nor down.
+        compare(titles(PL.parseFeed(feedOf([feedItem(2), feedItem(3), feedItem(1)]), 50)),
+                ["Ep 2", "Ep 3", "Ep 1"])
+        // All on one day: no end is newer.
+        compare(titles(PL.parseFeed(feedOf([feedItem(5), feedItem(5), feedItem(5)]), 2)),
+                ["Ep 5", "Ep 5"])
+        compare(titles(PL.parseFeed(feedOf([feedItem(7)]), 50)), ["Ep 7"])
+        compare(PL.parseFeed(feedOf([]), 50).episodes.length, 0)
+    }
+
+    function test_items_that_are_not_episodes_do_not_count_for_the_order() {
+        // A trailer with no audio and a LAN address carry no date here.
+        // They are not episodes, so they say nothing about the order.
+        var noAudio = "<item><title>Trailer page</title></item>"
+        var lan = '<item><title>LAN</title><enclosure url="http://192.168.1.10/x.mp3" type="audio/mpeg"/></item>'
+        compare(titles(PL.parseFeed(feedOf([noAudio, feedItem(1), lan, feedItem(2), feedItem(3)]), 2)),
+                ["Ep 3", "Ep 2"])
+    }
+
+    function test_a_very_long_oldest_first_feed_still_ends_with_its_newest() {
+        var items = []
+        for (var n = 1; n <= 5000; n++) items.push(feedItem(n))
+        var f = PL.parseFeed(feedOf(items), 50)
+        compare(f.episodes.length, 50)
+        compare(f.episodes[0].title, "Ep 5000")
+        compare(f.episodes[49].title, "Ep 4951")
+    }
+
+    // ── pubDate ───────────────────────────────────────────────────────────
+    // 2026-11-03T08:00:00Z is 1793692800000; the other values are that
+    // instant moved by the zone's offset (python3 datetime, not this code).
+
+    function test_pubdate_reads_the_rfc_822_zone_names() {
+        var at = "Tue, 03 Nov 2026 08:00:00 "
+        compare(PL.parseRfc822(at + "UT"), 1793692800000)
+        compare(PL.parseRfc822(at + "GMT"), 1793692800000)
+        compare(PL.parseRfc822(at + "Z"), 1793692800000)
+        compare(PL.parseRfc822(at + "EST"), 1793710800000)
+        compare(PL.parseRfc822(at + "EDT"), 1793707200000)
+        compare(PL.parseRfc822(at + "CST"), 1793714400000)
+        compare(PL.parseRfc822(at + "CDT"), 1793710800000)
+        compare(PL.parseRfc822(at + "MST"), 1793718000000)
+        compare(PL.parseRfc822(at + "MDT"), 1793714400000)
+        compare(PL.parseRfc822(at + "PST"), 1793721600000)
+        compare(PL.parseRfc822(at + "PDT"), 1793718000000)
+        compare(PL.parseRfc822(at + "pdt"), 1793718000000)
+    }
+
+    function test_pubdate_reads_numeric_offsets() {
+        var at = "Tue, 03 Nov 2026 08:00:00 "
+        compare(PL.parseRfc822(at + "+0000"), 1793692800000)
+        compare(PL.parseRfc822(at + "+0200"), 1793685600000)
+        compare(PL.parseRfc822(at + "-0800"), 1793721600000)
+        compare(PL.parseRfc822(at + "+0530"), 1793673000000)
+        compare(PL.parseRfc822(at + "+02:00"), 1793685600000)
+        // No zone at all counts as UTC.
+        compare(PL.parseRfc822("Tue, 03 Nov 2026 08:00:00"), 1793692800000)
+    }
+
+    function test_pubdate_does_not_depend_on_the_day_name() {
+        compare(PL.parseRfc822("Tues, 03 Nov 2026 08:00:00 GMT"), 1793692800000)
+        compare(PL.parseRfc822("Tuesday, 03 Nov 2026 08:00:00 GMT"), 1793692800000)
+        // 3 November 2026 is a Tuesday; the date is what counts.
+        compare(PL.parseRfc822("Mon, 03 Nov 2026 08:00:00 GMT"), 1793692800000)
+        compare(PL.parseRfc822("03 Nov 2026 08:00:00 GMT"), 1793692800000)
+        compare(PL.parseRfc822("tue, 03 nov 2026 08:00:00 gmt"), 1793692800000)
+        compare(PL.parseRfc822("Tue,03 Nov 2026 08:00:00 GMT"), 1793692800000)
+    }
+
+    function test_pubdate_edges_of_the_format() {
+        compare(PL.parseRfc822("Tue, 3 Nov 2026 08:00:00 GMT"), 1793692800000)
+        compare(PL.parseRfc822("Tue, 03 Nov 2026 08:00 GMT"), 1793692800000)
+        compare(PL.parseRfc822("Tue, 03 November 2026 08:00:00 GMT"), 1793692800000)
+        // Two-digit years: RFC 2822 reads 00-49 as 20xx and 50-99 as 19xx.
+        compare(PL.parseRfc822("Tue, 03 Nov 26 08:00:00 GMT"), 1793692800000)
+        compare(PL.parseRfc822("Wed, 03 Nov 99 08:00:00 GMT"), 941616000000)
+        // The zone can carry the date into the next year.
+        compare(PL.parseRfc822("Thu, 31 Dec 2026 23:59:59 PST"), 1798790399000)
+        compare(PL.parseRfc822("Tue, 29 Feb 2028 08:00:00 GMT"), 1835424000000)
+        compare(PL.parseRfc822("  Tue,  03   Nov 2026\n08:00:00   GMT "), 1793692800000)
+    }
+
+    function test_pubdate_that_is_no_date_is_zero() {
+        compare(PL.parseRfc822(""), 0)
+        compare(PL.parseRfc822(null), 0)
+        compare(PL.parseRfc822(undefined), 0)
+        compare(PL.parseRfc822("garbage"), 0)
+        compare(PL.parseRfc822("Tue, 31 Feb 2026 08:00:00 GMT"), 0)
+        compare(PL.parseRfc822("Tue, 03 Foo 2026 08:00:00 GMT"), 0)
+        compare(PL.parseRfc822("Tue, 03 Nov 2026 25:00:00 GMT"), 0)
+        compare(PL.parseRfc822("Tue, 03 Nov 2026 08:61:00 GMT"), 0)
+        compare(PL.parseRfc822("Tue, 00 Nov 2026 08:00:00 GMT"), 0)
+    }
+
+    function test_pubdate_of_any_length_answers() {
+        // Nothing this long is a date.
+        var junk = ""
+        for (var i = 0; i < 5000; i++) junk += "x "
+        compare(PL.parseRfc822("Tue, 03 Nov 2026 08:00:00 GMT " + junk), 0)
+        // A megabyte of padding inside a date is still that date.
+        var pad = new Array(1000001).join(" ")
+        compare(PL.parseRfc822("Tue," + pad + "03 Nov 2026 08:00:00" + pad + "GMT"), 1793692800000)
+    }
+
+    function test_pubdate_in_another_shape_is_left_to_the_engine() {
+        compare(PL.parseRfc822("2026-11-03T08:00:00Z"), 1793692800000)
+        compare(PL.parseRfc822("2026-11-03T08:00:00+02:00"), 1793685600000)
+    }
+
+    function test_feed_episode_keeps_its_date_when_the_feed_names_its_zone() {
+        var f = PL.parseFeed('<rss><channel><title>S</title><item><title>E</title>'
+            + '<pubDate>Tue, 03 Nov 2026 08:00:00 PDT</pubDate>'
+            + '<enclosure url="https://a.fm/e.mp3" type="audio/mpeg"/></item>'
+            + '<item><title>F</title><pubDate>soon</pubDate>'
+            + '<enclosure url="https://a.fm/f.mp3" type="audio/mpeg"/></item></channel></rss>', 50)
+        compare(f.episodes.length, 2)
+        compare(f.episodes[0].pubMs, 1793718000000)
+        compare(f.episodes[1].pubMs, 0)
+        // The feed at the top of this file, read as before.
+        compare(PL.parseFeed(realisticFeed, 50).episodes[0].pubMs, 1783922400000)
+    }
+
     function test_filenames_cannot_leave_the_folder_or_talk_to_the_shell() {
         compare(PL.safeFileName("../../etc/passwd", "ep"), "etc passwd")
         compare(PL.safeFileName("rm -rf `$(x)` '\"| ;", "ep"), "rm -rf (x) ;")
@@ -632,6 +947,93 @@ TestCase {
         // The pre-tag name stays available for files already on disk.
         compare(PL.legacyEpisodeFileName("Trailer", "https://a.fm/e.mp3"),
                 "Trailer.mp3")
+    }
+
+    // ── a file name is measured in bytes ──────────────────────────────────
+
+    function repeated(piece, n) {
+        var out = ""
+        for (var i = 0; i < n; i++) out += piece
+        return out
+    }
+
+    // UTF-8 length by the engine's own encoder, not by counting in a loop.
+    function utf8Bytes(s) {
+        return unescape(encodeURIComponent(s)).length
+    }
+
+    function test_a_long_cyrillic_or_cjk_title_can_still_be_downloaded() {
+        // 118 Cyrillic letters made a 251-byte name, and ".part" behind it
+        // was 256: one over NAME_MAX, so curl could never open the file.
+        var feed = "https://a.fm/rss"
+        var cyr = PL.episodeFileName(repeated("ж", 150), "https://a.fm/e.mp3", feed, "g1")
+        verify(utf8Bytes(cyr) + 5 <= 255, "cyrillic name is " + utf8Bytes(cyr) + " bytes")
+        var cjk = PL.episodeFileName(repeated("語", 100), "https://a.fm/e.mp3", feed, "g2")
+        verify(utf8Bytes(cjk) + 5 <= 255, "cjk name is " + utf8Bytes(cjk) + " bytes")
+        // A four-letter extension has to fit too.
+        var flac = PL.episodeFileName(repeated("語", 100), "https://a.fm/e.flac", feed, "g3")
+        verify(utf8Bytes(flac) + 5 <= 255, "flac name is " + utf8Bytes(flac) + " bytes")
+        // Far past any limit, same answer.
+        var huge = PL.episodeFileName(repeated("語", 10000), "https://a.fm/e.mp3", feed, "g4")
+        verify(utf8Bytes(huge) + 5 <= 255, "huge name is " + utf8Bytes(huge) + " bytes")
+        // Still the title in front and the tag and extension behind.
+        verify(cyr.indexOf(repeated("ж", 50)) === 0)
+        verify(/ \[[0-9a-f]{8}\]\.mp3$/.test(cyr))
+        verify(/ \[[0-9a-f]{8}\]\.flac$/.test(flac))
+    }
+
+    function test_a_title_that_fit_before_keeps_its_name() {
+        // The name is how a file already on disk is recognised, so nothing
+        // that could be saved before may be spelled differently now.
+        // 117 letters and a digit are 235 bytes: with " [8hex].mp3.part"
+        // exactly 255, the longest name that ever worked.
+        var feed = "https://a.fm/rss"
+        var fits = repeated("ж", 117) + "7"
+        var name = PL.episodeFileName(fits, "https://a.fm/e.mp3", feed, "g1")
+        verify(name.indexOf(fits + " [") === 0)
+        compare(utf8Bytes(name) + 5, 255)
+        // One byte more never fitted, and loses its last letter.
+        var over = repeated("ж", 118)
+        var cut = PL.episodeFileName(over, "https://a.fm/e.mp3", feed, "g1")
+        verify(cut.indexOf(repeated("ж", 117) + " [") === 0)
+        // A plain Latin title is cut at 120 characters as it always was.
+        var latin = PL.episodeFileName(repeated("a", 150), "https://a.fm/e.mp3", feed, "g1")
+        verify(latin.indexOf(repeated("a", 120) + " [") === 0)
+        // The pre-tag name is only ever matched against old files, and
+        // those were named by the old 120-character rule.
+        compare(PL.legacyEpisodeFileName(repeated("ж", 150), "https://a.fm/e.mp3"),
+                repeated("ж", 120) + ".mp3")
+    }
+
+    function test_an_emoji_at_the_cut_is_kept_whole_or_dropped_whole() {
+        var feed = "https://a.fm/rss"
+        // 77 CJK characters are 231 bytes; the emoji's four make 235 and fit.
+        var kept = PL.episodeFileName(repeated("語", 77) + "🎧", "https://a.fm/e.mp3", feed, "g")
+        verify(kept.indexOf(repeated("語", 77) + "🎧 [") === 0)
+        // Two letters first and the emoji would end at byte 237: it goes whole.
+        var dropped = PL.episodeFileName(repeated("語", 77) + "ab🎧", "https://a.fm/e.mp3", feed, "g")
+        verify(dropped.indexOf(repeated("語", 77) + "ab [") === 0)
+        // The 120-character cut used to fall between the emoji's two halves.
+        var latin = PL.episodeFileName(repeated("a", 119) + "🎧 tail", "https://a.fm/e.mp3", feed, "g")
+        verify(latin.indexOf(repeated("a", 119) + " [") === 0)
+        compare(PL.safeFileName(repeated("a", 118) + "🎧 tail", "ep"), repeated("a", 118) + "🎧")
+    }
+
+    function test_cap_text_edges() {
+        compare(PL.capText("", 10, 10), "")
+        compare(PL.capText("abc", 10, 0), "")
+        compare(PL.capText("abc", 0, 10), "")
+        compare(PL.capText("abc", 3, 3), "abc")
+        compare(PL.capText("abcd", 3, 100), "abc")
+        compare(PL.capText("ääää", 100, 5), "ää")     // two bytes each
+        compare(PL.capText("語語", 100, 5), "語")      // three bytes each
+        compare(PL.capText("🎧🎧", 100, 7), "🎧")      // four bytes, two units
+        compare(PL.capText("🎧🎧", 3, 100), "🎧")
+        // Half a pair is malformed text, and it reaches the disk as U+FFFD,
+        // three bytes. It is counted as that and never thrown on.
+        var lone = "\uD83C"
+        compare(PL.capText(lone + lone + lone, 100, 7), lone + lone)
+        compare(PL.capText("a" + lone, 100, 3), "a")
     }
 
     function test_one_show_keeps_one_tag_across_url_spellings() {

@@ -57,6 +57,144 @@ TestCase {
         compare(next.getDate(), 29)
     }
 
+    // ── the clock change itself, in whatever zone the runner lives in ─────
+    // QML cannot set TZ for itself, so these find the local zone's own
+    // change in 2026 and build the alarm around it. In Europe/Tallinn that
+    // is 03:00 -> 04:00 on 29 March and 04:00 -> 03:00 on 25 October. A zone
+    // that keeps one offset all year (a UTC container) has no such night,
+    // and the tests say so with a skip instead of passing on nothing.
+
+    // The instant the local offset moves and by how many minutes the wall
+    // clock jumps. forward=true is the spring change. null when there is none.
+    function clockChange(year, forward) {
+        var hour = 3600000
+        var prev = new Date(Date.UTC(year, 0, 1)).getTimezoneOffset()
+        for (var t = Date.UTC(year, 0, 1) + hour; t < Date.UTC(year + 1, 0, 1); t += hour) {
+            var off = new Date(t).getTimezoneOffset()
+            if (off === prev) continue
+            if ((prev - off > 0) === forward) {
+                var lo = t - hour, hi = t
+                while (hi - lo > 1000) {
+                    var mid = Math.floor((lo + hi) / 2000) * 1000
+                    if (new Date(mid).getTimezoneOffset() === prev) lo = mid
+                    else hi = mid
+                }
+                return { at: hi, jumpMin: Math.abs(prev - off) }
+            }
+            prev = off
+        }
+        return null
+    }
+
+    // A daily alarm set for a wall-clock time inside the spring hole, with
+    // the instant it has to ring at: as far past the change as it sat past
+    // the start of the hole (03:30 rings at 04:30 new time).
+    function holeAlarm() {
+        var c = clockChange(2026, true)
+        if (!c) return null
+        var into = Math.min(30, Math.floor(c.jumpMin / 2))
+        var lastMinute = new Date(c.at - 60000)
+        var wall = lastMinute.getHours() * 60 + lastMinute.getMinutes() + 1 + into
+        return { hh: Math.floor(wall / 60) % 24, mm: wall % 60, repeat: "daily", weekday: 0,
+                 at: c.at, rings: c.at + into * 60000 }
+    }
+
+    // What the engine's tick does to one entry, every 30 s: re-express it
+    // when the zone offset moved, ask whether it is due, advance it after.
+    // Returns the instants it rang at and how many times it was written off.
+    function runTicks(entry, fromMs, toMs) {
+        var rang = [], missed = 0
+        var tz = new Date(fromMs).getTimezoneOffset()
+        for (var now = fromMs; now <= toMs; now += 30000) {
+            var z = new Date(now).getTimezoneOffset()
+            if (z !== tz) {
+                tz = z
+                if (AL.shouldRetime(entry, now)) entry.nextRun = AL.retimeForZone(entry, now)
+            }
+            var dec = AL.fireDecision(entry.nextRun, now, AL.GRACE_MS)
+            if (dec === "wait") continue
+            if (dec === "fire") rang.push(now)
+            else missed++
+            entry.nextRun = AL.advance(entry, now)
+        }
+        return { rang: rang, missed: missed }
+    }
+
+    function test_a_retime_at_the_spring_flip_keeps_the_hole_alarm_today() {
+        var a = holeAlarm()
+        if (!a) skip("this zone has no spring clock change in 2026")
+        // The first tick after the change sees a new offset and retimes.
+        // The alarm is still ahead, half an hour into the new time.
+        a.nextRun = a.rings
+        compare(AL.retimeForZone(a, a.at + 30000), a.rings)
+    }
+
+    function test_a_hole_alarm_slept_through_is_still_caught_after_the_flip() {
+        var a = holeAlarm()
+        if (!a) skip("this zone has no spring clock change in 2026")
+        // The machine wakes ten minutes late, on the far side of the change.
+        // Retimed, the alarm must stay at or before now so the fire scan
+        // rings it inside its grace hour.
+        a.nextRun = a.rings
+        compare(AL.retimeForZone(a, a.rings + 600000), a.rings)
+    }
+
+    function test_next_occurrence_counts_a_hole_time_where_it_really_rings() {
+        var a = holeAlarm()
+        if (!a) skip("this zone has no spring clock change in 2026")
+        // Asked the evening before, and asked again just after the change:
+        // the same instant both times.
+        compare(AL.nextOccurrence(a.hh, a.mm, "daily", 0, a.at - 5 * 3600000), a.rings)
+        compare(AL.nextOccurrence(a.hh, a.mm, "daily", 0, a.at + 1000), a.rings)
+        // One second before it rings is still today.
+        compare(AL.nextOccurrence(a.hh, a.mm, "daily", 0, a.rings - 1000), a.rings)
+        // "Strictly after": at the ringing instant the next one is tomorrow,
+        // where the asked-for wall clock exists again.
+        var d = new Date(a.rings)
+        var tomorrow = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1,
+                                a.hh, a.mm, 0, 0).getTime()
+        compare(AL.nextOccurrence(a.hh, a.mm, "daily", 0, a.rings), tomorrow)
+    }
+
+    function test_weekly_hole_alarm_stays_on_its_own_day() {
+        var a = holeAlarm()
+        if (!a) skip("this zone has no spring clock change in 2026")
+        // Where the change is at midnight the hole time resolves back into
+        // the evening before, and the alarm still belongs to the new day.
+        var weekday = new Date(a.rings).getDay()
+        compare(AL.nextOccurrence(a.hh, a.mm, "weekly", weekday, a.at + 1000), a.rings)
+        // After it rang, the next one is a week of wall-clock days away.
+        var d = new Date(a.rings)
+        var nextWeek = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7,
+                                a.hh, a.mm, 0, 0).getTime()
+        compare(AL.nextOccurrence(a.hh, a.mm, "weekly", weekday, a.rings), nextWeek)
+    }
+
+    function test_hole_alarm_rings_once_on_the_spring_night() {
+        var a = holeAlarm()
+        if (!a) skip("this zone has no spring clock change in 2026")
+        var from = a.at - 5 * 3600000 + 7000
+        a.nextRun = AL.nextOccurrence(a.hh, a.mm, "daily", 0, from)
+        var night = runTicks(a, from, a.at + 5 * 3600000)
+        compare(night.missed, 0)
+        compare(night.rang.length, 1)
+        // The 30 s tick lands on or just after the instant, never before.
+        verify(night.rang[0] >= a.rings && night.rang[0] < a.rings + 30000)
+    }
+
+    function test_alarm_in_the_repeated_autumn_hour_rings_once() {
+        var c = clockChange(2026, false)
+        if (!c) skip("this zone has no autumn clock change in 2026")
+        // Half an hour into the hour the wall clock shows twice.
+        var w = new Date(c.at + Math.min(30, Math.floor(c.jumpMin / 2)) * 60000)
+        var a = { hh: w.getHours(), mm: w.getMinutes(), repeat: "daily", weekday: 0 }
+        var from = c.at - 5 * 3600000 + 7000
+        a.nextRun = AL.nextOccurrence(a.hh, a.mm, "daily", 0, from)
+        var night = runTicks(a, from, c.at + 5 * 3600000)
+        compare(night.missed, 0)
+        compare(night.rang.length, 1)
+    }
+
     // ── _resolveGap: the spring-forward hole ──────────────────────────────
     // Pure math on already-constructed Dates: no real gap in the test zone
     // is needed, only the "resolved clock reads short of asked-for" shape
@@ -306,6 +444,28 @@ TestCase {
         compare(AL.castSilencesWakeTone(undefined, true, false), false)
         compare(AL.castSilencesWakeTone(true, undefined, false), false)
         compare(AL.castSilencesWakeTone(1, 1, 0), false)
+    }
+
+    // ── podcastWake ───────────────────────────────────────────────────────
+    // A podcast alarm with nothing on disk said "waking with the chime" and
+    // then left last night's radio on at last night's volume: the chime sat
+    // behind a check for whether anything was playing.
+
+    function test_a_podcast_alarm_wakes_with_the_episode_it_found() {
+        compare(AL.podcastWake("ep1.mp3"), "episode")
+        compare(AL.podcastWake("a"), "episode")
+        compare(AL.podcastWake(new Array(5001).join("x") + ".mp3"), "episode")
+    }
+
+    function test_a_podcast_alarm_with_no_episode_wakes_with_the_chime() {
+        compare(AL.podcastWake(""), "chime")
+        compare(AL.podcastWake(null), "chime")
+        compare(AL.podcastWake(undefined), "chime")
+        // Not a file name: nothing the player could be handed.
+        compare(AL.podcastWake(0), "chime")
+        compare(AL.podcastWake(true), "chime")
+        compare(AL.podcastWake({}), "chime")
+        compare(AL.podcastWake(["ep1.mp3"]), "chime")
     }
 
     // ── inhibitSeconds ────────────────────────────────────────────────────

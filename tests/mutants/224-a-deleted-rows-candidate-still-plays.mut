@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A heal candidate whose playlist was still unwrapping starts although the
+  order ended meanwhile.
+
+history:
+  The lookup's own callbacks asked whether the listener still wanted the
+  station; the audition's playlist callback asked only for the generation and
+  the deadline. A row deleted in those few seconds started playing when the
+  playlist answered, the same hole the retry road had until 2026-11-03.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              // The row can be deleted, or the order end, while a .pls unwraps.
+              if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return;
+
+replace:
+              // The row can be deleted, or the order end, while a .pls unwraps.
+              if (false) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_kin_rung_runs_before_a_stranger_auditions_and_only_once.
+  Line-neutral.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  With no text to show the panel item still asks the panel for a fixed width.
+
+history:
+  The contributed version set the width hints on every horizontal panel,
+  option or not. The option is off unless a listener turns it on, and until
+  then the panel must get exactly the widget it always got.
+
+target:
+  package/contents/ui/PanelLogic.js
+
+find:
+      if (shown !== true) return nothing;
+
+replace:
+      if (shown !== true) return { "min": 36, "pref": 36, "max": 36 };
+
+expect:
+  Killed by tests/qml/tst_panellogic.qml::test_showing_nothing_asks_for_what_a_bare_item_asks.
+  Line-neutral.

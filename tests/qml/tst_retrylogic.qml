@@ -241,4 +241,36 @@ TestCase {
         verify(!RL.beatOnTime(1000, NaN, 60000));
         verify(!RL.beatOnTime(-5, 61000, 60000));
     }
+
+    // titleOnOpen: does opening the popup ask for the title at once? The
+    // poll's next tick is up to five seconds away, eight on battery.
+    function test_opening_the_popup_onto_a_playing_station_asks_for_the_title() {
+        compare(RL.titleOnOpen(false, true, true), true);
+    }
+
+    function test_the_desktop_form_never_asks_on_its_own() {
+        compare(RL.titleOnOpen(true, true, true), false);
+    }
+
+    function test_nothing_is_asked_where_the_poll_is_not_the_road() {
+        // The poll's timer stands still: a local file, a podcast episode, a
+        // player that delivers titles itself, a station pinned as title-less.
+        compare(RL.titleOnOpen(false, false, true), false);
+        // Nothing plays, or the station is in error.
+        compare(RL.titleOnOpen(false, true, false), false);
+        compare(RL.titleOnOpen(false, false, false), false);
+    }
+
+    function test_a_fact_that_is_not_known_asks_nothing() {
+        compare(RL.titleOnOpen(), false);
+        compare(RL.titleOnOpen(undefined, true, true), false);
+        compare(RL.titleOnOpen(null, true, true), false);
+        compare(RL.titleOnOpen(false, undefined, true), false);
+        compare(RL.titleOnOpen(false, true, null), false);
+        compare(RL.titleOnOpen(0, 1, 1), false);
+        compare(RL.titleOnOpen("", "yes", "yes"), false);
+        // Only a real true is a running timer or a playing station.
+        compare(RL.titleOnOpen(false, 1, true), false);
+        compare(RL.titleOnOpen(false, true, "yes"), false);
+    }
 }

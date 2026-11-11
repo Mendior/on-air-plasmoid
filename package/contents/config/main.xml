@@ -12,23 +12,23 @@
             <label>Stations</label>
             <default>[
       {"active":true,"hostname":"https://mangoradio.stream.laut.fm/mangoradio","name":"MANGORADIO","uuid":"78012206-1aa1-11e9-a80b-52543be04c81"},
-      {"active":true,"hostname":"https://listen.reyfm.de/original_192kbps.mp3","name":"REYFM - #original","uuid":"f592bcd7-c052-11e9-8502-52543be04c81"},
+      {"active":true,"hostname":"https://listen.reyfm.de/original_192kbps.mp3","name":"REYFM - #original","uuid":"e5589411-82e8-46b2-b90d-e95b159afcf3"},
       {"active":true,"hostname":"https://dancewave.online/dance.mp3","name":"Dance Wave!","uuid":"962cc6df-0601-11e8-ae97-52543be04c81"},
-      {"active":true,"hostname":"https://drive.uber.radio/uber/bollywoodnow/icecast.audio","name":"Mirchi Top 20","uuid":"6b36ba4f-6d29-4272-b3c0-9aeeb64e61ec"},
+      {"active":true,"hostname":"https://drive.uber.radio/uber/bollywoodnow/icecast.audio","name":"Mirchi Top 20","uuid":"0e2c2465-333c-4c40-b90e-286993b2aae4"},
       {"active":true,"hostname":"http://stream-uk1.radioparadise.com/aac-320","name":"Radio Paradise (320k)","uuid":"9617a958-0601-11e8-ae97-52543be04c81"},
       {"active":true,"hostname":"https://icecast.walmradio.com:8443/classic","name":"Classic Vinyl HD","uuid":"d1a54d2e-623e-4970-ab11-35f7b56c5ec3"},
-      {"active":true,"hostname":"https://icecast.walmradio.com:8443/jazz","name":"Adroit Jazz Underground","uuid":"ea8059be-d119-4de3-b27b-0d9bd6aedb17"},
-      {"active":true,"hostname":"https://icecast.walmradio.com:8443/christmas","name":"Christmas Vinyl HD","uuid":"6eff3484-4ab4-4d36-bf27-9172c5aac15c"},
-      {"active":true,"hostname":"https://icecast.walmradio.com:8443/walm","name":"WALM HD","uuid":"348dfc58-ce8c-413b-b264-0384f816344b"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/jazz","name":"Adroit Jazz Underground","uuid":"d963c52c-25a4-4813-ac29-eabed22fe5b6"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/christmas","name":"Christmas Vinyl HD","uuid":"b7da048a-bc9b-4493-afd8-172ff13c80e1"},
+      {"active":true,"hostname":"https://icecast.walmradio.com:8443/walm","name":"WALM HD","uuid":"378a5ae3-5c52-4843-a6e8-90f0a627c70d"},
       {"active":true,"hostname":"https://ice5.somafm.com/beatblender-128-mp3","name":"SomaFM Beat Blender","uuid":"960eb232-0601-11e8-ae97-52543be04c81"},
       {"active":true,"hostname":"https://playerservices.streamtheworld.com/api/livestream-redirect/SAM03AAC226_SC.mp3","name":"#1980s Zoom","uuid":"5ba5ce07-cb82-46ef-874a-7c9613bf2abf"},
       {"active":true,"hostname":"http://ice3.somafm.com/groovesalad-128-mp3","name":"SomaFM Groove Salad","uuid":"960cf833-0601-11e8-ae97-52543be04c81"},
       {"active":true,"hostname":"http://jking.cdnstream1.com/b22139_128mp3","name":"101 SMOOTH JAZZ","uuid":"d28420a4-eccf-47a2-ace1-088c7e7cb7e0"},
-      {"active":true,"hostname":"http://jazzblues.ice.infomaniak.ch/jazzblues-high.mp3","name":"Jazz Radio Blues","uuid":"96102c22-0601-11e8-ae97-52543be04c81"},
-      {"active":true,"hostname":"http://ep256.hostingradio.ru:8052/europaplus256.mp3","name":"Europa Plus","uuid":"731ff19a-2c9c-4d35-af38-ef05e8b2b3cb"},
-      {"active":true,"hostname":"http://lin3.ash.fast-serv.com:6026/stream_96","name":"Rockabilly-radio.net","uuid":"9c4b1fd9-83d5-4478-992b-700781194b38"},
+      {"active":true,"hostname":"http://jazzblues.ice.infomaniak.ch/jazzblues-high.mp3","name":"Jazz Radio Blues","uuid":"897176f2-007c-430b-bdb4-b8032c03d9e4"},
+      {"active":true,"hostname":"http://ep256.hostingradio.ru:8052/europaplus256.mp3","name":"Europa Plus","uuid":"d12a9f51-f603-4e30-9707-3e5c657b7fca"},
+      {"active":true,"hostname":"http://lin3.ash.fast-serv.com:6026/stream_96","name":"Rockabilly-radio.net","uuid":"88a8205b-2ce7-4af9-990e-a55e336cd834"},
       {"active":true,"hostname":"https://streaming.nrjaudio.fm/ou7xugf3s5gi?origine=playernrj","name":"NRJ Hits","uuid":"36eba167-5c51-4421-98f0-d2cda24be928"},
-      {"active":true,"hostname":"http://retroserver.streamr.ru:8043/retro256.mp3","name":"Ретро FM","uuid":"964fade0-0601-11e8-ae97-52543be04c81"},
+      {"active":true,"hostname":"http://retroserver.streamr.ru:8043/retro256.mp3","name":"Ретро FM","uuid":"d12b21d7-e3c3-4798-a8e3-5fe544c9b1e7"},
       {"active":true,"hostname":"https://dfm-disc90.hostingradio.ru/disc9096.aacp","name":"DFM Дискач 90-х","uuid":"165eab56-4a14-11e9-a4d7-52543be04c81"},
       {"active":true,"hostname":"https://playerservices.streamtheworld.com/api/livestream-redirect/977_COUNTRY_SC","name":".977 Country","uuid":"961d9b63-0601-11e8-ae97-52543be04c81"}
       ]</default>
@@ -60,6 +60,16 @@
         <entry name="fadeDuration" type="Int">
             <label>Fade duration in ms</label>
             <default>400</default>
+        </entry>
+        <entry name="panelShowTrack" type="bool">
+            <label>Show artist and title next to the panel icon</label>
+            <default>false</default>
+        </entry>
+        <entry name="panelTextWidth" type="Int">
+            <label>Maximum width of the panel text (grid units)</label>
+            <default>10</default>
+            <min>4</min>
+            <max>40</max>
         </entry>
         <entry name="albumArtEnabled" type="bool">
             <label>Lookup album art online (Deezer, iTunes)</label>

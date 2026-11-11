@@ -160,12 +160,122 @@ function probeVerdict(status) {
     return -1;
 }
 
+// One pass of the liveness probe over the rows on screen: what the session
+// already knows about them, and which get a knock now.
+// The pass used to mark a row the moment it met a remembered verdict, and
+// marking a dead row sinks it to the end of the list the pass was walking.
+// The row behind it slid into its place and was stepped over. Reproduced on
+// [a, b, DEAD1, DEAD2, c, DEAD3, DEAD4, DEAD5, d] with every verdict
+// remembered: after one pass DEAD2 and DEAD4 were still bright and the dead
+// stood in reverse order, and it took a second pass to put that right. So a
+// query typed again inside the cache's fifteen minutes showed dead stations
+// as if nobody had asked. The pass only reads now, and markAlive applies
+// what it found once the walk is over.
+// Loopback and private hosts never get the knock: such a row keeps its
+// unknown verdict and stays clickable, because a preview is the listener's
+// own act and the background probe is not.
+// Contract: probePass(rows, s) = { spent, known, knock }.
+//   rows are the list's rows as shown ({ url, alive }); s = { spent,
+//   verdicts, inFlight, active, now, ttl, slots }: the urls dealt with in this
+//   search, the remembered verdicts ({ v, t } by url), the urls with a probe in
+//   the air, how many of those there are, the time, a verdict's lifetime and
+//   how many probes may run at once.
+//   spent: the urls this pass settles (a host that is never knocked on, a
+//   remembered verdict, a knock). known: [{ url, v }] in row order, v 1 or 0
+//   from a verdict younger than ttl; a remembered "unknown" is spent and not
+//   listed. knock: the urls to probe now, never one already in the air and
+//   never more than the free slots; the rest wait for the next pass.
+//   A row already judged or already spent is not looked at. No rows, or an s
+//   that is no object, is an empty pass.
+function probePass(rows, s) {
+    var out = { spent: [], known: [], knock: [] };
+    if (!Array.isArray(rows) || s === null || typeof s !== "object") return out;
+    var has = function(book, url) {
+        return book !== null && typeof book === "object"
+               && Object.prototype.hasOwnProperty.call(book, url);
+    };
+    var free = (parseInt(s.slots, 10) || 0) - (parseInt(s.active, 10) || 0);
+    var mine = Object.create(null);
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (row === null || typeof row !== "object" || typeof row.url !== "string") continue;
+        var url = row.url;
+        if (row.alive !== -1 || mine[url] === true || (has(s.spent, url) && s.spent[url])) continue;
+        var hit = has(s.verdicts, url) ? s.verdicts[url] : null;
+        var fresh = hit !== null && typeof hit === "object" && typeof hit.t === "number"
+                    && s.now - hit.t < s.ttl;
+        var safe = isProbeSafeHost(url);
+        if (safe && !fresh) {
+            if ((has(s.inFlight, url) && s.inFlight[url]) || free <= 0) continue;
+            out.knock.push(url);
+            free--;
+        } else if (safe && (hit.v === 0 || hit.v === 1)) {
+            out.known.push({ url: url, v: hit.v });
+        }
+        mine[url] = true;
+        out.spent.push(url);
+    }
+    return out;
+}
+
+// Rows the probe condemned sink below the living and keep their own order
+// there: the list is a recommendation, and "not answering" is not one.
+// Each dead row goes to the very END in encounter order. Moving into a
+// shrinking last slot came out reversed, and re-runs flip-flopped the block
+// (measured on a real ListModel). This form is stable and idempotent: a
+// second pass rotates the dead block through the tail and lands it exactly
+// where it started.
+// Contract: sinkDead(model) moves the rows of a results ListModel with
+//   alive === 0 under all the others, both groups in the order they stood.
+function sinkDead(model) {
+    if (!model || typeof model.get !== "function" || typeof model.move !== "function") return;
+    var moved = 0;
+    var i = 0;
+    while (i < model.count - moved) {
+        if (model.get(i).alive === 0) {
+            model.move(i, model.count - 1, 1);
+            moved++;
+        } else {
+            i++;
+        }
+    }
+}
+
+// Verdicts land by url and not by index: probes race against relevance
+// moves, "Show more" pages and the star's remove.
+// Contract: markAlive(model, known) gives the first row with each known[i].url
+//   the verdict known[i].v, and only then sinks the dead, once, so several dead
+//   rows marked together keep the order they stood in. A url the list no
+//   longer shows is passed over. No model or no list does nothing.
+function markAlive(model, known) {
+    if (!model || typeof model.get !== "function" || !Array.isArray(known)) return;
+    // Nothing moves until every mark is in, so a row's index holds that long.
+    var at = Object.create(null);
+    for (var i = model.count - 1; i >= 0; i--) at["u:" + model.get(i).url] = i;
+    var dead = false;
+    for (var k = 0; k < known.length; k++) {
+        var mark = known[k];
+        if (mark === null || typeof mark !== "object" || typeof mark.v !== "number") continue;
+        var row = at["u:" + mark.url];
+        if (row === undefined) continue;
+        model.setProperty(row, "alive", mark.v);
+        if (mark.v === 0) dead = true;
+    }
+    if (dead) sinkDead(model);
+}
+
 // "70s in UK" — what a scoped query MEANS. Every " in " / " from "
 // separator offers its tail to the resolver (the country map), longest
 // tail first; only a tail the resolver recognizes splits the query into
 // {text, cc, country}. "alice in chains" stays one query — "chains" is
 // no country — and the resolver decides, never this parser, so the
 // country vocabulary lives in exactly one place.
+// A tail the resolver does not know is offered once more without a leading
+// "the": measured 2026-11-10, "rock in the uk" and "jazz in the united
+// states" were no fence at all, and "pop in the netherlands" only worked
+// because the directory's own name begins with the article.
+// Contract: null, or { text, cc, country } with country the tail as the
+//   resolver took it.
 function scopedQuery(q, resolve) {
     var s = (q || "").trim()
     var sep = /\s+(?:in|from)\s+/gi
@@ -176,6 +286,9 @@ function scopedQuery(q, resolve) {
         if (text === "" || tail === "") continue
         var cc = resolve(tail)
         if (cc !== "") return { text: text, cc: cc, country: tail }
+        var bare = tail.replace(/^the\s+/i, "")
+        cc = bare !== tail ? resolve(bare) : ""
+        if (cc !== "") return { text: text, cc: cc, country: bare }
     }
     return null
 }
@@ -269,10 +382,11 @@ var NAME_WORDS = { "radio": 1, "fm": 1, "am": 1, "station": 1, "the": 1,
 // to two unknown words read as one tag ("synthwave uk"). A word that smells
 // like a station name (radio, fm, a frequency) sends the whole query back to
 // the name roads untouched: "virgin radio uk" is a station, not a wish.
-// Contract: null, or { text, tags, cc, country } where text is the query
-// without its country words (what runs as the name inside the country),
+// Contract: null, or { text, tags, cc, country, loose } where text is the
+// query without its country words (what runs as the name inside the country),
 // tags are tagList fragments in typed order, cc/country are "" when no
-// country was named. A reading needs two facets, a lone decade excepted.
+// country was named, and loose counts the unknown words that were read as a
+// tag. A reading needs two facets, a lone decade excepted.
 function facetQuery(q, resolve) {
     var typed = String(q === undefined || q === null ? "" : q).trim().split(/\s+/);
     var ws = words(q);
@@ -323,8 +437,134 @@ function facetQuery(q, resolve) {
     if (tags.length === 0) return null;
     var facets = tags.length + (cc !== "" ? 1 : 0);
     if (facets < 2 && !(decades === 1 && ws.length === 1)) return null;
-    return { text: kept.join(" "), tags: tags, cc: cc, country: country };
+    return { text: kept.join(" "), tags: tags, cc: cc, country: country, loose: loose };
 }
+
+// How a typed query is read before the directory is asked anything.
+// "70s in UK": the tail names a country and the head is the real query
+// (scopedQuery; not in the country mode, where the text is the country).
+// "rock 80 uk": the same wish without the word "in" (facetQuery; in the All
+// and Genre modes). Measured before that reading: the directory was asked for
+// a station NAMED that, had none, and the stem retry answered with French and
+// German "rock 80" stations; tagList=rock,80 inside GB has sixteen.
+// A fence read without "in" beside a word nothing knows is a guess: "new
+// jersey" is read as "new" in Jersey and finds nothing there, while six
+// stations carry the name (measured 2026-11-10). bareScope marks the guess,
+// and plain is the retry that does not make it.
+// Contract: reading(q, mode, resolve, plain) = { cc, scoped, bareScope }.
+//   cc is the country the whole text names, "" for none. scoped is null or
+//   { text, cc, country }, the fence the text itself names. bareScope says
+//   the fence came without "in" and one of the words beside it was unknown.
+//   plain === true reads no fence without "in". resolve(text) answers a
+//   country code or ""; without one nothing is a country.
+function reading(q, mode, resolve, plain) {
+    var t = String(q === undefined || q === null ? "" : q).trim();
+    var ask = function(text) {
+        var code = typeof resolve === "function" ? resolve(text) : "";
+        return typeof code === "string" ? code : "";
+    };
+    var out = { cc: ask(t), scoped: null, bareScope: false };
+    if (t === "" || out.cc !== "") return out;
+    if (mode !== "country") out.scoped = scopedQuery(t, ask);
+    if (out.scoped === null && plain !== true && (mode === "all" || mode === "genre")) {
+        var bare = facetQuery(t, ask);
+        if (bare !== null && bare.cc !== "") {
+            out.scoped = { text: bare.text, cc: bare.cc, country: bare.country };
+            out.bareScope = bare.loose > 0;
+        }
+    }
+    return out;
+}
+
+// Whether two country vocabularies read a text the same way. The directory's
+// own country list arrives after the session's first search has gone out,
+// and that search was read without it. Measured 2026-11-10: the first
+// "portugal" listed 27 stations with Portugal in their name, every later one
+// Portugal's chart, and 3 of the first 30 rows were the same.
+// Contract: readingKey(q, mode, resolve) is a string, equal for two resolvers
+//   exactly when the search would ask the same thing with both: the country
+//   the whole text names (in the All and Country modes, the only ones that
+//   use it) and the fence the text names. Nothing typed has one key.
+function readingKey(q, mode, resolve) {
+    var r = reading(q, mode, resolve);
+    var whole = (mode === "all" || mode === "country") ? r.cc : "";
+    return JSON.stringify(r.scoped === null ? [whole] : [whole, r.scoped.cc, r.scoped.text]);
+}
+
+// The code a typed text has in the country maps: the hand-written one first,
+// then the directory's own list. The widget looked both up with a plain
+// index, and the directory's map started the session as an ordinary object:
+// "constructor" came back as a function and would have gone out as
+// countrycode=function Object() { [native code] }.
+// Contract: countryCode(q, hand, api) is the two-letter code fold(q) has as
+//   an own entry of hand, else of api, else "". A map that is no object and a
+//   text that is no string have no countries.
+function countryCode(q, hand, api) {
+    var f = typeof q === "string" ? fold(q) : "";
+    var maps = [hand, api];
+    for (var i = 0; i < maps.length; i++) {
+        var m = maps[i];
+        if (m === null || typeof m !== "object" || !Object.prototype.hasOwnProperty.call(m, f)) continue;
+        if (typeof m[f] === "string" && /^[A-Z]{2}$/.test(m[f])) return m[f];
+    }
+    return "";
+}
+
+// Inside a fence read without "in" the country word may be part of the name
+// after all. Measured 2026-11-10: "bbc wales" asks for name=bbc inside GB,
+// and the row "bbc Wales" is the 39th of that answer, past the page's 30.
+// The rows that hold every word as typed lead the fenced answer in the
+// directory's own order, and the rest of it follows them.
+// Contract: fenceLead(typed) = function(row) -> bool, true for a row whose
+//   name holds every word of typed (matchesAllWords). Text without a word
+//   gives a filter that keeps nothing; a row without a name is not kept.
+function fenceLead(typed) {
+    var ws = words(typeof typed === "string" ? typed : "");
+    return function(row) {
+        return row !== null && typeof row === "object" && typeof row.name === "string"
+               && matchesAllWords(row.name, ws);
+    };
+}
+
+// A station name typed with its country: "retro fm eesti". A station word
+// or a number makes the text a name and facetQuery leaves it alone, so the
+// country was never tried as a fence. Measured 2026-11-10: the three words
+// as a name showed one row with no votes, while name=retro fm inside EE
+// answers four, Retro FM Estonia with 166 votes among them. The name stays
+// the first reading ("virgin radio uk" is a station); this is what an empty
+// answer, or one of a row or two, falls back on.
+// Contract: nameInCountry(q, resolve) = null | { text, cc, country }. The
+//   text holds exactly one country the resolver knows (up to three words,
+//   the longest phrase first) and at least one other word; text is those
+//   other words as typed. null for what facetQuery already reads as a wish,
+//   for two countries, for a country alone, past six words and for no text.
+function nameInCountry(q, resolve) {
+    var t = typeof q === "string" ? q.trim() : "";
+    var typed = t.split(/\s+/), ws = words(t);
+    if (ws.length < 2 || ws.length > 6 || typed.length !== ws.length) return null;
+    var ask = function(text) {
+        var code = typeof resolve === "function" ? resolve(text) : "";
+        return typeof code === "string" ? code : "";
+    };
+    if (facetQuery(t, ask) !== null) return null;
+    var kept = [], cc = "", country = "";
+    for (var i = 0; i < ws.length; ) {
+        var hit = 0;
+        for (var len = Math.min(3, ws.length - i); len >= 1 && hit === 0; len--) {
+            var phrase = ws.slice(i, i + len).join(" ");
+            var code = ask(phrase);
+            if (code === "") continue;
+            if (cc !== "") return null;
+            cc = code; country = phrase; hit = len;
+        }
+        if (hit === 0) { kept.push(typed[i]); hit = 1; }
+        i += hit;
+    }
+    return cc !== "" && kept.length > 0 ? { text: kept.join(" "), cc: cc, country: country } : null;
+}
+
+// How few rows still count as next to nothing (emptyNext's "incountry").
+var THIN_ANSWER = 3;
 
 // A genre word typed alone in the All mode: "rock", "smooth jazz", "80s".
 // Measured 2026-09-21, votes order: name=rock answers 50 rows, the page's 30
@@ -674,27 +914,50 @@ function artInitials(name) {
 }
 
 // How strongly a candidate's artist is OUR artist: 2 for the same name in
-// any spelling, 0 for a stranger. On the art fold one name has to sit in the
-// other as whole words, in one run: "mary j blige" in a station's "Mary J
-// Blige feat. Drake", never "tatu" in "art tatum" or "y and t" in "bob
-// marley and the wailers". Taken letter by letter, the fold matched those
-// strangers, and taken whole only, it lost every credit with a guest
-// (measured 2026-11-03). A name under four letters is the artist only at
-// the start of a credit, before a word that joins performers, as nameAkin
-// has it. The initials are read off the names as written, not off the art
-// fold: that one turns "&" into a word and drops the apostrophe of N', and
-// "CSNY" or "GNR" would stop finding their bands.
+// any spelling, 1 for a name that is only a part of a longer one, 0 for a
+// stranger. On the art fold one name has to sit in the other as whole words,
+// in one run: "mary j blige" in a station's "Mary J Blige feat. Drake", never
+// "tatu" in "art tatum" or "y and t" in "bob marley and the wailers". Taken
+// letter by letter, the fold matched those strangers, and taken whole only,
+// it lost every credit with a guest (measured 2026-11-03). The run is the
+// same name when the credit ends or a word that joins performers stands on
+// each side of it. Anything else is a part of somebody's name: "Queen" in
+// Queen Latifah, "Laine" in Frankie Laine, "Pink" for Pink Floyd. Counted as
+// the artist, such a part gave a station's "Laura - Muusa" a Laura Mvula
+// sleeve, so artPick takes it only together with the song. A name under four
+// letters is the artist only at the start of a credit, before a word that
+// joins performers, as nameAkin has it, and is never a part. The initials
+// are read off the names as written, not off the art fold: that one turns
+// "&" into a word and drops the apostrophe of N', and "CSNY" or "GNR" would
+// stop finding their bands.
+// Contract: artArtistScore("Drake", "Mary J Blige feat. Drake") = 2;
+//   artArtistScore("Laura", "Laura Mvula") = 1; artArtistScore("Sia", "Sia
+//   Furler") = 0; artArtistScore("", "Anyone") = 0.
 function artArtistScore(wantArtist, gotArtist) {
     var wa = artFold(wantArtist), ga = artFold(gotArtist);
     if (wa === "" || ga === "") return 0;
-    if (wa.replace(/ /g, "") === ga.replace(/ /g, "") || _wordRun(_creditWords(wantArtist), _creditWords(gotArtist)))
-        return 2;
+    if (wa.replace(/ /g, "") === ga.replace(/ /g, "")) return 2;
+    var run = _wordRun(_creditWords(wantArtist), _creditWords(gotArtist));
+    if (run === 2) return 2;
     if (ga.length >= 2 && artInitials(wantArtist) === ga) return 2;
     if (wa.length >= 2 && artInitials(gotArtist) === wa) return 2;
-    return 0;
+    return run;
 }
 
 var _JOINS = { ",": true, "and": true, "feat": true, "ft": true, "featuring": true, "with": true, "vs": true, "x": true };
+
+// Whether two words of two credits are one word. Any two that join
+// performers are: a station's "feat." is a catalogue's "&", and a slash in
+// one list is a comma in the other. A station's "Merlyn Uusküla feat. Ice
+// Dog M" met iTunes' "Merlyn Uusküla & Ice Dog M" as a stranger, and the
+// sleeve went to the next row, another song filed under her name alone.
+function _sameWord(x, y) {
+    return x.w === y.w || (_joins(x.w) && _joins(y.w));
+}
+
+function _joins(w) {
+    return w === "/" || _JOINS[w] === true;
+}
 
 // Letters on both sides of a dot, a hyphen, an apostrophe or a "!" inside one
 // word, which the art fold then joins: "will.i.am", "t.A.T.u.", "P!nk".
@@ -725,29 +988,38 @@ function _creditWords(s) {
 }
 
 // Whether the shorter of two credits is an unbroken run of the longer one's
-// words; one under four letters only at the start, followed by nothing or by
-// a word that joins performers ("AC/DC" is a name, not AC and company). A
-// word the fold joined meeting a plain one counts like a short name: the
-// "william" of will.i.am is no William Orbit, and the "tatu" of t.A.T.u. no
-// Tatu Kantomaa.
+// words: 2 when the run is a performer of its own, 1 when it is only a part
+// of a longer name, 0 when there is no run. A performer of its own has the
+// end of the credit, a word that joins performers or a slash on each side.
+// A "the" in front of it is passed over: a station's "Rolling Stones" and a
+// catalogue's "The Rolling Stones" are one band, and the word alone makes
+// nobody a namesake. One under four letters counts only at the start,
+// followed by nothing or by a word that joins performers ("AC/DC" is a name,
+// not AC and company), and is never a part. A word the fold joined meeting a
+// plain one counts like a short name: the "william" of will.i.am is no
+// William Orbit, and the "tatu" of t.A.T.u. no Tatu Kantomaa.
 function _wordRun(a, b) {
     var letters = function(ws) {
         return ws.filter(function(x) { return x.w !== "," && x.w !== "/"; })
                  .map(function(x) { return x.w; }).join("").length;
     };
     var s = letters(a) <= letters(b) ? a : b, l = s === a ? b : a;
-    if (s.length === 0) return false;
+    if (s.length === 0) return 0;
+    var ends = function(k) { return k < 0 || k >= l.length || _joins(l[k].w); };
+    var part = 0;
     for (var i = 0; i + s.length <= l.length; i++) {
         var j = 0, mixed = false;
-        while (j < s.length && l[i + j].w === s[j].w) {
+        while (j < s.length && _sameWord(l[i + j], s[j])) {
             if (l[i + j].joined !== s[j].joined) mixed = true;
             j++;
         }
         if (j < s.length) continue;
-        if (!mixed && letters(s) >= 4) return true;
-        if (i === 0 && (s.length === l.length || _JOINS[l[s.length].w] === true)) return true;
+        if (i === 0 && (s.length === l.length || _JOINS[l[s.length].w] === true)) return 2;
+        if (mixed || letters(s) < 4) continue;
+        if (ends(i > 0 && l[i - 1].w === "the" ? i - 2 : i - 1) && ends(i + s.length)) return 2;
+        part = 1;
     }
-    return false;
+    return part;
 }
 
 // Which of the covers a music service offered actually belongs to this
@@ -781,8 +1053,11 @@ function artPick(wantArtist, wantTitle, cands, requireTitle) {
         // claims to have fixed. Containment itself has to stay: it is what
         // matches "Radio Ga Ga" to "Radio Ga Ga - Remastered 2011". So the
         // cure is an order between the two, not a stricter nameAkin.
-        // artArtistScore answers only 0 or 2, so with an artist known this
-        // reads 5 / 4 / 2 and never ties.
+        // With an artist known the ranks are 6 and 5 for the artist whole
+        // with the exact title and with one that holds it, 3 and 2 for a
+        // part of a longer name with the same two, and 1 for the artist
+        // whole with another song. A part of a name without the song ranks
+        // 0, which the > below never takes: see artArtistScore.
         var wantCore = artCoreTitle(wantTitle);
         var candCore = artCoreTitle(c.title);
         var te = 0;
@@ -792,7 +1067,7 @@ function artPick(wantArtist, wantTitle, cands, requireTitle) {
         if (wa !== "") {
             var ae = artArtistScore(wantArtist, c.artist);
             if (ae === 0 || (requireTitle === true && te === 0)) continue;
-            score = ae + te;
+            score = ae === 1 ? te : (te === 0 ? 1 : te + 3);
         } else {
             // Nothing in the widget reaches this branch since 2026-11-02:
             // ArtworkEngine turns a line without an artist away before the
@@ -845,6 +1120,47 @@ function artPickByArtist(wantArtist, cands) {
         if (artFold(c.artist) === want) return i;
     }
     return -1;
+}
+
+// How long a changed title waits before its cover is looked up, in ms.
+// first: the title follows an empty header. sinceMoveMs: how long before
+// this change the lookup key last moved.
+// The full window is for a StreamTitle that flaps, so that each flap does
+// not start a chain of requests. It was also what every ordinary song
+// change waited: 1.50 to 1.53 s on 29 of 29 changes, 87% of the time from
+// title to cover, where the catalogues answer in 0.15 to 0.26 s. A title
+// that has stood for four seconds is not flapping. The polled titles are at
+// least five seconds apart, so on that road nothing waits the window out.
+// A span that is no number, or runs backwards after a clock change, gets
+// the full window.
+// Contract: artWaitMs(true, 0) = 200; artWaitMs(false, 4000) = 200;
+//   artWaitMs(false, 3999) = 1500; artWaitMs(false, undefined) = 1500.
+function artWaitMs(first, sinceMoveMs) {
+    if (first === true) return 200;
+    return sinceMoveMs >= 4000 ? 200 : 1500;
+}
+
+// Whether a lookup that found no cover is asked once more, and after how
+// long: ms, or -1 for no. unanswered: some service timed out, refused or
+// reported a quota, so the chain did not end on everybody's "no". key: the
+// lookup's key. currentKey: the key of what plays now. retriedKey: the
+// track that already had its second attempt. enabled: covers are switched on.
+// Such an end is not cached, and nothing asked again until the title
+// changed: measured with two timeouts in the chain, the song stayed without
+// a cover for its whole play. One more attempt, never two, and only while
+// the same track stands. Twenty-five seconds leaves a per-minute limit time
+// to ease (iTunes refuses at about 20 requests a minute) and most of a song
+// is still ahead.
+// The engine asks twice with the same arguments: when the chain ends, and
+// again when the wait is over, since by then the track may have changed.
+// Contract: artRetryMs(true, "a b", "a b", "", true) = 25000;
+//   artRetryMs(false, "a b", "a b", "", true) = -1;
+//   artRetryMs(true, "a b", "c d", "", true) = -1;
+//   artRetryMs(true, "a b", "a b", "a b", true) = -1;
+//   artRetryMs(true, "a b", "a b", "", false) = -1.
+function artRetryMs(unanswered, key, currentKey, retriedKey, enabled) {
+    if (unanswered !== true || !enabled || !key) return -1;
+    return key === currentKey && key !== retriedKey ? 25000 : -1;
 }
 
 // The form a typed country name must take on the wire. The directory's
@@ -917,7 +1233,8 @@ function countryLabel(cc, apiName, localeName) {
     return String(apiName || "").replace(/^The\s+/, "");
 }
 
-// What an empty answer tries next: "unscope", "stems" or "done".
+// What an empty answer tries next: "unscope", "astyped", "incountry", "stems"
+// or "done".
 // A country chip pinned by an EARLIER search keeps scoping what is typed
 // after it — that is its job ("Popular in Finland", then "rock"). But when
 // the new text finds nothing inside that country, the chip is yesterday's
@@ -925,11 +1242,23 @@ function countryLabel(cc, apiName, localeName) {
 // then "virgin radio uk" answered "No matching stations" with the American
 // chip still up. The scope goes and the text runs again everywhere. A scope
 // the text itself names ("80s in uk") is the listener's word and stays.
-// Contract: s = { count, gotAnswer, mode, inheritedScope, countryQuery,
-//   stemCount }. No answer from the network is never "no results".
+// A fence the search read out of the text without "in", beside a word it did
+// not know (reading's bareScope), was a guess: the text runs again as it was
+// typed, as a name, and the chip the guess put up goes. That comes before the
+// stems, which would shorten the one word left inside the wrong country.
+// A name typed with its country ("retro fm eesti", nameInCountry) is asked
+// inside that country when the name alone found nothing, and also when it
+// found under THIN_ANSWER rows: that is the one answer with rows in it that
+// still gets another question.
+// Contract: s = { count, gotAnswer, mode, inheritedScope, bareScope, inCountry,
+//   countryQuery, stemCount }. No answer from the network is never "no results".
 function emptyNext(s) {
-    if (!s || s.gotAnswer !== true || s.count > 0) return "done";
+    if (!s || s.gotAnswer !== true) return "done";
+    var inCountry = s.inCountry === true && s.mode === "all";
+    if (s.count > 0) return inCountry && s.count < THIN_ANSWER ? "incountry" : "done";
     if (s.inheritedScope === true) return "unscope";
+    if (s.bareScope === true) return "astyped";
+    if (inCountry) return "incountry";
     if (s.mode === "all" && s.countryQuery !== true && s.stemCount > 0) return "stems";
     return "done";
 }
@@ -1016,14 +1345,25 @@ function mirrorRungs(rows, seeds) {
 // matches without regard to case and /search?country= does not.
 var DIRECTORY_ROADS = { "byname": 1, "bycountry": 1, "bylanguage": 1, "bytag": 1 };
 
+// bycountry matches its word inside the directory's English country names,
+// and those do not hold the words people type. Measured 2026-11-10:
+// bycountry/uk answered a hundred rows and every one was Ukrainian,
+// bycountry/usa answered none. A word the popup's hand-written aliases know
+// is asked by its code instead; bycountrycodeexact takes order, reverse,
+// limit and offset like the other roads (GB by votes: LBC Radio, Radio
+// Caroline, Capital FM London, and offset=1 opens on Radio Caroline).
 // Contract: no road or no word is the bare list; a road the combo box never
 // offered reads as byname and never becomes a path segment; a mirror name
-// that is not a hostname label never becomes a host.
+// that is not a hostname label never becomes a host; on the country road a
+// word COUNTRY_ALIASES knows, folded, is asked as bycountrycodeexact/<code>
+// and any other word as it was typed.
 function directoryBase(server, by, val) {
     var host = /^[a-z0-9-]+$/.test(String(server || "")) ? String(server) : "all";
     var base = "https://" + host + ".api.radio-browser.info/json/stations";
     var v = String(val === undefined || val === null ? "" : val).trim();
     if (!by || v === "") return base;
+    var code = by === "bycountry" ? COUNTRY_ALIASES[fold(v)] : undefined;
+    if (code !== undefined) return base + "/bycountrycodeexact/" + code;
     return base + "/" + (DIRECTORY_ROADS.hasOwnProperty(by) ? by : "byname") + "/" + uriPart(v);
 }
 
@@ -1108,6 +1448,55 @@ function urlKey(url) {
     return host + m[3].replace(/\/+$/, "") + m[4];
 }
 
+// Whether a directory row is a station the list already holds. The popup
+// compared the saved address with the row's, and the directory moves a
+// record between a broadcaster's servers: measured 2026-11-10 on the twenty
+// default stations, four came back under "From the web" beside their saved
+// selves, Groove Salad saved at ice3.somafm.com and listed at ice2 under the
+// same uuid, and a star then saved the twin.
+// Contract: knownStationAt(savedRows, row) is the index of the first saved
+//   row ({hostname, prev, uuid}) that holds one of the row's two addresses
+//   (url_resolved, url) as its hostname or its prev, by urlKey, or carries the
+//   row's stationuuid; -1 for none. An empty address or an empty uuid matches
+//   nothing. No list, no row and rows that are no objects answer -1.
+function knownStationAt(savedRows, row) {
+    if (!Array.isArray(savedRows) || row === null || typeof row !== "object") return -1;
+    var text = function(v) { return typeof v === "string" ? v.trim() : ""; };
+    var a = urlKey(text(row.url_resolved)), b = urlKey(text(row.url)), id = text(row.stationuuid);
+    for (var i = 0; i < savedRows.length; i++) {
+        var s = savedRows[i];
+        if (s === null || typeof s !== "object") continue;
+        if (id !== "" && text(s.uuid) === id) return i;
+        var at = urlKey(text(s.hostname)), was = urlKey(text(s.prev));
+        if (at !== "" && (at === a || at === b)) return i;
+        if (was !== "" && (was === a || was === b)) return i;
+    }
+    return -1;
+}
+
+// Whether the list holds the row's station, for the results, which drop it.
+// What they drop the list has to show: its own filter reads names alone, so a
+// saved station the directory found by its country, its language or its genre
+// was dropped here and hidden there, and stood nowhere on the screen.
+// Contract: knownStation(savedRows, row, named) = knownStationAt(...) !== -1.
+//   named, when it is a list, gets the saved row an answer names, once, as
+//   { url_resolved: its hostname, url: "", stationuuid: its uuid }: the list's
+//   own words and not the mirror's, and a row knownStationAt finds that
+//   station by again, also after the list was reloaded or the station healed.
+function knownStation(savedRows, row, named) {
+    var at = knownStationAt(savedRows, row);
+    if (at === -1 || !Array.isArray(named)) return at !== -1;
+    var text = function(v) { return typeof v === "string" ? v.trim() : ""; };
+    var own = { url_resolved: text(savedRows[at].hostname), url: "", stationuuid: text(savedRows[at].uuid) };
+    for (var i = 0; i < named.length; i++) {
+        var n = named[i];
+        if (n !== null && typeof n === "object" && n.url_resolved === own.url_resolved
+            && n.stationuuid === own.stationuuid) return true;
+    }
+    named.push(own);
+    return true;
+}
+
 // The directory's bitrate field in kbps. Most rows are kbps already and some
 // are bps; only what is clearly bps is scaled. A cutoff at 1000 once turned a
 // 1411 kbps lossless stream into "1 kb/s".
@@ -1155,6 +1544,30 @@ function pageOrder(rows, qs, room) {
     // The index closes every tie: V4's sort has not always been stable.
     head.sort(function(a, b) { return (b.rate - a.rate) || (b.votes - a.votes) || (a.at - b.at); });
     return head.map(function(h) { return h.row; }).concat(rows.slice(n));
+}
+
+// Where "Show more" stands in the list it pages, once an answer was walked.
+// The popup read both things off the rows left on screen: the next offset was
+// the row count, and the button showed only while the count filled the cap.
+// The walk drops what the listener has saved, so a full page of 50 holding 25
+// saved stations left 25 rows under a cap of 30 and the button went, the rest
+// of the directory's list never asked for; 30 rows and a next page of 30
+// duplicates and 20 new made 50 under a cap of 60, and it went the same way.
+// Here both come from the directory's own page. The next page starts behind
+// the last row the walk passed, shown or dropped. There may be more while rows
+// of the answer are still unwalked (the cap cut the walk short) or while the
+// answer was a full page; a short page is the end of the list, an empty one too.
+// Contract: pageAfter(qs, from, parsed, consumed) -> { at, more }. qs is the
+//   query as sent, without its offset (its limit= is the page size); from the
+//   offset it was asked at; parsed the rows the answer carried; consumed the
+//   rows of it the walk passed. at = from + consumed. No answer yet,
+//   pageAfter(), is { at: 0, more: false }. What is no count reads as 0,
+//   consumed never passes parsed, and a query without a limit has no full page.
+function pageAfter(qs, from, parsed, consumed) {
+    var n = function(v) { v = parseInt(v, 10); return v > 0 ? v : 0; };
+    var m = /[?&]limit=(\d+)/.exec(String(qs));
+    var size = m ? n(m[1]) : 0, got = n(parsed), walked = Math.min(n(consumed), got);
+    return { at: n(from) + walked, more: walked < got || (size > 0 && got >= size) };
 }
 
 // pageOrder sorts one answer, but one search fills the list from several:

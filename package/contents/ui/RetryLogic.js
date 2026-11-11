@@ -126,3 +126,20 @@ function orderLapsed(wantsPlaying, quietSince, heardAt, nowMs, exempt, cap) {
 function beatOnTime(prevAt, nowAt, intervalMs) {
     return prevAt > 0 && nowAt - prevAt <= 2 * intervalMs;
 }
+
+// Whether opening the popup asks for the title at once, ahead of the title
+// poll's next tick. The poll runs every five seconds, eight on battery, and
+// a popup opened just after a song changed showed the old title for up to
+// that long. One request per opening, and only where the poll is the road
+// the titles come by. planar: the desktop form, which stays expanded for
+// its whole life and has no opening to speak of. ticking: the title poll's
+// timer is running. listening: a station is playing without an error, on a
+// player that delivers no titles of its own. Saving battery does not hold
+// this one request back. getStreamInfo's single reader at a time and the
+// no-titles pin still stand behind it.
+// Contract: titleOnOpen(false, true, true) = true; titleOnOpen(true, true,
+//   true) = false; titleOnOpen(false, false, true) = false;
+//   titleOnOpen(false, true, false) = false; titleOnOpen() = false.
+function titleOnOpen(planar, ticking, listening) {
+    return planar === false && ticking === true && listening === true;
+}

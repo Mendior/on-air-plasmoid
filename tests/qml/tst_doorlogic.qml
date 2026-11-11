@@ -179,4 +179,164 @@ TestCase {
         compare(DL.normalize("x"), "x");
     }
 
+    // ── a station file picked in the Import dialog ───────────────────────
+    // The Stations page used to empty its list before it had looked at the
+    // file, so a wrong pick cost the listener every station.
+    readonly property var exported: [
+        { "active": true, "country": "Estonia", "favicon": "https://e.example/l.png",
+          "hostname": router, "name": "Raadio Elmar" },
+        { "active": false, "favicon": "", "hostname": "http://b.example/s", "name": "Beta", "uuid": u1 },
+        { "active": true, "bitrate": 900, "codec": "flac", "favicon": "",
+          "hostname": "https://f.example/flac", "name": "Mast FLAC", "uuid": "",
+          "prev": "https://old.example/flac" }
+    ]
+
+    // One row as text with its keys in order, so a failure names the field.
+    function _flat(row) {
+        if (row === null || typeof row !== "object") return String(row);
+        var keys = Object.keys(row).sort(), out = [];
+        for (var i = 0; i < keys.length; i++) out.push(keys[i] + "=" + JSON.stringify(row[keys[i]]));
+        return out.join(" ");
+    }
+    function _names(rows) {
+        if (!Array.isArray(rows)) return String(rows);
+        return rows.map(function(r) { return r.name; }).join(",");
+    }
+
+    function test_a_file_that_is_no_list_gives_no_rows() {
+        compare(DL.importedRows({}), null, "an object root");
+        compare(DL.importedRows({ "stations": exported }), null, "a list wrapped in an object");
+        compare(DL.importedRows([]), null, "an empty array");
+        compare(DL.importedRows("http://a.example/s"), null, "a JSON string");
+        compare(DL.importedRows(42), null);
+        compare(DL.importedRows(true), null);
+        compare(DL.importedRows(null), null);
+        compare(DL.importedRows(undefined), null);
+    }
+
+    function test_another_programs_array_gives_no_rows() {
+        compare(DL.importedRows([{ "title": "Jazz", "url": "http://a.example/s" }, { "id": 1 }]), null,
+                "objects with no hostname");
+        compare(DL.importedRows([1, 2, 3]), null);
+        compare(DL.importedRows(["http://a.example/s"]), null, "bare strings");
+        compare(DL.importedRows([[{ "name": "A", "hostname": "http://a.example/s" }]]), null,
+                "a list inside a list");
+        compare(DL.importedRows([null, null]), null);
+    }
+
+    function test_rows_that_are_no_station_are_left_out() {
+        var a = { "name": "A", "hostname": "http://a.example/s" };
+        var b = { "name": "B", "hostname": "http://b.example/s" };
+        var c = { "name": "C", "hostname": "http://c.example/s" };
+        var rows = DL.importedRows([a, null, b, 7, "x", ["y"], { "name": "no address" },
+                                    { "name": "empty", "hostname": "" }, { "name": "blank", "hostname": "   " },
+                                    { "name": "number", "hostname": 42 }, { "name": "object", "hostname": {} },
+                                    { "name": "null", "hostname": null }, c]);
+        compare(_names(rows), "A,B,C");
+    }
+
+    function test_the_import_can_say_how_many_rows_it_left_out() {
+        var a = { "name": "A", "hostname": "http://a.example/s" };
+        var whole = [a, a, a];
+        compare(DL.importLeftOut(whole, DL.importedRows(whole)), 0);
+        var holed = [a, null, { "name": "no address" }, a, 7];
+        compare(DL.importLeftOut(holed, DL.importedRows(holed)), 3);
+        // Past the cap the rows are stations too, and they are still not in the list.
+        var many = [];
+        for (var i = 0; i < DL.IMPORT_ROWS + 4; i++) many.push(a);
+        compare(DL.importLeftOut(many, DL.importedRows(many)), 4);
+        // A file that was refused has nothing to count.
+        compare(DL.importLeftOut([null], DL.importedRows([null])), 0);
+        compare(DL.importLeftOut({}, null), 0);
+        compare(DL.importLeftOut(undefined, undefined), 0);
+        compare(DL.importLeftOut([a], [a, a]), 0);
+    }
+
+    function test_the_widgets_own_export_comes_back_whole() {
+        var file = JSON.parse(JSON.stringify(exported));
+        var rows = DL.importedRows(file);
+        verify(Array.isArray(rows), "the widget's own export was refused");
+        compare(rows.length, exported.length);
+        for (var i = 0; i < exported.length; i++)
+            compare(_flat(rows[i]), _flat(exported[i]), "row " + i);
+        compare(rows[2].codec, "flac");
+        compare(rows[2].bitrate, 900);
+        compare(JSON.stringify(file), JSON.stringify(exported), "the parsed file was changed");
+        verify(rows[0] !== file[0], "a row of the file was handed back as it was");
+    }
+
+    function test_a_plain_row_gets_its_four_fields_and_no_more() {
+        var rows = DL.importedRows([{ "hostname": "http://a.example/s", "junk": 1, "objectName": "x",
+                                      "homepage": "http://a.example/" }]);
+        compare(_flat(rows[0]), _flat({ "name": "http://a.example/s", "hostname": "http://a.example/s",
+                                        "favicon": "", "active": true }));
+        // A name that is no text is no name.
+        rows = DL.importedRows([{ "hostname": "http://a.example/s", "name": { "en": "A" } }]);
+        compare(_names(rows), "http://a.example/s");
+        rows = DL.importedRows([{ "hostname": "http://a.example/s", "name": 1337 }]);
+        compare(_names(rows), "1337");
+    }
+
+    function test_every_field_arrives_as_the_list_keeps_it() {
+        var host = "http://a.example/s";
+        function one(extra) {
+            var o = { "name": "A", "hostname": host };
+            for (var k in extra) o[k] = extra[k];
+            var rows = DL.importedRows([o]);
+            return (rows && rows[0]) || {};
+        }
+        compare(one({}).active, true, "a row that does not say is shown");
+        compare(one({ "active": false }).active, false);
+        compare(one({ "active": "false" }).active, false);
+        compare(one({ "active": 0 }).active, false);
+        compare(one({ "active": true }).active, true);
+        compare(one({ "favicon": "https://a.example/l.png" }).favicon, "https://a.example/l.png");
+        compare(one({ "favicon": "file:///etc/passwd" }).favicon, "");
+        compare(one({ "favicon": "http://192.168.1.1/l.png" }).favicon, "", "a logo on the listener's own network");
+        compare(one({ "favicon": null }).favicon, "");
+        compare(one({ "codec": "FLAC" }).codec, "flac");
+        compare(one({ "codec": null }).codec, "");
+        compare(one({ "bitrate": "128" }).bitrate, 128);
+        compare(one({ "bitrate": 128.9 }).bitrate, 128);
+        compare(one({ "bitrate": -5 }).bitrate, 0);
+        compare(one({ "bitrate": "fast" }).bitrate, 0);
+        compare(one({ "bitrate": null }).bitrate, 0);
+        compare(one({ "country": 372 }).country, "372");
+        compare(one({ "uuid": u1 }).uuid, u1);
+        compare(one({ "prev": "https://old.example/s" }).prev, "https://old.example/s");
+        verify(one({ "prev": "javascript:alert(1)" }).prev === undefined, "junk reached prev");
+        verify(one({ "prev": host + "/" }).prev === undefined, "prev names the row's own address");
+        verify(one({}).codec === undefined && one({}).bitrate === undefined && one({}).country === undefined
+               && one({}).uuid === undefined, "a field the file never had was made up");
+    }
+
+    function test_five_hundred_rows_are_the_most_a_file_gives() {
+        var file = [];
+        for (var i = 0; i < 500; i++) file.push({ "name": "S" + i, "hostname": "http://s.example/" + i });
+        var rows = DL.importedRows(file);
+        compare(rows.length, 500);
+        compare(rows[0].name, "S0");
+        compare(rows[499].name, "S499");
+        file.push({ "name": "S500", "hostname": "http://s.example/500" });
+        rows = DL.importedRows(file);
+        compare(rows.length, 500);
+        compare(rows[499].name, "S499", "the file's order was not kept");
+    }
+
+    function test_a_field_is_cut_at_five_hundred_characters() {
+        var big = new Array(10001).join("n");
+        var rows = DL.importedRows([{ "name": big, "hostname": "http://a.example/" + big,
+                                      "country": big, "uuid": big, "codec": big.toUpperCase(),
+                                      "favicon": "https://a.example/" + big }]);
+        compare(_names(rows).length, 500);
+        compare(rows[0].hostname.length, 500);
+        compare(rows[0].hostname.substring(0, 17), "http://a.example/");
+        compare(rows[0].country.length, 500);
+        compare(rows[0].uuid.length, 500);
+        compare(rows[0].codec, new Array(17).join("n"));
+        compare(rows[0].favicon.length, 500);
+        var exact = new Array(501).join("n");
+        compare(_names(DL.importedRows([{ "name": exact, "hostname": "http://a.example/s" }])), exact);
+    }
+
 }

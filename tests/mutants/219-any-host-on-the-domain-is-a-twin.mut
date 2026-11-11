@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A mount twin no longer needs its host to be a numbered sibling of the saved
+  one.
+
+history:
+  edge02 and edge43 are one server family; some other host of the same domain
+  serving the same path need not be. Only an answer from the family proves the
+  sound is the saved mount.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      return a.host.replace(/\d+/g, "#") === b.host.replace(/\d+/g, "#");
+
+replace:
+      return true;
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_the_same_mount_on_a_sibling_edge_is_the_same_station.
+  Line-neutral.

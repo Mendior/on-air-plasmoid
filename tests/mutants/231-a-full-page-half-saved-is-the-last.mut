@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A full page that lost rows to the listener's own stations ends the list.
+
+history:
+  "Show more" showed only while the rows on screen filled the cap. A page of
+  fifty that held twenty-five saved stations left twenty-five rows under a
+  cap of thirty, and the button went with the rest of the directory's list
+  never asked for. Whether there is a next page is read from the page the
+  directory sent: one that came full may have another behind it.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      return { at: n(from) + walked, more: walked < got || (size > 0 && got >= size) };
+
+replace:
+      return { at: n(from) + walked, more: walked < got };
+
+expect:
+  Killed by tests/qml/tst_searchlogic.qml::test_a_full_page_half_saved_still_has_a_next_one
+  and tests/qml/tst_searchlogic.qml::test_a_page_of_nothing_but_duplicates_is_asked_past.
+  Line-neutral.

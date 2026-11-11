@@ -46,12 +46,15 @@ Item {
 
     // A flapping StreamTitle (rotating ad text, titles carrying elapsed
     // time) used to launch a full art-lookup chain per flap. Debounced to
-    // one chain per stable window; the ~1.5 s later cover is acceptable.
+    // one chain per stable window. Only a title that follows another within
+    // four seconds waits that window out: SearchLogic.artWaitMs.
     property string _artLookupPendingRaw: ""
     // The normalized lookup key the pending debounce is already aimed at —
     // so same-key raw flaps (an embedded per-second counter) don't restart
     // the timer forever and starve the lookup.
     property string _artPendingKey: ""
+    // When the lookup key last moved, by either of the two doors below.
+    property double _artKeyMovedAt: 0
 
     Timer {
         id: artLookupDebounce
@@ -60,13 +63,60 @@ Item {
         onTriggered: engine.lookupAlbumArt(engine._artLookupPendingRaw)
     }
 
-    function debounceStop() { artLookupDebounce.stop(); }
+    // The one later attempt for a chain that ended on a timeout or a
+    // refusal: { key, again } while it waits, null otherwise. again() starts
+    // that lookup over. _artRetriedKey is the track that has had its attempt.
+    property var _artRetry: null
+    property string _artRetriedKey: ""
+    property alias _artRetryArmed: artRetry.running
+    property alias _artRetryWaitMs: artRetry.interval
+
+    Timer {
+        id: artRetry
+        repeat: false
+        onTriggered: engine._artAskAgain()
+    }
+
+    // Called where a chain ends without a cover. SearchLogic.artRetryMs
+    // says whether this end is asked again and after how long.
+    function _artRetryArm(unanswered, key, again) {
+        var ms = again ? SearchLogic.artRetryMs(unanswered, key, app.trackArtistTitleKey(),
+                                                _artRetriedKey, cfg.albumArtEnabled) : -1;
+        if (ms < 0) return;
+        _artRetry = { "key": key, "again": again };
+        artRetry.interval = ms;
+        artRetry.restart();
+    }
+
+    // The retry timer's handler, and the tests' door to it. The question is
+    // put once more, because the wait is long enough for the track to change
+    // or the covers to be switched off.
+    function _artAskAgain() {
+        var r = _artRetry;
+        _artRetry = null;
+        artRetry.stop();
+        if (!r || SearchLogic.artRetryMs(true, r.key, app.trackArtistTitleKey(),
+                                         _artRetriedKey, cfg.albumArtEnabled) < 0) return;
+        _artRetriedKey = r.key;
+        r.again();
+    }
+
+    // Both doors are a title change as main.qml sees it: this one for a
+    // title the cache settled or a header that went empty, the next for a
+    // title that needs the network. Each stamps the moment, so the wait is
+    // measured from the last change of either kind.
+    function debounceStop() {
+        _artKeyMovedAt = Date.now();
+        artLookupDebounce.stop();
+    }
     // first = the title that follows an empty header (a station start, a
     // return from a stop): there is nothing for it to flap against yet, and
     // the full window only kept every station's first cover a second and a
     // half further away. A flap that follows is back on the full window.
     function debounceRestart(first) {
-        artLookupDebounce.interval = first === true ? 200 : 1500;
+        var now = Date.now();
+        artLookupDebounce.interval = SearchLogic.artWaitMs(first === true, now - _artKeyMovedAt);
+        _artKeyMovedAt = now;
         artLookupDebounce.restart();
     }
 
@@ -268,7 +318,8 @@ Item {
         // What the stream said it is playing — every candidate a music
         // service offers is judged against this, never accepted on faith.
         var want = { "artist": parsed.artist || "", "title": parsed.title || "" };
-        _runAttempts(_artPlan(parsed, query, trackString), query, want);
+        _runAttempts(_artPlan(parsed, query, trackString), query, want,
+                     function() { engine.lookupAlbumArt(trackString); });
     }
 
     // The requests a lookup will try, in order, each {fn, q, svc}: svc names
@@ -280,6 +331,12 @@ Item {
     // costs a single Deezer call and iTunes only ever sees fallbacks.
     // The old parallel-pair start burned both quotas on every track.
     function _artPlan(parsed, query, trackString) {
+        // Deezer reads track:"…" against the title alone, and an aside the
+        // station added is not part of it: track:"Kaotand pea (2026)"
+        // answered total 0 where track:"Kaotand pea" has the record. A title
+        // that is one aside and nothing else still goes as it came.
+        var bare = (parsed.title || "").replace(/"/g, " ");
+        bare = TrackLogic.cleanQueryLocal(bare) || bare.trim();
         var attempts = [
             {fn: _queryDeezer, q: query, svc: "deezer"},
             // Deezer's field search, for the records filed under a name the
@@ -287,7 +344,7 @@ Item {
             // three karaoke pressings by free text, while track:"Sunshine In
             // The Rain" has the real one — under "BWO". The picker's initial
             // matching recognizes the pair; free text alone never could.
-            {fn: _queryDeezer, q: 'track:"' + (parsed.title || "").replace(/"/g, " ") + '"', svc: "deezer"},
+            {fn: _queryDeezer, q: 'track:"' + bare + '"', svc: "deezer"},
             {fn: _queryItunes, q: query, svc: "itunes"}
         ];
         var primary = _primaryArtist(parsed.artist);
@@ -338,8 +395,10 @@ Item {
 
     // Runs the plan one request at a time for the lookup key query: the first
     // cover found settles it and nothing after it is asked. Each fn is called
-    // as fn(q, query, onResult(url, definitive), want).
-    function _runAttempts(attempts, query, want) {
+    // as fn(q, query, onResult(url, definitive), want). again, when given,
+    // starts this same lookup over, for the one later attempt after a chain
+    // that ended on a transient failure.
+    function _runAttempts(attempts, query, want, again) {
         var sawTransient = false;
 
         function runNext() {
@@ -351,6 +410,7 @@ Item {
                 // Cache the miss only when every source really said "no
                 // match" — a timeout/quota blip must retry on the next play.
                 _artFinish(query, "", !sawTransient);
+                _artRetryArm(sawTransient, query, again);
                 return;
             }
             var step = attempts.shift();

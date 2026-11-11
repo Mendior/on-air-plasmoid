@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A DLNA Stop answered with any HTTP error is reported as stopped.
+
+history:
+  An idle renderer answers Stop with a SOAP fault, and that is a quiet DONE.
+  The handler took every HTTP error for one. A fault rides HTTP 500; a 404
+  (the control address is gone) or a 503 (busy) is not the renderer speaking
+  about Stop at all, and the widget said nothing while the speaker may have
+  gone on playing. Measured 2026-11-10 against a local server answering 404,
+  500 and 503: DONE all three times.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+          if exc.code != 500:
+
+replace:
+          if exc.code >= 600:
+
+expect:
+  Killed by tests/test_cast_stop.py::test_cmd_dlna_stop_refused_at_the_door_emits_fail.
+  Line-neutral.

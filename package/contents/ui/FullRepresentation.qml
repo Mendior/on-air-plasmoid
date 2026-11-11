@@ -226,17 +226,20 @@ PlasmaExtras.Representation {
     readonly property int webResultCapMax: 300
     // The last query string sent, offset-free — "Show more" re-issues it.
     property string _webLastQs: ""
-    // Rows the last parsed directory page carried, and how many known
-    // duplicates paging must ask past: a whole page can be rows the list
-    // already shows (the dedup eats it), and offset=count would then
-    // fetch that same page forever.
+    // Rows the last parsed directory page carried, and the raw rows the last
+    // append walked before the cap cut it off: how far into the SOURCE list
+    // it got. Appended rows undercount that (dedup), the whole parsed page
+    // overcounts it (the cap break).
     property int _webLastParsed: 0
-    property int _webSkipAhead: 0
-    // Raw rows the last append actually walked before the cap cut it off —
-    // the true position in the SOURCE list, which is what a next page's
-    // offset must name. Appended rows undercount it (dedup), the whole
-    // parsed page overcounts it (the cap break).
     property int _webLastConsumed: 0
+    // Where "Show more" stands in the list it pages, { at, more }: counted in
+    // the directory's own rows, never in what the dedup left of them.
+    property var _webPage: SearchLogic.pageAfter()
+    // The listener's own stations this text's answers held. The results leave
+    // them out as already saved, so the list shows them whatever their names
+    // say (ReorderLogic.buildFilteredRows).
+    property var _webHeld: []
+    on_WebHeldChanged: rebuildFilteredModel()
     // The typed string whose derived country scope the user released with
     // the chip's ✕ — a mode or order chip re-running the same text must
     // not pin that scope right back. Any new text clears it: new intent.
@@ -287,29 +290,21 @@ PlasmaExtras.Representation {
 
     function _probeKick(seq) {
         if (seq !== fullRepresentation._webSearchSeq) return
-        var now = Date.now()
-        for (var i = 0; i < webResultsModel.count; i++) {
-            var row = webResultsModel.get(i)
-            if (row.alive !== -1 || fullRepresentation._probeSpent[row.url]) continue
-            // Loopback/private hosts never get the knock — the row keeps
-            // its "unknown" verdict and stays clickable (a preview is the
-            // user's own deliberate act; the background probe is not).
-            if (!SearchLogic.isProbeSafeHost(row.url)) {
-                fullRepresentation._probeSpent[row.url] = true
-                continue
-            }
-            var hit = fullRepresentation._probeVerdicts[row.url]
-            if (hit !== undefined && now - hit.t < fullRepresentation._probeVerdictTtlMs) {
-                fullRepresentation._probeSpent[row.url] = true
-                if (hit.v !== -1) _webSetAlive(row.url, hit.v)
-                continue
-            }
-            if (fullRepresentation._probeInFlight[row.url]) continue
-            if (fullRepresentation._probeActive >= 6) continue
-            fullRepresentation._probeSpent[row.url] = true
-            fullRepresentation._probeInFlight[row.url] = true
+        var rows = []
+        for (var i = 0; i < webResultsModel.count; i++) rows.push(webResultsModel.get(i))
+        // The walk only reads. A remembered "dead" used to be marked under it,
+        // which sinks the row and made the one behind it miss its turn
+        // (SearchLogic.probePass); marks and knocks come when the walk is over.
+        const pass = SearchLogic.probePass(rows, {
+            spent: fullRepresentation._probeSpent, verdicts: fullRepresentation._probeVerdicts,
+            inFlight: fullRepresentation._probeInFlight, active: fullRepresentation._probeActive,
+            now: Date.now(), ttl: fullRepresentation._probeVerdictTtlMs, slots: 6 })
+        for (const done of pass.spent) fullRepresentation._probeSpent[done] = true
+        SearchLogic.markAlive(webResultsModel, pass.known)
+        for (const url of pass.knock) {
+            fullRepresentation._probeInFlight[url] = true
             fullRepresentation._probeActive++
-            _probeOne(row.url, seq)
+            _probeOne(url, seq)
         }
     }
 
@@ -382,43 +377,23 @@ PlasmaExtras.Representation {
             }
         }
         xhr.open("GET", url)
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43")
         guard = root._armXhrTimeout(xhr, 6000)
         fullRepresentation._probeLiveXhrs.push(xhr)
         xhr.send()
     }
 
-    // The verdict lands by URL, not by index — probes race against
-    // relevance moves, "Show more" pages and the ⭐ remove.
+    // The verdict lands by URL, not by index, and a dead row sinks
+    // (SearchLogic.markAlive).
     function _webSetAlive(url, verdict) {
-        for (var i = 0; i < webResultsModel.count; i++)
-            if (webResultsModel.get(i).url === url) {
-                webResultsModel.setProperty(i, "alive", verdict)
-                if (verdict === 0) _webSinkDead()
-                return
-            }
+        SearchLogic.markAlive(webResultsModel, [{ "url": url, "v": verdict }])
     }
 
-    // Rows the probe condemned sink below the living, keeping their own
-    // order at the bottom — the list is a recommendation, and "not
-    // answering" is not one. Re-run after every page append too, or the
-    // fresh page's live rows would land underneath yesterday's dead.
+    // Rows the probe condemned stay below the living (SearchLogic.sinkDead).
+    // Re-run after every page append too, or the fresh page's live rows
+    // would land underneath yesterday's dead.
     function _webSinkDead() {
-        // Each dead row goes to the very END in encounter order — moving
-        // into a shrinking `last` slot came out reversed, and re-runs
-        // flip-flopped the block (measured on a real ListModel). This form
-        // is stable and idempotent: a second pass rotates the dead block
-        // through the tail and lands it exactly where it started.
-        var moved = 0
-        var i = 0
-        while (i < webResultsModel.count - moved) {
-            if (webResultsModel.get(i).alive === 0) {
-                webResultsModel.move(i, webResultsModel.count - 1, 1)
-                moved++
-            } else {
-                i++
-            }
-        }
+        SearchLogic.sinkDead(webResultsModel)
     }
 
     // Every search road ends here. A directory that answered but left the
@@ -426,25 +401,49 @@ PlasmaExtras.Representation {
     // berlin"), a glued number spelled apart ("raadio2" as "raadio 2"), then
     // the stems for an inflection ("Elmari" hunting "Elmar") or for every hit
     // already sitting in the user's own list.
-    function _webFinish(q, seq, tail, gotAnswer) {
+    function _webFinish(q, seq, tail, gotAnswer, askedInCountry) {
         if (seq !== fullRepresentation._webSearchSeq) return
         var stems = SearchLogic.spellings(q).concat(SearchLogic.stems(q))
+        // A name typed with its country ("retro fm eesti") has a second reading,
+        // the name inside the country. Once per search, and only without a fence.
+        var inCc = (askedInCountry || tail.indexOf("&countrycode=") !== -1)
+                   ? null : SearchLogic.nameInCountry(q, _countryCodeOf)
         var next = SearchLogic.emptyNext({
             count: webResultsModel.count, gotAnswer: gotAnswer,
             mode: fullRepresentation.webSearchMode,
-            inheritedScope: fullRepresentation._webScopeInherited,
-            countryQuery: _countryCodeOf(q) !== "", stemCount: stems.length })
-        if (next === "unscope") {
-            // The chip was an earlier search's country and this text found
-            // nothing inside it — the text runs again without the fence.
+            inheritedScope: fullRepresentation._webScopeInherited, bareScope: fullRepresentation._webScopeBare,
+            inCountry: inCc !== null, countryQuery: _countryCodeOf(q) !== "", stemCount: stems.length })
+        if (next === "incountry") {
+            // The word pass froze the cap at what it found, and this answer
+            // needs the page: it goes in under the row or two already there.
+            fullRepresentation.webResultCap = 30
+            var inQs = "/json/stations/search?name=" + encodeURIComponent(inCc.text) + "&countrycode=" + inCc.cc
+            var had = webResultsModel.count
+            root._rbFetch(inQs + tail, 4000, function(xhr) {
+                if (seq !== fullRepresentation._webSearchSeq) return
+                _webAppendResults(xhr)
+                if (webResultsModel.count > had) {
+                    _webRememberQuery(fullRepresentation._webLastTyped || q)
+                    _webMark(0, inQs + tail)
+                    _probeKick(seq)
+                }
+                // Still empty goes on to the stems; dead mirrors over an empty list say so.
+                _webFinish(q, seq, tail, xhr !== null || webResultsModel.count > 0, true)
+            })
+            return
+        }
+        if (next === "unscope" || next === "astyped") {
+            // The fence found nothing inside it: an earlier search's chip, or
+            // ("astyped") a guess read out of the text itself, "new jersey" as
+            // "new" in Jersey. The chip goes and the text runs again without it.
             fullRepresentation.webScopeCc = ""
             fullRepresentation.webScopeName = ""
-            runWebSearch(root.searchFilter)
+            runWebSearch(root.searchFilter, false, next === "astyped")
             return
         }
         if (next === "stems") {
-            // The word pass froze the cap at count+1 to retire its own
-            // "Show more" — but with ZERO rows found that freeze is 1,
+            // The word pass froze the cap at count+1, being a pass with no
+            // next page of its own. With ZERO rows found that freeze is 1,
             // and the stem retry about to run would append exactly one
             // row and stop: 'raadio elmari' showed a single result
             // where the directory had thirty. An empty pass has nothing
@@ -461,9 +460,7 @@ PlasmaExtras.Representation {
                     _webAppendResults(xhr)
                     if (webResultsModel.count > 0) {
                         _webRememberQuery(fullRepresentation._webLastTyped || q)
-                        fullRepresentation._webLastQs = gpQs + tail
-                        fullRepresentation._webSkipAhead =
-                            fullRepresentation._webLastConsumed - webResultsModel.count
+                        _webMark(0, gpQs + tail)
                         _probeKick(seq)
                     }
                     // No mirror answered at all: the stems would only walk the
@@ -511,9 +508,7 @@ PlasmaExtras.Representation {
                 // list, not the original name query that returned nothing —
                 // and from the position this answer really consumed, or the
                 // rows the dedup ate would push the offset past unseen ones.
-                fullRepresentation._webLastQs = qs + tail
-                fullRepresentation._webSkipAhead =
-                    fullRepresentation._webLastConsumed - webResultsModel.count
+                _webMark(0, qs + tail)
                 _probeKick(seq)
                 fullRepresentation.webSearchFailed = false
                 fullRepresentation.webSearching = false
@@ -577,8 +572,9 @@ PlasmaExtras.Representation {
     // never heard of); this map is the other 200-odd countries — before
     // it, "salsa in mexico" scoped nothing because mexico was simply not
     // in the hand-written thirty.
-    property var _countryMapApiFolded: ({})
+    property var _countryMapApiFolded: SearchLogic.countryMapFromApi([])
     property bool _webScopeInherited: false
+    property bool _webScopeBare: false
     property bool _countryListAsked: false
 
     function _ensureCountryList() {
@@ -592,6 +588,11 @@ PlasmaExtras.Representation {
                 fullRepresentation._countryListAsked = false
                 return
             }
+            // The search that asked for the list went out without it. If the
+            // list reads the text in the field another way ("portugal" as a
+            // country) and nothing newer is being typed, that search runs again.
+            const key = () => SearchLogic.readingKey(root.searchFilter, fullRepresentation.webSearchMode, _countryCodeOf)
+            const was = key()
             try {
                 fullRepresentation._countryMapApiFolded =
                     SearchLogic.countryMapFromApi(JSON.parse(xhr.responseText))
@@ -600,18 +601,14 @@ PlasmaExtras.Representation {
                 fullRepresentation._countryListAsked = false
                 console.log("[ARP] country list parse: " + e)
             }
+            if (!webSearchDebounce.running && key() !== was) runWebSearch(root.searchFilter)
         })
     }
 
-    // A prototype-safe country-map lookup: a plain `in` also matched
-    // Object.prototype keys, so searching "constructor" went to the
-    // country branch with an undefined code (the null-prototype folded
-    // map keeps that guarantee without the hasOwnProperty dance).
+    // The hand-written words first, then the directory's list. Only a map's
+    // own entry is a country (SearchLogic.countryCode): "constructor" is not.
     function _countryCodeOf(q) {
-        var f = SearchLogic.fold(q)
-        var code = _countryMapFolded[f]
-        if (code === undefined) code = fullRepresentation._countryMapApiFolded[f]
-        return code === undefined ? "" : code
+        return SearchLogic.countryCode(q, _countryMapFolded, fullRepresentation._countryMapApiFolded)
     }
 
     // Open-and-type: a printable key anywhere in the lists lands in the
@@ -619,21 +616,16 @@ PlasmaExtras.Representation {
     // away and nobody should have to know that. Modifier chords (Ctrl+Up
     // reorder, Ctrl+Return star) pass through untouched.
     function typeToSearch(event) {
-        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier)) return false
-        // Space stays with the list (play/pause there), and control
-        // characters are keys, not text — including DEL (0x7f), which xkb
-        // hands the Delete key as event.text and which sorts ABOVE space:
-        // one Delete press was blanking the whole list into a %7F search.
-        if (!event.text || event.text.length !== 1) return false
-        var cc = event.text.charCodeAt(0)
-        if (cc <= 0x20 || cc === 0x7f) return false
+        var ch = ViewLogic.typedChar(Plasmoid.configuration.showSearchRow !== false,
+                                     event.modifiers & (Qt.ControlModifier | Qt.AltModifier), event.text)
+        if (ch === "") return false
         filterField.forceActiveFocus()
-        filterField.text = filterField.text + event.text
+        filterField.text = filterField.text + ch
         filterField.cursorPosition = filterField.text.length
         return true
     }
 
-    function runWebSearch(q, releaseScope) {
+    function runWebSearch(q, releaseScope, plain) {
         q = (q || "").trim()
         // The country vocabulary rides in lazily with the first search of
         // the session — a listener who never searches never fetches it.
@@ -642,35 +634,26 @@ PlasmaExtras.Representation {
         // typing would fire the same query a beat later as a duplicate.
         webSearchDebounce.stop()
         webResultsModel.clear()
+        fullRepresentation._webPage = SearchLogic.pageAfter()
+        fullRepresentation._webHeld = []
         fullRepresentation._probeSpent = ({})
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
+        // How the text is read is SearchLogic.reading's to say: a country,
+        // a wish fenced to one with "in" or without. plain is the retry after
+        // a fence read without "in" came back empty.
+        const read = SearchLogic.reading(q, fullRepresentation.webSearchMode, _countryCodeOf, plain)
         // Short queries are noise — EXCEPT exact country-map keys ("uk").
-        const cc = _countryCodeOf(q)
+        const cc = read.cc, scoped = read.scoped
         if (q.length < 3 && cc === "" && SearchLogic.decadeTag(q) === "") {
             fullRepresentation.webSearching = false
             return
         }
         fullRepresentation.webSearching = true
         fullRepresentation.webResultCap = 30
-        fullRepresentation._webSkipAhead = 0
-        // "70s in UK" — the tail names a country, the head is the real query,
-        // and every pass below runs inside that country. A country pinned by
-        // the scope CHIP does the same for a plain query; a new "in X" in the
-        // query re-pins the chip.
-        const scopedIn = (fullRepresentation.webSearchMode !== "country" && cc === "")
-                         ? SearchLogic.scopedQuery(q, _countryCodeOf) : null
-        // "rock 80 uk" — the same wish without the word "in". Measured before
-        // this: the directory was asked for a station NAMED that, had none,
-        // and the stem retry answered with French and German "rock 80"
-        // stations; tagList=rock,80 inside GB has sixteen.
-        const bare = (scopedIn === null && cc === ""
-                      && (fullRepresentation.webSearchMode === "all"
-                          || fullRepresentation.webSearchMode === "genre"))
-                     ? SearchLogic.facetQuery(q, _countryCodeOf) : null
-        const scoped = scopedIn !== null ? scopedIn
-                     : (bare !== null && bare.cc !== "")
-                       ? { text: bare.text, cc: bare.cc, country: bare.country } : null
+        // A fence the text names ("70s in UK", "rock 80 uk") holds every pass
+        // below inside that country and re-pins the chip. A country pinned by
+        // the scope CHIP does the same for a plain query.
         // A ✕-released scope stays released for THIS text: a mode or order
         // chip re-runs the same string and must not pin the country back.
         // releaseScope marks the text released; new text clears the mark
@@ -719,6 +702,7 @@ PlasmaExtras.Representation {
             railShown: Plasmoid.configuration.showDiscoveryRow !== false })
         // Inherited = the fence came from the chip, not from this text.
         fullRepresentation._webScopeInherited = scopeCc !== "" && scoped === null
+        fullRepresentation._webScopeBare = scopeCc !== "" && read.bareScope
         const ccTail = scopeCc !== "" ? "&countrycode=" + scopeCc : ""
         const tail = ccTail + "&hidebroken=true&order=" + fullRepresentation.webSearchOrder
                      + "&reverse=true&limit=50"
@@ -732,6 +716,8 @@ PlasmaExtras.Representation {
         // A genre word alone ("rock", "80s") asks for the genre: of the name
         // answer only the stations NAMED after it lead, the tag list follows.
         const lead = (mode === "all" && cc === "") ? SearchLogic.leadRows(q) : null
+        // Inside a guessed fence the rows that hold every typed word go first ("bbc wales").
+        const own = (mode === "all" && lead === null && fullRepresentation._webScopeBare) ? SearchLogic.fenceLead(qTyped) : null
         var qs
         if (mode === "genre")
             qs = tagQs
@@ -751,7 +737,10 @@ PlasmaExtras.Representation {
         // other radio-browser call uses.
         root._rbFetch(qs + tail, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return // stale request
-            var gotAnswer = _webAppendResults(xhr, lead)
+            var gotAnswer = _webAppendResults(xhr, lead || own)
+            // The rest of that answer follows its leads at once, and "Show more" goes on where the last walk stopped.
+            if (gotAnswer && own) _webAppendResults(xhr)
+            if (gotAnswer) _webMark(0)
             if (gotAnswer && webResultsModel.count > 0)
                 _webRememberQuery(qTyped)
             if (gotAnswer && mode === "all" && cc === "" && !SearchLogic.asksBitrate(tail))
@@ -772,22 +761,19 @@ PlasmaExtras.Representation {
                 root._rbFetch(tagQs + tail, 4000, function(xhr2) {
                     if (seq !== fullRepresentation._webSearchSeq) return
                     _webAppendResults(xhr2)
-                    var tagAt = webResultsModel.count > beforeTag ? fullRepresentation._webLastConsumed : -1
-                    // Room left: the name rows the lead filter held back, below the genre's own.
-                    if (lead) _webAppendResults(xhr)
+                    // If the tag pass put rows in, "Show more" must page IT, from
+                    // the tag list's own place: marked here, before the name rows
+                    // come back in and leave their own walk's numbers behind.
+                    var tagIn = webResultsModel.count > beforeTag
+                    if (tagIn) _webMark(0, tagQs + tail)
+                    // Room left: the name rows the lead filter held back, below the genre's
+                    // own. When the tag list gave none, theirs is the list that is paged.
+                    if (lead && _webAppendResults(xhr) && !tagIn) _webMark(0)
                     // "jazz" can be a genre with zero NAME matches — a query
                     // that only produced tag hits is still a successful
                     // query, and history exists for successful queries.
                     if (webResultsModel.count > 0)
                         _webRememberQuery(qTyped)
-                    // If the tag pass put rows in, "Show more" must page IT, and
-                    // from the tag list's own consumed position (tagAt): the
-                    // model also counts name rows the tag query never served,
-                    // and offset=count skipped that many of its best rows.
-                    if (tagAt >= 0) {
-                        fullRepresentation._webLastQs = tagQs + tail
-                        fullRepresentation._webSkipAhead = tagAt - webResultsModel.count
-                    }
                     _probeKick(seq)
                     // A scoped multiword query that the tag reading didn't
                     // satisfy still deserves the word pass — "nova radio in
@@ -820,8 +806,8 @@ PlasmaExtras.Representation {
         if (ws.length < 2) return false
         // "Show more" can't re-run a client-side word filter, and the
         // one-word query alone would page in unrelated stations — so the
-        // word pass is a one-shot: freeze the cap at what it found and let
-        // the button hide rather than mislead.
+        // word pass is a one-shot: it never becomes the list that is paged,
+        // and the cap freezes at what it found.
         root._rbFetch("/json/stations/search?name="
                       + encodeURIComponent(SearchLogic.askWord(q)) + tail,
                       4000, function(xhr2) {
@@ -831,8 +817,8 @@ PlasmaExtras.Representation {
             })
             if (webResultsModel.count > 0)
                 _webRememberQuery(qTyped)
-            // count < cap hides "Show more" (visible needs count >= cap) —
-            // this pass has no honest next page to offer.
+            // This pass has no honest next page to offer and marks none:
+            // "Show more" goes by the name or tag list marked before it.
             fullRepresentation.webResultCap = webResultsModel.count + 1
             _probeKick(seq)
             // Same honesty as the tag pass: dead mirrors over an empty
@@ -854,7 +840,7 @@ PlasmaExtras.Representation {
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
         fullRepresentation.webResultCap = 30
-        fullRepresentation._webSkipAhead = 0
+        fullRepresentation._webPage = SearchLogic.pageAfter()
         fullRepresentation.webSearching = true
         // Trending is deliberately GLOBAL — release the country chip so it
         // can't sit over a worldwide list claiming the results are local.
@@ -869,6 +855,7 @@ PlasmaExtras.Representation {
         root._rbFetch(qs, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
+            if (!fullRepresentation.webSearchFailed) _webMark(0)
             _probeKick(seq)
             fullRepresentation.webSearching = false
             ViewLogic.revealFooter(stationView)
@@ -891,7 +878,7 @@ PlasmaExtras.Representation {
         const seq = ++fullRepresentation._webSearchSeq
         fullRepresentation.webSearchFailed = false
         fullRepresentation.webResultCap = 30
-        fullRepresentation._webSkipAhead = 0
+        fullRepresentation._webPage = SearchLogic.pageAfter()
         fullRepresentation.webSearching = true
         fullRepresentation.webScopeCc = cc
         // The label reaches a styled-text-capable sink (the chip button) —
@@ -908,6 +895,7 @@ PlasmaExtras.Representation {
         root._rbFetch(qs, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
             fullRepresentation.webSearchFailed = !_webAppendResults(xhr)
+            if (!fullRepresentation.webSearchFailed) _webMark(0)
             _probeKick(seq)
             fullRepresentation.webSearching = false
             ViewLogic.revealFooter(stationView)
@@ -937,23 +925,29 @@ PlasmaExtras.Representation {
         })
     }
 
+    // The answer just walked is the list "Show more" pages, asked from row
+    // `from`, and qs its query where another list was paged until now.
+    // SearchLogic.pageAfter says where its next page starts and whether the
+    // directory may hold one.
+    function _webMark(from, qs) {
+        if (qs) fullRepresentation._webLastQs = qs
+        fullRepresentation._webPage = SearchLogic.pageAfter(fullRepresentation._webLastQs, from, fullRepresentation._webLastParsed, fullRepresentation._webLastConsumed)
+    }
 
     // The next page of whatever is showing — same query, same generation.
     function loadMoreWeb() {
         if (fullRepresentation._webLastQs === "" || fullRepresentation.webSearching) return
         if (fullRepresentation.webResultCap >= fullRepresentation.webResultCapMax) return
         const seq = fullRepresentation._webSearchSeq
-        const before = webResultsModel.count
-        fullRepresentation.webResultCap += 30
+        const from = fullRepresentation._webPage.at
+        // Thirty more than are on screen: rows an earlier page lost to the
+        // dedup do not come off this one.
+        fullRepresentation.webResultCap = Math.min(fullRepresentation.webResultCapMax, webResultsModel.count + 30)
         fullRepresentation.webSearching = true
-        root._rbFetch(fullRepresentation._webLastQs + "&offset="
-                      + (webResultsModel.count + fullRepresentation._webSkipAhead),
-                      4000, function(xhr) {
+        root._rbFetch(fullRepresentation._webLastQs + "&offset=" + from, 4000, function(xhr) {
             if (seq !== fullRepresentation._webSearchSeq) return
-            // A failed page must give the cap back — the button's
-            // visibility compares count against the cap, and a raised cap
-            // with no rows to show made "Show more" vanish for good after
-            // one bad mirror moment.
+            // A failed page gives the cap back and leaves the place alone:
+            // the button returns and asks for that same page again.
             if (!_webAppendResults(xhr)) {
                 fullRepresentation.webResultCap = Math.max(30, fullRepresentation.webResultCap - 30)
                 // The button coming back is not enough: without a word the
@@ -966,16 +960,10 @@ PlasmaExtras.Representation {
                 // The fresh page appends after previously sunk dead rows —
                 // re-sink so the living stay on top.
                 _webSinkDead()
-                if (fullRepresentation._webLastParsed > 0
-                    && webResultsModel.count === before) {
-                    // The server page existed but the dedup ate every row of
-                    // it — the next request must ask PAST it, and the cap
-                    // falls back to the count so the button survives to ask.
-                    // An empty page (_webLastParsed 0) is the honest end of
-                    // the results and retires the button as before.
-                    fullRepresentation._webSkipAhead += fullRepresentation._webLastParsed
-                    fullRepresentation.webResultCap = webResultsModel.count
-                }
+                // The next page starts behind the last row this walk passed,
+                // shown or dropped: a page the dedup ate, whole or in part, is
+                // asked PAST, and a short or an empty one ends the list.
+                _webMark(from)
             }
             _probeKick(seq)
             fullRepresentation.webSearching = false
@@ -1037,12 +1025,14 @@ PlasmaExtras.Representation {
             const results = SearchLogic.pageOrder(JSON.parse(xhr.responseText) || [], fullRepresentation._webLastQs,
                                                   fullRepresentation.webResultCap - webResultsModel.count)
             fullRepresentation._webLastParsed = results.length
-            // Null-prototype maps, keyed by SearchLogic.urlKey so the http and
+            // The listener's own rows, for SearchLogic.knownStation: a station
+            // is known by its address, by where a heal moved it from and by its
+            // directory uuid. named takes the ones this answer holds.
+            const saved = [], named = fullRepresentation._webHeld.slice()
+            for (var i = 0; i < stationsModel.count; i++) saved.push(stationsModel.get(i))
+            // A null-prototype map, keyed by SearchLogic.urlKey so the http and
             // the https row of one mount are one station: the keys come from the
             // catalogue, and "constructor" would hit Object.prototype on a plain {}.
-            const existing = Object.create(null)
-            for (var i = 0; i < stationsModel.count; i++)
-                existing[SearchLogic.urlKey(stationsModel.get(i).hostname)] = true
             const seen = Object.create(null)
             for (var j = 0; j < webResultsModel.count; j++) {
                 seen[SearchLogic.urlKey(webResultsModel.get(j).url)] = true
@@ -1066,14 +1056,11 @@ PlasmaExtras.Representation {
                 // http(s) only — catalogue data is untrusted and these URLs
                 // reach playMusic.source, the config and ffmpeg (same rule
                 // as _favUrls in main.qml).
-                if (!u || existing[uKey] || seen[uKey] || !/^https?:\/\//i.test(u)) continue
-                // A station the user already has, saved under its RAW url
-                // while the directory now reports a different url_resolved
-                // (or vice versa), would slip past the check above and show
-                // as a web result that ⭐ then duplicates. Dedup on the raw
-                // url too — the shipped MANGORADIO default is exactly this.
+                if (!u || seen[uKey] || SearchLogic.knownStation(saved, r, named) || !/^https?:\/\//i.test(u)) continue
+                // The directory's twin entry: the same wrapper url with a
+                // url_resolved of its own, or none yet.
                 var rawU = (r.url || "").toString(), rawKey = SearchLogic.urlKey(rawU)
-                if (rawU && (existing[rawKey] || seen[rawKey])) continue
+                if (rawU && seen[rawKey]) continue
                 seen[uKey] = true
                 if (rawU) seen[rawKey] = true
                 // The favicon lands in an Image.source — through the same
@@ -1103,6 +1090,7 @@ PlasmaExtras.Representation {
                 })
                 } catch (rowErr) { continue }
             }
+            if (named.length > fullRepresentation._webHeld.length) fullRepresentation._webHeld = named
             // Every pass lands here, and under Bitrate they are one list, not blocks.
             if (SearchLogic.asksBitrate(fullRepresentation._webLastQs)) SearchLogic.rateSort(webResultsModel)
             fullRepresentation._webLastConsumed = consumed
@@ -1418,6 +1406,7 @@ PlasmaExtras.Representation {
                             ++fullRepresentation._webSearchSeq
                             fullRepresentation.webSearching = false
                             webResultsModel.clear()
+                            fullRepresentation._webPage = SearchLogic.pageAfter()
                         }
                     }
                 }
@@ -1494,7 +1483,8 @@ PlasmaExtras.Representation {
                     model: root.searchFilter === "" ? fullRepresentation._rbTags : []
                     delegate: PlasmaComponents3.ToolButton {
                         required property string modelData
-                        text: modelData
+                        text: ViewLogic.chipLabel(modelData)
+                        Accessible.name: modelData
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         onClicked: filterField.text = modelData
                     }
@@ -1504,7 +1494,8 @@ PlasmaExtras.Representation {
                     delegate: PlasmaComponents3.ToolButton {
                         id: historyChip
                         required property string modelData
-                        text: modelData
+                        text: ViewLogic.chipLabel(modelData)
+                        Accessible.name: modelData
                         icon.name: "view-history"
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         onClicked: filterField.text = modelData
@@ -1581,7 +1572,7 @@ PlasmaExtras.Representation {
                     Keys.onReturnPressed: activateCurrent()
                     Keys.onEnterPressed: activateCurrent()
                     Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Slash) {
+                        if (event.key === Qt.Key_Slash && Plasmoid.configuration.showSearchRow !== false) {
                             filterField.forceActiveFocus()
                             event.accepted = true
                             return
@@ -1673,7 +1664,8 @@ PlasmaExtras.Representation {
                         // with local rows matching, the big empty state never
                         // shows, and an offline search used to read as "the
                         // catalogue has nothing" with no word about the network.
-                        visible: webResultsModel.count > 0 || fullRepresentation.webSearching
+                        // A first page of nothing but saved stations keeps it too, for "Show more".
+                        visible: webResultsModel.count > 0 || fullRepresentation.webSearching || fullRepresentation._webPage.more
                                  || (fullRepresentation.webSearchFailed && stationView.count > 0)
                         height: visible ? implicitHeight : 0
 
@@ -1758,7 +1750,7 @@ PlasmaExtras.Representation {
                                         } else if (stationView.count > 0) {
                                             stationView.currentIndex = stationView.count - 1
                                             stationView.forceActiveFocus()
-                                        } else {
+                                        } else if (Plasmoid.configuration.showSearchRow !== false) {
                                             filterField.forceActiveFocus()
                                         }
                                         event.accepted = true
@@ -1766,10 +1758,8 @@ PlasmaExtras.Representation {
                                 }
 
                                 // One exit for both the pointer star and Ctrl+Return: add,
-                                // drop the row, and keep the paging honest — the removal
-                                // shrinks the count below the cap, and the "Show more"
-                                // button's visibility (count >= cap) would retire for good
-                                // over a page the directory still has more of.
+                                // drop the row, and let the cap follow the count down: on a
+                                // list at its 300 the star makes room for one more row.
                                 function starThisRow() {
                                     var wasIndex = webItem.index
                                     // remove() destroys this delegate and the scope these names live
@@ -1779,6 +1769,7 @@ PlasmaExtras.Representation {
                                     var rep = fullRepresentation
                                     var rows = webRepeater
                                     var rowModel = webResultsModel
+                                    rep._webHeld = rep._webHeld.concat([{ "url_resolved": webItem.model.url, "url": webItem.model.rawUrl, "stationuuid": webItem.model.rbUuid }])
                                     root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid, webItem.model.codec, webItem.model.bitrate)
                                     rowModel.remove(wasIndex)
                                     rep.webResultCap =
@@ -1950,9 +1941,8 @@ PlasmaExtras.Representation {
 
                         PlasmaComponents3.ToolButton {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            visible: webResultsModel.count >= fullRepresentation.webResultCap
+                            visible: fullRepresentation._webPage.more && !fullRepresentation.webSearching
                                      && fullRepresentation.webResultCap < fullRepresentation.webResultCapMax
-                                     && !fullRepresentation.webSearching
                             text: i18n("Show more results")
                             icon.name: "arrow-down"
                             onClicked: loadMoreWeb()
@@ -1988,6 +1978,11 @@ PlasmaExtras.Representation {
                     }
 
                     Column {
+                        id: emptyList
+                        // Which of the four an empty list says. "No favorite stations yet"
+                        // was also the answer to a search that matched none of them.
+                        readonly property string kind: ViewLogic.emptyList(root.favoritesOnly, root.favoriteNames.length,
+                                                                           root.searchFilter, fullRepresentation.webSearchFailed)
                         anchors.centerIn: parent
                         width: parent.width - Kirigami.Units.largeSpacing * 2
                         visible: stationView.count === 0 && webResultsModel.count === 0 && !fullRepresentation.webSearching
@@ -1995,9 +1990,8 @@ PlasmaExtras.Representation {
 
                         Kirigami.Icon {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            source: root.favoritesOnly
-                                    ? "favorite"
-                                    : (fullRepresentation.webSearchFailed ? "network-disconnect" : "search")
+                            source: emptyList.kind === "favorites" ? "favorite"
+                                    : (emptyList.kind === "unreachable" ? "network-disconnect" : "search")
                             width: Kirigami.Units.iconSizes.huge
                             height: width
                             opacity: 0.4
@@ -2005,11 +1999,9 @@ PlasmaExtras.Representation {
                         PlasmaComponents3.Label {
                             anchors.horizontalCenter: parent.horizontalCenter
                             horizontalAlignment: Text.AlignHCenter
-                            text: root.favoritesOnly
-                                  ? i18n("No favorite stations yet")
-                                  : (fullRepresentation.webSearchFailed
-                                     ? i18n("The station directory is not reachable")
-                                     : (root.searchFilter !== "" ? i18n("No matching stations") : i18n("No stations")))
+                            text: emptyList.kind === "favorites" ? i18n("No favorite stations yet")
+                                  : (emptyList.kind === "unreachable" ? i18n("The station directory is not reachable")
+                                     : (emptyList.kind === "nomatch" ? i18n("No matching stations") : i18n("No stations")))
                             font.weight: Font.DemiBold
                             opacity: 0.7
                         }
@@ -2021,11 +2013,9 @@ PlasmaExtras.Representation {
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             opacity: 0.55
                             visible: text !== ""
-                            text: root.favoritesOnly
-                                  ? i18n("Tap the star on a station to add it here")
-                                  : (fullRepresentation.webSearchFailed
-                                     ? i18n("Check the connection and type to search again")
-                                     : (root.searchFilter !== "" ? i18n("Try a different search term") : ""))
+                            text: emptyList.kind === "favorites" ? i18n("Tap the star on a station to add it here")
+                                  : (emptyList.kind === "unreachable" ? i18n("Check the connection and type to search again")
+                                     : (emptyList.kind === "nomatch" ? i18n("Try a different search term") : ""))
                         }
                     }
                 }
@@ -2813,6 +2803,8 @@ PlasmaExtras.Representation {
                         iconScale: 0.55
                         checkable: true
                         checked: !previewing && root.isFavorite(root.currentStation)
+                        // A My Music file's name is no station: starring it made a favourite nothing carries.
+                        enabledState: !fullRepresentation._localPlayback
                         tooltipText: {
                             if (previewing) return i18n("Add to my stations + favorites")
                             return root.isFavorite(root.currentStation) ? i18n("Remove from favorites") : i18n("Add to favorites")
@@ -3926,6 +3918,9 @@ PlasmaExtras.Representation {
                     parent: podAlarmBtn
                     y: podAlarmBtn.height + Kirigami.Units.smallSpacing
                     x: -width + podAlarmBtn.width
+                    // Wider than the room to its left: the edge sat at -38 px, at 16 gu -128.
+                    margins: Kirigami.Units.smallSpacing
+                    width: Math.min(implicitWidth, fullRepresentation.width - 2 * Kirigami.Units.smallSpacing)
                     padding: Kirigami.Units.largeSpacing
                     contentItem: ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
@@ -3937,7 +3932,7 @@ PlasmaExtras.Representation {
                             spacing: Kirigami.Units.smallSpacing
                             QQC2.SpinBox {
                                 id: podAlarmHH
-                                from: 0; to: 23; value: 7
+                                from: 0; to: 23; value: 7; Layout.fillWidth: true; Layout.maximumWidth: implicitWidth
                                 textFromValue: function(v) { return ("0" + v).slice(-2) }
                                 Accessible.name: i18n("Hour")
                             }
@@ -3945,7 +3940,7 @@ PlasmaExtras.Representation {
                             QQC2.SpinBox {
                                 id: podAlarmMM
                                 // Five-minute grid, so 55 — 59 leaves the grid it steps on.
-                                from: 0; to: 55; value: 0; stepSize: 5
+                                from: 0; to: 55; value: 0; stepSize: 5; Layout.fillWidth: true; Layout.maximumWidth: implicitWidth
                                 textFromValue: function(v) { return ("0" + v).slice(-2) }
                                 Accessible.name: i18n("Minute")
                             }
@@ -5325,7 +5320,7 @@ PlasmaExtras.Representation {
         for (var i = 0; i < stationsModel.count; i++)
             stations.push(stationsModel.get(i))
         const rows = ReorderLogic.buildFilteredRows(
-            stations, root.favoriteNames, root.searchFilter, root.favoritesOnly)
+            stations, root.favoriteNames, root.searchFilter, root.favoritesOnly, fullRepresentation._webHeld)
         if (ReorderLogic.syncModelToRows(filteredStationsModel, rows)) return
         filteredStationsModel.clear()
         for (var r = 0; r < rows.length; r++)
@@ -5352,6 +5347,7 @@ PlasmaExtras.Representation {
             // must not leak onto a query the user is typing now.
             if (root.searchFilter !== fullRepresentation._webScopeReleasedFor)
                 fullRepresentation._webScopeReleasedFor = ""
+            fullRepresentation._webHeld = []
             rebuildFilteredModel()
             webSearchDebounce.restart()
         }
@@ -5402,17 +5398,18 @@ PlasmaExtras.Representation {
 
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
-            // Esc on ANY non-list page returns to the station list; only on
-            // the list itself it may close the popup. Inside the podcasts
-            // page an open feed steps back to the shows first.
+            // Esc on any other page returns to the first one that has a tab,
+            // the station list unless it is switched off; only from there may
+            // it close the popup. An open podcast feed steps back to the shows first.
+            var home = ViewLogic.firstVisibleView(root.shownViews())
             if (root.view === 3 && root.podcastEpisodesFor !== "") {
                 root.podcastEpisodesFor = ""
                 root.podcastFeedError = ""
                 event.accepted = true
-            } else if (root.view !== 0) {
-                root.view = 0
+            } else if (root.view !== home) {
+                root.view = home
                 event.accepted = true
-            } else if (filterField.text !== "") {
+            } else if (root.view === 0 && filterField.text !== "") {
                 filterField.text = ""
                 event.accepted = true
             }
@@ -5664,7 +5661,7 @@ PlasmaExtras.Representation {
                 color: {
                     if (root.recording)
                         return root.recordRedText
-                    if (isError || !isConnected)
+                    if (isError || ViewLogic.offlineWord(isConnected, fullRepresentation._localPlayback, fullRepresentation._streamActive))
                         return Kirigami.Theme.negativeTextColor
                     else if (fullRepresentation._streamActive)
                         return root.accentText
@@ -5692,7 +5689,7 @@ PlasmaExtras.Representation {
                         // the loading-state branch below catches a stopped
                         // player — which looks like a hang, not a pause.
                         return i18n("Paused — the station keeps recording")
-                    if (!isConnected)
+                    if (ViewLogic.offlineWord(isConnected, fullRepresentation._localPlayback, fullRepresentation._streamActive))
                         return i18n("Check internet connection…")
                     else if (root.isError)
                         // The human sentence beats the backend's growl when

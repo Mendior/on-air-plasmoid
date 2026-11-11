@@ -13,10 +13,10 @@ target:
   package/contents/ui/ArtworkEngine.qml
 
 find:
-          artLookupDebounce.interval = first === true ? 200 : 1500;
+          artLookupDebounce.interval = SearchLogic.artWaitMs(first === true, now - _artKeyMovedAt);
 
 replace:
-          artLookupDebounce.interval = first === true ? 1500 : 1500;
+          artLookupDebounce.interval = SearchLogic.artWaitMs(false, now - _artKeyMovedAt);
 
 expect:
   Killed by tst_artworkengine::test_the_first_title_of_a_station_does_not_wait_out_the_debounce.

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Five minutes on, the move is written without asking whether the old address
+  answers again.
+
+history:
+  The wait alone proves nothing: the listener was on the new address the whole
+  time and nobody looked at the old one. The second look opens it, and an
+  address that plays again keeps its place in the list.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      if (aliveAnswer(status, contentType)) return "keep";
+
+replace:
+      if (false) return "keep";
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_the_second_look_keeps_a_living_address_and_moves_a_gone_one.
+  Line-neutral.

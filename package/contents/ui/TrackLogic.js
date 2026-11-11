@@ -246,20 +246,37 @@ function historyTakes(rows, artist, title, station) {
 // 2026-11-02 "Love & Fate" searched as "Love" got the photo of a band
 // called Love, and "Florence and the Machine" as "Florence" got "Florence &
 // The Bare Souls".
+// The feat. may open a bracket, "Sia (feat. Sean Paul)", and the cut never
+// leaves one open behind it. A closed aside stays where it is: on "Nirvana
+// (UK)" it is what tells two bands apart.
 // Contract: photoArtist("Love & Fate") = "Love & Fate";
 //   photoArtist("Sia feat. Sean Paul & X") = "Sia";
-//   photoArtist("A & B feat. C") = "A & B"; photoArtist(null) = "".
+//   photoArtist("A & B feat. C") = "A & B"; photoArtist(null) = "";
+//   photoArtist("Sia (feat. Sean Paul)") = "Sia";
+//   photoArtist("A (with B feat. C)") = "A".
 function photoArtist(artist) {
     var s = artist || "";
-    var m = s.match(/\s+(?:feat\.?|ft\.?)\s+/i);
-    return (m ? s.substring(0, m.index) : s).trim();
+    var m = s.match(/\s+[(\[]?(?:feat\.?|ft\.?)\s+/i);
+    return (m ? s.substring(0, m.index) : s).replace(_OPEN_ASIDE, "").trim();
 }
 
+// A bracket that follows a name and never closes, to the end of the credit.
+var _OPEN_ASIDE = /\s+[(\[][^)\]]*$/;
+
 // The first-billed name alone — collaboration glue ("feat.", "&", "vs")
-// derails an artist search more often than it narrows one.
+// derails an artist search more often than it narrows one. An aside in
+// brackets behind the name goes first, closed or left open. With it in
+// place the splitters cut inside the bracket, and "Nightlight Duo (Rita
+// Liiver & Elise Mängel) - Armid näol" was searched as "Nightlight Duo
+// (Rita Liiver Armid näol". A bracket with no space in front of it belongs
+// to the name ("(G)I-DLE"), and a credit that is one aside and nothing else
+// comes back whole.
+// Contract: primaryArtist("Nightlight Duo (Rita Liiver & Elise Mängel)") =
+//   "Nightlight Duo"; primaryArtist("Sia (feat. Sean Paul") = "Sia";
+//   primaryArtist("(G)I-DLE & Friends") = "(G)I-DLE"; primaryArtist(null) = "".
 function primaryArtist(artist) {
     if (!artist) return "";
-    var s = artist;
+    var s = artist.replace(/\s+[(\[][^)\]]*[)\]]/g, " ").replace(_OPEN_ASIDE, "").trim() || artist;
     var splitters = [" & ", " feat. ", " feat ", " ft. ", " ft ", " with ", " vs. ", " vs ", ", ", " and ", " x ", " X "];
     for (var i = 0; i < splitters.length; i++) {
         var idx = s.toLowerCase().indexOf(splitters[i].toLowerCase());

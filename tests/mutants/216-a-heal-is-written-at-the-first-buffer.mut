@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The commit writes the new address the moment the candidate buffers.
+
+history:
+  Who the station is and whether it moved are two questions, and the commit
+  used to answer only the first. A mount that was down for a minute lost its
+  row to a sibling. The write waits until the old address has stayed dead for
+  five minutes.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (!proven && HealLogic.moveWhen("permanent", _healDeadSince[oldUrl] || 0, Date.now()) !== "now") {
+
+replace:
+          if (false) {
+
+expect:
+  Killed by tests/test_invariants.py::test_a_heal_is_written_only_over_an_address_that_stayed_dead.
+  Line-neutral.

@@ -400,7 +400,7 @@ Item {
         app._volumeOverrideAtMs = Date.now();
         var feed = a.url.substring(8);
         var f = PodcastLogic.newestForAlarm(app._podDownloads, feed, app._podPlayed);
-        if (f !== "") {
+        if (AlarmLogic.podcastWake(f) === "episode") {
             var meta = app._podDownloads[f];
             var furl = app._podFileUrl(f);
             _alarmFiring = true;
@@ -424,11 +424,20 @@ Item {
             alarmFallbackTimer.restart();
             app.notify(i18n("Wake-up alarm"), meta.title || a.station, "clock");
         } else {
-            // Nothing of the show on disk: the chime takes over almost at
-            // once — 25 seconds of silence at 07:00 helps nobody.
-            _alarmFallbackArmed = true;
-            alarmFallbackTimer.interval = 1200;
-            alarmFallbackTimer.restart();
+            // Nothing of the show on disk: the chime starts here, the way
+            // _alarmFireChime starts it. It used to be left to the fallback
+            // net 1.2 s later, and the net stands down for anything that
+            // has played five seconds. With the radio left on overnight
+            // (seven hours in, at 5 %) no tone came and the notice below
+            // still promised one.
+            _alarmFallbackArmed = false;
+            alarmFallbackTimer.stop();
+            app._podHandoff();
+            app._previewUrl = "";
+            app._previewCodec = "";
+            app._previewUuid = "";
+            app.startWithFade({ "name": i18n("Wake-up alarm"), "hostname": _alarmToneUrl,
+                            "favicon": "", "active": true });
             app.notify(i18n("Wake-up alarm"),
                    i18n("No downloaded episode of %1 was on disk — waking with the chime.",
                         a.station || i18n("the show")),

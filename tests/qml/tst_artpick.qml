@@ -115,6 +115,120 @@ TestCase {
         compare(SL.artArtistScore("TATU", "t.A.T.u."), 2)
     }
 
+    // One word of a longer name is not that name. A station sent "Laura -
+    // Muusa", Deezer answered "Laura Muusa" with these three rows, and the
+    // widget wore a Laura Mvula sleeve.
+    function test_a_part_of_a_longer_name_needs_the_song_too() {
+        compare(SL.artPickEither("Laura", "Muusa", _rows([
+            ["Jose James", "Nobody Knows My Name"], ["Laura Mvula", "Africa - InVersions 80s"],
+            ["Laura Mvula", "You Work for Me"]])), -1)
+        compare(SL.artArtistScore("Queen", "Queen Latifah"), 1)
+        compare(SL.artArtistScore("Prince", "Prince Royce"), 1)
+        compare(SL.artArtistScore("Laine", "Frankie Laine"), 1)
+        compare(SL.artArtistScore("Pink Floyd", "Pink"), 1)
+        compare(SL.artPick("Queen", "Radio Ga Ga", _rows([["Queen Latifah", "U.N.I.T.Y."]])), -1)
+        // The swapped reading is held to the same rule.
+        compare(SL.artPickEither("Muusa", "Laura", _rows([["Laura Mvula", "You Work for Me"]])), -1)
+        // With the song it is the record after all: a station that sends a
+        // surname, or the first half of a band's name.
+        compare(SL.artPick("Marley", "One Love", _rows([
+            ["Bob Marley & The Wailers", "One Love / People Get Ready"]])), 0)
+        compare(SL.artPickEither("Florence", "Dog Days Are Over", _rows([
+            ["Florence + The Machine", "Dog Days Are Over"]])), 0)
+    }
+
+    // A name that stands whole between the ends of a credit and the words
+    // that join performers is that performer, with or without the song.
+    function test_a_whole_name_in_a_credit_is_the_artist_without_the_song() {
+        compare(SL.artArtistScore("Mary J Blige", "Mary J Blige feat. Drake"), 2)
+        compare(SL.artArtistScore("Drake", "Mary J Blige feat. Drake"), 2)
+        compare(SL.artArtistScore("Bob Marley", "Bob Marley & The Wailers"), 2)
+        compare(SL.artArtistScore("Alphaville", "David Guetta, Alphaville & Ava Max"), 2)
+        compare(SL.artArtistScore("RUSSI", "Santi/RUSSI/Miles Barker/Afro Queen"), 2)
+        compare(SL.artArtistScore("Calvin Harris", "Rihanna with Calvin Harris"), 2)
+        compare(SL.artPick("Drake", "Hotline Bling", _rows([["Mary J Blige feat. Drake", "Whole Damn Year"]])), 0)
+        // A "The" one side leaves out is not a longer name. It excuses the
+        // left side only: what follows the name still makes it a part.
+        compare(SL.artArtistScore("Rolling Stones", "The Rolling Stones"), 2)
+        compare(SL.artArtistScore("The Beatles", "Beatles"), 2)
+        compare(SL.artArtistScore("Wailers", "Bob Marley & The Wailers"), 2)
+        compare(SL.artArtistScore("Eagles", "The Eagles of Death Metal"), 1)
+        compare(SL.artArtistScore("Marley", "The Bob Marley Band"), 1)
+        // Four letters are enough for a part of a name, three are not: a
+        // short name is the artist at the start of a credit or nobody.
+        compare(SL.artArtistScore("Pink", "Pink Floyd"), 1)
+        compare(SL.artArtistScore("Sia", "Sia Furler"), 0)
+        compare(SL.artArtistScore("Furler", "Sia Furler"), 1)
+    }
+
+    // The order between the rows of one answer: the artist whole with the
+    // exact song, whole with a title that holds it, a part of a name with the
+    // exact song, a part with a title that holds it, and last the artist
+    // whole with another song. Each pair is listed worse row first.
+    function test_the_artist_whole_outranks_a_part_of_a_name() {
+        compare(SL.artPick("Queen", "Radio Ga Ga", _rows([
+            ["Queen", "Radio Ga Ga - Remastered 2011"], ["Queen", "Radio Ga Ga"]])), 1)
+        compare(SL.artPick("Queen", "Radio Ga Ga", _rows([
+            ["Queen Latifah", "Radio Ga Ga"], ["Queen", "Radio Ga Ga - Remastered 2011"]])), 1)
+        compare(SL.artPick("Prince", "Kiss", _rows([
+            ["Prince Royce", "Kiss the Sky"], ["Prince Royce", "Kiss"]])), 1)
+        compare(SL.artPick("Prince", "Kiss", _rows([
+            ["Prince", "Purple Rain"], ["Prince Royce", "Kiss the Sky"]])), 1)
+        // And each pair the other way round, so it is the rank that decides
+        // and not the place in the list.
+        compare(SL.artPick("Queen", "Radio Ga Ga", _rows([
+            ["Queen", "Radio Ga Ga - Remastered 2011"], ["Queen Latifah", "Radio Ga Ga"]])), 0)
+        compare(SL.artPick("Prince", "Kiss", _rows([
+            ["Prince Royce", "Kiss the Sky"], ["Prince", "Purple Rain"]])), 0)
+        // The artist's other record still beats a namesake's other record.
+        compare(SL.artPick("Prince", "Kiss", _rows([
+            ["Prince Royce", "Stand by Me"], ["Prince", "Purple Rain"]])), 1)
+    }
+
+    function test_a_part_of_a_name_with_nothing_to_go_on() {
+        // No title on the line: a part of a name has nothing to stand on.
+        compare(SL.artPick("Laura", "", _rows([["Laura Mvula", "You Work for Me"]])), -1)
+        compare(SL.artPick("Laura", null, _rows([["Laura Mvula", ""]])), -1)
+        // Rows that are not rows, and one without a title.
+        compare(SL.artPick("Laura", "Muusa", [null, {}, { artist: "Laura Mvula" }, { title: "Muusa" }]), -1)
+        // A very long credit and a very long title are walked, not hung on.
+        var crowd = "Laura"
+        for (var i = 0; i < 300; i++) crowd += " Mvula"
+        compare(SL.artArtistScore("Laura", crowd), 1)
+        compare(SL.artArtistScore(crowd, "Laura"), 1)
+        var longTitle = ""
+        for (var k = 0; k < 400; k++) longTitle += "Muusa "
+        compare(SL.artPick("Laura", longTitle, _rows([[crowd, "You Work for Me"]])), -1)
+        compare(SL.artPick("Laura", "Muusa", _rows([[crowd, longTitle]])), 0)
+    }
+
+    // A station writes "feat." where the catalogue writes "&". The line was
+    // "Merlyn Uusküla feat. Ice Dog M - 1995" and these are iTunes' first two
+    // rows: the record itself counted as a stranger's, so the second row won.
+    function test_two_performers_are_the_same_two_however_they_are_joined() {
+        compare(SL.artPickEither("Merlyn Uusküla feat. Ice Dog M", "1995", _rows([
+            ["Merlyn Uusküla & Ice Dog M", "1995"], ["Merlyn Uusküla", "Ihuüksi (I.M.T.B Remix)"]])), 0)
+        compare(SL.artArtistScore("Merlyn Uusküla feat. Ice Dog M", "Merlyn Uusküla & Ice Dog M"), 2)
+        compare(SL.artArtistScore("David Guetta ft. Sia", "David Guetta featuring Sia"), 2)
+        compare(SL.artArtistScore("Sia, Sean Paul", "Sia with Sean Paul"), 2)
+        compare(SL.artArtistScore("Rihanna x Calvin Harris", "Rihanna vs. Calvin Harris"), 2)
+        compare(SL.artArtistScore("Santi/RUSSI/Miles Barker", "Santi, RUSSI & Miles Barker"), 2)
+        // Only the words that join are one word. Another word in their place,
+        // or another partner behind them, is another credit.
+        compare(SL.artArtistScore("Merlyn Uusküla feat. Ice Dog M", "Merlyn Uusküla meets Ice Dog M"), 0)
+        compare(SL.artArtistScore("Nas & Damian Marley", "Nas feat. Lauryn Hill"), 0)
+        compare(SL.artArtistScore("AC", "AC/DC"), 0)
+        // A long list, joined one way on the air and another in the catalogue.
+        var onAir = "Act 0", filed = "Act 0"
+        for (var i = 1; i < 200; i++) {
+            onAir += (i % 2 ? " feat. " : " & ") + "Act " + i
+            filed += ", Act " + i
+        }
+        compare(SL.artArtistScore(onAir, filed), 2)
+        compare(SL.artArtistScore(onAir, ""), 0)
+        compare(SL.artArtistScore(onAir, null), 0)
+    }
+
     // Lists written with ×, 、 or a full-width ampersand and no spaces.
     function test_a_list_joined_without_spaces_still_holds_its_first_one() {
         compare(SL.artArtistScore("LiSA×Uru", "LiSA"), 2)

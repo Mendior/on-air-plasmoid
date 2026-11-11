@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A guess that looks like a sibling edge is accepted even when its answer came
+  from somewhere else.
+
+history:
+  Qt follows redirects by itself. An address that has the right shape and
+  hands the listener on to another host has proven nothing about whose stream
+  plays.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      return mountTwin(savedUrl, (landedUrl || "") === "" ? guessUrl : landedUrl);
+
+replace:
+      return mountTwin(savedUrl, guessUrl) || mountTwin(savedUrl, landedUrl);
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_a_guess_is_taken_only_when_it_lands_on_the_twin.
+  Line-neutral.

@@ -41,3 +41,19 @@ function sanitize(s) {
     return (s || "").replace(/[<>&\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
                     .substring(0, 120);
 }
+
+// A text as a notice has to be handed it. Plasma draws a notification's body
+// as rich text with links that open (read from the notification applet of
+// plasma-workspace 6.8.2; its title is drawn as plain text), and a station's
+// name or a song's title arrives here as the station wrote it. The stripper
+// above takes the three characters out, which suits a device's name and
+// would turn "Rock & Pop" into "Rock  Pop". This keeps them and spells them
+// so that they are shown: nothing in the text can open a tag or an entity.
+//
+// It is applied once, by notify() itself. A text that already holds "&amp;"
+// is shown as those five characters, which is what it says.
+// Nothing readable comes back as "".
+function escapeMarkup(s) {
+    if (s === null || s === undefined) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

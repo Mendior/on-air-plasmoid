@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An answer whose last hop Qt does not name is reported like no answer at
+  all, so the second look counts it towards a silent address.
+
+history:
+  The probe gave 0 both when nobody answered and when somebody did but Qt
+  left the place unnamed. Silence on three looks moves a station; on a Qt
+  that never names the last hop a living address would give nothing but such
+  answers and be moved after fifteen minutes. The two are told apart now: 0
+  for silence, -1 for an answer with no place, and -1 never moves anything.
+
+target:
+  package/contents/ui/KinHunt.qml
+
+find:
+                      finish(status === 0 ? 0 : -1, "", "");
+
+replace:
+                      finish(0, "", "");
+
+expect:
+  Killed by tests/qml/tst_kinhunt.qml::test_an_answer_with_no_place_is_told_apart_from_no_answer
+  and tests/qml/tst_kinhunt.qml::test_an_answer_with_no_place_never_becomes_a_move.
+  Line-neutral.

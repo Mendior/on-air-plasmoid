@@ -343,9 +343,76 @@ TestCase {
         var e = makeEngine();
         e._alarmFire({ station: "Show", url: "podcast:https://f.example/rss", volumePct: 40 });
         compare(tc.podPlays.length, 0);
-        verify(e._alarmFallbackArmed);
-        compare(e._fallbackIntervalForTest(), 1200);    // 25 s of silence helps nobody
+        // The tone starts in the same call, as on the chime's own road. It
+        // used to be left to the net 1.2 s later, which a radio left on
+        // overnight talked out of ringing.
+        compare(tc.faded.length, 1);
+        verify(String(tc.faded[0].hostname).indexOf("alarm-fallback") !== -1);
+        verify(!e._alarmFallbackArmed);                 // the tone IS the tone
+        verify(!e._fallbackRunningForTest());
         e.destroy();
+    }
+
+    function _toneStarts() {
+        var n = 0;
+        for (var i = 0; i < tc.faded.length; i++)
+            if (String(tc.faded[i].hostname).indexOf("alarm-fallback") !== -1) n++;
+        return n;
+    }
+
+    function test_a_podcast_alarm_with_nothing_on_disk_chimes_over_what_was_playing() {
+        // Seen with the real engine: radio left on overnight, seven hours
+        // in, and the alarm said "waking with the chime" while the radio
+        // played on at 5 %. The tone waited behind a check for sound, and
+        // anything more than five seconds into a stream counted as sound.
+        var states = [[false, 0], [true, 0], [true, 5000], [true, 5001], [true, 60000],
+                      [true, 7 * 3600 * 1000]];
+        for (var s = 0; s < states.length; s++) {
+            var e = makeEngine();
+            tc.playingNow = states[s][0];
+            e.app.playMusicRef.position = states[s][1];
+            e._alarmFire({ station: "Show", url: "podcast:https://f.example/rss", volumePct: 70 });
+            // Whatever net the engine keeps gets its turn too.
+            e._fallbackTrigger();
+            var at = "playing=" + states[s][0] + " position=" + states[s][1];
+            compare(_toneStarts(), 1, at + ": the tone");
+            compare(tc.podPlays.length, 0, at);
+            compare(e.app._volumeOverridePct, 70, at + ": the alarm's own volume");
+            verify(!e.app._wantsPlaying, at + ": last night's order still stands");
+            e.destroy();
+        }
+    }
+
+    function test_a_podcast_alarm_with_nothing_on_disk_says_so_once() {
+        // In a silent room it sent two notices, and the second spoke of a
+        // station that could not start. A podcast alarm has no station.
+        var e = makeEngine();
+        e._alarmFire({ station: "Show", url: "podcast:https://f.example/rss", volumePct: 40 });
+        e._fallbackTrigger();
+        compare(tc.notified.length, 1);
+        compare(tc.notified[0].text, "No downloaded episode of Show was on disk — waking with the chime.");
+        e.destroy();
+        // An alarm that lost its show's name still says what happened.
+        e = makeEngine();
+        e._alarmFire({ url: "podcast:https://f.example/rss" });
+        e._fallbackTrigger();
+        compare(tc.notified.length, 1);
+        compare(tc.notified[0].text, "No downloaded episode of the show was on disk — waking with the chime.");
+        compare(_toneStarts(), 1);
+        e.destroy();
+    }
+
+    function test_the_chime_of_a_podcast_alarm_comes_at_a_volume_that_wakes() {
+        var asked = [[undefined, 40], [0, 40], [5, 15], [15, 15], [100, 100], [500, 100]];
+        for (var i = 0; i < asked.length; i++) {
+            var e = makeEngine();
+            tc.playingNow = true;
+            e.app.playMusicRef.position = 60000;
+            e._alarmFire({ station: "Show", url: "podcast:https://f.example/rss", volumePct: asked[i][0] });
+            compare(e.app._volumeOverridePct, asked[i][1], "asked " + asked[i][0]);
+            compare(_toneStarts(), 1, "asked " + asked[i][0]);
+            e.destroy();
+        }
     }
 
     function test_an_unconfirmed_cast_never_gags_the_tone() {

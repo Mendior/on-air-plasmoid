@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  moveWhen says now whatever the old address's time of death.
+
+history:
+  The rule the commit asks. With it gone every identity-proven candidate is
+  written at once again, which is the behaviour the five minutes were added to
+  end.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      return firstDeadMs > 0 && dead >= DEATH_PROOF_MS ? "now" : "later";
+
+replace:
+      return "now";
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_a_move_is_written_only_over_an_address_that_stayed_dead.
+  Line-neutral.

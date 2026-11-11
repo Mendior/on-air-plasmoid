@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The station list shows a saved station only when its name holds the text.
+
+history:
+  The web results leave out every station the list already holds, and the
+  list's own filter read names alone. A saved station the directory found by
+  its country, its language or its genre was dropped from the results and
+  hidden in the list: "Example FM", filed under Estonia and jazz, stood
+  nowhere under "estonia" or "jazz", and a row starred under such a search
+  vanished at the click. The list now also shows the stations the answer named.
+
+target:
+  package/contents/ui/ReorderLogic.js
+
+find:
+          if (filter !== "" && found[i] !== true && SearchLogic.fold(s.name).indexOf(filter) === -1)
+
+replace:
+          if (filter !== "" && SearchLogic.fold(s.name).indexOf(filter) === -1)
+
+expect:
+  Killed by tests/qml/tst_reorderlogic.qml::test_a_saved_station_the_directory_named_shows_whatever_its_name_says
+  and tests/qml/tst_reorderlogic.qml::test_a_named_station_is_found_under_another_address.
+  Line-neutral.

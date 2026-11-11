@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The capture shell goes from its free-space check straight to the stream and
+  never looks for the stop mark first.
+
+history:
+  A stop read the pid file once. While the shell was still at its mkdir or df
+  there was no pid, nothing was signalled, and the shell went on to record.
+  Measured 2026-11-10 with the real command and df held back: no pid file at
+  Stop, the stream asked for afterwards, 159819 bytes written, rc=0. A stop
+  now leaves a mark, and the shell reads it before it asks for the stream.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+                  + "if off; then cln; echo __REC_OFF__; exit 0; fi; "
+
+replace:
+                  + "if false; then cln; echo __REC_OFF__; exit 0; fi; "
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_the_capture_reads_the_mark_before_the_stream_and_after_the_pid
+  and tests/test_recording_stop_race.py::test_a_stop_during_the_preparation_records_nothing.
+  Line-neutral.

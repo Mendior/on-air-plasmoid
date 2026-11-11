@@ -211,11 +211,13 @@ PlasmaComponents3.ItemDelegate {
                 // appeared on logo-less rows and was already hidden on hover
                 // — but while the row is being DRAGGED the number RESURFACES,
                 // because that is the one moment position genuinely matters.
+                // It is the place the row has now: the drag moves it in the
+                // model at every step, and targetIndex is where it started.
                 PlasmaComponents3.Label {
                     anchors.centerIn: parent
                     readonly property bool reorderHover: dragArea.pressed
-                    text: (reorderHover || avatar.mono === "")
-                          ? (listItem.targetIndex + 1) : avatar.mono
+                    text: reorderHover ? (model.index + 1)
+                          : (avatar.mono === "" ? (listItem.targetIndex + 1) : avatar.mono)
                     // Monogram ink serves the number during a drag too —
                     // on-palette and higher-contrast than dimmed textColor
                     // over the tint. On the current row's accent flood the
@@ -319,7 +321,15 @@ PlasmaComponents3.ItemDelegate {
                 PlasmaComponents3.Label {
                     id: trackName
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
+                    // A long name is cut with "…" at rest and laid out whole
+                    // for as long as the pointer rests on the row. implicitWidth
+                    // is the name's full length; contentWidth is what is left
+                    // after the cut and never exceeds the row (measured on a
+                    // 120 px row: 117.48 against 462.56), so a marquee waiting
+                    // for it had not run since the label learned to elide.
+                    readonly property bool passing: listItem.hovered && implicitWidth > trackRect.width
+                                                    && Kirigami.Units.longDuration > 0
+                    width: passing ? implicitWidth : parent.width
                     text: model.name
                     // Untrusted (station name) — never interpret as HTML
                     textFormat: Text.PlainText
@@ -339,14 +349,13 @@ PlasmaComponents3.ItemDelegate {
                     XAnimator {
                         target: trackName
                         from: 0
-                        to: -trackName.contentWidth
+                        to: -trackName.implicitWidth
                         // Clamped: a corrupt speedfactor must not yield a
                         // zero/negative duration
                         duration: Math.round(Math.abs(to - from) / Kirigami.Units.gridUnit * 300
                                              * Math.max(0.1, Math.min(8, (Plasmoid.configuration.speedfactor || 1))))
                         // longDuration is 0 when animations are disabled system-wide
-                        running: listItem.hovered && trackName.contentWidth > trackRect.width
-                                 && Kirigami.Units.longDuration > 0
+                        running: trackName.passing
                         loops: 1
                         onFinished: {
                             from = trackRect.width

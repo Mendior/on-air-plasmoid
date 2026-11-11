@@ -35,6 +35,7 @@ import "StreamLogic.js" as StreamLogic
 import "TimeshiftLogic.js" as TimeshiftLogic
 import "TrackLogic.js" as TrackLogic
 import "TransportLogic.js" as TransportLogic
+import "ViewLogic.js" as ViewLogic
 
 PlasmoidItem {
     id: root
@@ -112,15 +113,14 @@ PlasmoidItem {
         return 0;
     }
     // A hidden page can still be arrived at — a swipe, a restored index, a
-    // tab switched off while standing on it. Walk on rather than stare at
-    // a page whose tab is gone; Stations is always there to land on.
+    // tab switched off while standing on it. Walk on the way the listener
+    // was going rather than stare at a page whose tab is gone.
+    property int _viewWas: 0
+    function shownViews() { return [0, 1, 2, 3, 4].map(function(i) { return viewVisible(i); }); }
     function _ensureViewVisible() {
-        if (viewVisible(view)) return;
-        for (var f = view + 1; f <= 4; f++)
-            if (viewVisible(f)) { view = f; return; }
-        for (var b = view - 1; b >= 0; b--)
-            if (viewVisible(b)) { view = b; return; }
-        view = 0;
+        var to = ViewLogic.nextVisibleView(view, view < _viewWas ? -1 : 1, shownViews());
+        _viewWas = to;
+        view = to;
     }
     // Asked for in Discussions, shipped OFF by default with the guard the
     // discussion itself named: switching takes the screen away from
@@ -754,7 +754,7 @@ PlasmoidItem {
         var xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         // A real playlist is a few hundred bytes; a hostile server could
         // otherwise stream gigabytes into responseText and exhaust memory.
         // Abort the moment the body crosses a generous ceiling — a truncated
@@ -770,9 +770,9 @@ PlasmoidItem {
             if (xhr.readyState !== xhr.DONE) return;
             _clearXhrTimeout(guard);
             // A wrapper that redirects into the LAN must not have its body
-            // parsed into a stream address: Qt follows redirects internally,
-            // so the requested URL's gate covers the first hop only.
-            if (!HostGuard.answerFromPublicHost(xhr)) { cb(url); return; }
+            // parsed into a stream address (Qt follows redirects internally).
+            // A playlist on the home server answers where it was asked, and is read.
+            if (!HostGuard.answerPublicOrAsked(url, xhr)) { cb(url); return; }
             var got = PlaylistLogic.classify(xhr.responseText || "", url);
             if (got.kind === "entry" && hop < 1 && got.url !== url
                 && PlaylistLogic.isWrapper(got.url)) {
@@ -1289,7 +1289,7 @@ PlasmoidItem {
             _flushHistory();
             _stampPodPosition();
             _flushPodPositions();
-        }
+        } else if (RetryLogic.titleOnOpen(planar, infoTimer.running, isPlaying() && !isError && !_qtMetaWorks)) getStreamInfo(playMusic.source, root.metadata);
     }
 
     function _pushHistory(artist, trackName, station) {
@@ -2299,6 +2299,7 @@ PlasmoidItem {
         root._previewUuid = "";
         root.lastPlay = -1;
         root.currentStationFavicon = "";
+        root.metadata = "";   // over a park or a shifted listen no stopped edge comes to clear the radio's last song
         // A local file is not a station: clear the station-tracking state so
         // e.g. removeStation's "resume what was playing" can't restart a stale
         // radio URL over the local track.
@@ -2375,8 +2376,9 @@ PlasmoidItem {
                                        "icon": root.currentStationFavicon,
                                        "uuid": root._previewUuid, "raw": root._previewRawUrl, "codec": root._previewCodec, "bitrate": root._previewBitrate }
                                    : null;
-            Plasmoid.configuration.servers = JSON.stringify(servers); // → reload (stops playback)
+            const kept = _listWrite(servers); // → reload (stops playback, unless a file plays on)
             Qt.callLater(function() {
+                if (kept) return;   // nothing stopped: nothing to start, and no row to light up
                 if (wasPlayingUrl !== "" && wasPlayingUrl !== hostname) {
                     for (var k = 0; k < stationsModel.count; k++) {
                         if (stationsModel.get(k).hostname === wasPlayingUrl) {
@@ -2402,6 +2404,21 @@ PlasmoidItem {
     // Set for the duration of one servers-write so onServersChanged knows this
     // is a pure reorder and must not stop playback (see the Connections below).
     property bool _reorderKeepPlaying: false
+    // The star's and the trash's write. It stops the player, and its caller
+    // starts again what was a row or an audition; a My Music file or an
+    // episode is neither and was cut off for good. Those play on. Returns
+    // whether the sound was kept. An unchanged list fires no change and
+    // would leave the flag armed for the next write, so it arms nothing.
+    function _listWrite(servers) {
+        var out = JSON.stringify(servers);
+        var kept = TransportLogic.listWriteKeepsSound({ "audible": isPlaying(), "preview": root._previewUrl !== "",
+            "source": playMusic.source.toString(), "episode": root._podPlayingKey !== "" ? root._podPlayingUrl : "",
+            "tone": root._alarmToneUrl.toString(), "bufferPath": timeshift.bufPath, "shifted": timeshift.shifted });
+        if (out === Plasmoid.configuration.servers) return false;
+        if (kept) _reorderKeepPlaying = true;
+        Plasmoid.configuration.servers = out;
+        return kept;
+    }
 
     // Move a station one step up/down in the main list. popupIndex indexes the
     // ACTIVE-stations list (what the popup shows); the swap partner is the
@@ -2606,24 +2623,22 @@ PlasmoidItem {
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
             var wrote = false;
-            var known = false;
-            for (var i = 0; i < servers.length; i++) {
-                if ((servers[i].hostname || "") === url) {
-                    known = true;
-                    if (makeFavorite && !isFavorite(servers[i].name)) toggleFavorite(servers[i].name);
-                    // A saved station can only appear as a web result while
-                    // it is DEACTIVATED (the search dedup knows active rows
-                    // only) — and the ⭐ then did nothing at all: row gone,
-                    // station still hidden. "Add" means make it show.
-                    if (servers[i].active === false) {
-                        servers[i].active = true;
-                        Plasmoid.configuration.servers = JSON.stringify(servers);
-                        wrote = true;
-                    }
-                    break;
+            // The row the list already holds for this station, by address or
+            // by directory uuid (SearchLogic.knownStationAt), and where it sits.
+            const at = SearchLogic.knownStationAt(servers, { "url_resolved": url, "stationuuid": rbUuid });
+            const held = at >= 0 ? (servers[at].hostname || "") : url;
+            if (at >= 0) {
+                if (makeFavorite && !isFavorite(servers[at].name)) toggleFavorite(servers[at].name);
+                // A saved station can only appear as a web result while
+                // it is DEACTIVATED (the search dedup knows active rows
+                // only) — and the ⭐ then did nothing at all: row gone,
+                // station still hidden. "Add" means make it show.
+                if (servers[at].active === false) {
+                    servers[at].active = true;
+                    _listWrite(servers);
+                    wrote = true;
                 }
-            }
-            if (!known) {
+            } else {
                 const stName = (name || url).toString();
                 // The radio-browser uuid rides along from the search result — it
                 // is the station's identity for clicks/votes, free at add time.
@@ -2642,7 +2657,7 @@ PlasmoidItem {
                                "uuid": rbUuid || "" }));
                 // This triggers onServersChanged → reloadStationsModel (stop + reload),
                 // so we continue only after an event-loop cycle.
-                Plasmoid.configuration.servers = JSON.stringify(servers);
+                _listWrite(servers);
                 // Favorites are keyed by NAME: starring a new station whose name
                 // already matches an existing favorite must not TOGGLE that
                 // favorite off. Guard on isFavorite, same as the already-in-list
@@ -2655,7 +2670,7 @@ PlasmoidItem {
             Qt.callLater(function() {
                 for (var k = 0; k < stationsModel.count; k++) {
                     var h = stationsModel.get(k).hostname;
-                    if (keepPlaying && h === url) {
+                    if (keepPlaying && h === held) {
                         root._previewUrl = "";
                         root._previewCodec = "";
                         root._previewUuid = "";
@@ -2815,7 +2830,7 @@ PlasmoidItem {
             // DONE, and a second walk-on would skip a mirror unheard.
             var walked = false;
             xhr.open("GET", "https://" + srv + ".api.radio-browser.info" + path);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
             xhr.onreadystatechange = function() {
                 if (walked) return;
                 // A directory mirror is only semi-trusted — a compromised or
@@ -3063,7 +3078,9 @@ PlasmoidItem {
     function notify(title, text, icon) {
         try {
             dlNotification.title = title;
-            dlNotification.text = text;
+            // Plasma draws the body as rich text and the title as plain: a
+            // station's name or a song's title is spelled out here, for all.
+            dlNotification.text = NameGuard.escapeMarkup(text);
             dlNotification.iconName = icon;
             dlNotification.sendEvent();
         } catch (e) {
@@ -4008,6 +4025,11 @@ PlasmoidItem {
     // station per 10 minutes, so a station that is simply offline isn't
     // hammered with searches.
     property var _healTried: ({})        // dead url → the lookup stamp (HealLogic.unheard)
+    property var _healKnocked: ({})      // saved url → when it last got its second knock
+    property var _healDeadSince: ({})    // saved url → when this session first saw it fail
+    property string _healBackupFor: ""   // the saved url a heal candidate is standing in for
+    property var _healLater: null        // a move waiting for its old address to stay dead
+    property bool _healProven: false     // the second look found it still dead
     property string _healPendingUrl: ""  // candidate being auditioned
     property string _healOrigUrl: ""     // the dead configured url it replaces
     // Whether the audition came from the station's own directory uuid —
@@ -4118,6 +4140,8 @@ PlasmoidItem {
         _healPendingExact = false;
         _healPendingFavicon = "";
         _healPendingWho = "";
+        _healBackupFor = ""; _healProven = false; _healLater = null;
+        healProofTimer.stop();
     }
 
     // Whether the auditioned name-search candidate carried the EXACT
@@ -4145,6 +4169,32 @@ PlasmoidItem {
         onTriggered: root._tryHealStation()
     }
 
+    KinHunt { id: kinHunt; app: root }
+
+    // The second look. A move the identity gate allowed has played from its
+    // new address for five minutes; it is written only once the old address
+    // is proven gone (HealLogic.proofVerdict), and one that answers again
+    // keeps its place. The answer counts while its own move still stands:
+    // after a Stop and a fresh start it was taken for the new play's.
+    Timer {
+        id: healProofTimer
+        repeat: false
+        onTriggered: {
+            var m = root._healLater;
+            if (!m || root._currentOrigUrl !== m.oldUrl || !isPlaying()) { root._healLater = null; return; }
+            kinHunt.proof(m, function(verdict) {
+                if (root._healLater !== m || root._currentOrigUrl !== m.oldUrl || !isPlaying() || root._healPendingUrl !== "") return;
+                if (verdict === "again") { healProofTimer.interval = HealLogic.DEATH_PROOF_MS; healProofTimer.restart(); return; }
+                root._healLater = null;
+                if (verdict === "keep") { console.log("[ARP] heal: the saved address answers again, the list stays as it is"); return; }
+                root._healPendingUrl = m.newUrl; root._healOrigUrl = m.oldUrl;
+                root._healByUuid = m.byUuid; root._healPendingExact = m.exact;
+                root._healPendingFavicon = m.newFav; root._healProven = true;
+                root._healCommit();
+            });
+        }
+    }
+
     function _tryHealStation() {
         if (!_recoveryWanted() || isPlaying()) return;
         if (_orderLapsed()) return;
@@ -4163,6 +4213,7 @@ PlasmoidItem {
         // guards so a preview or a recovered stream never arms it.
         if (!Plasmoid.configuration.autoHeal) { _healArmRetry(); return; }
         var now = Date.now();
+        if (!(_healDeadSince[orig] > 0)) _healDeadSince[orig] = now;
         // Every early return past this point still owes the standing order a
         // heartbeat: the 10-minute lookup lock (a station simply offline),
         // autoHeal off, or a nameless entry all skip the ladder — but the
@@ -4184,12 +4235,21 @@ PlasmoidItem {
         // standing with no ladder under it, and the network-back resume
         // would put this dead station on hours later.
         if (!_mayKnock(root._healRetryAttempts)) { _orderSpent(); return; }
+        // One failure is not a death. The saved address is opened once more
+        // before anybody is asked where the station went (HealLogic.knockFirst);
+        // an encoder restarting used to send the listener to another mount.
+        if (root._healRetryAttempts === 0 && HealLogic.knockFirst(_healKnocked[orig], now)) {
+            _healKnocked[orig] = now;
+            console.log("[ARP] heal: one more knock on the saved address before the directory is asked");
+            _replayOrder();
+            return;
+        }
         var name = (st.name || "").toString();
         if (HealLogic.normName(name) === "") { _healArmRetry(); return; }
         var mySeq = ++_healSeq;
         root._healRun = { seq: mySeq, orig: orig, name: name, cc: "",
                           favicon: st.favicon || "", answered: false,
-                          candidates: [], nameSearched: false };
+                          candidates: [], nameSearched: false, rows: [], kin: 0 };
         // Identity beats guesswork: a station added from the search carries
         // its directory uuid, and byuuid answers with wherever that EXACT
         // station lives today — no name collisions, no scoring. byuuid, not
@@ -4214,6 +4274,7 @@ PlasmoidItem {
                 if (root._healRun && root._healRun.seq === mySeq && rung !== null) {
                     root._healRun.answered = true;
                     root._healRun.cc = HealLogic.uuidCountry(uxhr);
+                    root._healRun.rows = HealLogic.replyRows(uxhr);
                     root._healRun.candidates = rung;
                     _healTried[orig] = Date.now();
                 }
@@ -4237,12 +4298,15 @@ PlasmoidItem {
                  5000, function(xhr) {
             if (mySeq !== _healSeq) return;          // superseded by a newer heal
             if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return; // user moved on / recovered
-            if (xhr && xhr.status === 200) {
+            if (HealLogic.answered(xhr)) {
                 try {
                     // Which rows may audition, and which namesakes may not, is
                     // HealLogic.ladder's call (tst_heallogic). A wake-up takes a
                     // namesake over silence; ordinary listening does not.
-                    var res = HealLogic.ladder(JSON.parse(xhr.responseText) || [], run.orig, run.name,
+                    var heard = HealLogic.replyRows(xhr);
+                    run.rows = run.rows.concat(heard);
+                    if (run.cc === "") run.kinCc = HealLogic.homeCountry(heard, run.orig);
+                    var res = HealLogic.ladder(heard, run.orig, run.name,
                                                run.cc, root._alarmStandingOrder === true);
                     run.answered = true; _healTried[run.orig] = Date.now();
                     if (res.refused > 0)
@@ -4264,6 +4328,13 @@ PlasmoidItem {
         var run = root._healRun;
         if (!run || run.seq !== _healSeq) return;
         if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return;
+        // Before a stranger auditions, and before giving up: the saved mount
+        // may simply be on another server of its own CDN (_healKin).
+        if (run.kin === 0 && HealLogic.kinPossible(run.orig)
+            && (run.candidates.length === 0 ? run.nameSearched : run.candidates[0].byUuid !== true)) {
+            _healKin(run);
+            return;
+        }
         if (run.candidates.length === 0) {
             if (!run.nameSearched) { _healNameSearch(run.seq); return; }
             root._healRun = null;
@@ -4309,10 +4380,15 @@ PlasmoidItem {
         console.log("[ARP] heal: auditioning " + _hostOf(next.url) + " for dead " + _hostOf(run.orig));
         _unwrapPlaylist(next.url, function(playUrl) {
             if (run.seq !== _healSeq) return;
+            // The row can be deleted, or the order end, while a .pls unwraps.
+            if (!_recoveryWanted() || isPlaying() || _orderSubject() === null) return;
             if (_orderLapsed()) return;
+            if (!Plasmoid.configuration.autoHeal || !_mayKnock(root._healRetryAttempts)) { _tryHealStation(); return; } // switched off while the playlist unwrapped
             root._healOrigUrl = run.orig;
+            root._healBackupFor = run.orig;
             root._healPendingUrl = playUrl;
-            root._healByUuid = next.byUuid === true;
+            // A mount twin is the station by the same right as its uuid row.
+            root._healByUuid = next.byUuid === true || next.twin === true;
             root._healPendingExact = next.exact === true;
             root._healPendingFavicon = (next.favicon || "").toString();
             root._healPendingWho = HealLogic.strangerLabel(next,
@@ -4322,6 +4398,29 @@ PlasmoidItem {
             root._currentResolvedUrl = playUrl;
             startWithFade({ "name": run.name, "hostname": playUrl,
                             "favicon": run.favicon, "active": true });
+        });
+    }
+
+    // The kin rung. A CDN moves a mount to another of its servers and the
+    // saved address answers 404 while the station plays on: seven rows of one
+    // home list in October 2026, five of which the directory knew nothing
+    // usable about. KinHunt asks, HealLogic.kin* decides; here are only the
+    // listener's own rows and the one directory request the hunt may make.
+    function _healKin(run) {
+        var own = [];
+        run.kin = 1;
+        try { own = JSON.parse(Plasmoid.configuration.servers); } catch (e) { own = []; }
+        kinHunt.search({ saved: run.orig, name: run.name, cc: run.cc !== "" ? run.cc : (run.kinCc || ""),
+                         own: own, rows: run.rows, wide: run.candidates.length === 0,
+                         ask: function(path, onRows) {
+                             _rbFetch(path, 5000, function(kx) { onRows(HealLogic.replyRows(kx)); });
+                         } }, function(found) {
+            if (run.seq !== _healSeq || root._healRun !== run) return;
+            if (found !== "") {
+                console.log("[ARP] heal: the saved mount answers from " + _hostOf(found));
+                run.candidates.unshift({ url: found, twin: true });
+            }
+            _healAdvance();
         });
     }
 
@@ -4440,6 +4539,7 @@ PlasmoidItem {
         var exact = _healPendingExact;
         var newFav = _healPendingFavicon;
         var who = _healPendingWho;
+        var proven = _healProven;
         _healClearPending();
         // The generation found its door — the ladder and the backoff die.
         root._healRun = null;
@@ -4447,7 +4547,9 @@ PlasmoidItem {
         healRetryTimer.stop();
         // The saved address answering again is no move: a record whose url is
         // a .pls naming that very address unwraps back to it.
-        if (HealLogic.addrKey(newUrl) === HealLogic.addrKey(oldUrl)) return;
+        // The same door, not the same key: a station that left https for
+        // http did move, and has to be saved (HealLogic.sameDoor).
+        if (HealLogic.sameDoor(newUrl, oldUrl)) return;
         var oldBase = _baseDomain(_hostOf(oldUrl));
         // May this address overwrite the saved one? Identity, not
         // similarity — HealLogic.commitVerdict holds the bar (uuid row,
@@ -4459,6 +4561,7 @@ PlasmoidItem {
         // the lock in refreshServer instead.
         if (HealLogic.commitVerdict(byUuid, oldBase,
                                     _baseDomain(_hostOf(newUrl)), exact) !== "permanent") {
+            root._healBackupFor = oldUrl;
             notify(i18n("Playing from a backup address"),
                    who === ""
                    ? i18n("The station's saved address is not answering — playing the directory's closest match for now. Your saved address was kept.")
@@ -4466,13 +4569,27 @@ PlasmoidItem {
                    "network-connect");
             return;
         }
+        // Who the station is was settled above; whether it MOVED takes time
+        // to know. The new address plays on, and the list is rewritten only
+        // once the old one has stayed dead for five minutes (healProofTimer).
+        if (!proven && HealLogic.moveWhen("permanent", _healDeadSince[oldUrl] || 0, Date.now()) !== "now") {
+            root._healBackupFor = oldUrl;
+            root._healLater = { oldUrl: oldUrl, newUrl: newUrl, byUuid: byUuid, exact: exact, newFav: newFav };
+            healProofTimer.interval = HealLogic.proofWaitMs(_healDeadSince[oldUrl] || 0, Date.now());
+            healProofTimer.restart();
+            return;
+        }
+        delete _healDeadSince[oldUrl];
         // An alarm and a scheduled recording carry their own copy of the address.
         alarmEngine.retargetStation(oldUrl, newUrl);
         recordingEngine.retargetStation(oldUrl, newUrl);
         try {
             const servers = JSON.parse(Plasmoid.configuration.servers);
+            // Two rows can hold one address, and the one ahead may be
+            // switched off or be another name's: the row that plays moves.
+            const moved = HealLogic.movedRow(servers, oldUrl, root.currentStation);
             for (var i = 0; i < servers.length; i++) {
-                if ((servers[i].hostname || "") !== oldUrl) continue;
+                if (i !== moved) continue;
                 servers[i].hostname = newUrl;
                 // Where it was stays as prev. The row keeps its own uuid:
                 // a name twin's identity is weaker proof than the one the
@@ -4504,6 +4621,10 @@ PlasmoidItem {
                 _reorderKeepPlaying = true;
                 Plasmoid.configuration.servers = out;
                 Qt.callLater(function() {
+                    // The row that was playing keeps the mark where it already
+                    // holds the new address; a twin ahead of it must not take it.
+                    if (lastPlay >= 0 && lastPlay < stationsModel.count
+                        && stationsModel.get(lastPlay).hostname === newUrl) return;
                     for (var k = 0; k < stationsModel.count; k++) {
                         if (stationsModel.get(k).hostname === newUrl) {
                             lastPlay = k;
@@ -4618,7 +4739,7 @@ PlasmoidItem {
             // Fire-and-forget, single attempt: the ping is a write, and a
             // reply lost on flaky wifi does not mean the click was — the
             // failover walk was double-counting it on the next mirror.
-            _rbFetch("/json/url/" + uuid, 4000, function(xhr) {}, true);
+            _rbFetch("/json/url/" + encodeURIComponent(uuid), 4000, function(xhr) {}, true);
         });
     }
 
@@ -4654,7 +4775,7 @@ PlasmoidItem {
             // API counts it whether or not the reply survived the wifi —
             // re-walking the mirrors turned one 👍 into several and then
             // reported the vote as failed on top.
-            _rbFetch("/json/vote/" + uuid, 5000, function(xhr) {
+            _rbFetch("/json/vote/" + encodeURIComponent(uuid), 5000, function(xhr) {
                 var ok = false;
                 try { ok = xhr && JSON.parse(xhr.responseText).ok === true; } catch (e) {}
                 if (ok) {
@@ -4816,6 +4937,10 @@ PlasmoidItem {
         });
     }
 
+    // The timeshift session is over: writer down, buffer deleted, parked
+    // position forgotten. A stop means this, whichever road made it.
+    function _tsSessionOver() { timeshift.disarm(); root._tsPaused = false; root._tsPendingSeekUrl = ""; }
+
     function stopWithFade() {
         // Who asked for silence: a radio found quiet in the morning left no
         // trace of why (2026-09-22, a stop at 06:01, no heal or Bluetooth line
@@ -4837,11 +4962,7 @@ PlasmoidItem {
         // An explicit stop cancels the standing order — every automatic
         // recovery road (retry backoff, network-back resume) dies with it.
         root._wantsPlaying = false;
-        // A full stop ends the timeshift session too: writer down, buffer
-        // deleted, parked position forgotten.
-        timeshift.disarm();
-        root._tsPaused = false;
-        root._tsPendingSeekUrl = "";
+        _tsSessionOver();
         root._orphanOrder = null;
         root._healRetryAttempts = 0;
         root._orderHeardAt = 0;
@@ -4969,8 +5090,7 @@ PlasmoidItem {
                 root.currentStationFavicon = station.favicon || "";
                 // Cast-only playback cannot be shifted — the buffer sits on
                 // this computer and the sound sits on the TV.
-                timeshift.disarm();
-                root._tsPaused = false;
+                _tsSessionOver();
                 return;
             }
         }
@@ -5693,8 +5813,7 @@ PlasmoidItem {
             // used to put the radio back on over a park or a paused buffer.
             if (root._tsPaused || (timeshift.shifted && !isPlaying())) stopWithFade();
             else if (timeshift.shifted) tsPlayLive(timeshift.streamUrl);
-            timeshift.disarm();
-            root._tsPaused = false;
+            _tsSessionOver();
         }
         function onServersChanged() {
             // A reorder only changes positions, never the set of stations —
@@ -5711,9 +5830,10 @@ PlasmoidItem {
                 // later restarts a station believed off. A write that silenced
                 // nothing leaves the order alone — a dead row tidied away beside a
                 // recovering stream must not cancel the recovery under way.
+                // The relay goes with the order: left armed, it re-armed at its writer's cap an hour on and played by itself.
                 var listed = false;
                 for (var si = 0; si < stationsModel.count && !listed; si++) listed = stationsModel.get(si).hostname === root._currentOrigUrl;
-                if (wasAudible || !listed) root._wantsPlaying = false;
+                if (wasAudible || !listed) { root._wantsPlaying = false; _tsSessionOver(); }
             }
             syncFavicons();
             // A just-added station may have arrived without a favicon —
@@ -6619,7 +6739,7 @@ PlasmoidItem {
             // (different from the user's configured URL), the upgrade just failed.
             // Negative-cache it and retry with the original URL.
             if (root._healPendingUrl !== ""
-                && playMusic.source.toString() === root._healPendingUrl) {
+                && _icyStreamTarget(playMusic.source) === root._healPendingUrl) {
                 // The auditioned replacement is dead too — next rung of the
                 // ladder (or, inside _healAdvance, the honest give-up and
                 // the standing-order retry).
@@ -6711,6 +6831,9 @@ PlasmoidItem {
                 || playMusic.mediaStatus === MediaPlayer.BufferingMedia)
                 connectWatchdog.stop();
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia) {
+                // The saved address itself buffered: whatever was seen of
+                // its death is over. A heal candidate buffering proves nothing.
+                if (root._healPendingUrl === "" && root._healBackupFor === "") delete root._healDeadSince[root._currentOrigUrl];
                 root._healRetryAttempts = 0;
                 healRetryTimer.stop();
                 root._orderQuietSince = 0;
@@ -6731,7 +6854,7 @@ PlasmoidItem {
             // then is it saved over the dead one.
             if (playMusic.mediaStatus === MediaPlayer.BufferedMedia
                 && root._healPendingUrl !== ""
-                && playMusic.source.toString() === root._healPendingUrl) {
+                && _icyStreamTarget(playMusic.source) === root._healPendingUrl) {
                 _healCommit();
             }
             // A real buffer clears the stall count on EVERY stream, not just
@@ -7240,7 +7363,7 @@ PlasmoidItem {
                     console.log("[ARP] stall watchdog: still starving after "
                                 + root._stallAttempts + " retries — treating as dead");
                     var starvedAudition = (root._healPendingUrl !== ""
-                        && playMusic.source.toString() === root._healPendingUrl);
+                        && _icyStreamTarget(playMusic.source) === root._healPendingUrl);
                     playMusic.stop();
                     isError = true;
                     errorTimer.restart();
@@ -7300,7 +7423,7 @@ PlasmoidItem {
                 errorTimer.restart();
                 return;
             }
-            var wasAudition = (root._healPendingUrl !== "" && src === root._healPendingUrl);
+            var wasAudition = (root._healPendingUrl !== "" && _icyStreamTarget(src) === root._healPendingUrl);
             playMusic.stop();
             isError = true;
             errorTimer.restart();

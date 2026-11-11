@@ -67,7 +67,7 @@ QtObject {
         try {
             xhr = _request();
             xhr.open("GET", page);
-            xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.42)");
+            xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.43)");
             xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         } catch (e) {
             finish("", "");
@@ -159,7 +159,7 @@ QtObject {
             xhr = _request();
             xhr.open("GET", url);
             xhr.responseType = "arraybuffer";
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         } catch (e) {
             finish(null, false);
             return;
@@ -189,10 +189,10 @@ QtObject {
                 && hunt._fromPublicHost(xhr, strict)) {
                 try { bytes = new Uint8Array(xhr.response); } catch (e) { bytes = null; }
             }
-            if (bytes && bytes.length <= hunt.imageCap && FaviconLogic.looksLikeImageBytes(bytes))
-                finish(FaviconLogic.imageSize(bytes), true);
-            else
-                finish(null, false);
+            // Whether the bytes are a picture, and one a hunt nobody clicked
+            // may keep, is FaviconLogic.logoVerdict's to say.
+            var verdict = FaviconLogic.logoVerdict(bytes && bytes.length <= hunt.imageCap ? bytes : null, strict);
+            finish(verdict.size, verdict.image);
         };
         guard = app._armXhrTimeout(xhr, hunt.probeTimeoutMs);
         try {

@@ -147,4 +147,79 @@ TestCase {
         verify(!HG.answerKnownPublic(null))
         verify(!HG.answerKnownPublic({ responseURL: "not an address" }))
     }
+
+    // A .pls or .m3u on the listener's own server was never unwrapped: the
+    // answer came from private space, and the gate read that as a public
+    // wrapper redirecting into the LAN. Measured with the unwrap's own lines
+    // against a loopback server: the player was handed the .pls itself.
+    function test_a_private_answer_to_a_private_question_is_no_redirect_data() {
+        return [
+            // the listener's own server, asked and answered in one place
+            { tag: "home server answers itself", asked: "http://192.168.1.5:8000/raadio.m3u",
+              from: "http://192.168.1.5:8000/raadio.m3u", ok: true },
+            { tag: "loopback answers itself", asked: "http://127.0.0.1:8000/listen.pls",
+              from: "http://127.0.0.1:8000/listen.pls", ok: true },
+            { tag: "same host, another port and scheme", asked: "http://192.168.1.5:8000/raadio.m3u",
+              from: "https://192.168.1.5:8443/lists/raadio.m3u", ok: true },
+            { tag: "localhost by name", asked: "http://LocalHost:8000/a.pls",
+              from: "http://localhost:8000/a.pls", ok: true },
+            { tag: "ipv6 loopback", asked: "http://[::1]:8000/a.pls",
+              from: "http://[::1]:8000/a.pls", ok: true },
+            { tag: "userinfo in front of the private host", asked: "http://egon@192.168.1.5/a.m3u",
+              from: "http://192.168.1.5/a.m3u", ok: true },
+            // what the gate exists for
+            { tag: "public wrapper redirected into the LAN", asked: "https://radio.example.com/listen.pls",
+              from: "http://192.168.1.1/admin.pls", ok: false },
+            { tag: "public wrapper redirected to loopback", asked: "http://8.8.8.8/listen.m3u",
+              from: "http://127.0.0.1:631/printers.m3u", ok: false },
+            { tag: "a public host hiding a private one in its userinfo", asked: "http://192.168.1.1@radio.example.com/a.pls",
+              from: "http://192.168.1.1/a.pls", ok: false },
+            { tag: "one private host answers for another", asked: "http://192.168.1.5:8000/raadio.m3u",
+              from: "http://192.168.1.1/raadio.m3u", ok: false },
+            { tag: "the neighbouring address", asked: "http://192.168.1.5/a.m3u",
+              from: "http://192.168.1.50/a.m3u", ok: false },
+            { tag: "loopback asked, the LAN answers", asked: "http://127.0.0.1:8000/a.pls",
+              from: "http://10.0.0.7/a.pls", ok: false },
+            // public answers, as before
+            { tag: "public answers public", asked: "https://radio.example.com/listen.pls",
+              from: "https://cdn.example.net/listen.pls", ok: true },
+            { tag: "home server sends the request out", asked: "http://192.168.1.5:8000/raadio.m3u",
+              from: "https://radio.example.com/raadio.m3u", ok: true },
+            // an end Qt does not name: the old verdict, whatever was asked
+            { tag: "no end, public question", asked: "https://radio.example.com/listen.pls", from: "", ok: true },
+            { tag: "no end, private question", asked: "http://192.168.1.5:8000/raadio.m3u", from: "", ok: true },
+            // malformed
+            { tag: "an end that is no address", asked: "http://192.168.1.5:8000/raadio.m3u",
+              from: "not an address", ok: false },
+            { tag: "a question that is no address", asked: "not an address",
+              from: "http://192.168.1.5:8000/raadio.m3u", ok: false },
+            { tag: "neither is an address", asked: "not an address", from: "nor is this", ok: false },
+            { tag: "no question at all", asked: "", from: "http://192.168.1.5/a.m3u", ok: false },
+            { tag: "a null question", asked: null, from: "http://127.0.0.1/a.m3u", ok: false },
+            { tag: "a null question, public answer", asked: null, from: "https://radio.example.com/a.m3u", ok: true },
+            { tag: "a spelling Qt rewrites", asked: "http://127.1:8000/a.pls",
+              from: "http://127.0.0.1:8000/a.pls", ok: false },
+            { tag: "a percent-spelled host", asked: "http://%31%32%37.0.0.1/a.pls",
+              from: "http://127.0.0.1/a.pls", ok: false }
+        ]
+    }
+
+    function test_a_private_answer_to_a_private_question_is_no_redirect(data) {
+        compare(HG.answerPublicOrAsked(data.asked, { responseURL: data.from }), data.ok)
+    }
+
+    function test_the_asked_address_changes_nothing_without_an_answer() {
+        verify(HG.answerPublicOrAsked("http://192.168.1.5:8000/raadio.m3u", {}))
+        verify(HG.answerPublicOrAsked("http://192.168.1.5:8000/raadio.m3u", null))
+        verify(HG.answerPublicOrAsked(undefined, undefined))
+    }
+
+    function test_a_very_long_question_is_read_like_any_other() {
+        var path = "/"
+        for (var i = 0; i < 20000; i++) path += "a"
+        verify(HG.answerPublicOrAsked("http://192.168.1.5:8000" + path + ".m3u",
+                                      { responseURL: "http://192.168.1.5:8000" + path + ".m3u" }))
+        verify(!HG.answerPublicOrAsked("https://radio.example.com" + path + ".m3u",
+                                       { responseURL: "http://192.168.1.5:8000" + path + ".m3u" }))
+    }
 }

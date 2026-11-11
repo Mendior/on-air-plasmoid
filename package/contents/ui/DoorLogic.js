@@ -13,8 +13,13 @@
 // settings page.
 .pragma library
 .import "HealLogic.js" as HealLogic
+.import "FaviconLogic.js" as FaviconLogic
 
 var MAX_ADDR = 2048;
+// A station file is whatever the listener picked in the file dialog. 500
+// rows and 500 characters a field is far beyond any real station list.
+var IMPORT_ROWS = 500;
+var IMPORT_FIELD = 500;
 
 // Contract: the address as a trimmed string when it is http(s) and at most
 // MAX_ADDR long, else "". null, numbers and objects are answered, never
@@ -85,4 +90,61 @@ function editedRow(live, opened, shown, clean) {
         out.uuid = "";
     if (HealLogic.addrKey(out.hostname) !== HealLogic.addrKey(src.hostname)) out.prev = "";
     return out;
+}
+
+// A parsed station file as the rows the list would save.
+// Contract: null when parsed is not an array or no row in it is usable;
+// else an array of at most IMPORT_ROWS new rows in the file's order. A row
+// is usable when it is an object whose hostname is a string with something
+// in it; anything else is skipped. Each row has name (the hostname when the
+// file has none), hostname, favicon (a public web address or "") and
+// active, plus country, uuid, codec, bitrate and prev when the file's row
+// has them. Text is cut at IMPORT_FIELD characters, codec is lower case and
+// at most 16, bitrate a whole number from 0 up, prev as normalize leaves
+// it. Keys the list never wrote are left behind. Nothing is thrown.
+function importedRows(parsed) {
+    if (!Array.isArray(parsed)) return null;
+    var out = [];
+    for (var i = 0; i < parsed.length && out.length < IMPORT_ROWS; i++) {
+        var src = parsed[i];
+        if (src === null || typeof src !== "object" || Array.isArray(src)) continue;
+        if (typeof src.hostname !== "string" || src.hostname.trim() === "") continue;
+        // The address and the name stay as the file spells them: favorites
+        // are kept by name, and an alarm finds its station by the address.
+        var row = {
+            "name": _importText(src.name),
+            "hostname": src.hostname.substring(0, IMPORT_FIELD),
+            "favicon": FaviconLogic.webUrlOrEmpty(_importText(src.favicon)),
+            "active": src.active === undefined ? true
+                      : src.active !== false && src.active !== "false" && src.active !== 0
+        };
+        if (row.name === "") row.name = row.hostname;
+        if (src.country !== undefined) row.country = _importText(src.country);
+        if (src.uuid !== undefined) row.uuid = _importText(src.uuid);
+        // The codec is what sends an Ogg stream through the relay, and the
+        // bitrate is all the footer has on a FLAC station. Both were left
+        // behind here once, so an export and an import cost a station both.
+        if (src.codec !== undefined) row.codec = _importText(src.codec).toLowerCase().substring(0, 16);
+        if (src.bitrate !== undefined) row.bitrate = Math.max(0, parseInt(src.bitrate, 10) || 0);
+        row.prev = src.prev;
+        row = normalize(row);
+        if (row.prev === "") delete row.prev;
+        out.push(row);
+    }
+    return out.length > 0 ? out : null;
+}
+
+// How many rows of a file the import did not take: the ones that are no
+// station, and whatever stood past IMPORT_ROWS.
+// Contract: parsed is what importedRows was handed and rows what it gave
+// back. 0 when either is no array, never below 0.
+function importLeftOut(parsed, rows) {
+    if (!Array.isArray(parsed) || !Array.isArray(rows)) return 0;
+    return Math.max(0, parsed.length - rows.length);
+}
+
+// Text and numbers as text, cut at IMPORT_FIELD; anything else is "".
+function _importText(v) {
+    if (typeof v !== "string" && typeof v !== "number") return "";
+    return String(v).substring(0, IMPORT_FIELD);
 }

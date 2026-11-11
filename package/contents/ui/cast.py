@@ -961,6 +961,12 @@ def cmd_dlna_stop(location):
         # A SOAP fault is the documented answer of an already-idle renderer to
         # Stop — the same class cmd_dlna_play deliberately swallows. Nothing is
         # playing, so DONE, not a misleading FAIL.
+        # A fault rides HTTP 500 and nothing else does. A 404 or a 503 here
+        # is not the renderer answering Stop: every status used to pass as
+        # "idle", and a box that never heard the command was called stopped.
+        if exc.code != 500:
+            _out("%s HTTP %d" % (FAIL, exc.code))
+            return
         _dbg("dlna-stop fault (idle renderer)", exc)
     except Exception as exc:
         # Descriptor answered but the control URL did not — the renderer may

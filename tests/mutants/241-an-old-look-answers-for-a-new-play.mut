@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The answer to the heal's second look is taken for whatever plays now,
+  whether or not the move it was asked for still stands.
+
+history:
+  The look is asked while the stopgap plays. Stop the radio, start the same
+  station again from its saved address, and the old look's answer arrives to
+  a state that passes every check it had: same station, playing, nothing
+  pending. It then wrote the stopgap's address into the list, the alarms and
+  the scheduled recordings while the saved address was playing. Found
+  2026-11-10 before release. The answer now counts only while the very move
+  it was asked for is still the one waiting.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                  if (root._healLater !== m || root._currentOrigUrl !== m.oldUrl || !isPlaying() || root._healPendingUrl !== "") return;
+
+replace:
+                  if (root._healLater === null || root._currentOrigUrl !== m.oldUrl || !isPlaying() || root._healPendingUrl !== "") return;
+
+expect:
+  Killed by tests/test_invariants.py::test_a_heal_is_written_only_over_an_address_that_stayed_dead.
+  Line-neutral.

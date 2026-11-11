@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A hunt question goes out to an address on the listener's own network.
+
+history:
+  Refusing the answer afterwards is not enough: the request itself is the
+  knock. The address is judged before anything leaves the machine.
+
+target:
+  package/contents/ui/KinHunt.qml
+
+find:
+          if (host === "" || HostGuard.isPrivateHost(host)) {
+
+replace:
+          if (host === "") {
+
+expect:
+  Killed by tests/qml/tst_kinhunt.qml::test_one_question_reports_what_it_saw.
+  Line-neutral.

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The relayed-Ogg reader gives up at the first place a field name stands
+  without a sane length in front of it.
+
+history:
+  The reader took the last place the letters TITLE= or ARTIST= stood and
+  returned nothing when the four bytes ahead were no field length. But
+  ALBUMARTIST= ends in ARTIST= and SUBTITLE= in TITLE=: a block that names
+  the album's artist after the track's lost its artist, and one with a
+  subtitle lost the title too. Found 2026-11-10 with built comment blocks.
+  The search now goes on with what stands before such a place.
+
+target:
+  package/contents/ui/reader.py
+
+find:
+              end = pos + len(key) - 1
+
+replace:
+              return -1, ""
+
+expect:
+  Killed by tests/test_reader_oggbuf.py::test_a_longer_name_ending_in_the_same_letters_is_another_field
+  and tests/test_reader_oggbuf.py::test_a_block_cut_off_mid_title_leaves_the_last_whole_one.
+  Line-neutral.

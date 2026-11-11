@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heal's second look takes any answer that is not a stream, however
+  often it comes, as proof that the saved address is gone.
+
+history:
+  A move is written to the list only after the old address has stayed dead
+  for five minutes and a second look confirms it. That look counted
+  everything that was not a stream as dead: a three-second timeout, a busy
+  503, a 429. Found 2026-11-10 before the first release that has the second
+  look. Proof is the server's own 403, 404 or 410, or silence on three looks
+  five minutes apart; a server that says anything else is still there.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+      return status === 0 && looks >= PROOF_LOOKS ? "move" : "again";
+
+replace:
+      return looks >= PROOF_LOOKS ? "move" : "again";
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_a_server_that_answers_something_else_is_still_there
+  and tests/qml/tst_heallogic.qml::test_an_answer_qt_cannot_place_never_moves_a_station.
+  Line-neutral.

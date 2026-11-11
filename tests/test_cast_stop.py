@@ -98,6 +98,28 @@ def test_cmd_dlna_stop_idle_soap_fault_stays_done(cast, monkeypatch, capsys):
     assert sentinel_lines(capsys) == [cast.DONE]
 
 
+def test_cmd_dlna_stop_refused_at_the_door_emits_fail(cast, monkeypatch, capsys):
+    # A SOAP fault rides HTTP 500, and that is the answer an idle renderer
+    # gives. Any other status is not the renderer speaking about Stop at all:
+    # the control address is gone (404), the box is busy (503), it wants a
+    # login or sends us elsewhere. All of those were swallowed as "idle" too,
+    # and a speaker that may well still be playing was reported stopped.
+    dev = {"name": "X", "model": "", "udn": "u",
+           "avtransport": "http://192.0.2.1:8080/ctl", "rendering": None}
+    monkeypatch.setattr(cast, "_describe_renderer", lambda loc: dev)
+    for status in (301, 401, 404, 503):
+        def refused(*a, _status=status, **kw):
+            raise urllib.error.HTTPError(
+                "http://192.0.2.1:8080/ctl", _status, "nope", Message(), None)
+
+        monkeypatch.setattr(cast, "_soap", refused)
+        cast.cmd_dlna_stop("http://192.0.2.1:8080/dd.xml")
+        out = sentinel_lines(capsys)
+        assert len(out) == 1, status
+        assert out[0].startswith(cast.FAIL), status
+        assert str(status) in out[0], status
+
+
 def test_cmd_dlna_stop_gone_device_stays_done(cast, monkeypatch, capsys):
     # No descriptor = the device is off or unplugged — nothing is playing,
     # so the quiet DONE path is the right answer, not a FAIL notify.

@@ -242,6 +242,23 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       if [ -x "$QMLTESTRUNNER" ]; then
         (cd "$REPO_DIR" && QT_QPA_PLATFORM=offscreen "$QMLTESTRUNNER" -silent -input tests/qml) \
           || { echo "lint FAILED: qml tests"; exit 1; }
+        # The clock-change cases build their alarm around the change of the
+        # zone they run in and skip where the year has none. CI runs in UTC:
+        # there all six were skipped, every time (measured 2026-11-10, 41
+        # passed and 6 skipped against 47 and 0 in Europe/Tallinn). So they
+        # run again in three zones that between them hold the kinds there
+        # are: 03:00 to 04:00, a change at midnight, and half an hour in the
+        # southern order. A skip counts as a failure here, which also catches
+        # a container without zone data, where every name reads as UTC.
+        for zone in Europe/Tallinn Asia/Beirut Australia/Lord_Howe; do
+          zrc=0
+          zout=$(cd "$REPO_DIR" && TZ="$zone" QT_QPA_PLATFORM=offscreen "$QMLTESTRUNNER" -silent \
+                   -input tests/qml/tst_alarmlogic.qml 2>&1) || zrc=$?
+          if [ "$zrc" -ne 0 ] || ! printf '%s\n' "$zout" | grep -q '^Totals: .* 0 skipped'; then
+            printf '%s\n' "$zout"
+            echo "lint FAILED: clock-change tests in $zone"; exit 1
+          fi
+        done
         echo "qml tests OK"
       else
         echo "NB: qmltestrunner unavailable ($QMLTESTRUNNER) — QML tests skipped here, CI runs them"
@@ -320,7 +337,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
       if (cd "$REPO_DIR" && git ls-files \
             | grep -vE '^(po/|LICENSES/|LICENSE$|screenshots/)' \
             | grep -vE '\.(png|ogg)$' \
-            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem,nd,hart,alph,rade' -q 3); then
+            | xargs -d '\n' codespell --ignore-words-list='unparseable,retuned,te,derails,parem,nd,hart,alph,rade,caf' -q 3); then
         echo "codespell OK"
       else echo "preflight FAILED: codespell"; fail=1; fi
     else echo "NB: codespell not installed"; fi

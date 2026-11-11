@@ -132,5 +132,48 @@ Item {
             verify(!VL.revealFooter(null))
             verify(!VL.revealFooter({}))
         }
+
+        // ── the footer's word for a network that is gone ─────────────────
+        // Read from the footer's own bindings with a downloaded episode
+        // playing and the network down: "Check internet connection…", in
+        // the error red, over sound that needs no network at all.
+
+        function test_a_file_playing_from_disk_is_not_told_to_check_the_network() {
+            compare(VL.offlineWord(false, true, true), false)
+        }
+
+        function test_a_station_with_the_network_gone_is_told() {
+            compare(VL.offlineWord(false, false, false), true, "nothing playing")
+            // A stream still draining what it buffered before the link went.
+            compare(VL.offlineWord(false, false, true), true, "a station still sounding")
+        }
+
+        function test_a_silent_file_does_not_hide_a_dead_network() {
+            // Paused, ended or not started: the next pick may be a station.
+            compare(VL.offlineWord(false, true, false), true)
+        }
+
+        function test_with_the_network_up_the_word_stays_away() {
+            compare(VL.offlineWord(true, false, false), false)
+            compare(VL.offlineWord(true, false, true), false)
+            compare(VL.offlineWord(true, true, false), false)
+            compare(VL.offlineWord(true, true, true), false)
+        }
+
+        function test_only_a_plain_answer_counts() {
+            // Only a definite "disconnected" is offline: a value that has
+            // not arrived yet is not a dead network.
+            compare(VL.offlineWord(undefined, false, false), false)
+            compare(VL.offlineWord(null, false, false), false)
+            compare(VL.offlineWord(0, false, false), false)
+            compare(VL.offlineWord("", false, false), false)
+            compare(VL.offlineWord(), false)
+            // And only a plain yes is a file playing.
+            compare(VL.offlineWord(false, 1, 1), true)
+            compare(VL.offlineWord(false, "file", "playing"), true)
+            compare(VL.offlineWord(false, true, undefined), true)
+            compare(VL.offlineWord(false, undefined, true), true)
+            compare(VL.offlineWord(false), true)
+        }
     }
 }

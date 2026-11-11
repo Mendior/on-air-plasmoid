@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  sameDoor folds the scheme away, so a station that left https for http counts
+  as not having moved.
+
+history:
+  The commit's check for the same address used addrKey, which folds scheme and
+  case. A station whose TLS port closed was found on plain http, played and
+  never saved: every later play went through the error and the heal again.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+          return m ? m[1].toLowerCase() + m[2].toLowerCase() + m[3].replace(/\/$/, "") : "";
+
+replace:
+          return m ? m[2].toLowerCase() + m[3].replace(/\/$/, "") : "";
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_the_same_door_is_the_same_scheme_host_and_path.
+  Line-neutral.

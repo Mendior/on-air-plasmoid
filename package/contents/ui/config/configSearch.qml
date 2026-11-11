@@ -82,6 +82,14 @@ KCM.ScrollViewKCM {
         return /^https?:\/\//i.test(s) ? s : ""
     }
 
+    // The directory's codec field as a chip shows it. The field is untrusted
+    // and Chip has no textFormat, so the value itself is reduced to the codec
+    // charset: an <img>/markup in a station's codec cannot survive to be
+    // interpreted as rich text.
+    function _codecText(raw) {
+        return String(raw === undefined || raw === null ? "" : raw).replace(/[^A-Za-z0-9+.\/-]/g, "")
+    }
+
     function _appendRow(srv) {
         if (!srv || !SearchLogic.firstSight(_seen, srv.stationuuid))
             return
@@ -162,7 +170,11 @@ KCM.ScrollViewKCM {
                 if (items.length === 0)
                     items = ["de2", "de1", "all"]
                 getServer()
-                getStations()
+                // This look-up can take five seconds. A search made meanwhile
+                // has its answer on screen or on its way, and the default
+                // list must not come in over it.
+                if (isNoSearch)
+                    getStations()
             }
             if (xhr.status === 200) {
                 try {
@@ -180,7 +192,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43")
     }
 
     function getStations(by, val) {
@@ -596,11 +608,7 @@ KCM.ScrollViewKCM {
                     }
 
                     Kirigami.Chip {
-                        // Directory field, untrusted — Chip has no textFormat,
-                        // so the value itself is reduced to the codec charset:
-                        // an <img>/markup in a station's codec cannot survive
-                        // to be interpreted as rich text.
-                        text: (listItem.model.codec || "").replace(/[^A-Za-z0-9+.\/-]/g, "")
+                        text: root._codecText(listItem.model.codec)
                         closable: false
                         enabled: false
                         visible: text !== "" && text !== "UNKNOWN"
@@ -655,17 +663,15 @@ KCM.ScrollViewKCM {
                             searchModel.setProperty(listItem.index,
                                                     "added", true)
                             const src = searchModel.get(listItem.index)
-                            // The popup's star refuses an address the list already
+                            // The popup's star refuses a station the list already
                             // holds and keeps the directory's codec, bitrate and
-                            // uuid; this road appended a bare twin instead. A
-                            // saved row may sit at the station's own address
-                            // (url) after a heal, so that and the uuid count too.
-                            var dupAt = -1
-                            for (var di = 0; di < stationsModel.count; di++) {
-                                const held = stationsModel.get(di)
-                                if (held.hostname === src.url_resolved || held.hostname === src.url
-                                    || (src.stationuuid && held.uuid === src.stationuuid)) { dupAt = di; break }
-                            }
+                            // uuid; this road appended a bare twin instead. Both
+                            // ask SearchLogic.knownStationAt now: either address
+                            // of the record, where a heal moved the row from,
+                            // and the uuid.
+                            const held = []
+                            for (var di = 0; di < stationsModel.count; di++) held.push(stationsModel.get(di))
+                            const dupAt = SearchLogic.knownStationAt(held, src)
                             if (dupAt < 0) {
                                 // favicon and url_resolved were gated to http(s)
                                 // as the row entered the model (_appendRow).
@@ -938,8 +944,7 @@ KCM.ScrollViewKCM {
             Kirigami.Chip {
                 Kirigami.FormData.label: i18n("Codec:")
 
-                text: mainList.currentIndex !== -1 ? searchModel.get(
-                                                         mainList.currentIndex).codec : ""
+                text: mainList.currentIndex !== -1 ? root._codecText(searchModel.get(mainList.currentIndex).codec) : ""
                 closable: false
                 checkable: false
                 visible: mainList.currentIndex !== -1 && searchModel.get(

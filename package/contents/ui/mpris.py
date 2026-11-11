@@ -93,6 +93,24 @@ def shown_names(state: dict) -> dict[str, str]:
     return {key: text for key, text in names.items() if text}
 
 
+def position_asked(state: dict, playing_track: str, track_id: object, position: object) -> int | None:
+    """Where a SetPosition call may move the episode, in microseconds.
+
+    None when the call is to be left alone. The caller names the track it
+    means, and a name that is not the playing track's is a call made for one
+    that has ended since: obeyed, it moved the episode that came after. Past
+    the end and below zero are nowhere, as MPRIS has it. The length counts
+    only once it is known; it lands a beat after the episode starts.
+    """
+    if not state.get("canSeek") or str(track_id) != playing_track:
+        return None
+    pos = int(str(position))
+    length_us = int(float(state.get("durationMs") or 0) * 1000)
+    if pos < 0 or (length_us > 0 and pos > length_us):
+        return None
+    return pos
+
+
 class MPRISBridge(dbus.service.Object):
     def __init__(self, bus_name, state_file: Path, cmd_file: Path, ms_seq: bool = False):
         super().__init__(bus_name, OBJ_PATH)
@@ -316,8 +334,9 @@ class MPRISBridge(dbus.service.Object):
 
     @dbus.service.method(PLAYER_IF, in_signature="ox")
     def SetPosition(self, track_id, position):
-        if self._state.get("canSeek") and int(position) >= 0:
-            self._emit_command(f"SetPos {int(position)}")
+        pos = position_asked(self._state, self._tracker_path, track_id, position)
+        if pos is not None:
+            self._emit_command(f"SetPos {pos}")
 
     @dbus.service.method(PLAYER_IF, in_signature="s")
     def OpenUri(self, uri):

@@ -312,6 +312,50 @@ TestCase {
         compare(TrackLogic.primaryArtist(""), "")
     }
 
+    // A credit with an aside in brackets: the splitters cut inside it, and
+    // "Nightlight Duo (Rita Liiver & Elise Mängel) - Armid näol" went out to
+    // the catalogues as "Nightlight Duo (Rita Liiver Armid näol".
+    function test_the_first_billed_artist_ends_before_an_aside() {
+        compare(TrackLogic.primaryArtist("Nightlight Duo (Rita Liiver & Elise Mängel)"), "Nightlight Duo")
+        compare(TrackLogic.primaryArtist("Sigur Rós (live)"), "Sigur Rós")
+        compare(TrackLogic.primaryArtist("Sia (feat. Sean Paul)"), "Sia")
+        compare(TrackLogic.primaryArtist("Sia [feat. Sean Paul] & Diplo"), "Sia")
+        // A bracket that never closes goes with everything after it.
+        compare(TrackLogic.primaryArtist("Nightlight Duo (Rita Liiver & Elise Mängel"), "Nightlight Duo")
+        compare(TrackLogic.primaryArtist("Nightlight Duo (Rita Liiver"), "Nightlight Duo")
+        // With no space in front, the bracket is part of the name.
+        compare(TrackLogic.primaryArtist("(G)I-DLE"), "(G)I-DLE")
+        compare(TrackLogic.primaryArtist("(G)I-DLE & Friends"), "(G)I-DLE")
+        compare(TrackLogic.primaryArtist("Sunn O)))"), "Sunn O)))")
+        // A credit that is one aside and nothing else is not cut to nothing.
+        compare(TrackLogic.primaryArtist("(Various Artists)"), "(Various Artists)")
+        compare(TrackLogic.primaryArtist("  (Various Artists)"), "(Various Artists)")
+        compare(TrackLogic.primaryArtist(null), "")
+        compare(TrackLogic.primaryArtist(undefined), "")
+        var crowd = "Band"
+        for (var i = 0; i < 300; i++) crowd += " (with Guest " + i + " & Friends)"
+        compare(TrackLogic.primaryArtist(crowd), "Band")
+    }
+
+    // The photo search keeps a closed aside, which can be what tells two acts
+    // apart, but it never asks with a bracket left open.
+    function test_the_photo_search_leaves_no_bracket_open() {
+        compare(TrackLogic.photoArtist("Sia (feat. Sean Paul)"), "Sia")
+        compare(TrackLogic.photoArtist("Sia [ft. Sean Paul]"), "Sia")
+        compare(TrackLogic.photoArtist("Nightlight Duo (Rita Liiver feat. Elise Mängel)"), "Nightlight Duo")
+        compare(TrackLogic.photoArtist("Nightlight Duo (Rita Liiver & Elise Mängel"), "Nightlight Duo")
+        compare(TrackLogic.photoArtist("Nirvana (UK)"), "Nirvana (UK)")
+        compare(TrackLogic.photoArtist("Nightlight Duo (Rita Liiver & Elise Mängel)"),
+                "Nightlight Duo (Rita Liiver & Elise Mängel)")
+        compare(TrackLogic.photoArtist("(G)I-DLE"), "(G)I-DLE")
+        compare(TrackLogic.photoArtist("Sunn O)))"), "Sunn O)))")
+        compare(TrackLogic.photoArtist("("), "(")
+        compare(TrackLogic.photoArtist(undefined), "")
+        var crowd = "Band"
+        for (var i = 0; i < 300; i++) crowd += " & Band " + i
+        compare(TrackLogic.photoArtist(crowd + " (feat. Guest & Another)"), crowd)
+    }
+
     // The photo search asks for the band, not the first word of it.
     function test_the_photo_search_keeps_the_whole_band_name() {
         compare(TrackLogic.photoArtist("Love & Fate"), "Love & Fate")

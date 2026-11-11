@@ -291,7 +291,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -337,7 +337,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -408,6 +408,11 @@ KCM.ScrollViewKCM {
             stationsModel.setProperty(job.index, "favicon", faviconUrl);
             _logoFound++;
             if (job.upgrade === true) _logoUpgradeFound++;
+            // Said now, not when the run ends. Until the page calls a find
+            // its own edit, a list the popup writes is taken over whole,
+            // and the logos found so far went with it while the run's last
+            // line still counted them.
+            _edited();
             return true;
         }
         return false;
@@ -961,42 +966,34 @@ KCM.ScrollViewKCM {
         function onExited(cmd, exitCode, exitStatus, stdout, stderr) {
             var formattedText = stdout.trim();
             if (cmd.startsWith("head")) {
-                //   if (formattedText != cfg_servers) {
+                // An .arp is just a file the user picked, so the rows are
+                // built and judged first (DoorLogic.importedRows) and the
+                // list is replaced only by a file that has a station in it.
+                // The list used to be emptied before the file was looked
+                // at: an object, another program's array or "[]" left the
+                // page empty, three of those under the word "loaded", and
+                // the next Apply saved it.
+                let rows = null, leftOut = 0;
                 try {
-                    const servers = JSON.parse(formattedText);
-                    stationsModel.clear();
-                    // An .arp is just a file the user picked: rebuild each
-                    // row from the fields the config actually uses, coerced
-                    // and capped, instead of appending whatever object the
-                    // file carried (a file:// favicon, a 10 MB "name", keys
-                    // nothing here ever wrote). 500 rows / 500 chars is far
-                    // beyond any real station list.
-                    const clip = (v) => v == null ? "" : String(v).substring(0, 500);
-                    for (const srv of servers.slice(0, 500)) {
-                        const row = {
-                            "name": clip(srv.name),
-                            "hostname": clip(srv.hostname),
-                            "favicon": _extUrlOrEmpty(clip(srv.favicon)),
-                            "active": srv.active === undefined ? true
-                                      : srv.active !== false && srv.active !== "false" && srv.active !== 0
-                        };
-                        // No URL = unplayable and unremovable-by-URL — the
-                        // add dialog refuses these too.
-                        if (row.hostname === "")
-                            continue;
-                        if (row.name === "")
-                            row.name = row.hostname;
-                        if (srv.country !== undefined)
-                            row.country = clip(srv.country);
-                        if (srv.uuid !== undefined)
-                            row.uuid = clip(srv.uuid);
-                        row.prev = srv.prev;
-                        stationsModel.append(DoorLogic.normalize(row));
-                    }
-                    _edited();
-                    showMessage(true, i18n("Configuration has been loaded. Click 'Apply' to save changes."));
+                    const parsed = JSON.parse(formattedText);
+                    rows = DoorLogic.importedRows(parsed);
+                    leftOut = DoorLogic.importLeftOut(parsed, rows);
                 } catch (e) {
+                    // Not JSON: rows stays null and the listener is told below.
+                }
+                if (rows === null) {
                     showMessage(false, i18n("Error loading configuration. Try choosing a different file."));
+                } else {
+                    stationsModel.clear();
+                    for (const row of rows) stationsModel.append(DoorLogic.normalize(row));
+                    _edited();
+                    // A backup with a few broken rows in it looks whole in a
+                    // long list. The count is the only place it shows.
+                    showMessage(true, leftOut === 0
+                        ? i18n("Configuration has been loaded. Click 'Apply' to save changes.")
+                        : i18np("Configuration has been loaded, but one row of the file was left out. Click 'Apply' to save changes.",
+                                "Configuration has been loaded, but %1 rows of the file were left out. Click 'Apply' to save changes.",
+                                leftOut));
                 }
             } else {
                 if (formattedText === _servers)

@@ -415,6 +415,152 @@ TestCase {
                 [{ url: "https://r.ee/favicon.svg", kind: "page" }])
     }
 
+    // ── an attribute is read where it starts ─────────────────────────────
+    // The reader looked for "href" anywhere a word could begin, and a word
+    // can begin after a hyphen: a tag with data-href ahead of href gave the
+    // page /wrong.png for its icon.
+    function _page(html) { return _urls(FL.extractIconLinks(html, "https://r.ee/")) }
+
+    function test_a_data_attribute_is_not_the_attribute_it_ends_like() {
+        compare(_page('<link data-href="/wrong.png" rel="icon" href="/right.png">'), "page https://r.ee/right.png")
+        compare(_page('<link xlink:href="/wrong.png" rel="icon" href="/right.png">'), "page https://r.ee/right.png")
+        compare(_page('<link ng-href="/wrong.png" data-lazy-href="/wrong2.png" rel="icon" href="/right.png">'),
+                "page https://r.ee/right.png")
+        // A stylesheet is no icon because some script noted "icon" beside it.
+        compare(_page('<link data-rel="icon" rel="stylesheet" href="/style.css">'), "")
+        compare(_page('<meta data-content="/wrong.png" property="og:image" content="/right.png">'),
+                "share https://r.ee/right.png")
+        compare(_page('<meta data-property="og:image" property="og:title" content="/title.png">'), "")
+        compare(_page('<meta data-name="og:image" name="description" content="/words.png">'), "")
+        // With only the data attribute there is no address at all.
+        compare(_page('<link rel="icon" data-href="/lazy.png">'), "")
+    }
+
+    function test_words_inside_a_value_are_no_attribute() {
+        compare(_page('<link title="set href=/wrong.png here" rel="icon" href="/right.png">'),
+                "page https://r.ee/right.png")
+        compare(_page("<link title='rel=stylesheet href=\"/wrong.png\"' rel='icon' href='/right.png'>"),
+                "page https://r.ee/right.png")
+        compare(_page('<meta content="/right.png" property="og:image" data-note="content=/wrong.png">'),
+                "share https://r.ee/right.png")
+        compare(_page('<meta name="description" content="property=og:image content=/wrong.png">'), "")
+    }
+
+    function test_attributes_are_read_however_a_page_spaces_them() {
+        compare(_page('<link\n\trel="icon"\n\thref="/a.png"\n>'), "page https://r.ee/a.png")
+        compare(_page('<LINK REL="ICON" HREF="/a.png">'), "page https://r.ee/a.png")
+        compare(_page('<link rel = "icon" href = "/a.png">'), "page https://r.ee/a.png")
+        compare(_page('<link rel="icon"href="/a.png">'), "page https://r.ee/a.png")
+        compare(_page('<link crossorigin rel="icon" href="/a.png">'), "page https://r.ee/a.png")
+        compare(_page('<link rel="icon" href="/a.png" crossorigin>'), "page https://r.ee/a.png")
+        compare(_page('<link rel=icon href=/a.png>'), "page https://r.ee/a.png")
+        compare(_page('<link/rel="icon"/href="/a.png"/>'), "page https://r.ee/a.png")
+        // Of two, the first is the tag's, as a browser has it.
+        compare(_page('<link rel="icon" href="/first.png" href="/second.png">'), "page https://r.ee/first.png")
+        compare(_page('<link rel="stylesheet" rel="icon" href="/style.css">'), "")
+    }
+
+    function test_one_attribute_of_a_tag() {
+        compare(FL.tagAttr(' rel="icon" href="/a.png"', "href"), "/a.png")
+        compare(FL.tagAttr(' rel="icon" href="/a.png"', "rel"), "icon")
+        compare(FL.tagAttr(' rel="icon" href="/a.png"', "HREF"), "/a.png")
+        compare(FL.tagAttr(' REL=icon', "rel"), "icon")
+        compare(FL.tagAttr('href=/a.png', "href"), "/a.png", "at the very start of the text")
+        compare(FL.tagAttr(" href='/a b.png'", "href"), "/a b.png")
+        compare(FL.tagAttr(' href="it\'s.png"', "href"), "it's.png")
+        // Absent is null, there with nothing in it is "".
+        compare(FL.tagAttr(' rel="icon"', "href"), null)
+        compare(FL.tagAttr(' rel="icon" href=""', "href"), "")
+        compare(FL.tagAttr(' rel="icon" href', "href"), "")
+        compare(FL.tagAttr(' data-href="/w.png"', "href"), null)
+        compare(FL.tagAttr(' hreflang="et" href="/a.png"', "href"), "/a.png", "a longer name is another name")
+        compare(FL.tagAttr(' href="/a.png"', "hre"), null, "a shorter one too")
+    }
+
+    function test_a_broken_tag_gives_what_came_before_the_break() {
+        // A quote that never closes: a browser would read on past the ">",
+        // and here the address was taken with the quote in front of it.
+        compare(_page('<link rel="icon" href="/a.png>'), "")
+        compare(FL.tagAttr(' rel="icon" href="/a.png', "rel"), "icon")
+        compare(FL.tagAttr(' rel="icon" href="/a.png', "href"), "")
+        compare(FL.tagAttr(' title="x rel=icon href=/w.png', "href"), null, "the inside of the broken value")
+        compare(FL.tagAttr(' = rel="icon"', "rel"), null, "nothing is read past what starts no attribute")
+        compare(FL.tagAttr(' rel=', "rel"), "")
+        compare(FL.tagAttr('', "href"), null)
+        compare(FL.tagAttr('   ', "href"), null)
+        compare(FL.tagAttr(' href="/a.png"', ""), null)
+        var junk = [null, undefined, 42, true, {}, []]
+        for (var i = 0; i < junk.length; i++) {
+            compare(FL.tagAttr(junk[i], "href"), null, "text " + i)
+            compare(FL.tagAttr(' href="/a.png"', junk[i]), null, "name " + i)
+        }
+    }
+
+    function test_a_tag_as_long_as_the_cap_is_read_to_its_end() {
+        var noise = ""
+        while (noise.length < 1900) noise += 'data-href="/w.png" '
+        compare(_page('<link ' + noise + 'rel="icon" href="/right.png">'), "page https://r.ee/right.png")
+        // Two thousand names with nothing between them but a space, in five
+        // hundred tags, is a megabyte of nothing to find.
+        var names = ""
+        while (names.length < 2000) names += "a "
+        var body = ""
+        for (var i = 0; i < 500; i++) body += "<link " + names + ">"
+        var t0 = Date.now()
+        compare(_page(body), "")
+        var took = Date.now() - t0
+        verify(took < 2000, "the attribute flood took " + took + " ms")
+    }
+
+    // ── an address written the way HTML writes an ampersand ──────────────
+    function test_an_ampersand_in_an_address_is_read_as_a_browser_reads_it() {
+        // Saved as written, the address held "&amp;" and asked the host
+        // for a parameter called "amp;y".
+        compare(_page('<link rel="icon" href="/a.png?x=1&amp;y=2">'), "page https://r.ee/a.png?x=1&y=2")
+        compare(_page('<meta property="og:image" content="https://cdn.r.ee/logo.jpg?w=600&amp;h=600&amp;fit=crop">'),
+                "share https://cdn.r.ee/logo.jpg?w=600&h=600&fit=crop")
+        compare(_page('<link rel="icon" href="/a.png?x=1&#38;y=2">'), "page https://r.ee/a.png?x=1&y=2")
+        compare(_page('<link rel="icon" href="/a.png?x=1&#038;y=2">'), "page https://r.ee/a.png?x=1&y=2")
+        compare(_page('<link rel="icon" href="/a.png?x=1&#x26;y=2">'), "page https://r.ee/a.png?x=1&y=2")
+        // The same picture written both ways is one picture.
+        compare(_page('<link rel="icon" href="/a.png?x=1&amp;y=2"><link rel="apple-touch-icon" href="/a.png?x=1&y=2">'),
+                "page https://r.ee/a.png?x=1&y=2")
+        compare(_page('<link rel="icon" href="/a.png?x=1&y=2">'), "page https://r.ee/a.png?x=1&y=2", "a bare one, as before")
+    }
+
+    function test_only_the_ampersand_is_decoded_and_only_once() {
+        compare(FL.ampDecoded("a&amp;b"), "a&b")
+        compare(FL.ampDecoded("a&AMP;b"), "a&b")
+        compare(FL.ampDecoded("a&#38;b&#038;c&#0038;d"), "a&b&c&d")
+        compare(FL.ampDecoded("a&#x26;b&#X26;c&#x026;d"), "a&b&c&d")
+        compare(FL.ampDecoded("&amp;&amp;"), "&&")
+        compare(FL.ampDecoded("no reference at all"), "no reference at all")
+        // Once: the page wrote "&amp;" on purpose.
+        compare(FL.ampDecoded("a&amp;amp;b"), "a&amp;b")
+        compare(FL.ampDecoded("a&#38;amp;b"), "a&amp;b")
+        // Everything else stays as written.
+        var kept = ["a&ampb", "a&amp b", "a&Amp;b", "a&#39;b", "a&#x27;b", "a&quot;b", "a&lt;b",
+                    "a&#380;b", "a&#3;8;b", "a&#x260;b", "a&#x2;6;b", "a&#;b", "a&#x;b", "a&;b", "a&b", "&", ""]
+        for (var i = 0; i < kept.length; i++)
+            compare(FL.ampDecoded(kept[i]), kept[i], "case " + i)
+        var none = [null, undefined, 42, true, {}, ["a&amp;b"]]
+        for (var k = 0; k < none.length; k++)
+            compare(FL.ampDecoded(none[k]), "", "what is no text, case " + k)
+    }
+
+    function test_a_long_run_of_references_is_decoded_in_a_moment() {
+        var many = new Array(100001).join("&amp;")
+        var zeros = "&#" + new Array(100001).join("0") + ";"
+        var t0 = Date.now()
+        var out = FL.ampDecoded(many)
+        compare(typeof out, "string")
+        compare(out.length, 100000)
+        compare(FL.ampDecoded(zeros), zeros)
+        compare(FL.ampDecoded(new Array(50001).join("&#0")), new Array(50001).join("&#0"))
+        var took = Date.now() - t0
+        verify(took < 2000, "decoding took " + took + " ms")
+    }
+
     function test_a_hunt_keeps_the_logo_a_row_has_unless_something_beats_it() {
         // Re-fetch all asks the row's own logo first: the find that is that
         // very logo changes nothing, and anything else beat it or found it dead.
@@ -451,6 +597,89 @@ TestCase {
         compare(FL.homepageCandidates(null, "https://kadi.ee/").length, 7)
     }
 
+    function _urls(list) {
+        if (!Array.isArray(list)) return String(list)
+        return list.map(function(c) { return c.kind + " " + c.url }).join(" | ")
+    }
+
+    function test_a_station_page_on_tunein_offers_the_stations_picture_only() {
+        // Measured on https://tunein.com/radio/EROTICA-LOUNGE-s260655/: the
+        // hunt asked TuneIn's favicon first and TuneIn's 180 px
+        // apple-touch-icon second, a real picture, so it settled there and
+        // the station's own og:image, fourth in line, was never asked. The
+        // og:image below is the page's; the two icon paths stand in for
+        // TuneIn's own.
+        var page = "https://tunein.com/radio/EROTICA-LOUNGE-s260655/"
+        var html = '<html><head>'
+                 + '<link rel="icon" href="/favicon.ico">'
+                 + '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180.png">'
+                 + '<meta property="og:image" content="https://cdn-profiles.tunein.com/s260655/images/logog.png">'
+                 + '</head></html>'
+        var named = FL.extractIconLinks(html, page)
+        compare(named.length, 3, "the page's three tags were not all read")
+        verify(FL.landlordPage(page), "TuneIn's page was read as the station's own site")
+        compare(_urls(FL.homepageCandidates(named, page)),
+                "share https://cdn-profiles.tunein.com/s260655/images/logog.png")
+        // A page there that names no picture of the station offers nothing,
+        // and the station keeps its initials.
+        compare(_urls(FL.homepageCandidates(named.slice(0, 2), page)), "")
+        compare(_urls(FL.homepageCandidates(null, page)), "")
+    }
+
+    function test_the_services_many_stations_keep_a_page_on_are_landlords() {
+        var pages = [
+            "https://www.facebook.com/raadioelmar", "https://m.facebook.com/raadioelmar/",
+            "https://tunein.com/radio/Raadio-Elmar-s1234/", "https://www.radio.net/s/elmar",
+            "https://www.instagram.com/raadioelmar/", "https://elmar.wixsite.com/raadio",
+            "https://sites.google.com/view/raadioelmar", "http://raadioelmar.blogspot.com/",
+            "https://www.mixcloud.com/live/raadioelmar/", "https://onlineradiobox.com/ee/elmar/",
+            "https://streema.com/radios/Raadio_Elmar", "https://mytuner-radio.com/radio/raadio-elmar-1/",
+            "https://raadioelmar.weebly.com/", "HTTPS://WWW.FACEBOOK.COM/RaadioElmar",
+            "https://twitter.com/raadioelmar", "https://x.com/raadioelmar",
+            "https://www.youtube.com/@raadioelmar", "https://soundcloud.com/raadioelmar",
+            "https://www.tiktok.com/@raadioelmar", "https://vk.com/raadioelmar",
+            "https://linktr.ee/raadioelmar", "https://www.radio.de/s/elmar",
+            // The stream hosts that rent to many were landlords before.
+            "https://laut.fm/mangoradio", "https://zeno.fm/radio/x/", "https://radio.co/"
+        ]
+        for (var i = 0; i < pages.length; i++)
+            verify(FL.landlordPage(pages[i]), pages[i] + " was read as a station's own site")
+    }
+
+    function test_a_stations_own_site_is_no_landlord_whatever_it_is_called() {
+        var own = [
+            "https://kadi.ee/", "https://www.elmar.ee/kuula",
+            // A name that only ends like a service's is another site.
+            "https://myradio.net/", "https://notfacebook.com/elmar", "https://xtunein.com/",
+            "https://tunein.com.example.org/radio/x", "https://sites.google.com.example.org/view/x",
+            "https://example.org/facebook.com/elmar", "https://example.org/?u=https://tunein.com/radio/x",
+            // Only Google's site builder, not Google.
+            "https://google.com/", "https://maps.google.com/elmar"
+        ]
+        for (var i = 0; i < own.length; i++)
+            verify(!FL.landlordPage(own[i]), own[i] + " was read as a landlord's page")
+        // And its pictures and well-known paths are all offered, as before.
+        compare(FL.homepageCandidates([{ url: "https://myradio.net/i.png", kind: "page" }],
+                                      "https://myradio.net/").length, 1 + 7)
+    }
+
+    function test_what_is_no_web_address_is_no_landlords_page() {
+        var junk = ["", "tunein.com/radio/x", "//facebook.com/elmar", "ftp://facebook.com/elmar",
+                    "javascript:alert('facebook.com')", "file:///home/me/facebook.com/index.html",
+                    "https://", "https:///facebook.com", null, undefined, 42, true, {}, [], ["https://tunein.com/"]]
+        for (var i = 0; i < junk.length; i++)
+            compare(FL.landlordPage(junk[i]), false, "case " + i)
+    }
+
+    function test_a_long_address_is_judged_like_a_short_one() {
+        var deep = new Array(301).join("a.")
+        compare(FL.landlordPage("https://" + deep + "wixsite.com/raadio"), true)
+        compare(FL.landlordPage("https://" + deep + "example.org/raadio"), false)
+        var tail = new Array(100001).join("x")
+        compare(FL.landlordPage("https://www.facebook.com/" + tail), true)
+        compare(FL.landlordPage("https://kadi.ee/" + tail + "/facebook.com"), false)
+    }
+
     function test_the_well_known_icon_paths_of_an_origin() {
         compare(FL.wellKnownIcons("https://kadi.ee"), [
             { url: "https://kadi.ee/apple-touch-icon.png", kind: "guess" },
@@ -484,7 +713,9 @@ TestCase {
         verify(FL.looksLikeImageBytes(bytes([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])))   // GIF
         verify(FL.looksLikeImageBytes(bytes([0x00, 0x00, 0x01, 0x00])))               // ICO
         verify(FL.looksLikeImageBytes(bytes([0x00, 0x00, 0x02, 0x00])))               // CUR
-        verify(FL.looksLikeImageBytes(bytes([0x42, 0x4D, 0x00, 0x00])))               // BMP
+        // "BM" and two more bytes stood here: the letters alone are no
+        // bitmap, its header is (test_a_bitmap_is_known_by_its_whole_header).
+        verify(FL.looksLikeImageBytes(bytes(bmp(64, 64))))                            // BMP
         verify(FL.looksLikeImageBytes(bytes([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4,
                                              0x57, 0x45, 0x42, 0x50])))               // WebP
         var svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
@@ -505,6 +736,208 @@ TestCase {
         verify(!FL.looksLikeImageBytes(bytes([])))
         verify(!FL.looksLikeImageBytes(null))
         verify(!FL.looksLikeImageBytes(undefined))
+    }
+
+    // ── replies that only look like a picture ────────────────────────────
+    // Anything starting with "<" that held "<?xml" or "<svg" in its first
+    // 256 bytes passed for an SVG, and anything starting with "BM" for a
+    // bitmap. Each of these was read as a picture with no size, which the
+    // hunt ranks above a banner and saves.
+    readonly property string xhtml404: '<?xml version="1.0" encoding="UTF-8"?>\n'
+        + '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n'
+        + '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>404 Not Found</title></head>'
+        + '<body><h1>Not Found</h1></body></html>'
+    readonly property string inlineSvgPage: '<html><body><svg width="24" height="24">'
+        + '<path d="M0 0h24v24H0z"/></svg><h1>Page not found</h1></body></html>'
+    readonly property string rss: '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel>'
+        + '<title>Station news</title><link>https://r.example/</link></channel></rss>'
+    readonly property string plainSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+        + '<rect width="10" height="10"/></svg>'
+
+    function le32(n) { return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255] }
+    // The two headers every Windows bitmap starts with, 54 bytes: the file
+    // header (its two reserved words zero, where the pixels start) and a
+    // 40 byte BITMAPINFOHEADER.
+    function bmp(w, h, over) {
+        var o = over || {}
+        var dib = o.dib === undefined ? 40 : o.dib
+        return [0x42, 0x4D].concat(le32(54 + 3 * 64 * 64), le16(o.r1 || 0), le16(o.r2 || 0),
+                                   le32(o.pixels === undefined ? 14 + dib : o.pixels), le32(dib),
+                                   le32(w), le32(h), le16(o.planes === undefined ? 1 : o.planes),
+                                   le16(o.bpp === undefined ? 24 : o.bpp), filler(24))
+    }
+    // The 26 bytes an OS/2 bitmap starts with: 16 bit sizes, no more.
+    function bmpCore(w, h) {
+        return [0x42, 0x4D].concat(le32(26 + 3 * w * h), le16(0), le16(0), le32(26), le32(12),
+                                   le16(w), le16(h), le16(1), le16(24))
+    }
+    function pic(s) { return FL.looksLikeImageBytes(bytes(ascii(s))) }
+
+    function test_a_reply_that_is_xml_but_no_svg_is_no_picture() {
+        compare(pic(xhtml404), false, "an XHTML error page")
+        compare(pic(rss), false, "an RSS feed")
+        compare(pic('<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code>'
+                    + '<Message>Access Denied</Message></Error>'), false, "a storage host's refusal")
+        compare(pic('<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>x</title></feed>'),
+                false, "an Atom feed")
+        compare(pic('<?xml version="1.0"?>'), false, "a declaration and nothing else")
+    }
+
+    function test_a_page_with_a_drawing_in_it_is_no_picture() {
+        compare(pic(inlineSvgPage), false, "an svg inside a page's body")
+        compare(pic('<!DOCTYPE html><html><head></head><body><svg viewBox="0 0 1 1"></svg></body></html>'), false)
+        compare(pic('<div><svg></svg></div>'), false)
+        compare(pic('<!-- <svg xmlns="http://www.w3.org/2000/svg"></svg> --><html></html>'), false,
+                "an svg inside a comment")
+        compare(pic('<svgx xmlns="http://www.w3.org/2000/svg"></svgx>'), false, "a name that only starts like svg")
+        compare(pic("<!DOCTYPE html><html><head><title>404</title></head></html>"), false, "a plain page, as before")
+    }
+
+    function test_an_svg_with_what_drawing_programs_put_before_it_is_a_picture() {
+        compare(pic(plainSvg), true)
+        compare(pic('<svg/>'), true)
+        compare(pic('<svg\n  xmlns="http://www.w3.org/2000/svg"></svg>'), true)
+        compare(pic('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + plainSvg), true)
+        compare(pic('<?xml version="1.0" encoding="utf-8"?>\n'
+                    + '<!-- Generator: Adobe Illustrator 24.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->\n'
+                    + '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
+                    + plainSvg), true, "declaration, comment and doctype")
+        compare(pic('<?xml version="1.0"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
+                    + '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [\n'
+                    + '  <!ENTITY ns_extend "http://ns.adobe.com/Extensibility/1.0/">\n'
+                    + '  <!ENTITY ns_svg "http://www.w3.org/2000/svg">\n]>\n' + plainSvg), true,
+                "a doctype that declares entities")
+        compare(pic('<?xml version="1.0"?>\n<?xml-stylesheet type="text/css" href="style.css"?>\n' + plainSvg), true)
+        compare(pic('<!-- a --><!-- b -->\n\t<!-- c -->' + plainSvg), true)
+    }
+
+    function test_an_svg_cut_short_or_buried_is_no_picture() {
+        compare(pic('<svg'), false, "the name and nothing after it")
+        compare(pic('<?xml version="1.0"?><!-- ' + plainSvg), false, "a comment that never ends")
+        compare(pic('<?xml version="1.0" ' + plainSvg), false, "a declaration that never ends")
+        compare(pic('<!DOCTYPE svg PUBLIC "x" ' + '"y"'), false, "a doctype that never ends")
+        compare(pic('<!DOCTYPE svg [ <!ENTITY a "b"> ' + plainSvg), false, "entities that never end")
+        compare(pic('<p>logo</p>' + plainSvg), false, "something else first")
+        compare(pic('<?xml version="1.0"?>logo' + plainSvg), false, "text before the root")
+        // Only the first 4096 bytes are read, and "<svg" with the character
+        // that ends the name has to lie inside them: five bytes, so the
+        // root may start at byte 4091 and no later.
+        var commentOf = function(len) { return "<!--" + new Array(len - 7 + 1).join("x") + "-->" }
+        compare(commentOf(4091).length, 4091)
+        compare(pic(commentOf(4091) + '<svg>'), true, "the root just inside the first 4096 bytes")
+        compare(pic(commentOf(4092) + '<svg>'), false, "the root one byte too far")
+        var many = new Array(301).join("<!--x-->")
+        compare(pic(many + plainSvg), true, "three hundred comments")
+        // Half a megabyte of openings comes back at once, and as no picture.
+        var t0 = Date.now()
+        compare(pic(new Array(125001).join("<!--")), false)
+        compare(pic(new Array(500001).join("<")), false)
+        compare(pic('<!DOCTYPE svg [' + new Array(100001).join("<!--[")), false)
+        verify(Date.now() - t0 < 2000, "took " + (Date.now() - t0) + " ms")
+    }
+
+    function test_text_that_starts_with_bm_is_no_bitmap() {
+        compare(pic("BMW Radio: page not found. The page you asked for is not here any more."), false)
+        compare(pic("BM"), false)
+        compare(FL.looksLikeImageBytes(bytes([0x42, 0x4D].concat(filler(60)))), false, "BM and filler")
+        var zeros = []
+        for (var i = 0; i < 60; i++) zeros.push(0)
+        compare(FL.looksLikeImageBytes(bytes([0x42, 0x4D].concat(zeros))), false, "BM and zeros")
+    }
+
+    function test_a_bitmap_is_known_by_its_whole_header() {
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64))), true)
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, -64 >>> 0))), true, "rows stored top down")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { dib: 124, pixels: 138 }))), true, "a version 5 header")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { pixels: 54 + 1024, bpp: 8 }))), true, "a palette before the pixels")
+        compare(FL.looksLikeImageBytes(bytes(bmpCore(64, 64))), true, "an OS/2 header")
+        // One field off at a time.
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { r1: 1 }))), false, "first reserved word")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { r2: 1 }))), false, "second reserved word")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { dib: 41 }))), false, "a header length no bitmap has")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { planes: 0 }))), false)
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { planes: 2 }))), false)
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { bpp: 7 }))), false)
+        compare(FL.looksLikeImageBytes(bytes(bmp(0, 64))), false, "no width")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 0))), false, "no height")
+        compare(FL.looksLikeImageBytes(bytes(bmp(-64 >>> 0, 64))), false, "a width below zero")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { pixels: 53 }))), false, "pixels inside the header")
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64, { pixels: 54 }))), true, "pixels right after it")
+        // Cut one byte before the bit depth ends, and at it.
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64).slice(0, 29))), false)
+        compare(FL.looksLikeImageBytes(bytes(bmp(64, 64).slice(0, 30))), true)
+        compare(FL.looksLikeImageBytes(bytes(bmpCore(64, 64).slice(0, 25))), false)
+    }
+
+    // ── what the hunt makes of a reply ───────────────────────────────────
+    function png24(w, h) {
+        return [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+                (w >>> 24) & 255, (w >>> 16) & 255, (w >>> 8) & 255, w & 255,
+                (h >>> 24) & 255, (h >>> 16) & 255, (h >>> 8) & 255, h & 255, 8, 6, 0, 0, 0]
+    }
+    function verdict(list, strict) {
+        var v = FL.logoVerdict(bytes(list), strict)
+        if (v === null || typeof v !== "object") return String(v)
+        return v.image + " " + (v.size ? v.size.width + "x" + v.size.height : String(v.size))
+    }
+
+    function test_a_picture_that_says_its_size_is_a_logo_on_both_roads() {
+        compare(verdict(png24(512, 512), true), "true 512x512")
+        compare(verdict(png24(512, 512), false), "true 512x512")
+        compare(verdict(png24(512, 512)), "true 512x512")
+    }
+
+    function test_nobody_clicked_so_a_picture_has_to_say_its_size() {
+        // Known by their first bytes and cut before the size: a road the
+        // listener asked for still takes them, as it always has.
+        var cut = [
+            [[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A], "a PNG with no header chunk"],
+            [[0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46, 0x49, 0x46, 0, 1], "a JPEG with no frame"],
+            [[0x47, 0x49, 0x46, 0x38, 0x39, 0x61], "a GIF with no screen"],
+            [[0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "an icon file holding no icon"],
+            [[0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50, 0x41, 0x4C, 0x50, 0x48].concat(filler(20)),
+             "a WebP that starts with another chunk"]
+        ]
+        for (var i = 0; i < cut.length; i++) {
+            compare(verdict(cut[i][0], true), "false null", cut[i][1] + ", nobody clicked")
+            compare(verdict(cut[i][0], false), "true null", cut[i][1] + ", the listener asked")
+        }
+    }
+
+    function test_an_svg_and_a_bitmap_are_logos_without_a_size() {
+        compare(verdict(ascii(plainSvg), true), "true null")
+        compare(verdict(ascii(plainSvg), false), "true null")
+        compare(verdict(bmp(64, 64), true), "true null")
+        compare(verdict(bmp(64, 64), false), "true null")
+    }
+
+    function test_what_only_looked_like_a_picture_is_no_logo_on_either_road() {
+        var fakes = [xhtml404, inlineSvgPage, rss, "BMW Radio: page not found, try the front page instead.",
+                     "<!DOCTYPE html><html><head><title>404</title></head></html>"]
+        for (var i = 0; i < fakes.length; i++) {
+            compare(verdict(ascii(fakes[i]), true), "false null", "case " + i + ", nobody clicked")
+            compare(verdict(ascii(fakes[i]), false), "false null", "case " + i + ", the listener asked")
+        }
+    }
+
+    function test_only_a_plain_yes_means_nobody_clicked() {
+        var cut = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A]
+        compare(verdict(cut, 1), "true null")
+        compare(verdict(cut, "true"), "true null")
+        compare(verdict(cut, null), "true null")
+        compare(verdict(cut, undefined), "true null")
+    }
+
+    function test_a_reply_that_is_no_bytes_is_no_logo() {
+        var none = [null, undefined, "", plainSvg, 42, true, {}]
+        for (var i = 0; i < none.length; i++) {
+            var v = FL.logoVerdict(none[i], true)
+            compare(v && v.image, false, "case " + i)
+            compare(v && v.size, null, "case " + i)
+        }
+        compare(verdict([], true), "false null")
+        compare(verdict([], false), "false null")
+        compare(verdict([0x89, 0x50, 0x4E], false), "false null", "three bytes")
     }
 
     function test_the_logo_addresses_that_are_small_by_construction() {

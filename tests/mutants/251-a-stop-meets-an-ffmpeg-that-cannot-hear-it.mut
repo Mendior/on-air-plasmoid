@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A stop sends SIGINT whatever state the process is in, also to an ffmpeg
+  that has not set its signal handlers yet and ignores it.
+
+history:
+  A shell's background job ignores SIGINT until it installs handlers of its
+  own. Measured 2026-11-10: a stop sent as the pid file appeared found ffmpeg
+  with SigIgn 0x6 and nothing caught, the signal was lost and the capture ran
+  on; 50 ms later the same stop worked. A process that still ignores SIGINT
+  is now ended with SIGTERM, which it does not ignore.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+              + " then kill -TERM \"$p\"; else kill -INT \"$p\"; fi; } 2>/dev/null; true");
+
+replace:
+              + " then kill -INT \"$p\"; else kill -INT \"$p\"; fi; } 2>/dev/null; true");
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_a_stop_sends_the_signal_the_process_can_hear
+  and tests/test_recording_stop_race.py::test_a_stop_the_moment_the_pid_is_written_ends_the_capture.
+  Line-neutral.

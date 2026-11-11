@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station's address is rewritten in a schedule while that schedule is being
+  recorded, and the running capture keeps the entry's old filing.
+
+history:
+  An occurrence is filed under address@time. When a healed station moved, the
+  schedule got the new address and the capture in progress kept the old key:
+  the next tick called its own recording "skipped", the finished capture found
+  no entry to settle, and a one-off stayed in the list to be called missed
+  when its window closed. Found 2026-11-10 on the bench, before any release
+  that moves an address mid-capture.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+          if (_recActiveSchedKey === was) _recActiveSchedKey = key;
+
+replace:
+          if (_recActiveSchedKey === key) _recActiveSchedKey = was;
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_a_station_moved_mid_capture_is_still_the_captures_own
+  and tests/qml/tst_recordingengine.qml::test_a_capture_stopped_by_hand_after_the_move_spends_its_entry.
+  Line-neutral.

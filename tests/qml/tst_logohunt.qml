@@ -344,6 +344,64 @@ TestCase {
         compare(huntFor("https://r.example/").url, "");
     }
 
+    function ascii(s) {
+        var a = [];
+        for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i));
+        return a;
+    }
+    // A page that names one logo, and what that address answers with.
+    function logoRoutes(path, bytes) {
+        var r = {};
+        r["https://r.example/"] = { status: 200, text: htmlWith('<link rel="icon" href="' + path + '">') };
+        r["https://r.example" + path] = { status: 200, bytes: bytes };
+        return r;
+    }
+
+    function test_a_reply_that_only_looks_like_a_picture_is_not_kept() {
+        // Each of these passed for a picture with no size, which the hunt
+        // ranks above a banner: an XHTML error page, a page with a drawing
+        // in its body, a feed, and a sentence that starts with "BM".
+        var fakes = [
+            '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" '
+                + '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n<html xmlns="http://www.w3.org/1999/xhtml">'
+                + '<head><title>404 Not Found</title></head><body><h1>Not Found</h1></body></html>',
+            '<html><body><svg width="24" height="24"><path d="M0 0h24v24H0z"/></svg>'
+                + '<h1>Page not found</h1></body></html>',
+            '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>Station news</title>'
+                + '</channel></rss>',
+            'BMW Radio: page not found. The page you asked for is not here any more.'
+        ];
+        for (var i = 0; i < fakes.length; i++) {
+            tc.routes = logoRoutes("/logo.png", ascii(fakes[i]));
+            compare(huntFor("https://r.example/").url, "", "case " + i + ", nobody clicked");
+            compare(probeWith([{ url: "https://r.example/logo.png", kind: "page" }]), null,
+                    "case " + i + ", the listener asked");
+        }
+    }
+
+    function test_a_real_svg_is_kept() {
+        var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<!-- Created with Inkscape -->\n'
+                + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30"/></svg>';
+        tc.routes = logoRoutes("/logo.svg", ascii(svg));
+        compare(huntFor("https://r.example/").url, "https://r.example/logo.svg");
+    }
+
+    function test_nobody_clicked_so_a_picture_that_hides_its_size_is_not_kept() {
+        // A PNG's first eight bytes and nothing after them: a picture by
+        // its opening, with no size to rank it by.
+        var cut = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        tc.routes = logoRoutes("/logo.png", cut);
+        compare(huntFor("https://r.example/").url, "");
+        // The settings button was pressed by the listener and takes it, as before.
+        var best = probeWith([{ url: "https://r.example/logo.png", kind: "page" }]);
+        verify(best !== null, "the listener's own hunt lost a picture it used to take");
+        compare(best.url, "https://r.example/logo.png");
+        compare(best.size, null);
+        // With its size it is kept by both.
+        tc.routes = logoRoutes("/logo.png", png(512, 512));
+        compare(huntFor("https://r.example/").url, "https://r.example/logo.png");
+    }
+
     function test_a_picture_sent_with_an_error_status_is_not_kept() {
         var r = {};
         r["https://r.example/"] = { status: 200, text: htmlWith('<link rel="icon" href="/logo.png">') };

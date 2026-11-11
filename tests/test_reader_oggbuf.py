@@ -102,3 +102,59 @@ def test_a_later_artist_without_a_title_cannot_reach_back(tmp_path):
             + b"\xf1audio" * 40)
     assert _read(tmp_path, blob).startswith(
         "Smilers - Jalgpall On Parem Kui Seks\t")
+
+
+def _block(*fields: bytes) -> bytes:
+    """One chain start: its identification header, then its comment fields."""
+    return b"OggS" + b"\x00" * 20 + b"\x03vorbis" + b"".join(_field(f) for f in fields)
+
+
+_AUDIO = b"\xf1audio" * 40
+
+
+def test_a_field_name_counts_whatever_its_case(tmp_path):
+    """The format says a field name is case-insensitive, and encoders differ.
+
+    The reader looked for TITLE= first and title= only when there was none, so
+    an older block in capitals outvoted a newer one in lower case, while the
+    artist was taken from around the newest title of either spelling: the new
+    artist with the old song. A name spelled Title= was not found at all.
+    """
+    old = _block(b"TITLE=Old Song", b"ARTIST=Old Artist") + _AUDIO
+    for title, artist in ((b"title", b"artist"), (b"TITLE", b"ARTIST"), (b"Title", b"Artist")):
+        new = _block(title + b"=New Song", artist + b"=New Artist") + _AUDIO
+        assert _read(tmp_path, old + new).startswith("New Artist - New Song\t"), title
+        assert _read(tmp_path, new).startswith("New Artist - New Song\t"), title
+    lower_old = _block(b"title=Old Song", b"artist=Old Artist") + _AUDIO
+    upper_new = _block(b"TITLE=New Song", b"ARTIST=New Artist") + _AUDIO
+    assert _read(tmp_path, lower_old + upper_new).startswith("New Artist - New Song\t")
+
+
+def test_a_newer_title_in_another_case_does_not_borrow_the_old_artist(tmp_path):
+    old = _block(b"TITLE=Old Song", b"ARTIST=Old Artist") + _AUDIO
+    new = _block(b"title=Uudised") + _AUDIO
+    assert _read(tmp_path, old + new).startswith("Uudised\t")
+
+
+def test_a_longer_name_ending_in_the_same_letters_is_another_field(tmp_path):
+    """ALBUMARTIST= ends in ARTIST=, and SUBTITLE= in TITLE=.
+
+    The search took the last place the letters stood, found a field length
+    that made no sense four bytes ahead of it and gave up: a block that names
+    the album's artist after the track's lost the artist, and one with a
+    subtitle after the title lost everything.
+    """
+    blob = _block(b"ARTIST=Smilers", b"TITLE=Vana Lugu",
+                  b"ALBUMARTIST=Various Artists", b"SUBTITLE=Live") + _AUDIO
+    assert _read(tmp_path, blob).startswith("Smilers - Vana Lugu\t")
+
+
+def test_a_block_cut_off_mid_title_leaves_the_last_whole_one(tmp_path):
+    """The buffer ends wherever the relay has got to.
+
+    A block whose title is still arriving is not the current track yet: the
+    one before it is, whole, and the next read finds the new one complete.
+    """
+    old = _block(b"TITLE=Old Song", b"ARTIST=Old Artist") + _AUDIO
+    cut = b"OggS" + b"\x00" * 20 + b"\x03vorbis" + _field(b"title=New Song That Is Still Arriv")[:-9]
+    assert _read(tmp_path, old + cut).startswith("Old Artist - Old Song\t")

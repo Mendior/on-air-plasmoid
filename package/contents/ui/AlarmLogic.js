@@ -43,18 +43,24 @@ function _resolveGap(d, hh, mm) {
     return d;
 }
 
+// "After fromMs" is judged on the instant the occurrence really happens.
+// Inside the hole that is the forward-resolved one, so a 03:30 asked for at
+// 04:00:30 new time is still today's, half an hour ahead.
 function nextOccurrence(hh, mm, repeat, weekday, fromMs) {
     var d = new Date(fromMs);
+    // Read before setHours. Where the clock changes at midnight (Cairo,
+    // Havana, Beirut, Santiago) a 00:30 on that day resolves back to 23:30
+    // the evening before, and the weekday read from there is yesterday's.
+    var today = d.getDay();
     d.setHours(hh, mm, 0, 0);
     if (repeat === "weekly") {
-        var delta = (weekday - d.getDay() + 7) % 7;
+        var delta = (weekday - today + 7) % 7;
         d.setDate(d.getDate() + delta);
-        if (d.getTime() <= fromMs) d.setDate(d.getDate() + 7);
-    } else if (d.getTime() <= fromMs) {
+        if (_resolveGap(d, hh, mm).getTime() <= fromMs) d.setDate(d.getDate() + 7);
+    } else if (_resolveGap(d, hh, mm).getTime() <= fromMs) {
         d.setDate(d.getDate() + 1);
     }
-    d = _resolveGap(d, hh, mm);
-    return d.getTime();
+    return _resolveGap(d, hh, mm).getTime();
 }
 
 // What a scheduler tick should do about one occurrence: nothing yet, fire
@@ -211,6 +217,16 @@ function shouldRetime(entry, nowMs) {
 // check regardless.
 function castSilencesWakeTone(casting, confirmed, localPlay) {
     return casting === true && confirmed === true && localPlay !== true;
+}
+
+// What a podcast alarm wakes with, given the downloaded file picked for it
+// (PodcastLogic.newestForAlarm; "" when the show has nothing on disk).
+// Contract: "episode" for a file name with something in it, "chime" for
+// anything else. What is playing at that moment is deliberately no input:
+// with no episode the alarm has promised the chime, and last night's radio
+// still running is not a wake-up.
+function podcastWake(file) {
+    return typeof file === "string" && file !== "" ? "episode" : "chime";
 }
 
 // How long one systemd-inhibit holder should hold, in seconds — 0 when

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  frontDoor offers a directory row's address on a private host for an
+  audition.
+
+history:
+  The catalogue is publicly writable and nobody clicked. A row naming
+  192.168.1.1 would send the player knocking on the listener's router, and on
+  the uuid road the address could be saved.
+
+target:
+  package/contents/ui/HealLogic.js
+
+find:
+          return host !== "" && !HostGuard.isPrivateHost(host) ? t : "";
+
+replace:
+          return host !== "" ? t : "";
+
+expect:
+  Killed by tests/qml/tst_heallogic.qml::test_a_door_into_the_listeners_own_network_is_no_door.
+  Line-neutral.

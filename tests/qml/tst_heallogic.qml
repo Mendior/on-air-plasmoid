@@ -554,4 +554,400 @@ TestCase {
         verify(!HL.lockHolds(0, 1000000))
         verify(!HL.lockHolds(-1000000, 1000000))
     }
+
+    // --- one address, two spellings ------------------------------------------
+
+    function test_the_same_door_is_the_same_scheme_host_and_path() {
+        verify(HL.sameDoor("http://Stream.Example.org/live/", "http://stream.example.org/live"));
+        verify(HL.sameDoor(" https://h.example/x ", "https://h.example/x"));
+        // The scheme moving IS the move: a TLS port that closed leaves the
+        // plain one, and that address has to be saved.
+        verify(!HL.sameDoor("https://h.example/x", "http://h.example/x"));
+        // Icecast mounts are case-sensitive.
+        verify(!HL.sameDoor("http://h.example/Live", "http://h.example/live"));
+        verify(!HL.sameDoor("http://h.example/a?x=1", "http://h.example/a?x=2"));
+        verify(!HL.sameDoor("", ""));
+        verify(!HL.sameDoor(null, undefined));
+        verify(!HL.sameDoor("http://h.example/x", 42));
+    }
+
+    function test_a_row_whose_two_addresses_are_one_door_offers_it_once() {
+        var doors = HL.frontDoor({ url: "http://Stream.Example.org/live/",
+                                   url_resolved: "http://stream.example.org/live" });
+        compare(doors.length, 1);
+    }
+
+    function test_the_saved_address_in_another_spelling_is_not_auditioned_again() {
+        var reply = { status: 200, responseText: JSON.stringify([{
+            url: "http://Stream.Example.org/live/", url_resolved: "http://stream.example.org/live",
+            lastcheckok: 1 }]) };
+        compare(HL.uuidRung(reply, "http://stream.example.org/live", false, function(f) { return ""; }).length, 0);
+        var res = HL.ladder([{ name: "Radio X", url_resolved: "http://Stream.Example.org/live/",
+                               lastcheckok: 1, countrycode: "EE" }],
+                            "http://stream.example.org/live", "Radio X", "", false);
+        compare(res.cands.length, 0);
+    }
+
+    function test_a_door_into_the_listeners_own_network_is_no_door() {
+        // The catalogue is publicly writable and nobody clicked: a row may
+        // not send the player knocking on the router or the printer.
+        compare(HL.frontDoor({ url: "http://192.168.1.1/x", url_resolved: "http://127.0.0.1:631/y" }).length, 0);
+        compare(HL.frontDoor({ url: "http://100.100.5.5/live", url_resolved: "http://[::1]:8000/live" }).length, 0);
+        compare(HL.frontDoor({ url: "http://192.168.1.1/x", url_resolved: "http://a.example/live" }),
+                ["http://a.example/live"]);
+    }
+
+    function test_a_row_with_a_name_that_is_no_string_does_not_take_the_answer_down() {
+        // One odd row used to throw and the catch dropped all thirty.
+        var res = HL.ladder([{ name: 123, url_resolved: "http://a.example/x", lastcheckok: 1, countrycode: "EE" },
+                             { name: "Radio X", url_resolved: "http://b.example/y", lastcheckok: 1, countrycode: "EE" }],
+                            "http://dead.example/z", "Radio X", "EE", false);
+        compare(res.cands.length, 1);
+        compare(res.cands[0].url, "http://b.example/y");
+        compare(HL.normName(123), "123");
+    }
+
+    function test_more_landlords_and_a_bare_address_with_another_port() {
+        // Rent-a-stream hosts in the shipped list and in a real one.
+        verify(HL.sharedBase("fast-serv.com"));
+        verify(HL.sharedBase("asurahosting.com"));
+        verify(HL.sharedBase("streamerr.co"));
+        verify(HL.sharedBase("streemlion.com"));
+        verify(HL.sharedBase("listen2myradio.com"));
+        // One address, two ports: two servers, and the second is nobody's
+        // home just because the number is the same.
+        var res = HL.ladder([{ name: "Radio X", url_resolved: "http://203.0.113.5:8010/", lastcheckok: 1,
+                               countrycode: "EE" }],
+                            "http://203.0.113.5:8000/live", "Radio X", "EE", false);
+        compare(res.cands.length, 1);
+        verify(!res.cands[0].home);
+        res = HL.ladder([{ name: "Radio X", url_resolved: "http://203.0.113.5:8000/hi", lastcheckok: 1,
+                           countrycode: "EE" }],
+                        "http://203.0.113.5:8000/live", "Radio X", "EE", false);
+        verify(res.cands[0].home);
+    }
+
+    // --- the same mount on another server ------------------------------------
+    // Measured 2026-11-10: Sky Media moved five mounts off four of its edges
+    // around 2026-10-22. The saved addresses answer 404, the directory has no
+    // usable row for most of them, and every one of them plays from
+    // skymedia-live.bitflip.ee/<mount>, which hands out edge41..43.
+
+    function test_a_mount_has_a_name_of_its_own_or_none() {
+        compare(HL.mountOf("https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b"), "RETRO");
+        compare(HL.mountOf("https://edge05.cdn.bitflip.ee:8888/retro1.mp3"), "retro1.mp3");
+        compare(HL.mountOf("https://edge05.cdn.bitflip.ee:8888/RetroJ6ulud"), "RetroJ6ulud");
+        compare(HL.mountOf("https://edge02.cdn.bitflip.ee:8888/KISS"), "KISS");
+        compare(HL.mountOf("http://a.example:8000/stream"), "");
+        compare(HL.mountOf("http://a.example:8000/live.mp3"), "");
+        compare(HL.mountOf("http://a.example:8000/listen.aac?sid=1"), "");
+        compare(HL.mountOf("http://a.example:8000/;"), "");
+        compare(HL.mountOf("http://a.example:8000/"), "");
+        compare(HL.mountOf("http://a.example:8000"), "");
+        compare(HL.mountOf("http://a.example/NRJ"), "");       // three letters name nothing
+        compare(HL.mountOf("http://a.example/128"), "");
+        compare(HL.mountOf("file:///etc/passwd"), "");
+        compare(HL.mountOf(null), "");
+        compare(HL.mountOf(undefined), "");
+        compare(HL.mountOf(42), "");
+    }
+
+    function test_the_same_mount_on_a_sibling_edge_is_the_same_station() {
+        var saved = "https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b";
+        verify(HL.mountTwin(saved, "https://edge43.cdn.bitflip.ee:8888/RETRO?_i=5b9ae0ef"));
+        verify(HL.mountTwin(saved, "https://edge42.cdn.bitflip.ee:8888/RETRO"));
+        verify(!HL.mountTwin(saved, "https://edge43.cdn.bitflip.ee:8888/RETRO_AAC"));  // another mount
+        verify(!HL.mountTwin(saved, "https://edge43.cdn.bitflip.ee:8888/retro"));      // case is part of a mount
+        verify(!HL.mountTwin(saved, "https://edge43.cdn.bitflip.ee:9000/RETRO"));      // another port, another server
+        verify(!HL.mountTwin(saved, "http://edge43.cdn.bitflip.ee:8888/RETRO"));       // another scheme
+        verify(!HL.mountTwin(saved, "https://skymedia-live.bitflip.ee/RETRO"));        // no edge of that family
+        verify(!HL.mountTwin(saved, "https://other.cdn.bitflip.ee:8888/RETRO"));       // nor is this, port or no port
+        // Numbers inside the domain itself are not an edge's number.
+        verify(!HL.mountTwin("http://s1.radio1.example:8000/RETRO", "http://s1.radio2.example:8000/RETRO"));
+        verify(!HL.mountTwin(saved, "https://edge43.cdn.evil.example:8888/RETRO"));
+        verify(!HL.mountTwin(saved, "https://stream.skymedia.ee/live/RETRO"));
+    }
+
+    function test_a_twin_needs_a_home_and_a_name() {
+        // A landlord's numbered hosts hold strangers.
+        verify(!HL.mountTwin("http://s1.streamtheworld.com/KISSFM", "http://s2.streamtheworld.com/KISSFM"));
+        // "stream" is every station's mount.
+        verify(!HL.mountTwin("http://s1.host.example:8000/stream", "http://s2.host.example:8000/stream"));
+        // Two bare addresses are two machines.
+        verify(!HL.mountTwin("http://203.0.113.5:8000/RETRO", "http://203.0.113.6:8000/RETRO"));
+        verify(!HL.mountTwin(null, undefined));
+        verify(!HL.mountTwin("", ""));
+        verify(!HL.mountTwin("ftp://a.example/RETRO", "ftp://b.example/RETRO"));
+    }
+
+    function test_the_guess_is_the_saved_mount_under_a_relatives_roof() {
+        var saved = "https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b";
+        compare(HL.kinGuess(saved, "https://skymedia-live.bitflip.ee/SKYPLUS"),
+                "https://skymedia-live.bitflip.ee/RETRO");
+        compare(HL.kinGuess(saved, "https://edge43.cdn.bitflip.ee:8888/RETRO_AAC?_i=1"),
+                "https://edge43.cdn.bitflip.ee:8888/RETRO");
+        compare(HL.kinGuess(saved, "https://edge02.cdn.bitflip.ee:8888/KISS"), "");    // the dead server itself
+        compare(HL.kinGuess(saved, "https://stream.skymedia.ee/live/RETRO_AAC"), "");  // another domain is no roof of ours
+        compare(HL.kinGuess("http://a.example:8000/stream", "http://b.example:8000/x"), "");
+        compare(HL.kinGuess("http://x.zeno.fm/abcd1234", "http://y.zeno.fm/zzzz9999"), "");
+        compare(HL.kinGuess("http://203.0.113.5:8000/RETRO", "http://203.0.113.5:9000/x"), "");
+        compare(HL.kinGuess(saved, null), "");
+        compare(HL.kinGuess(undefined, saved), "");
+    }
+
+    function test_an_answer_is_a_stream_or_it_is_not() {
+        verify(HL.aliveAnswer(200, "audio/mpeg"));
+        verify(HL.aliveAnswer(206, "audio/aac"));
+        verify(HL.aliveAnswer(200, "application/ogg"));
+        verify(HL.aliveAnswer(200, ""));                      // an old SHOUTcast says nothing
+        verify(!HL.aliveAnswer(200, "text/html; charset=utf-8"));   // an error page with a polite status
+        verify(!HL.aliveAnswer(200, "application/json"));
+        verify(!HL.aliveAnswer(404, "audio/mpeg"));
+        verify(!HL.aliveAnswer(302, "audio/mpeg"));
+        verify(!HL.aliveAnswer(0, ""));
+        verify(!HL.aliveAnswer(undefined, null));
+    }
+
+    function test_a_guess_is_taken_only_when_it_lands_on_the_twin() {
+        var saved = "https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b";
+        var door = "https://skymedia-live.bitflip.ee/RETRO";
+        verify(HL.kinAccepts(saved, door, 200, "audio/mpeg", "https://edge43.cdn.bitflip.ee:8888/RETRO?_i=77"));
+        verify(HL.kinAccepts(saved, "https://edge42.cdn.bitflip.ee:8888/RETRO", 200, "audio/mpeg",
+                             "https://edge42.cdn.bitflip.ee:8888/RETRO"));
+        verify(!HL.kinAccepts(saved, "https://edge06.cdn.bitflip.ee:8888/RETRO", 404, "text/html",
+                              "https://edge06.cdn.bitflip.ee:8888/RETRO"));
+        verify(!HL.kinAccepts(saved, door, 200, "text/html", "https://edge43.cdn.bitflip.ee:8888/RETRO"));
+        verify(!HL.kinAccepts(saved, door, 200, "audio/mpeg", "https://edge43.cdn.bitflip.ee:8888/SKYPLUS"));
+        // An edge that looks the part but hands the listener on elsewhere.
+        verify(!HL.kinAccepts(saved, "https://edge42.cdn.bitflip.ee:8888/RETRO", 200, "audio/mpeg",
+                              "https://elsewhere.example/RETRO"));
+        // Qt did not say where the answer came from, and the door itself is
+        // no edge: nothing ties this sound to the saved mount.
+        verify(!HL.kinAccepts(saved, door, 200, "audio/mpeg", ""));
+        verify(!HL.kinAccepts(saved, door, 200, "audio/mpeg", "http://192.168.1.10:8888/RETRO"));
+        verify(!HL.kinAccepts(saved, door, undefined, null, undefined));
+    }
+
+    function test_the_leads_are_our_own_roofs_and_the_directorys_doors() {
+        var saved = "https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b";
+        var leads = HL.kinLeads(saved,
+            [{ hostname: "https://skymedia-live.bitflip.ee/SKYPLUS" },
+             { hostname: "https://ice.leviracloud.eu/star320-mp3" },      // somebody else's roof
+             { hostname: saved }, null, { name: "no address" }],
+            [{ url: "https://stream.skymedia.ee/live/RETRO_AAC",
+               url_resolved: "https://edge43.cdn.bitflip.ee:8888/RETRO_AAC?_i=9" }, null, {}]);
+        compare(leads, ["https://skymedia-live.bitflip.ee/SKYPLUS",
+                        "https://edge43.cdn.bitflip.ee:8888/RETRO_AAC?_i=9",
+                        "https://stream.skymedia.ee/live/RETRO_AAC"]);
+        compare(HL.kinLeads(saved, null, undefined), []);
+    }
+
+    function test_the_plan_tries_our_own_roofs_before_strangers_doors() {
+        var saved = "https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b";
+        var plan = HL.kinPlan(saved, [
+            "https://stream.skymedia.ee/live/RETRO_AAC",
+            "https://edge02.cdn.bitflip.ee:8888/KISS",
+            "https://skymedia-live.bitflip.ee/SKYPLUS",
+            "https://edge06.cdn.bitflip.ee:8888/kadi",
+            "https://skymedia-live.bitflip.ee/NRJ",
+            saved, "", null, "file:///x", "http://192.168.1.5/RETRO"]);
+        compare(plan.guesses, ["https://skymedia-live.bitflip.ee/RETRO",
+                               "https://edge06.cdn.bitflip.ee:8888/RETRO"]);
+        compare(plan.doors, ["https://stream.skymedia.ee/live/RETRO_AAC"]);
+    }
+
+    function test_the_plan_is_short_and_empty_where_nothing_can_be_proven() {
+        var saved = "https://edge02.cdn.bitflip.ee:8888/RETRO";
+        var many = [];
+        for (var i = 10; i < 40; i++) {
+            many.push("https://edge" + i + ".cdn.bitflip.ee:8888/x");
+            many.push("https://door" + i + ".example/x");
+        }
+        var plan = HL.kinPlan(saved, many);
+        compare(plan.guesses.length, 6);
+        compare(plan.doors.length, 3);
+        // A mount called "stream", a landlord's host and a bare address
+        // cannot have a twin, so nobody is asked.
+        compare(HL.kinPlan("http://a.example:8000/stream", many).guesses.length, 0);
+        compare(HL.kinPlan("http://a.example:8000/stream", many).doors.length, 0);
+        compare(HL.kinPlan("http://s1.zeno.fm/abcd1234", ["http://s2.zeno.fm/x"]).guesses.length, 0);
+        compare(HL.kinPlan(null, null).doors.length, 0);
+    }
+
+    function test_the_wider_question_is_the_first_word_that_names_the_station() {
+        compare(HL.kinWord("Retro fm disco"), "retro");
+        compare(HL.kinWord("Raadio Relax International"), "relax");
+        compare(HL.kinWord("The Radio Station"), "");
+        compare(HL.kinWord("Radio 2"), "");
+        compare(HL.kinWord("FM 100"), "");
+        compare(HL.kinWord("Ретро FM"), "ретро");
+        compare(HL.kinWord("Raadio Elmar"), "elmar");
+        compare(HL.kinWord(null), "");
+        compare(HL.kinWord(42), "");
+    }
+
+    // --- one failure is not a death ------------------------------------------
+
+    function test_one_failure_earns_the_saved_address_a_second_knock() {
+        var now = 1000000000;
+        verify(HL.knockFirst(undefined, now));
+        verify(HL.knockFirst(0, now));
+        verify(!HL.knockFirst(now - 59000, now));    // it just had one and failed again
+        verify(HL.knockFirst(now - 61000, now));
+        verify(HL.knockFirst(NaN, now));
+        verify(HL.knockFirst(now + 5000, now));      // a clock that jumped back blocks nothing
+    }
+
+    function test_a_move_is_written_only_over_an_address_that_stayed_dead() {
+        var t = 1000000000;
+        compare(HL.moveWhen("permanent", t - 300000, t), "now");
+        compare(HL.moveWhen("permanent", t - 299000, t), "later");
+        compare(HL.moveWhen("permanent", 0, t), "later");          // nobody saw it die
+        compare(HL.moveWhen("permanent", undefined, t), "later");
+        compare(HL.moveWhen("permanent", t + 5000, t), "later");   // a clock that went back proves nothing
+        compare(HL.moveWhen("stopgap", t - 3600000, t), "never");
+        compare(HL.moveWhen(undefined, t - 3600000, t), "never");
+    }
+
+    function test_the_second_look_comes_when_the_five_minutes_are_up() {
+        var t = 1000000000;
+        compare(HL.proofWaitMs(t - 100000, t), 200000);
+        compare(HL.proofWaitMs(0, t), 300000);
+        compare(HL.proofWaitMs(undefined, t), 300000);
+        compare(HL.proofWaitMs(t - 900000, t), 1000);    // overdue: at once, but not inside this turn
+        compare(HL.proofWaitMs(t + 5000, t), 300000);
+    }
+
+    function test_a_reply_is_its_rows_or_nothing() {
+        compare(HL.replyRows({ status: 200, responseText: '[{"name":"a"},{"name":"b"}]' }).length, 2);
+        compare(HL.replyRows({ status: 200, responseText: '{"error":"x"}' }), []);
+        compare(HL.replyRows({ status: 200, responseText: "<html>portal</html>" }), []);
+        compare(HL.replyRows({ status: 503, responseText: "[]" }), []);
+        compare(HL.replyRows({ status: 404, responseText: '[{"name":"a"}]' }), []);
+        compare(HL.replyRows(null), []);
+        compare(HL.replyRows(undefined), []);
+    }
+
+    function test_only_a_named_mount_on_the_stations_own_domain_can_have_a_twin() {
+        verify(HL.kinPossible("https://edge02.cdn.bitflip.ee:8888/RETRO?_i=258f436b"));
+        verify(!HL.kinPossible("http://a.example:8000/stream"));
+        verify(!HL.kinPossible("http://s1.zeno.fm/abcd1234"));
+        verify(!HL.kinPossible("http://203.0.113.5:8000/RETRO"));
+        verify(!HL.kinPossible("file:///RETRO"));
+        verify(!HL.kinPossible(null));
+    }
+
+    function test_the_row_that_moves_is_the_one_that_plays() {
+        var dead = "https://edge05.cdn.bitflip.ee:8888/RetroJ6ulud";
+        var rows = [{ name: "Retro Love", hostname: dead, active: false },
+                    { name: "Other name", hostname: dead, active: true },
+                    { name: "Retro Love", hostname: dead, active: true },
+                    { name: "Kiss FM", hostname: "https://edge02.cdn.bitflip.ee:8888/KISS", active: true }];
+        compare(HL.movedRow(rows, dead, "retro  love"), 2);     // the playing name, switched on
+        compare(HL.movedRow(rows, dead, "Nobody"), 1);          // else one that is switched on
+        compare(HL.movedRow(rows, dead, ""), 1);
+        compare(HL.movedRow([rows[0]], dead, "Retro Love"), 0); // else the one there is
+        compare(HL.movedRow(rows, "https://gone.example/x", "Retro Love"), -1);
+        compare(HL.movedRow(null, dead, "x"), -1);
+        compare(HL.movedRow([null, {}, { hostname: dead }], dead, undefined), 2);
+    }
+
+    function test_the_wider_question_names_one_word_and_the_country_it_knows() {
+        compare(HL.kinSearchPath("Raadio Relax International", "ee"),
+                "/json/stations/search?name=relax&countrycode=EE&hidebroken=true&order=votes&reverse=true&limit=30");
+        compare(HL.kinSearchPath("Retro fm disco", ""),
+                "/json/stations/search?name=retro&hidebroken=true&order=votes&reverse=true&limit=30");
+        // A country that is not a two-letter code is no country.
+        compare(HL.kinSearchPath("Retro fm disco", "Estonia"), HL.kinSearchPath("Retro fm disco", ""));
+        compare(HL.kinSearchPath("Retro fm disco", "e&e"), HL.kinSearchPath("Retro fm disco", ""));
+        compare(HL.kinSearchPath("Retro fm disco", undefined), HL.kinSearchPath("Retro fm disco", ""));
+        compare(HL.kinSearchPath("Ретро FM", "RU"),
+                "/json/stations/search?name=%D1%80%D0%B5%D1%82%D1%80%D0%BE&countrycode=RU&hidebroken=true&order=votes&reverse=true&limit=30");
+        compare(HL.kinSearchPath("Radio 2", "EE"), "");
+        compare(HL.kinSearchPath(null, "EE"), "");
+    }
+
+    function test_a_country_domain_says_where_a_station_is_from() {
+        compare(HL.tldCountry("https://edge03.cdn.bitflip.ee:8888/relax"), "EE");
+        compare(HL.tldCountry("http://stream.live.bbc.co.uk/r1"), "GB");
+        compare(HL.tldCountry("http://icecast.yle.fi/x"), "FI");
+        // Two letters sold to everyone say nothing about a country.
+        compare(HL.tldCountry("http://stream.zeno.fm/abc"), "");
+        compare(HL.tldCountry("http://live.station.tv/x"), "");
+        compare(HL.tldCountry("http://x.radio.co/y"), "");
+        compare(HL.tldCountry("http://relay.example.io/y"), "");
+        compare(HL.tldCountry("https://ice1.somafm.com/groovesalad"), "");
+        compare(HL.tldCountry("http://203.0.113.5:8000/live"), "");
+        compare(HL.tldCountry("file:///x.ee"), "");
+        compare(HL.tldCountry(null), "");
+    }
+
+    // ── The second look, and a directory that is unwell ───────────────────
+
+    function test_the_second_look_keeps_a_living_address_and_moves_a_gone_one() {
+        compare(HL.proofVerdict(200, "audio/mpeg", 1), "keep")
+        compare(HL.proofVerdict(200, "", 3), "keep")            // an old SHOUTcast names no type
+        compare(HL.proofVerdict(404, "text/html", 1), "move")
+        compare(HL.proofVerdict(403, "", 1), "move")
+        compare(HL.proofVerdict(410, "", 1), "move")
+    }
+
+    function test_silence_is_no_proof_until_it_has_lasted() {
+        // The move used to be written on the first look that was not a
+        // stream. A look that timed out says nothing about the address: the
+        // connection may have been slow for three seconds.
+        compare(HL.proofVerdict(0, "", 1), "again")
+        compare(HL.proofVerdict(0, "", HL.PROOF_LOOKS - 1), "again")
+        compare(HL.proofVerdict(0, "", HL.PROOF_LOOKS), "move")
+        compare(HL.proofVerdict(0, "", HL.PROOF_LOOKS + 40), "move")
+    }
+
+    function test_a_server_that_answers_something_else_is_still_there() {
+        // Busy, asking for a login, sending us on, or a page behind a 200:
+        // somebody is at the address. However long that lasts it is not the
+        // address being gone.
+        var there = [[500, ""], [503, ""], [429, ""], [401, ""], [301, ""], [200, "text/html"],
+                     [200, "application/json"]]
+        for (var i = 0; i < there.length; i++) {
+            compare(HL.proofVerdict(there[i][0], there[i][1], 1), "again", "status " + there[i][0])
+            compare(HL.proofVerdict(there[i][0], there[i][1], 99), "again", "status " + there[i][0])
+        }
+    }
+
+    function test_an_answer_qt_cannot_place_never_moves_a_station() {
+        // KinHunt reports -1 for an answer whose last hop Qt does not name.
+        // On a Qt that never names it every look is one of these, alive or
+        // not, and counting them as silence would move a living station.
+        compare(HL.proofVerdict(-1, "", 1), "again")
+        compare(HL.proofVerdict(-1, "", HL.PROOF_LOOKS), "again")
+        compare(HL.proofVerdict(-1, "", 99), "again")
+    }
+
+    function test_the_second_look_with_nothing_readable_decides_nothing() {
+        compare(HL.proofVerdict(undefined, undefined, undefined), "again")
+        compare(HL.proofVerdict(NaN, null, NaN), "again")
+        compare(HL.proofVerdict("404", "", 1), "again")
+        compare(HL.proofVerdict(0, "", undefined), "again")
+        compare(HL.proofVerdict(0, "", -5), "again")
+        compare(HL.proofVerdict(null, "", 99), "again")
+    }
+
+    function test_a_page_behind_a_200_is_not_the_directorys_answer() {
+        // Counted as an answer it stamped the ten-minute lock and the
+        // listener was told the station is nowhere, by a directory that had
+        // only sent its error page.
+        verify(HL.answered(_reply([])))
+        verify(HL.answered(_reply([{ url: "http://a.example/x" }])))
+        verify(!HL.answered({ status: 200, responseText: "<html>portal</html>" }))
+        verify(!HL.answered({ status: 200, responseText: "{\"error\":\"busy\"}" }))
+        verify(!HL.answered({ status: 200, responseText: "null" }))
+        verify(!HL.answered({ status: 200, responseText: "" }))
+        verify(!HL.answered({ status: 200 }))
+        verify(!HL.answered({ status: 503, responseText: "[]" }))
+        verify(!HL.answered(null))
+        verify(!HL.answered(undefined))
+        var many = []
+        for (var i = 0; i < 3000; i++) many.push({ url: "http://a.example/" + i })
+        verify(HL.answered(_reply(many)))
+    }
 }

@@ -9,6 +9,7 @@ import QtQuick
 import "EpisodeState.js" as EpisodeState
 import "HostGuard.js" as HostGuard
 import "OpmlLogic.js" as OpmlLogic
+import "PathLogic.js" as PathLogic
 import "PodcastLogic.js" as PodcastLogic
 
 // ── The podcast engine ───────────────────────────────────────────────────────
@@ -30,6 +31,9 @@ Item {
     required property var app
     // Plasmoid's configuration object in production; a plain object in tests.
     required property var cfg
+    // Tests hand in a stand-in request here; null sends real ones. Only the
+    // refresh that runs unattended asks through it so far.
+    property var makeRequest: null
 
 
     // ── The playing identity (A2) ────────────────────────────────────────
@@ -599,7 +603,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -634,7 +638,7 @@ Item {
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/search/podcast?count=30&title="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -672,7 +676,7 @@ Item {
             _podSearchSettle(seq, res !== null, false);
         };
         xhr.open("GET", "https://gpodder.net/search.json?q=" + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -730,7 +734,7 @@ Item {
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&limit=30&term="
                         + encodeURIComponent(q));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -798,7 +802,7 @@ Item {
         };
         xhr.open("GET", "https://rss.marketingtools.apple.com/api/v2/" + cc
                         + "/podcasts/top/25/podcasts.json");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -845,7 +849,7 @@ Item {
             podcastTrendingBusy = false;
         };
         xhr.open("GET", "https://itunes.apple.com/lookup?id=" + ids.join(","));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -880,7 +884,7 @@ Item {
             }
         };
         xhr.open("GET", "https://api.fyyd.de/0.2/feature/podcast/hot?count=30");
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 10000);
         xhr.send();
     }
@@ -949,7 +953,8 @@ Item {
                 // addresses their crawlers last saw months ago. Before the
                 // honest error, one rescue — the same cure the stations
                 // have: ask iTunes for the show BY TITLE and follow where
-                // it lives today. A subscribed show heals PERMANENTLY.
+                // it lives today. A subscribed show moves for good only
+                // when its old address answered 404 or 410 (_podFeedAdopt).
                 if (!hiccup && !_podFeedNoRescue && (showTitle || "") !== "") {
                     _podFeedRescue(seq, feedUrl, showTitle, showArt || "",
                                         xhr.status);
@@ -974,7 +979,7 @@ Item {
                 podcastFeedError = i18n("No playable episodes in this feed.");
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 15000);
         xhr.send();
     }
@@ -988,19 +993,8 @@ Item {
             if (seq !== _podFeedSeq) return;
             var fresh = "";
             try {
-                var res = JSON.parse(xhr.responseText || "{}").results || [];
-                var want = String(showTitle).replace(/\s+/g, " ").trim().toLowerCase();
-                var deadKey = PodcastLogic.feedKey(deadFeed);
-                for (var i = 0; i < res.length; i++) {
-                    var r = res[i] || {};
-                    var cand = String(r.feedUrl || "").trim();
-                    if (!PodcastLogic.urlAllowed(cand)) continue;
-                    if (PodcastLogic.feedKey(cand) === deadKey) continue;
-                    var rn = String(r.collectionName || "").replace(/\s+/g, " ").trim().toLowerCase();
-                    if (rn !== want) continue;      // identity, not resemblance
-                    fresh = cand;
-                    break;
-                }
+                fresh = PodcastLogic.pickHealedFeed(JSON.parse(xhr.responseText || "{}").results,
+                                                    showTitle, deadFeed);
             } catch (e) {}
             if (fresh === "") {
                 podcastFeedLoading = false;
@@ -1011,44 +1005,56 @@ Item {
                       : i18n("This address is not a podcast feed.");
                 return;
             }
-            console.log("[ARP] podcast feed heal: " + app._hostOf(deadFeed) + " -> " + app._hostOf(fresh));
-            // A subscribed show follows its feed for good — the seen map
-            // and the per-show speed move with it, so nothing re-announces
-            // and the remembered pace survives the move.
-            for (var si = 0; si < podcastSubsModel.count; si++) {
-                if (podcastSubsModel.get(si).feedUrl !== deadFeed) continue;
-                podcastSubsModel.setProperty(si, "feedUrl", fresh);
-                saveSubs();
-                if (seen[deadFeed] !== undefined) {
-                    seen[fresh] = seen[deadFeed];
-                    delete seen[deadFeed];
-                    saveSeen();
-                }
-                break;
-            }
-            // Everything else keyed by the old address moves too, or the
-            // show's speed resets, the alarm that plays "the newest episode
-            // of this show" finds no episode under the new feed, and
-            // auto-clean judges downloads by a feed that no longer exists.
-            if (_podSpeeds[deadFeed] !== undefined) {
-                var sp = {};
-                for (var sk in _podSpeeds) sp[sk] = _podSpeeds[sk];
-                sp[fresh] = sp[deadFeed]; delete sp[deadFeed];
-                _podSpeeds = sp;
-                cfg.podcastSpeeds = JSON.stringify(_podSpeeds);
-            }
-            var moved = false;
-            for (var dk in downloads)
-                if (downloads[dk] && downloads[dk].feed === deadFeed) { downloads[dk].feed = fresh; moved = true; }
-            if (moved) saveDownloads();
-            feedMoved(deadFeed, fresh);
+            _podFeedAdopt(deadFeed, fresh, deadStatus);
             loadPodcastFeed(fresh, showTitle, showArt, true);
         };
         xhr.open("GET", "https://itunes.apple.com/search?media=podcast&limit=10&term="
                         + encodeURIComponent(showTitle));
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
         guard = app._armXhrTimeout(xhr, 8000);
         xhr.send();
+    }
+
+    // The found feed becomes the show's saved address, but only when the
+    // old one answered that it is gone (404 or 410). After any other bad
+    // answer the found feed is opened for this view and nothing is saved:
+    // one 403 from a host that was having a bad minute used to move the
+    // subscription, its downloads and its alarm to another address for good.
+    function _podFeedAdopt(deadFeed, fresh, deadStatus) {
+        var forGood = PodcastLogic.feedGoneForGood(deadStatus);
+        console.log("[ARP] podcast feed heal: " + app._hostOf(deadFeed) + " -> " + app._hostOf(fresh)
+                    + (forGood ? "" : " (this view only, answer " + deadStatus + ")"));
+        if (!forGood) return;
+        // A subscribed show follows its feed for good — the seen map
+        // and the per-show speed move with it, so nothing re-announces
+        // and the remembered pace survives the move.
+        for (var si = 0; si < podcastSubsModel.count; si++) {
+            if (podcastSubsModel.get(si).feedUrl !== deadFeed) continue;
+            podcastSubsModel.setProperty(si, "feedUrl", fresh);
+            saveSubs();
+            if (seen[deadFeed] !== undefined) {
+                seen[fresh] = seen[deadFeed];
+                delete seen[deadFeed];
+                saveSeen();
+            }
+            break;
+        }
+        // Everything else keyed by the old address moves too, or the
+        // show's speed resets, the alarm that plays "the newest episode
+        // of this show" finds no episode under the new feed, and
+        // auto-clean judges downloads by a feed that no longer exists.
+        if (_podSpeeds[deadFeed] !== undefined) {
+            var sp = {};
+            for (var sk in _podSpeeds) sp[sk] = _podSpeeds[sk];
+            sp[fresh] = sp[deadFeed]; delete sp[deadFeed];
+            _podSpeeds = sp;
+            cfg.podcastSpeeds = JSON.stringify(_podSpeeds);
+        }
+        var moved = false;
+        for (var dk in downloads)
+            if (downloads[dk] && downloads[dk].feed === deadFeed) { downloads[dk].feed = fresh; moved = true; }
+        if (moved) saveDownloads();
+        feedMoved(deadFeed, fresh);
     }
 
     function loadSeen() {
@@ -1217,7 +1223,7 @@ Item {
         app.exec(": POD_DL; mkdir -p " + dir + " && "
             + "curl -fSL --proto '=http,https' --proto-redir '=http,https' --max-redirs 10 "
             + "--max-time 3600 --max-filesize 1073741824 --retry 2 "
-            + "-A 'OnAir/2026.42' -o " + part + " -K " + cfg + "; "
+            + "-A 'OnAir/2026.43' -o " + part + " -K " + cfg + "; "
             + "rc=$?; rm -f " + cfg + "; "
             + "[ \"$rc\" -eq 0 ] && mv -f " + part + " " + dest + " "
             + "&& echo __POD_OK__ || { rm -f " + part + "; echo __POD_FAIL__; }; "
@@ -1395,7 +1401,7 @@ Item {
     // Same caps and the same deferred abort the visible loader carries.
     function _podFetchFeedSilent(feedUrl, cb) {
         if (!PodcastLogic.urlAllowed(feedUrl)) { cb(null); return; }
-        var xhr = new XMLHttpRequest();
+        var xhr = makeRequest ? makeRequest() : new XMLHttpRequest();
         var guard = null;
         var aborted = false;
         var partial = "";
@@ -1411,15 +1417,15 @@ Item {
             }
             if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
             done = true;
-            _clearXhrTimeout(guard); guard = null;
+            app._clearXhrTimeout(guard); guard = null;
             // Same last-hop gate as the visible loader: a feed that
             // redirected into the LAN answers nothing to the refresh.
             if (!HostGuard.answerFromPublicHost(xhr)) { cb(null); return; }
             cb(PodcastLogic.parseFeed((xhr.responseText || "") || partial, 50));
         };
         xhr.open("GET", feedUrl);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.42");
-        guard = _armXhrTimeout(xhr, 15000);
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
+        guard = app._armXhrTimeout(xhr, 15000);
         xhr.send();
     }
 
@@ -1427,9 +1433,12 @@ Item {
     // fragment and '?' a query — "Episode #42.mp3" opened a truncated
     // path on the raw-string road while the FolderListModel road (percent-
     // encoded) worked, which is exactly the kind of split that ships.
+    // It is also the folder model's own spelling, character for character.
+    // With only % # ? escaped the file opened, but "[8hex]" stayed bare
+    // where the model writes %5B and %5D, and a row could not tell that
+    // the episode the engine had started was its own.
     function _podFileUrl(fileName) {
-        var pth = app.downloadDirPath + "/Podcasts/" + fileName;
-        return "file://" + pth.replace(/%/g, "%25").replace(/#/g, "%23").replace(/\?/g, "%3F");
+        return PathLogic.fileUrl(app.downloadDirPath + "/Podcasts/" + fileName);
     }
 
     // Ledger filename of a playing file:// URL ("" when it is not ours).

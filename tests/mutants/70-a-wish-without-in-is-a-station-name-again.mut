@@ -8,17 +8,18 @@ history:
   Typed without the word "in", the wish went to the directory as a station
   name, found nothing, and the stem retry answered with French and German
   "rock 80" stations. The facet reading arrived on 2026-09-21; this takes
-  its one call in the search away.
+  its one call in the search away. The call lives in SearchLogic.reading
+  since 2026-11-10, where a test reads its answer.
 
 target:
-  package/contents/ui/FullRepresentation.qml
+  package/contents/ui/SearchLogic.js
 
 find:
-                     ? SearchLogic.facetQuery(q, _countryCodeOf) : null
+          var bare = facetQuery(t, ask);
 
 replace:
-                     ? null : null
+          var bare = null;
 
 expect:
-  Killed by test_invariants::test_a_wish_typed_without_the_word_in_reaches_the_tag_list.
+  Killed by tst_searchlogic::test_a_country_beside_a_genre_or_after_in_is_no_guess.
   Line-neutral.

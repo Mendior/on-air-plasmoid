@@ -267,6 +267,162 @@ TestCase {
         compare(holed[0].name, "b");
     }
 
+    // ── the liveness probe's pass over the rows ─────────────────────────
+    function _probeUrl(n) { return "https://" + n.toLowerCase() + ".example/live" }
+
+    function fillProbeModel(names) {
+        fillOrderModel(names.map(function(n) { return { "name": n, "url": _probeUrl(n), "alive": -1 } }))
+    }
+
+    function probeRows() {
+        var out = []
+        for (var i = 0; i < orderModel.count; i++) out.push(orderModel.get(i))
+        return out
+    }
+
+    function probeState(over) {
+        var s = { spent: {}, verdicts: {}, inFlight: {}, active: 0, now: 1000000, ttl: 900000, slots: 6 }
+        for (var k in over) s[k] = over[k]
+        return s
+    }
+
+    function aliveByName() {
+        var out = []
+        for (var i = 0; i < orderModel.count; i++) out.push(orderModel.get(i).name + ":" + orderModel.get(i).alive)
+        return out
+    }
+
+    function test_remembered_dead_rows_are_all_marked_in_one_pass_in_their_order() {
+        // The list and the cache of a query typed again within fifteen minutes.
+        var names = ["a", "b", "DEAD1", "DEAD2", "c", "DEAD3", "DEAD4", "DEAD5", "d"]
+        fillProbeModel(names)
+        var verdicts = {}
+        for (var i = 0; i < names.length; i++)
+            verdicts[_probeUrl(names[i])] = { v: names[i].indexOf("DEAD") === 0 ? 0 : 1, t: 999000 }
+        var pass = SL.probePass(probeRows(), probeState({ verdicts: verdicts }))
+        compare(pass.known.length, 9)
+        compare(pass.knock, [])
+        SL.markAlive(orderModel, pass.known)
+        compare(aliveByName(), ["a:1", "b:1", "c:1", "d:1",
+                                "DEAD1:0", "DEAD2:0", "DEAD3:0", "DEAD4:0", "DEAD5:0"])
+        // The next pass finds nothing left to do and moves nothing.
+        var again = SL.probePass(probeRows(), probeState({ verdicts: verdicts }))
+        compare(again.known, []); compare(again.spent, []); compare(again.knock, [])
+        SL.markAlive(orderModel, again.known)
+        compare(orderNames(), ["a", "b", "c", "d", "DEAD1", "DEAD2", "DEAD3", "DEAD4", "DEAD5"])
+    }
+
+    function test_a_pass_remembers_spends_and_knocks() {
+        fillProbeModel(["fresh", "alive", "dead", "shrug", "stale", "flying", "judged", "done"])
+        orderModel.setProperty(6, "alive", 1)
+        var verdicts = {}, spent = {}, inFlight = {}
+        verdicts[_probeUrl("alive")] = { v: 1, t: 999999 }
+        verdicts[_probeUrl("dead")] = { v: 0, t: 100001 }       // one tick inside its lifetime
+        verdicts[_probeUrl("shrug")] = { v: -1, t: 999999 }     // an unknown is remembered too
+        verdicts[_probeUrl("stale")] = { v: 0, t: 100000 }      // exactly its lifetime old
+        verdicts[_probeUrl("judged")] = { v: 0, t: 999999 }
+        inFlight[_probeUrl("flying")] = true
+        spent[_probeUrl("done")] = true
+        var pass = SL.probePass(probeRows(), probeState({ verdicts: verdicts, spent: spent, inFlight: inFlight }))
+        compare(pass.known.map(function(k) { return k.url + " " + k.v }),
+                [_probeUrl("alive") + " 1", _probeUrl("dead") + " 0"])
+        compare(pass.knock, [_probeUrl("fresh"), _probeUrl("stale")])
+        compare(pass.spent, [_probeUrl("fresh"), _probeUrl("alive"), _probeUrl("dead"),
+                             _probeUrl("shrug"), _probeUrl("stale")])
+        // The caller's books are read and never written.
+        compare(Object.keys(spent).length, 1); compare(Object.keys(inFlight).length, 1)
+    }
+
+    function test_a_pass_knocks_only_while_a_slot_is_free() {
+        var names = []
+        for (var i = 0; i < 40; i++) names.push("s" + i)
+        fillProbeModel(names)
+        var pass = SL.probePass(probeRows(), probeState({ active: 4 }))
+        compare(pass.knock, [_probeUrl("s0"), _probeUrl("s1")])
+        compare(pass.spent, pass.knock)      // the others wait unspent for the next pass
+        compare(SL.probePass(probeRows(), probeState({ active: 6 })).knock, [])
+        compare(SL.probePass(probeRows(), probeState({ active: 9 })).spent, [])
+        compare(SL.probePass(probeRows(), probeState({})).knock.length, 6)
+        // Slots that are no number open no door.
+        compare(SL.probePass(probeRows(), probeState({ slots: "many" })).knock, [])
+    }
+
+    function test_a_private_host_is_spent_and_never_knocked_on() {
+        var rows = [{ url: "http://192.168.1.10:8000/stream", alive: -1 },
+                    { url: "http://localhost/radio", alive: -1 },
+                    { url: "https://public.example/live", alive: -1 }]
+        var verdicts = { "http://192.168.1.10:8000/stream": { v: 1, t: 999999 } }
+        var pass = SL.probePass(rows, probeState({ verdicts: verdicts }))
+        compare(pass.knock, ["https://public.example/live"])
+        compare(pass.known, [])              // not even a remembered verdict marks it
+        compare(pass.spent, ["http://192.168.1.10:8000/stream", "http://localhost/radio",
+                             "https://public.example/live"])
+    }
+
+    function test_a_pass_over_nothing_or_over_rubbish_is_empty() {
+        var empty = [SL.probePass([], probeState({})), SL.probePass(null, probeState({})),
+                     SL.probePass([{ url: "https://a.example/x", alive: -1 }], null),
+                     SL.probePass("rows", "state"), SL.probePass(undefined, undefined)]
+        for (var i = 0; i < empty.length; i++) {
+            compare(empty[i].spent, [], i); compare(empty[i].known, [], i); compare(empty[i].knock, [], i)
+        }
+        // Rows that are no rows are stepped over; a row seen twice is dealt with once.
+        var rows = [null, 7, {}, { url: 5, alive: -1 }, { url: "https://a.example/x" },
+                    { url: "https://a.example/x", alive: -1 }, { url: "https://a.example/x", alive: -1 }]
+        var pass = SL.probePass(rows, probeState({}))
+        compare(pass.knock, ["https://a.example/x"]); compare(pass.spent, ["https://a.example/x"])
+        // A verdict without a time is no verdict, and the books may be anything.
+        var odd = { "https://a.example/x": "dead", "https://b.example/y": { v: 0 },
+                    "https://c.example/z": { v: 7, t: 999999 } }
+        pass = SL.probePass([{ url: "https://a.example/x", alive: -1 }, { url: "https://b.example/y", alive: -1 },
+                             { url: "https://c.example/z", alive: -1 }],
+                            probeState({ verdicts: odd, spent: null, inFlight: 5 }))
+        compare(pass.knock, ["https://a.example/x", "https://b.example/y"])
+        // A fresh one that says neither alive nor dead is a remembered shrug.
+        compare(pass.known, [])
+        compare(pass.spent.length, 3)
+    }
+
+    function test_marking_lands_by_address_and_sinks_once() {
+        fillProbeModel(["a", "b", "c", "d"])
+        // One verdict, as a finished probe brings it.
+        SL.markAlive(orderModel, [{ url: _probeUrl("b"), v: 0 }])
+        compare(aliveByName(), ["a:-1", "c:-1", "d:-1", "b:0"])
+        SL.markAlive(orderModel, [{ url: _probeUrl("c"), v: 1 }])
+        compare(aliveByName(), ["a:-1", "c:1", "d:-1", "b:0"])
+        // A row the list no longer shows, and marks that are no marks.
+        SL.markAlive(orderModel, [{ url: "https://gone.example/live", v: 0 }, null, {}, { url: _probeUrl("a") },
+                                  { url: _probeUrl("d"), v: "0" }])
+        compare(aliveByName(), ["a:-1", "c:1", "d:-1", "b:0"])
+        SL.markAlive(orderModel, null); SL.markAlive(null, [{ url: _probeUrl("a"), v: 0 }])
+        SL.markAlive(orderModel, []); SL.markAlive({}, [{ url: _probeUrl("a"), v: 0 }])
+        compare(aliveByName(), ["a:-1", "c:1", "d:-1", "b:0"])
+        // Of two rows at one address the first takes the mark, as it always did.
+        orderModel.append({ "name": "twin", "url": _probeUrl("a"), "alive": -1 })
+        SL.markAlive(orderModel, [{ url: _probeUrl("a"), v: 1 }])
+        compare(aliveByName(), ["a:1", "c:1", "d:-1", "b:0", "twin:-1"])
+        orderModel.remove(4)
+        // Sinking again changes nothing, on a full list and on an empty one.
+        SL.sinkDead(orderModel); SL.sinkDead(orderModel)
+        compare(orderNames(), ["a", "c", "d", "b"])
+        orderModel.clear(); SL.sinkDead(orderModel); SL.sinkDead(null); SL.sinkDead({})
+        compare(orderModel.count, 0)
+    }
+
+    function test_a_long_list_of_the_dead_keeps_its_order() {
+        var names = [], want = [], dead = []
+        for (var i = 0; i < 300; i++) names.push((i % 3 === 0 ? "DEAD" : "live") + i)
+        fillProbeModel(names)
+        var known = []
+        for (var j = 0; j < names.length; j++) {
+            var isDead = names[j].indexOf("DEAD") === 0
+            known.push({ url: _probeUrl(names[j]), v: isDead ? 0 : 1 })
+            if (isDead) dead.push(names[j]); else want.push(names[j])
+        }
+        SL.markAlive(orderModel, known)
+        compare(orderNames(), want.concat(dead))
+    }
+
     function test_matches_all_words_any_order_fold_blind() {
         verify(SL.matchesAllWords("Radio Nova", SL.words("nova radio")));
         verify(SL.matchesAllWords("Järviradio", SL.words("jarvi")));
@@ -467,6 +623,49 @@ TestCase {
     }
 
 
+    function test_a_country_after_in_may_wear_its_article() {
+        // Measured 2026-11-10: "rock in the uk" was no fence at all, because
+        // the tail went to the country map as "the uk".
+        var r = SL.scopedQuery("rock in the uk", _cc)
+        verify(r !== null)
+        compare(r.text, "rock"); compare(r.cc, "GB"); compare(r.country, "uk")
+        r = SL.scopedQuery("Jazz from The  France", _cc)
+        verify(r !== null)
+        compare(r.text, "Jazz"); compare(r.cc, "FR"); compare(r.country, "France")
+        r = SL.scopedQuery("classic rock in the new zealand", _cc)
+        verify(r !== null)
+        compare(r.text, "classic rock"); compare(r.cc, "NZ"); compare(r.country, "new zealand")
+        // A name the map files with its article is found as it stands.
+        var gambia = function(n) { return n.toLowerCase() === "the gambia" ? "GM" : "" }
+        r = SL.scopedQuery("reggae in the gambia", gambia)
+        verify(r !== null)
+        compare(r.cc, "GM"); compare(r.country, "the gambia")
+    }
+
+    function test_an_article_alone_names_no_country() {
+        compare(SL.scopedQuery("alice in chains", _cc), null)
+        compare(SL.scopedQuery("alice in the chains", _cc), null)
+        // One article is taken off, not two, and "the" by itself is no tail.
+        compare(SL.scopedQuery("rock in the the uk", _cc), null)
+        compare(SL.scopedQuery("rock in the", _cc), null)
+        compare(SL.scopedQuery("rock in the ", _cc), null)
+        compare(SL.scopedQuery("the the", _cc), null)
+        compare(SL.scopedQuery("the the in the the", _cc), null)
+        compare(SL.scopedQuery("in the uk", _cc), null)        // no text before
+        // "theuk" and "then uk" are words of their own.
+        compare(SL.scopedQuery("rock in theuk", _cc), null)
+        compare(SL.scopedQuery("rock in then uk", _cc), null)
+        compare(SL.scopedQuery(null, _cc), null)
+        // The band keeps its name when the country comes after it.
+        var r = SL.scopedQuery("the the in the uk", _cc)
+        verify(r !== null)
+        compare(r.text, "the the"); compare(r.cc, "GB")
+        // A tail past any honest length is asked once each way and let go.
+        var far = "the "
+        for (var i = 0; i < 4000; i++) far += "x"
+        compare(SL.scopedQuery("rock in " + far, _cc), null)
+    }
+
     // ── a wish typed as facets: "rock 80 uk" ────────────────────────────
     // The resolver the facet tests use: the hand aliases first, like the
     // widget does, then the small stand-in map above.
@@ -538,6 +737,11 @@ TestCase {
         // "synthwave" is in nobody's vocabulary, the country makes it a wish.
         var r = SL.facetQuery("synthwave uk", _ccAll)
         compare(r.tags, ["synthwave"]); compare(r.cc, "GB")
+        // The reading says how many of its words it had to guess.
+        compare(r.loose, 1)
+        compare(SL.facetQuery("bossa nova uk", _ccAll).loose, 2)
+        compare(SL.facetQuery("rock 80 uk", _ccAll).loose, 0)
+        compare(SL.facetQuery("new wave uk", _ccAll).loose, 0)   // a genre of two words
         r = SL.facetQuery("bossa nova 60s", _ccAll)
         compare(r.tags, ["bossa nova", "60"])
         // No anchor, no guessing: two unknown words are a station name.
@@ -755,6 +959,289 @@ TestCase {
         compare(_empty({ stemCount: 0 }), "done")
         compare(_empty({ mode: "genre" }), "done")
         compare(_empty({ countryQuery: true }), "done")
+    }
+
+    function test_a_fence_read_without_in_steps_aside_for_an_empty_answer() {
+        // Measured 2026-11-10: "new jersey" was read as "new" in Jersey, the
+        // name and the tag both answered nothing there, "new" has no stem, and
+        // the popup said No matching stations over six stations of that name.
+        compare(_empty({ bareScope: true, stemCount: 0 }), "astyped")
+        // Before the stems: "synthwav" inside Britain is a longer shot than
+        // the two words as a name.
+        compare(_empty({ bareScope: true }), "astyped")
+        compare(_empty({ bareScope: true, mode: "genre", stemCount: 0 }), "astyped")
+        // Rows, or a network that never answered, end the search as before.
+        compare(_empty({ bareScope: true, count: 1 }), "done")
+        compare(_empty({ bareScope: true, gotAnswer: false }), "done")
+        // Only the flag itself: a fence the listener spelled with "in" stays.
+        compare(_empty({ bareScope: false, stemCount: 0 }), "done")
+        compare(_empty({ bareScope: "true", stemCount: 0 }), "done")
+        compare(_empty({ bareScope: 1, stemCount: 0 }), "done")
+    }
+
+    function test_a_station_name_typed_with_its_country_has_a_second_reading() {
+        // Measured 2026-11-10: one row with no votes for the three words as a
+        // name, four for "retro fm" inside EE.
+        var r = SL.nameInCountry("retro fm eesti", _ccAll)
+        verify(r !== null)
+        compare(r.text, "retro fm"); compare(r.cc, "EE"); compare(r.country, "eesti")
+        // The station it was deliberately left for has the reading too, as a fallback.
+        r = SL.nameInCountry("virgin radio uk", _ccAll)
+        verify(r !== null)
+        compare(r.text, "virgin radio"); compare(r.cc, "GB")
+        // Any place, the listener's own case, a country of several words.
+        r = SL.nameInCountry("Eesti Retro FM", _ccAll)
+        verify(r !== null)
+        compare(r.text, "Retro FM"); compare(r.cc, "EE"); compare(r.country, "eesti")
+        r = SL.nameInCountry("retro eesti fm", _ccAll)
+        verify(r !== null)
+        compare(r.text, "retro fm")
+        r = SL.nameInCountry("Radio 2 New Zealand", _ccAll)
+        verify(r !== null)
+        compare(r.text, "Radio 2"); compare(r.cc, "NZ"); compare(r.country, "new zealand")
+        r = SL.nameInCountry("classic fm united kingdom", _ccAll)
+        verify(r !== null)
+        compare(r.text, "classic fm"); compare(r.cc, "GB")
+        // Three unknown words are a name to the facets, and get this reading.
+        r = SL.nameInCountry("sounds of silence uk", _ccAll)
+        verify(r !== null)
+        compare(r.text, "sounds of silence"); compare(r.cc, "GB")
+    }
+
+    function test_what_is_no_name_beside_one_country_has_no_second_reading() {
+        // A wish the facets already read was fenced on the first reading.
+        compare(SL.nameInCountry("synthwave uk", _ccAll), null)
+        compare(SL.nameInCountry("rock 80 uk", _ccAll), null)
+        // No country, a country alone, two countries.
+        compare(SL.nameInCountry("retro fm", _ccAll), null)
+        compare(SL.nameInCountry("uk", _ccAll), null)
+        compare(SL.nameInCountry("united kingdom", _ccAll), null)
+        compare(SL.nameInCountry("radio finland france", _ccAll), null)
+        // Six words at most, like the facets.
+        verify(SL.nameInCountry("one two three four fm uk", _ccAll) !== null)
+        compare(SL.nameInCountry("one two three four five fm uk", _ccAll), null)
+        // Nothing typed, no text, no resolver, a resolver that answers no string.
+        compare(SL.nameInCountry("", _ccAll), null)
+        compare(SL.nameInCountry("   ", _ccAll), null)
+        compare(SL.nameInCountry(null, _ccAll), null)
+        compare(SL.nameInCountry(undefined, _ccAll), null)
+        compare(SL.nameInCountry(44, _ccAll), null)
+        compare(SL.nameInCountry("retro fm eesti", null), null)
+        compare(SL.nameInCountry("retro fm eesti"), null)
+        compare(SL.nameInCountry("retro fm eesti", function() { return 7 }), null)
+        var far = "fm "
+        for (var i = 0; i < 4000; i++) far += "x"
+        compare(SL.nameInCountry(far, _ccAll), null)
+        var r = SL.nameInCountry(far + " uk", _ccAll)
+        verify(r !== null)
+        compare(r.text, far)
+    }
+
+    function test_a_thin_answer_to_a_name_with_a_country_asks_inside_the_country() {
+        compare(_empty({ inCountry: true }), "incountry")            // before the stems
+        compare(_empty({ inCountry: true, stemCount: 0 }), "incountry")
+        // "retro fm eesti" had one row. Under three is next to nothing.
+        compare(_empty({ inCountry: true, count: 1 }), "incountry")
+        compare(_empty({ inCountry: true, count: 2 }), "incountry")
+        compare(_empty({ inCountry: true, count: 3 }), "done")
+        compare(_empty({ inCountry: true, count: 30 }), "done")
+        // A thin answer without that reading is an answer.
+        compare(_empty({ count: 1 }), "done")
+        compare(_empty({ inCountry: false, count: 1 }), "done")
+        compare(_empty({ inCountry: "yes", count: 1 }), "done")
+        compare(_empty({ inCountry: 1 }), "stems")
+        // Only where a name is what was asked for, and only on a real answer.
+        compare(_empty({ inCountry: true, count: 1, mode: "genre" }), "done")
+        compare(_empty({ inCountry: true, mode: "language" }), "done")
+        compare(_empty({ inCountry: true, mode: "country" }), "done")
+        compare(_empty({ inCountry: true, gotAnswer: false }), "done")
+        compare(_empty({ inCountry: true, count: 1, gotAnswer: false }), "done")
+        // A fence that found nothing steps aside first.
+        compare(_empty({ inCountry: true, inheritedScope: true }), "unscope")
+        compare(_empty({ inCountry: true, bareScope: true }), "astyped")
+    }
+
+    // The directory's own list knows Jersey; the hand aliases do not.
+    function _ccJersey(name) {
+        return SL.fold(name) === "jersey" ? "JE" : _ccAll(name)
+    }
+
+    function test_a_country_beside_an_unknown_word_is_read_as_a_guess() {
+        var r = SL.reading("new jersey", "all", _ccJersey)
+        verify(r.scoped !== null)
+        compare(r.cc, "")
+        compare(r.scoped.text, "new"); compare(r.scoped.cc, "JE"); compare(r.scoped.country, "jersey")
+        compare(r.bareScope, true)
+        // The retry reads the same words as a name and nothing else.
+        r = SL.reading("new jersey", "all", _ccJersey, true)
+        compare(r.cc, ""); compare(r.scoped, null); compare(r.bareScope, false)
+        // The reading itself stays: synthwave in the UK is still a wish.
+        r = SL.reading("synthwave uk", "all", _ccAll)
+        verify(r.scoped !== null)
+        compare(r.scoped.text, "synthwave"); compare(r.scoped.cc, "GB"); compare(r.bareScope, true)
+        r = SL.reading("bbc wales", "all", _ccAll)
+        verify(r.scoped !== null)
+        compare(r.scoped.text, "bbc"); compare(r.scoped.cc, "GB"); compare(r.bareScope, true)
+    }
+
+    function test_a_country_beside_a_genre_or_after_in_is_no_guess() {
+        var r = SL.reading("rock uk", "all", _ccAll)
+        verify(r.scoped !== null)
+        compare(r.scoped.text, "rock"); compare(r.scoped.cc, "GB"); compare(r.bareScope, false)
+        r = SL.reading("rock 80 uk", "genre", _ccAll)
+        verify(r.scoped !== null)
+        compare(r.scoped.text, "rock 80"); compare(r.bareScope, false)
+        // "in" is the listener's own word and the retry does not take it away.
+        r = SL.reading("synthwave in UK", "all", _ccAll)
+        verify(r.scoped !== null)
+        compare(r.scoped.text, "synthwave"); compare(r.scoped.cc, "GB"); compare(r.scoped.country, "UK")
+        compare(r.bareScope, false)
+        r = SL.reading("synthwave in UK", "all", _ccAll, true)
+        verify(r.scoped !== null)
+        compare(r.scoped.cc, "GB"); compare(r.bareScope, false)
+    }
+
+    function test_the_whole_text_as_a_country_and_the_modes_that_read_no_fence() {
+        var r = SL.reading("uk", "all", _ccAll)
+        compare(r.cc, "GB"); compare(r.scoped, null); compare(r.bareScope, false)
+        r = SL.reading("  United Kingdom ", "country", _ccAll)
+        compare(r.cc, "GB"); compare(r.scoped, null)
+        // The country mode reads the text as the country, with "in" or without.
+        r = SL.reading("jazz in uk", "country", _ccAll)
+        compare(r.cc, ""); compare(r.scoped, null)
+        // The language mode knows "in" and no facets.
+        r = SL.reading("synthwave uk", "language", _ccAll)
+        compare(r.scoped, null); compare(r.bareScope, false)
+        r = SL.reading("english in uk", "language", _ccAll)
+        verify(r.scoped !== null)
+        compare(r.scoped.cc, "GB")
+        // A station name is left alone, and so is a sentence.
+        compare(SL.reading("virgin radio uk", "all", _ccAll).scoped, null)
+        compare(SL.reading("rock pop jazz soul funk disco uk", "all", _ccAll).scoped, null)
+    }
+
+    function test_a_reading_of_nothing_is_no_reading() {
+        var none = [SL.reading("", "all", _ccAll), SL.reading(null, "all", _ccAll),
+                    SL.reading(undefined, "all", _ccAll), SL.reading("   ", "genre", _ccAll),
+                    SL.reading("rock uk", "all", null), SL.reading("rock uk", "all"),
+                    SL.reading("rock uk", undefined, _ccAll)]
+        for (var i = 0; i < none.length; i++) {
+            compare(none[i].cc, "", i); compare(none[i].scoped, null, i); compare(none[i].bareScope, false, i)
+        }
+        // A resolver that answers no string is a resolver that said no.
+        var r = SL.reading("rock uk", "all", function() { return undefined })
+        compare(r.cc, ""); compare(r.scoped, null)
+    }
+
+    // The resolver the widget builds: the hand aliases, then the directory's list.
+    function _ccWith(api) {
+        return function(q) { return SL.countryCode(q, SL.countryAliases(), api) }
+    }
+
+    function test_the_directorys_country_list_changes_how_a_text_is_read() {
+        // What the first search of a session has, and what every later one has.
+        var first = SL.countryMapFromApi([])
+        var later = SL.countryMapFromApi([{ name: "Portugal", iso_3166_1: "PT" },
+                                          { name: "Jersey", iso_3166_1: "JE" }])
+        compare(SL.countryAliases()[SL.fold("portugal")], undefined)
+        compare(SL.countryCode("Portugal", SL.countryAliases(), first), "")
+        compare(SL.countryCode("Portugal", SL.countryAliases(), later), "PT")
+        verify(SL.readingKey("portugal", "all", _ccWith(first)) !== SL.readingKey("portugal", "all", _ccWith(later)))
+        verify(SL.readingKey("Portugal", "country", _ccWith(first)) !== SL.readingKey("Portugal", "country", _ccWith(later)))
+        // A fence the list makes readable is a new reading too, either way.
+        verify(SL.readingKey("fado in portugal", "all", _ccWith(first)) !== SL.readingKey("fado in portugal", "all", _ccWith(later)))
+        verify(SL.readingKey("rock jersey", "all", _ccWith(first)) !== SL.readingKey("rock jersey", "all", _ccWith(later)))
+        verify(SL.readingKey("fado in portugal", "all", _ccWith(later)) !== SL.readingKey("rock in portugal", "all", _ccWith(later)))
+    }
+
+    function test_a_text_the_list_reads_no_differently_has_one_key() {
+        var first = SL.countryMapFromApi([])
+        var later = SL.countryMapFromApi([{ name: "Portugal", iso_3166_1: "PT" }])
+        var same = ["nova radio", "uk", "rock uk", "70s in UK", "jazz", "portugalia", "x"]
+        for (var i = 0; i < same.length; i++)
+            compare(SL.readingKey(same[i], "all", _ccWith(first)),
+                    SL.readingKey(same[i], "all", _ccWith(later)), same[i])
+        // In the Genre and Language modes a country name is a tag or a language.
+        compare(SL.readingKey("portugal", "genre", _ccWith(first)), SL.readingKey("portugal", "genre", _ccWith(later)))
+        compare(SL.readingKey("portugal", "language", _ccWith(first)), SL.readingKey("portugal", "language", _ccWith(later)))
+        // Nothing typed, or no resolver at all, is one and the same reading.
+        compare(SL.readingKey("", "all", _ccWith(first)), SL.readingKey("", "all", _ccWith(later)))
+        compare(SL.readingKey(null, "all", _ccWith(first)), SL.readingKey("   ", "all", _ccWith(later)))
+        compare(SL.readingKey("portugal", "all", null), SL.readingKey("portugal", "all", undefined))
+        compare(typeof SL.readingKey("portugal", "all", _ccWith(later)), "string")
+        // The parts cannot run into each other: a fence is not a longer country.
+        verify(SL.readingKey("rock in uk", "all", _ccWith(first)) !== SL.readingKey("uk", "all", _ccWith(first)))
+        var far = ""
+        for (var j = 0; j < 3000; j++) far += "p"
+        compare(SL.readingKey(far, "all", _ccWith(first)), SL.readingKey(far, "all", _ccWith(later)))
+    }
+
+    function test_an_objects_own_furniture_is_no_country() {
+        // Measured: with the map the session started on, ({})["constructor"]
+        // is a function, and it went on towards countrycode=.
+        var maps = [SL.countryMapFromApi([]), {}, SL.countryMapFromApi(null)]
+        var words = ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__", "prototype"]
+        for (var m = 0; m < maps.length; m++)
+            for (var w = 0; w < words.length; w++) {
+                compare(SL.countryCode(words[w], SL.countryAliases(), maps[m]), "", words[w])
+                compare(SL.countryCode(words[w], maps[m], maps[m]), "", words[w])
+            }
+        compare(Object.getPrototypeOf(SL.countryMapFromApi([])), null)
+        // What a map inherits is not in the map, even when it looks like a code.
+        compare(SL.countryCode("x", Object.create({ x: "GB" }), Object.create({ x: "FI" })), "")
+    }
+
+    function test_a_country_code_comes_from_the_hand_map_first() {
+        var api = SL.countryMapFromApi([{ name: "Georgia", iso_3166_1: "GE" }, { name: "Estonia", iso_3166_1: "XX" }])
+        compare(SL.countryCode("Georgia", SL.countryAliases(), api), "GE")
+        compare(SL.countryCode("  eesti ", SL.countryAliases(), api), "EE")
+        compare(SL.countryCode("Estonia", SL.countryAliases(), api), "EE")     // the hand map's word
+        compare(SL.countryCode("turgi", SL.countryAliases(), api), "TR")       // accent-blind
+        // No text, a text that is no string, maps that are no maps.
+        compare(SL.countryCode("", SL.countryAliases(), api), "")
+        compare(SL.countryCode(null, SL.countryAliases(), api), "")
+        compare(SL.countryCode(44, SL.countryAliases(), api), "")
+        compare(SL.countryCode("uk", null, undefined), "")
+        compare(SL.countryCode("uk", "uk", 7), "")
+        compare(SL.countryCode("georgia", null, api), "GE")
+        // Only a two-letter code is a code, whatever a map was filled with.
+        compare(SL.countryCode("x", { x: "GBR" }, { x: 5 }), "")
+        compare(SL.countryCode("x", { x: "gb" }, { x: "FI" }), "FI")
+        var far = ""
+        for (var i = 0; i < 3000; i++) far += "p"
+        compare(SL.countryCode(far, SL.countryAliases(), api), "")
+    }
+
+    function test_inside_a_guessed_fence_the_rows_with_every_typed_word_lead() {
+        // The name answer for "bbc" inside GB, by votes; "bbc Wales" was 39th.
+        var rows = [{ name: "BBC Radio 1" }, { name: "BBC Radio 4" }, { name: "BBC World Service" },
+                    { name: "bbc Wales" }, { name: "BBC Radio Cymru" }, { name: "BBC Radio Wales" }]
+        var lead = SL.fenceLead("bbc wales")
+        // The list takes the answer twice: the leads, then what is left.
+        var shown = rows.filter(lead).concat(rows.filter(function(r) { return !lead(r) }))
+        compare(shown.map(function(r) { return r.name }),
+                ["bbc Wales", "BBC Radio Wales", "BBC Radio 1", "BBC Radio 4",
+                 "BBC World Service", "BBC Radio Cymru"])
+        // Any order, fold-blind, and the filter keeps no count: every such row leads.
+        verify(SL.fenceLead("Wales BBC")({ name: "bbc wales" }))
+        verify(SL.fenceLead("jarvi soome")({ name: "Järviradio Soome" }))
+        verify(lead({ name: "BBC Wales" })); verify(lead({ name: "BBC Wales" }))
+        // One word missing is no lead.
+        verify(!lead({ name: "Wales Online" }))
+    }
+
+    function test_a_lead_filter_without_words_or_names_keeps_nothing() {
+        verify(!SL.fenceLead("")({ name: "BBC Wales" }))
+        verify(!SL.fenceLead(null)({ name: "BBC Wales" }))
+        verify(!SL.fenceLead("   ")({ name: "" }))
+        var lead = SL.fenceLead("bbc wales")
+        verify(!lead(null)); verify(!lead(undefined)); verify(!lead({}))
+        verify(!lead({ name: null })); verify(!lead({ name: 7 })); verify(!lead("bbc wales"))
+        // A name past any honest length is read like any other.
+        var far = "bbc "
+        for (var i = 0; i < 5000; i++) far += "x"
+        verify(lead({ name: far + " wales" }))
+        verify(!lead({ name: far }))
     }
 
     function test_rows_or_a_dead_network_end_the_search() {
@@ -1056,6 +1543,66 @@ TestCase {
                 b + "?hidebroken=true&order=votes&reverse=true&limit=100&offset=0")
     }
 
+    // The wait before a cover lookup. Measured on 29 song changes: the old
+    // fixed 1.5 s was 87% of the time from a new title to its cover.
+    function test_a_title_that_stood_does_not_wait_out_the_flap_window() {
+        compare(SL.artWaitMs(false, 5000), 200)
+        compare(SL.artWaitMs(false, 180000), 200)
+        // The first title after an empty header has nothing to flap against.
+        compare(SL.artWaitMs(true, 0), 200)
+        compare(SL.artWaitMs(true, undefined), 200)
+        // A change on the heels of another keeps the full window.
+        compare(SL.artWaitMs(false, 0), 1500)
+        compare(SL.artWaitMs(false, 1200), 1500)
+        // Four seconds is where a title has stood long enough.
+        compare(SL.artWaitMs(false, 3999), 1500)
+        compare(SL.artWaitMs(false, 4000), 200)
+        // No span, a span that is no number, a clock that went backwards:
+        // nothing says the title stood, so it waits.
+        compare(SL.artWaitMs(false, undefined), 1500)
+        compare(SL.artWaitMs(false, null), 1500)
+        compare(SL.artWaitMs(false, NaN), 1500)
+        compare(SL.artWaitMs(false, "soon"), 1500)
+        compare(SL.artWaitMs(false, -60000), 1500)
+        compare(SL.artWaitMs(undefined, undefined), 1500)
+        // Only a real true is a first title.
+        compare(SL.artWaitMs("yes", 0), 1500)
+        // A span as long as the clock itself, the engine's first call.
+        compare(SL.artWaitMs(false, Date.now()), 200)
+        compare(SL.artWaitMs(false, Infinity), 200)
+    }
+
+    // Whether a cover lookup that ended on a timeout or a refusal is asked
+    // once more, and after how long.
+    function test_a_cover_lookup_that_timed_out_is_asked_once_more() {
+        compare(SL.artRetryMs(true, "artist song", "artist song", "", true), 25000)
+        // Another track having had its second attempt is no reason against.
+        compare(SL.artRetryMs(true, "artist song", "artist song", "some other song", true), 25000)
+        // Everybody answered and nobody had it: that is final.
+        compare(SL.artRetryMs(false, "artist song", "artist song", "", true), -1)
+        // The track changed while the chain ran or the wait lasted.
+        compare(SL.artRetryMs(true, "artist song", "next song", "", true), -1)
+        compare(SL.artRetryMs(true, "artist song", "", "", true), -1)
+        // This track has had its second attempt.
+        compare(SL.artRetryMs(true, "artist song", "artist song", "artist song", true), -1)
+        // Covers are switched off.
+        compare(SL.artRetryMs(true, "artist song", "artist song", "", false), -1)
+        compare(SL.artRetryMs(true, "artist song", "artist song", "", undefined), -1)
+        // No key is no track, even when nothing plays either.
+        compare(SL.artRetryMs(true, "", "", "", true), -1)
+        compare(SL.artRetryMs(true, "", "", "some other song", true), -1)
+        compare(SL.artRetryMs(true, null, null, null, true), -1)
+        compare(SL.artRetryMs(true, undefined, undefined, undefined, true), -1)
+        compare(SL.artRetryMs(), -1)
+        // Only a real true is a transient end.
+        compare(SL.artRetryMs("timeout", "artist song", "artist song", "", true), -1)
+        compare(SL.artRetryMs(undefined, "artist song", "artist song", "", true), -1)
+        var key = ""
+        for (var i = 0; i < 1000; i++) key += "song "
+        compare(SL.artRetryMs(true, key, key, "", true), 25000)
+        compare(SL.artRetryMs(true, key, key + "x", "", true), -1)
+    }
+
     function test_a_later_page_that_failed_is_asked_again_by_itself() {
         // Measured on the bench: page two of "rock" failed once at the end of
         // the list and nothing asked for it again, because the only trigger
@@ -1109,6 +1656,49 @@ TestCase {
         compare(SL.directoryBase("de2", "byname", "jazz\uD83D"), bare + "/byname/jazz")
     }
 
+    function test_the_settings_country_search_knows_the_everyday_names() {
+        // Measured 2026-11-10: bycountry/uk answered a hundred rows, every one
+        // Ukrainian, and bycountry/usa none. The popup reads both words right.
+        var bare = "https://de1.api.radio-browser.info/json/stations"
+        compare(SL.directoryBase("de1", "bycountry", "uk"), bare + "/bycountrycodeexact/GB")
+        compare(SL.directoryBase("de1", "bycountry", "usa"), bare + "/bycountrycodeexact/US")
+        // As the popup folds it: case, accents and spaces are no difference.
+        compare(SL.directoryBase("de1", "bycountry", "  UK "), bare + "/bycountrycodeexact/GB")
+        compare(SL.directoryBase("de1", "bycountry", "United   States"), bare + "/bycountrycodeexact/US")
+        compare(SL.directoryBase("de1", "bycountry", "Eesti"), bare + "/bycountrycodeexact/EE")
+        compare(SL.directoryBase("de1", "bycountry", "turgi"), bare + "/bycountrycodeexact/TR")
+        compare(SL.directoryBase("de1", "bycountry", "Türgi"), bare + "/bycountrycodeexact/TR")
+        // The page is asked the same way on the code road.
+        compare(SL.directoryPage(SL.directoryBase("de1", "bycountry", "uk"), 100, 100),
+                bare + "/bycountrycodeexact/GB?hidebroken=true&order=votes&reverse=true&limit=100&offset=100")
+        compare(SL.rehost(SL.directoryBase("de1", "bycountry", "uk"), "nl1"),
+                "https://nl1.api.radio-browser.info/json/stations/bycountrycodeexact/GB")
+    }
+
+    function test_a_country_word_no_alias_knows_is_asked_as_before() {
+        var bare = "https://de1.api.radio-browser.info/json/stations"
+        compare(SL.directoryBase("de1", "bycountry", "Portugal"), bare + "/bycountry/Portugal")
+        compare(SL.directoryBase("de1", "bycountry", "ukr"), bare + "/bycountry/ukr")
+        compare(SL.directoryBase("de1", "bycountry", "uk usa"), bare + "/bycountry/uk%20usa")
+        // Names of an object's own furniture are no countries.
+        compare(SL.directoryBase("de1", "bycountry", "constructor"), bare + "/bycountry/constructor")
+        compare(SL.directoryBase("de1", "bycountry", "__proto__"), bare + "/bycountry/__proto__")
+        compare(SL.directoryBase("de1", "bycountry", "toString"), bare + "/bycountry/toString")
+        // Nothing typed is the bare list, a number is a word like any other.
+        compare(SL.directoryBase("de1", "bycountry", "   "), bare)
+        compare(SL.directoryBase("de1", "bycountry", null), bare)
+        compare(SL.directoryBase("de1", "bycountry", 44), bare + "/bycountry/44")
+        var far = ""
+        for (var i = 0; i < 3000; i++) far += "u"
+        compare(SL.directoryBase("de1", "bycountry", far), bare + "/bycountry/" + far)
+        // Only the country road reads a country: "uk" is a name and a tag elsewhere.
+        compare(SL.directoryBase("de1", "byname", "uk"), bare + "/byname/uk")
+        compare(SL.directoryBase("de1", "bytag", "uk"), bare + "/bytag/uk")
+        compare(SL.directoryBase("de1", "bylanguage", "usa"), bare + "/bylanguage/usa")
+        // The code road is made here and never typed in.
+        compare(SL.directoryBase("de1", "bycountrycodeexact", "GB"), bare + "/byname/GB")
+    }
+
     function test_a_station_is_listed_once_however_the_pages_shift() {
         var seen = ({})
         verify(SL.firstSight(seen, "u-1"))
@@ -1139,5 +1729,313 @@ TestCase {
         // A cut that lands just after a space must not leave the space behind.
         var spaced = many.substring(0, 299) + " tail"
         compare(SL.rowName(spaced), many.substring(0, 299))
+    }
+
+    // ── a directory row the list already holds ──────────────────────────
+    readonly property string _grooveUuid: "960cf833-0601-11e8-ae97-52543be04c81"
+
+    function test_a_saved_station_is_known_by_its_directory_uuid() {
+        // Measured 2026-11-10: saved at ice3, listed at ice2, one record.
+        var saved = [{ hostname: "http://ice3.somafm.com/groovesalad-128-mp3", uuid: _grooveUuid }]
+        var row = { url_resolved: "https://ice2.somafm.com/groovesalad-128-mp3",
+                    url: "https://somafm.com/groovesalad.pls", stationuuid: _grooveUuid }
+        verify(SL.knownStation(saved, row))
+        compare(SL.knownStationAt(saved, row), 0)
+        // Another record at another address is another station.
+        var other = { url_resolved: "https://ice2.somafm.com/dronezone-128-mp3",
+                      url: "https://somafm.com/dronezone.pls",
+                      stationuuid: "11111111-0601-11e8-ae97-52543be04c81" }
+        verify(!SL.knownStation(saved, other))
+        compare(SL.knownStationAt(saved, other), -1)
+    }
+
+    function test_a_saved_station_is_known_by_either_address_of_the_row() {
+        var saved = [{ hostname: "https://a.example/one", uuid: "" },
+                     { hostname: "http://Stream.Example:80/live/", uuid: "" },
+                     { hostname: "https://b.example/list.pls", uuid: "" }]
+        // The resolved address, in the other scheme and without the slash.
+        compare(SL.knownStationAt(saved, { url_resolved: "https://stream.example/live", url: "", stationuuid: "" }), 1)
+        // The row's own address, where the saved row sits at the playlist.
+        compare(SL.knownStationAt(saved, { url_resolved: "https://cdn.example/x.mp3",
+                                           url: "https://b.example/list.pls", stationuuid: "" }), 2)
+        // A mount is case-sensitive: another path is another station.
+        compare(SL.knownStationAt(saved, { url_resolved: "https://stream.example/LIVE", url: "", stationuuid: "" }), -1)
+        // The first saved row that matches is the answer.
+        saved.push({ hostname: "https://a.example/one", uuid: "" })
+        compare(SL.knownStationAt(saved, { url_resolved: "http://a.example/one", url: "", stationuuid: "" }), 0)
+    }
+
+    // The popup and the settings page hand over the rows of their models,
+    // which keep a role per row the way the saved list does.
+    ListModel { id: savedModel; dynamicRoles: true }
+
+    function test_the_rows_of_a_station_model_are_known_too() {
+        savedModel.clear()
+        savedModel.append({ hostname: "https://first.example/a", name: "First" })
+        savedModel.append({ hostname: "http://ice3.somafm.com/groovesalad-128-mp3", prev: "", uuid: _grooveUuid })
+        var saved = []
+        for (var i = 0; i < savedModel.count; i++) saved.push(savedModel.get(i))
+        compare(SL.knownStationAt(saved, { url_resolved: "https://ice2.somafm.com/groovesalad-128-mp3",
+                                           url: "", stationuuid: _grooveUuid }), 1)
+        compare(SL.knownStationAt(saved, { url_resolved: "http://first.example/a/", url: "", stationuuid: "" }), 0)
+        // The directory's row as a model row, the way the settings page holds it.
+        savedModel.append({ url_resolved: "https://first.example/a", url: "", stationuuid: "" })
+        compare(SL.knownStationAt(saved, savedModel.get(2)), 0)
+    }
+
+    function test_a_healed_station_is_known_by_where_it_was() {
+        var saved = [{ hostname: "https://new.example/live", prev: "http://old.example/live", uuid: "" }]
+        verify(SL.knownStation(saved, { url_resolved: "https://old.example/live", url: "", stationuuid: "" }))
+        verify(SL.knownStation(saved, { url_resolved: "https://x.example/y", url: "http://old.example/live/", stationuuid: "" }))
+        verify(!SL.knownStation(saved, { url_resolved: "https://older.example/live", url: "", stationuuid: "" }))
+    }
+
+    function test_nothing_is_known_by_an_empty_uuid_or_an_empty_address() {
+        // Two rows without a uuid are not one station for that.
+        verify(!SL.knownStation([{ hostname: "https://a.example/one", uuid: "" }],
+                                { url_resolved: "https://b.example/two", url: "", stationuuid: "" }))
+        verify(!SL.knownStation([{ hostname: "https://a.example/one" }],
+                                { url_resolved: "https://b.example/two" }))
+        // An empty prev is no address, and neither is a row's missing url.
+        verify(!SL.knownStation([{ hostname: "https://a.example/one", prev: "", uuid: "" }],
+                                { url_resolved: "https://b.example/two", url: "", stationuuid: "" }))
+        verify(!SL.knownStation([{ hostname: "", prev: "", uuid: "" }], { url_resolved: "", url: "", stationuuid: "" }))
+        verify(!SL.knownStation([{ hostname: "  ", uuid: " " }], { url_resolved: " ", url: "  ", stationuuid: " " }))
+    }
+
+    function test_a_broken_list_or_row_knows_nothing_and_throws_nothing() {
+        var row = { url_resolved: "https://a.example/one", url: "", stationuuid: "u-1" }
+        compare(SL.knownStationAt(null, row), -1)
+        compare(SL.knownStationAt(undefined, row), -1)
+        compare(SL.knownStationAt("https://a.example/one", row), -1)
+        compare(SL.knownStationAt([], row), -1)
+        compare(SL.knownStationAt([{ hostname: "https://a.example/one", uuid: "u-1" }], null), -1)
+        compare(SL.knownStationAt([{ hostname: "https://a.example/one", uuid: "u-1" }], "u-1"), -1)
+        // Rows that are no rows are stepped over, and the good one is found.
+        compare(SL.knownStationAt([null, 7, "x", { hostname: 5, uuid: 6 },
+                                   { hostname: "https://a.example/one" }], row), 4)
+        // The catalogue types its fields as strings and a mirror may not.
+        compare(SL.knownStationAt([{ hostname: "https://a.example/one", uuid: "u-1" }],
+                                  { url_resolved: 12, url: ["x"], stationuuid: { a: 1 } }), -1)
+        // A uuid that is a property name is only a string.
+        compare(SL.knownStationAt([{ hostname: "https://a.example/one", uuid: "constructor" }],
+                                  { url_resolved: "https://z.example/", url: "", stationuuid: "constructor" }), 0)
+        // An address past any honest length is compared like any other.
+        var far = "https://a.example/"
+        for (var i = 0; i < 3000; i++) far += "x"
+        compare(SL.knownStationAt([{ hostname: far, uuid: "" }], { url_resolved: far + "/", url: "", stationuuid: "" }), 0)
+        compare(SL.knownStationAt([{ hostname: far, uuid: "" }], { url_resolved: far + "y", url: "", stationuuid: "" }), -1)
+    }
+
+    // ── knownStation: the saved rows an answer named ─────────────────────
+    function test_a_known_row_names_the_saved_station_it_is() {
+        var saved = [{ hostname: "https://first.example/a", uuid: "" },
+                     { hostname: "http://ice3.somafm.com/groovesalad-128-mp3", prev: "", uuid: _grooveUuid }]
+        var named = []
+        // Listed at another server under the same uuid: the list's own address is kept.
+        verify(SL.knownStation(saved, { url_resolved: "https://ice2.somafm.com/groovesalad-128-mp3",
+                                        url: "", stationuuid: _grooveUuid }, named))
+        compare(named.length, 1)
+        compare(named[0].url_resolved, "http://ice3.somafm.com/groovesalad-128-mp3")
+        compare(named[0].url, "")
+        compare(named[0].stationuuid, _grooveUuid)
+        // What it kept finds that saved row again.
+        compare(SL.knownStationAt(saved, named[0]), 1)
+        // A row the list does not hold names nothing.
+        verify(!SL.knownStation(saved, { url_resolved: "https://nobody.example/x", url: "", stationuuid: "n-1" }, named))
+        compare(named.length, 1)
+    }
+
+    function test_a_station_named_twice_is_kept_once() {
+        var saved = [{ hostname: "https://first.example/a", uuid: "f-1" }, { hostname: "https://second.example/b", uuid: "" }]
+        var named = []
+        // One answer walked twice, the http twin of the row, and the next page's copy.
+        verify(SL.knownStation(saved, { url_resolved: "https://first.example/a", url: "", stationuuid: "" }, named))
+        verify(SL.knownStation(saved, { url_resolved: "http://first.example/a/", url: "", stationuuid: "" }, named))
+        verify(SL.knownStation(saved, { url_resolved: "https://moved.example/a", url: "", stationuuid: "f-1" }, named))
+        compare(named.length, 1)
+        verify(SL.knownStation(saved, { url_resolved: "https://second.example/b", url: "", stationuuid: "" }, named))
+        compare(named.length, 2)
+        compare(named[1].url_resolved, "https://second.example/b")
+        compare(named[1].stationuuid, "")
+        // Stations added by hand carry no uuid, and two of them are two stations.
+        var byHand = [{ hostname: "https://one.example/a", uuid: "" }, { hostname: "https://two.example/b", uuid: "" }]
+        named = []
+        verify(SL.knownStation(byHand, { url_resolved: "https://one.example/a", url: "", stationuuid: "" }, named))
+        verify(SL.knownStation(byHand, { url_resolved: "https://two.example/b", url: "", stationuuid: "" }, named))
+        compare(named.length, 2)
+        compare(SL.knownStationAt(byHand, named[1]), 1)
+    }
+
+    function test_a_healed_station_is_named_by_where_it_stands_now() {
+        var saved = [{ hostname: "https://new.example/live", prev: "http://old.example/live", uuid: "" }]
+        var named = []
+        verify(SL.knownStation(saved, { url_resolved: "https://old.example/live", url: "", stationuuid: "" }, named))
+        compare(named.length, 1)
+        compare(named[0].url_resolved, "https://new.example/live")
+        // The list is reloaded with the row moved once more: still found, by where it was.
+        var later = [{ hostname: "https://newer.example/live", prev: "https://new.example/live", uuid: "" }]
+        compare(SL.knownStationAt(later, named[0]), 0)
+    }
+
+    function test_no_list_to_name_into_still_answers() {
+        var saved = [{ hostname: "https://first.example/a", uuid: "f-1" }]
+        var row = { url_resolved: "https://first.example/a", url: "", stationuuid: "f-1" }
+        var none = [undefined, null, "", "x", 7, {}, { length: 0 }]
+        for (var i = 0; i < none.length; i++) {
+            verify(SL.knownStation(saved, row, none[i]))
+            verify(!SL.knownStation(saved, { url_resolved: "https://b.example/", url: "", stationuuid: "" }, none[i]))
+        }
+        verify(SL.knownStation(saved, row))
+        // A saved row whose fields are no strings is named with empty ones.
+        var odd = [{ hostname: "https://first.example/a", uuid: 12 }], named = []
+        verify(SL.knownStation(odd, row, named))
+        compare(named.length, 1)
+        compare(named[0].stationuuid, "")
+        compare(named[0].url_resolved, "https://first.example/a")
+        // A broken list or row names nothing and throws nothing.
+        named = []
+        verify(!SL.knownStation(null, row, named))
+        verify(!SL.knownStation(saved, null, named))
+        compare(named.length, 0)
+        // What already stands in the list and is no row is stepped over.
+        named = [null, 7, "x"]
+        verify(SL.knownStation(saved, row, named))
+        compare(named.length, 4)
+    }
+
+    function test_a_long_answer_names_every_saved_station_once() {
+        var saved = [], named = []
+        for (var i = 0; i < 300; i++) saved.push({ hostname: "https://s" + i + ".example/live", uuid: "u-" + i, prev: "" })
+        for (var pass = 0; pass < 2; pass++)
+            for (var k = 0; k < 300; k++)
+                verify(SL.knownStation(saved, { url_resolved: "http://s" + k + ".example/live/", url: "", stationuuid: "" }, named))
+        compare(named.length, 300)
+        compare(named[299].stationuuid, "u-299")
+        compare(SL.knownStationAt(saved, named[150]), 150)
+    }
+
+    // ── pageAfter: where "Show more" stands ──────────────────────────────
+    // The search asks for fifty rows a page and shows thirty a click.
+    readonly property string _qs50: "/json/stations/search?name=nova&hidebroken=true&order=votes&reverse=true&limit=50"
+
+    function test_a_page_nothing_was_dropped_from_goes_on_where_the_cap_cut_it() {
+        // Fifty rows, none saved: the walk stops at the thirtieth.
+        var first = SL.pageAfter(_qs50, 0, 50, 30)
+        compare(first.at, 30)
+        compare(first.more, true)
+        // The next page is asked from there and cut at thirty again.
+        var second = SL.pageAfter(_qs50, first.at, 50, 30)
+        compare(second.at, 60)
+        compare(second.more, true)
+    }
+
+    function test_a_full_page_half_saved_still_has_a_next_one() {
+        // Fifty rows, twenty-five of them the listener's own: twenty-five are
+        // shown, under the cap, and every row was walked. The page was full,
+        // so the directory may hold a fifty-first.
+        var p = SL.pageAfter(_qs50, 0, 50, 50)
+        compare(p.at, 50)
+        compare(p.more, true)
+    }
+
+    function test_a_next_page_of_thirty_duplicates_and_twenty_new_still_has_one_behind_it() {
+        // Asked from row 30. Twenty rows go in, short of the thirty the click
+        // had room for, and the next page starts behind all fifty.
+        var p = SL.pageAfter(_qs50, 30, 50, 50)
+        compare(p.at, 80)
+        compare(p.more, true)
+    }
+
+    function test_a_page_of_nothing_but_duplicates_is_asked_past() {
+        // The same numbers whatever the dedup left: what is shown is no input.
+        var p = SL.pageAfter(_qs50, 80, 50, 50)
+        compare(p.at, 130)
+        compare(p.more, true)
+    }
+
+    function test_a_short_page_is_the_end_of_the_list() {
+        // Twelve rows answered a query that asked for fifty.
+        compare(SL.pageAfter(_qs50, 0, 12, 12).more, false)
+        compare(SL.pageAfter(_qs50, 0, 12, 12).at, 12)
+        // One row short of a full page is short; the full page is not.
+        compare(SL.pageAfter(_qs50, 0, 49, 49).more, false)
+        compare(SL.pageAfter(_qs50, 0, 50, 50).more, true)
+        // Thirty rows fill the cap exactly and the walk still reached the end.
+        compare(SL.pageAfter(_qs50, 0, 30, 30).more, false)
+        // A short page the cap cut has its tail still unshown.
+        compare(SL.pageAfter(_qs50, 0, 40, 30).more, true)
+        compare(SL.pageAfter(_qs50, 0, 40, 30).at, 30)
+        // The last rows of the list, a short page of duplicates: nothing behind it.
+        compare(SL.pageAfter(_qs50, 100, 7, 7).more, false)
+        compare(SL.pageAfter(_qs50, 100, 7, 7).at, 107)
+    }
+
+    function test_an_empty_page_ends_the_list_where_it_stood() {
+        var p = SL.pageAfter(_qs50, 100, 0, 0)
+        compare(p.at, 100)
+        compare(p.more, false)
+    }
+
+    function test_before_any_answer_there_is_no_next_page() {
+        compare(SL.pageAfter().at, 0)
+        compare(SL.pageAfter().more, false)
+        compare(SL.pageAfter(null, null, null, null).more, false)
+        compare(SL.pageAfter(undefined, undefined, undefined, undefined).at, 0)
+        compare(SL.pageAfter("", 0, 0, 0).more, false)
+    }
+
+    function test_a_query_without_a_limit_has_no_full_page() {
+        // Asked without a limit the directory sends the whole list.
+        var whole = "/json/stations/search?name=nova"
+        compare(SL.pageAfter(whole, 0, 50, 50).more, false)
+        compare(SL.pageAfter(whole, 0, 50, 30).more, true)
+        compare(SL.pageAfter("", 0, 50, 50).more, false)
+        compare(SL.pageAfter(null, 0, 50, 50).more, false)
+        // Only the query's own limit counts: not a name that holds the word,
+        // not a limit of nothing, not one that is no number.
+        compare(SL.pageAfter("/json/stations/search?name=limit=50", 0, 50, 50).more, false)
+        compare(SL.pageAfter("/json/stations/search?name=x&nolimit=50", 0, 50, 50).more, false)
+        compare(SL.pageAfter("/json/stations/search?name=x&limit=0", 0, 50, 50).more, false)
+        compare(SL.pageAfter("/json/stations/search?name=x&limit=fifty", 0, 50, 50).more, false)
+        compare(SL.pageAfter("/json/stations/search?limit=50&name=x", 0, 50, 50).more, true)
+        compare(SL.pageAfter("/json/stations/search?name=x&limit=20", 0, 20, 20).more, true)
+        compare(SL.pageAfter("/json/stations/search?name=x&limit=20", 0, 19, 19).more, false)
+    }
+
+    function test_counts_that_are_no_counts_read_as_nothing() {
+        // A walk cannot pass more rows than the answer carried.
+        compare(SL.pageAfter(_qs50, 0, 50, 80).at, 50)
+        compare(SL.pageAfter(_qs50, 0, 12, 80).more, false)
+        // Below zero, not a number, no number at all.
+        compare(SL.pageAfter(_qs50, -30, 50, 30).at, 30)
+        compare(SL.pageAfter(_qs50, NaN, 50, 30).at, 30)
+        compare(SL.pageAfter(_qs50, "x", 50, 30).at, 30)
+        compare(SL.pageAfter(_qs50, 30, -5, -5).at, 30)
+        compare(SL.pageAfter(_qs50, 30, -5, -5).more, false)
+        compare(SL.pageAfter(_qs50, 30, 50, NaN).at, 30)
+        compare(SL.pageAfter(_qs50, 30, 50, NaN).more, true)
+        compare(SL.pageAfter(_qs50, 30, {}, []).more, false)
+        // Numbers that came as text, and halves of a row.
+        compare(SL.pageAfter(_qs50, "30", "50", "50").at, 80)
+        compare(SL.pageAfter(_qs50, "30", "50", "50").more, true)
+        compare(SL.pageAfter(_qs50, 30.9, 50.9, 30.9).at, 60)
+        // A query that is no string.
+        compare(SL.pageAfter(50, 0, 50, 50).more, false)
+        compare(SL.pageAfter({ limit: 50 }, 0, 50, 50).more, false)
+    }
+
+    function test_a_list_and_a_query_past_any_honest_length_are_only_numbers() {
+        // A mirror that ignores the limit and sends everything it has.
+        var p = SL.pageAfter(_qs50, 1000000000, 100000, 100000)
+        compare(p.at, 1000100000)
+        compare(p.more, true)
+        compare(SL.pageAfter(_qs50, 0, 100000, 30).at, 30)
+        var name = ""
+        for (var i = 0; i < 20000; i++) name += "limit=50x"
+        compare(SL.pageAfter("/json/stations/search?name=" + name + "&limit=50", 0, 50, 50).more, true)
+        compare(SL.pageAfter("/json/stations/search?name=" + name, 0, 50, 50).more, false)
+        // A page size no directory serves is still only a size.
+        compare(SL.pageAfter("/json/stations/search?name=x&limit=99999999999999999999999", 0, 50, 50).more, false)
     }
 }

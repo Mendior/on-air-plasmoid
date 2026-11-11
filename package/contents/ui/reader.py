@@ -39,25 +39,41 @@ def _ogg_buffer_title(path: str) -> str:
     except OSError:
         return ""
 
-    def last_field(key: bytes, not_before: int = 0, not_after: int = -1) -> str:
-        pos = blob.rfind(key, 0, len(blob) if not_after < 0 else not_after)
-        if pos < 4 or pos < not_before:
-            return ""
-        # Each field rides as <u32le length><KEY=value>; a match whose
-        # length disagrees is stream data that happened to spell the key.
-        ln = int.from_bytes(blob[pos - 4:pos], "little")
-        if ln < len(key) + 1 or ln > 1000 or pos + ln > len(blob):
-            return ""
-        raw = blob[pos + len(key):pos + ln]
-        try:
-            return raw.decode("utf-8").strip()
-        except UnicodeDecodeError:
-            return ""
+    # A field name counts whatever its case, by the format's own rule, and
+    # encoders do differ. The search runs on a lowered copy: lowering moves
+    # no byte, so a place found in one is the same place in the other.
+    low = blob.lower()
 
-    title = last_field(b"TITLE=") or last_field(b"title=")
+    def last_field(key: bytes, not_before: int = 0, not_after: int = -1) -> tuple[int, str]:
+        """The last whole field of that name inside the window.
+
+        Where its name starts and what it says; (-1, "") when there is none.
+        """
+        end = len(low) if not_after < 0 else not_after
+        while True:
+            pos = low.rfind(key, 0, end)
+            if pos < 4 or pos < not_before:
+                return -1, ""
+            # Each field rides as <u32le length><KEY=value>. A match whose
+            # length disagrees is stream data that happened to spell the key,
+            # the tail of a longer name (ALBUMARTIST= ends in ARTIST=), or a
+            # field the relay has not finished writing. Giving up there lost
+            # the artist of every block that names the album's artist after
+            # the track's, so the search goes on with what stands before it.
+            ln = int.from_bytes(blob[pos - 4:pos], "little")
+            if len(key) + 1 <= ln <= 1000 and pos + ln <= len(blob):
+                try:
+                    return pos, blob[pos + len(key):pos + ln].decode("utf-8").strip()
+                except UnicodeDecodeError:
+                    pass
+            end = pos + len(key) - 1
+
+    tpos, title = last_field(b"title=")
     # The artist has to come from the SAME comment block as the title: a
     # newer block carrying a title and no artist used to be paired with the
-    # previous track's artist.
+    # previous track's artist. The block is the one around the title that was
+    # taken, not around the last place the word stood: with those two apart
+    # the old song was printed under the new artist.
     #
     # A block's real boundary is the identification header an Ogg chain
     # restart writes before its comments, not a neighbouring title. Anchoring
@@ -65,7 +81,6 @@ def _ogg_buffer_title(path: str) -> str:
     # TITLE; in the other order the old artist sat between the two titles and
     # was taken for the new one. The window is bounded at BOTH ends, so a
     # later block carrying an artist and no title cannot reach back either.
-    tpos = max(blob.rfind(b"TITLE="), blob.rfind(b"title="))
     floor, ceil = 0, len(blob)
     if tpos >= 0:
         for mark in _OGG_BLOCK_MARKS:
@@ -79,9 +94,9 @@ def _ogg_buffer_title(path: str) -> str:
             # No header inside the window — the 4 MB tail cut it off. Fall
             # back to the previous title, which still separates blocks when
             # ARTIST leads and is no worse than what it replaced.
-            prev = max(blob.rfind(b"TITLE=", 0, tpos), blob.rfind(b"title=", 0, tpos))
+            prev = low.rfind(b"title=", 0, tpos)
             floor = prev + 1 if prev >= 0 else 0
-    artist = last_field(b"ARTIST=", floor, ceil) or last_field(b"artist=", floor, ceil)
+    artist = last_field(b"artist=", floor, ceil)[1]
     if title and artist:
         return f"{artist} - {title}"
     return title
@@ -196,11 +211,22 @@ MAX_META_BLOCKS = 10
 
 
 def decode_meta(raw: bytes) -> str:
-    """UTF-8 first, Latin-1 as a fallback (Latin-1 can never fail)."""
+    """UTF-8 first, then Windows-1252, then Latin-1, which can never fail.
+
+    The two single-byte tables differ only from 0x80 to 0x9f, where Latin-1
+    has control characters and Windows-1252 has the en dash (0x96), the curly
+    quotes (0x91 to 0x94) and the euro sign. Read as Latin-1, a line with
+    that dash between artist and title did not split into the two.
+    Windows-1252 has no character at 0x81, 0x8d, 0x8f, 0x90 and 0x9d, so a
+    title with one of those still goes to Latin-1 whole.
+    """
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
-        return raw.decode("latin-1")
+        try:
+            return raw.decode("cp1252")
+        except UnicodeDecodeError:
+            return raw.decode("latin-1")
 
 
 def extract_field(raw_meta: bytes, key: bytes) -> str:
@@ -332,10 +358,18 @@ def main():
 
         except KeyboardInterrupt:
             pass
-    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ContentDecodingError) as exc:
         # TRANSIENT network failure — exit silently (no sentinel) so the
         # plasmoid's poll can retry once the network/server recovers. The
         # 6-empty-results counter on the QML side still bounds endless polling.
+        # A connection cut inside the body belongs here as well. requests
+        # raises ChunkedEncodingError for it (measured: a reset after 3000
+        # bytes, a chunk cut short, a body shorter than its Content-Length)
+        # and that is not a ConnectionError, so one dropped poll used to
+        # reach the verdict below and the station lost its titles until it
+        # was started again by hand.
         # requests embeds the full URL in the exception text — type+host only.
         print(f"reader.py: transient {type(exc).__name__} for {log_host}", file=sys.stderr)
     except requests.exceptions.RequestException as exc:

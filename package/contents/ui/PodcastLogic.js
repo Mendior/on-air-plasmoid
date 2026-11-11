@@ -193,9 +193,104 @@ function extractTimestamps(plain) {
 
 // ── the feed ─────────────────────────────────────────────────────────────
 
+// The zone names RFC 822 allows, in minutes east of Greenwich.
+var _RFC822_ZONES = { UT: 0, GMT: 0, Z: 0, EST: -300, EDT: -240, CST: -360,
+                      CDT: -300, MST: -420, MDT: -360, PST: -480, PDT: -420 }
+var _RFC822_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun",
+                      "jul", "aug", "sep", "oct", "nov", "dec"]
+
+// A feed's pubDate as epoch milliseconds, 0 when it cannot be read.
+//
+// RSS dates are RFC 822, and Date.parse reads only part of that. Measured
+// on Qt 6.12: "Tue, 03 Nov 2026 08:00:00 PDT" is NaN, and so are "UT", a
+// day name spelled "Tues,", the wrong day name, no day name at all and a
+// time without seconds, while EST, GMT and +0200 parse. Those episodes
+// were listed without a date. The day name is not checked here, the RFC's
+// zone names are looked up, and a time without a zone counts as UTC, as
+// Qt already had it. Anything in another shape (ISO 8601, a zone name
+// outside the RFC) is left to Date.parse.
+function parseRfc822(text) {
+    var s = String(text || "").replace(/\s+/g, " ").trim()
+    // A date is some forty characters. The cap also keeps the pattern
+    // below cheap on whatever a feed puts between its pubDate tags.
+    if (s.length > 80) return 0
+    var m = /^(?:[a-z]+[.,]? ?)?(\d{1,2}) ([a-z]{3})[a-z]*\.? (\d{2,4}) (\d{1,2}):(\d\d)(?::(\d\d))? ?(\S*)$/i.exec(s)
+    if (m) {
+        var day = parseInt(m[1], 10)
+        var month = _RFC822_MONTHS.indexOf(m[2].toLowerCase())
+        var year = parseInt(m[3], 10)
+        // RFC 2822 4.3: two digits are 20xx up to 49 and 19xx from 50,
+        // three digits are counted from 1900.
+        if (m[3].length === 2) year += year < 50 ? 2000 : 1900
+        else if (m[3].length === 3) year += 1900
+        var hh = parseInt(m[4], 10)
+        var mi = parseInt(m[5], 10)
+        var ss = m[6] ? parseInt(m[6], 10) : 0
+        var zone = m[7].toUpperCase()
+        var num = /^([+-])(\d\d):?(\d\d)$/.exec(zone)
+        var off = NaN
+        if (zone === "")
+            off = 0
+        else if (num && parseInt(num[3], 10) < 60)
+            off = (num[1] === "-" ? -1 : 1) * (parseInt(num[2], 10) * 60 + parseInt(num[3], 10))
+        else if (_RFC822_ZONES.hasOwnProperty(zone))
+            off = _RFC822_ZONES[zone]
+        // Date.UTC rolls 31 February over into March. A day the month does
+        // not have is no date, and reading the day back catches it.
+        if (!isNaN(off) && month !== -1 && hh < 24 && mi < 60 && ss <= 60
+            && new Date(Date.UTC(year, month, day)).getUTCDate() === day)
+            return Date.UTC(year, month, day, hh, mi, ss) - off * 60000
+    }
+    var parsed = Date.parse(s)
+    return isNaN(parsed) ? 0 : parsed
+}
+
+// One episode row from what parseFeed found for it: the item's own text,
+// its enclosure tag, the vetted address and the date.
+function _episodeRow(f) {
+    var item = f.item
+    var title = _cleanText(_tagBody(item, "title"))
+    var guid = _cleanText(_tagBody(item, "guid"))
+    // Notes: prefer the richer content:encoded, else description, else
+    // the itunes summary — all untrusted HTML, sanitized to plain here.
+    var rawNotes = _tagBody(item, "content:encoded")
+    if (rawNotes === "") rawNotes = _tagBody(item, "description")
+    if (rawNotes === "") rawNotes = _tagBody(item, "itunes:summary")
+    // Per-episode artwork: the itunes:image href (a self-closing tag,
+    // so read the attribute off the tag itself), kept only if it passes
+    // the same http(s)-and-not-private gate as every other fetched URL.
+    var imgTag = /<itunes:image\b[^>]*>/i.exec(item)
+    var img = imgTag ? decodeEntities(_attr(imgTag[0], "href")).trim() : ""
+    // No i18n here — a .pragma library has no QML context; an
+    // untitled episode ships as "" and the delegate names it.
+    return {
+        title: title,
+        url: f.url,
+        // Left empty when the feed gives none — episodeKey() already
+        // falls back to the url, so substituting here only threw away the
+        // one fact the seen-key needs: whether this show HAS stable ids.
+        // A token-carrying feed rotates its url every fetch, so the
+        // substituted "guid" changed each cycle and every poll announced
+        // the same episode as new. The guid-less branch that was meant to
+        // catch exactly that could never run, because nothing was ever
+        // guid-less once this line had spoken.
+        guid: guid,
+        pubMs: f.when,
+        durationSec: parseDuration(_tagBody(item, "itunes:duration")),
+        sizeBytes: parseInt(_attr(f.enclosure, "length"), 10) || 0,
+        notes: notesToPlain(stripCdata(rawNotes), 4000),
+        image: urlAllowed(img) ? img : ""
+    }
+}
+
 // RSS text in, episode rows out. Never throws. A page that is not an RSS
 // feed (HTML error page, a JSON API response) comes back ok:false so the
 // UI can say so instead of showing zero rows with a straight face.
+//
+// episodes[0] is the newest. Most feeds are written that way and come back
+// in file order. One whose every episode is dated, oldest at the top, is
+// turned round before the cap: sixty episodes in that order used to give
+// Ep 1 to Ep 50, and the refresh took Ep 1 for the latest every time.
 function parseFeed(xml, maxItems) {
     var text = String(xml || "")
     var cap = maxItems > 0 ? maxItems : 50
@@ -231,7 +326,13 @@ function parseFeed(xml, maxItems) {
     // scanner right back on the expensive path.
     var itemClose = /<\/item>/gi
     var m
-    while (out.episodes.length < cap) {
+    // Where each episode sits and when it came out. The rows themselves are
+    // built afterwards, for the ones that are kept. A feed is read past the
+    // cap only while it still looks oldest-first; the usual newest-first
+    // one gives that away at its second episode and stops at the cap.
+    var found = []
+    var oldestFirst = true
+    while (oldestFirst || found.length < cap) {
         itemClose.lastIndex = itemRe.lastIndex
         if (!itemClose.test(text)) break
         m = itemRe.exec(text)
@@ -242,40 +343,16 @@ function parseFeed(xml, maxItems) {
         var url = decodeEntities(_attr(encTag[0], "url")).trim()
         var mime = _attr(encTag[0], "type").trim()
         if (!urlAllowed(url) || !_enclosurePlayable(mime)) continue
-        var title = _cleanText(_tagBody(item, "title"))
-        var guid = _cleanText(_tagBody(item, "guid"))
-        var when = Date.parse(_cleanText(_tagBody(item, "pubDate")))
-        // Notes: prefer the richer content:encoded, else description, else
-        // the itunes summary — all untrusted HTML, sanitized to plain here.
-        var rawNotes = _tagBody(item, "content:encoded")
-        if (rawNotes === "") rawNotes = _tagBody(item, "description")
-        if (rawNotes === "") rawNotes = _tagBody(item, "itunes:summary")
-        // Per-episode artwork: the itunes:image href (a self-closing tag,
-        // so read the attribute off the tag itself), kept only if it passes
-        // the same http(s)-and-not-private gate as every other fetched URL.
-        var imgTag = /<itunes:image\b[^>]*>/i.exec(item)
-        var img = imgTag ? decodeEntities(_attr(imgTag[0], "href")).trim() : ""
-        // No i18n here — a .pragma library has no QML context; an
-        // untitled episode ships as "" and the delegate names it.
-        out.episodes.push({
-            title: title,
-            url: url,
-            // Left empty when the feed gives none — episodeKey() already
-            // falls back to the url, so substituting here only threw away the
-            // one fact the seen-key needs: whether this show HAS stable ids.
-            // A token-carrying feed rotates its url every fetch, so the
-            // substituted "guid" changed each cycle and every poll announced
-            // the same episode as new. The guid-less branch that was meant to
-            // catch exactly that could never run, because nothing was ever
-            // guid-less once this line had spoken.
-            guid: guid,
-            pubMs: isNaN(when) ? 0 : when,
-            durationSec: parseDuration(_tagBody(item, "itunes:duration")),
-            sizeBytes: parseInt(_attr(encTag[0], "length"), 10) || 0,
-            notes: notesToPlain(stripCdata(rawNotes), 4000),
-            image: urlAllowed(img) ? img : ""
-        })
+        var when = parseRfc822(_cleanText(_tagBody(item, "pubDate")))
+        if (when === 0 || (found.length > 0 && when < found[found.length - 1].when))
+            oldestFirst = false
+        found.push({ item: item, enclosure: encTag[0], url: url, when: when })
     }
+    // Dates that never go down and do go up: the newest is at the bottom.
+    if (oldestFirst && found.length > 1 && found[0].when < found[found.length - 1].when)
+        found.reverse()
+    for (var i = 0; i < found.length && i < cap; i++)
+        out.episodes.push(_episodeRow(found[i]))
     // A real feed with zero usable episodes is still a feed — ok reports
     // "this parsed as RSS", not "you will like the contents".
     out.ok = out.episodes.length > 0
@@ -285,10 +362,32 @@ function parseFeed(xml, maxItems) {
 
 // ── files and positions ──────────────────────────────────────────────────
 
+// The longest start of s that fits both maxUnits UTF-16 units and maxBytes
+// of UTF-8, cut between two code points: a surrogate pair is kept whole or
+// dropped whole. Linux measures a file name in bytes (NAME_MAX is 255), and
+// a Cyrillic letter takes two of them, a CJK one three.
+function capText(s, maxUnits, maxBytes) {
+    var i = 0
+    var bytes = 0
+    while (i < s.length) {
+        var c = s.charCodeAt(i)
+        var low = (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) ? s.charCodeAt(i + 1) : 0
+        var pair = low >= 0xDC00 && low <= 0xDFFF
+        // Half a pair on its own is written to disk as U+FFFD: three bytes.
+        var b = pair ? 4 : (c < 0x80 ? 1 : (c < 0x800 ? 2 : 3))
+        var units = pair ? 2 : 1
+        if (i + units > maxUnits || bytes + b > maxBytes) break
+        i += units
+        bytes += b
+    }
+    return s.substring(0, i)
+}
+
 // A filename the shell, the filesystem and the eye can all live with.
 // Path separators, control characters, quotes and leading dots go; long
-// titles are capped so the enclosure extension still fits.
-function safeFileName(title, fallback) {
+// titles are capped at 120 characters, and at maxBytes of UTF-8 where the
+// caller gives one.
+function safeFileName(title, fallback, maxBytes) {
     var t = String(title || "")
         .replace(/[\x00-\x1f\x7f]/g, " ")
         .replace(/[\/\\:*?"'<>|`$]/g, " ")
@@ -296,7 +395,7 @@ function safeFileName(title, fallback) {
         // Leading dot-runs go WITH their whitespace: "../../etc" arrives
         // here as ".. .. etc" and must shed the whole prefix, not one run.
         .replace(/^[.\s]+/, "")
-    if (t.length > 120) t = t.substring(0, 120).trim()
+    t = capText(t, 120, maxBytes > 0 ? maxBytes : Infinity).trim()
     return t !== "" ? t : (fallback || "episode")
 }
 
@@ -332,14 +431,22 @@ function episodeFileName(title, url, feed, guid) {
     // scheme, port and trailing slash for the same show, and the raw string
     // would give one show two tags — every file downloaded under the other
     // spelling then reads as "not downloaded".
-    return safeFileName(title, "episode")
+    //
+    // The title gets what NAME_MAX (255 bytes) leaves after " [8hex]." in
+    // front of the extension and ".part" behind it, which is 235 bytes for
+    // an mp3. Any name that could be saved before is under that and keeps
+    // its spelling, so a file already on disk is still recognised.
+    var ext = fileExt(url)
+    return safeFileName(title, "episode", 255 - 5 - 12 - ext.length)
            + " [" + shortTag(feedKey(feed) + "\n" + episodeKey(guid, url)) + "]."
-           + fileExt(url)
+           + ext
 }
 
 // What the same episode was called before the tag existed. Files already
 // on disk keep working: every "is it downloaded" check accepts this name
 // too, so nothing has to be renamed and no ledger has to be migrated.
+// No byte cap here: these names are only compared with files the old
+// 120-character rule already wrote.
 function legacyEpisodeFileName(title, url) {
     return safeFileName(title, "episode") + "." + fileExt(url)
 }
@@ -599,6 +706,49 @@ function feedKey(url) {
     var host = m[1].toLowerCase().replace(/:(80|443)$/, "")
     var path = (m[2] || "").replace(/\/+$/, "")
     return host + path
+}
+
+// The address a show has moved to, out of a directory's search results for
+// its title, or "" when the results do not single one out.
+//
+// A title is not an identity. Asked for "Tech Talk", iTunes names three
+// shows exactly that, each with its own feed, and "the morning show
+// podcast" comes twice. So one feed, and only one, has to carry the exact
+// title. A result still pointing at deadFeed means the directory knows of
+// no move, and then whatever else shares the title is another show.
+// Results with no feed, or with one the widget would not fetch, are passed
+// over. deadFeed itself is never the answer.
+function pickHealedFeed(results, title, deadFeed) {
+    if (!Array.isArray(results)) return ""
+    var want = _showName(title)
+    if (want === "") return ""
+    var deadKey = feedKey(deadFeed)
+    var pick = ""
+    for (var i = 0; i < results.length; i++) {
+        var r = results[i]
+        if (!r || typeof r !== "object") continue
+        var cand = String(r.feedUrl || "").trim()
+        if (cand === "") continue
+        if (feedKey(cand) === deadKey) return ""
+        if (!urlAllowed(cand) || _showName(r.collectionName) !== want) continue
+        if (pick === "") pick = cand
+        else if (feedKey(cand) !== feedKey(pick)) return ""
+    }
+    return pick
+}
+
+// A show's name as two directories would have to agree on it: case and
+// spacing aside, nothing else.
+function _showName(s) {
+    return String(s === undefined || s === null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase()
+}
+
+// Whether a feed's bad answer says the address itself is gone. Only then
+// may a subscription be moved for good. A 403, or a 200 that turns out to
+// be a web page, is what a paywall, a bot filter or a maintenance page
+// answers for a show that is still there.
+function feedGoneForGood(status) {
+    return status === 404 || status === 410
 }
 
 // ffprobe -show_chapters json → [[startSec, title], …]. Untrusted process

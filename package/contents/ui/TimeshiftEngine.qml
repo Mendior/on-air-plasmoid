@@ -538,8 +538,14 @@ Item {
                 // one from here — and the hour cap then re-armed it, brought the
                 // tap up and played the room awake with nobody asking. The park
                 // lives on the app side, so that is where the question goes.
+                // Nor for a room nobody is in. A bare stop() carries no park
+                // flag, so a relay left armed behind one looked live from here
+                // too: at the cap it re-armed, took its UP ack and played a
+                // station that had been silent for an hour. The birth-death
+                // branch above already asks the player, and this one must.
                 if (relay && !shifted && !app._tsPaused
                     && bufStartMs > 0 && nowMs - bufStartMs >= 60000
+                    && app.isPlaying()
                     && _relayRestarts < 3 && !app._orderLapsed()) {
                     _relayRestarts++;
                     relayRestartDecay.restart();

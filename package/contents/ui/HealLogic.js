@@ -9,10 +9,14 @@
 // dead address, and in what order.
 .pragma library
 .import "StreamLogic.js" as StreamLogic
+.import "HostGuard.js" as HostGuard
 
 // The normalized name form both sides of every comparison use.
 function normName(s) {
-    return (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+    // String(): the directory is publicly writable, and one row whose name
+    // arrived as a number used to throw here and take the other twenty-nine
+    // rows of the answer down with it.
+    return (s === undefined || s === null ? "" : String(s)).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 // Streaming hosts that rent one base domain to thousands of unrelated
@@ -33,6 +37,10 @@ var SHARED_STREAM_HOSTS = {
     "cloudfront.net": true, "fastly.net": true, "zenolive.com": true,
     "radioking.com": true, "voscast.com": true, "torontocast.com": true,
     "fluidstream.net": true, "mixlr.com": true, "yesstreaming.net": true,
+    // Rent-a-stream hosts met in a listener's own list and in the shipped
+    // one (2026-11-10); each rents a port or a subdomain to anybody.
+    "fast-serv.com": true, "asurahosting.com": true, "streamerr.co": true,
+    "streemlion.com": true, "listen2myradio.com": true,
     // Free dynamic-DNS names: anyone can take a.ddns.net next to yours, so
     // the base proves nothing about who runs the stream.
     "ddns.net": true, "duckdns.org": true, "no-ip.org": true, "no-ip.biz": true,
@@ -218,13 +226,15 @@ function ladder(results, savedUrl, savedName, knownCc, anySound) {
         if (String(r.lastcheckok) !== "1") continue;
         // http(s) only (frontDoor). This address is auditioned straight into
         // the player, and a file: or data: row must never become its source.
-        var cand = frontDoor(r).filter(function(d) { return d !== saved; })[0] || "";
+        var cand = frontDoor(r).filter(function(d) { return !sameDoor(d, saved); })[0] || "";
         if (cand === "") continue;
         var fmt = StreamLogic.streamFormat(cand);
         if (fmt === "playlist") continue;
         var rowNorm = normName(r.name);
         var rowBase = StreamLogic.baseDomain(StreamLogic.hostOf(cand));
-        var home = roof && rowBase === base;
+        // A bare address has no name to share: another port on the same
+        // number is another server, rented to anyone.
+        var home = roof && rowBase === base && (!_bareAddr(base) || _port(cand) === _port(saved));
         var score = scoreRow(rowNorm, norm, home);
         if (score < 0) continue;
         var br = parseInt(r.bitrate) || 0;
@@ -297,12 +307,21 @@ function strangerLabel(row, countryName) {
 // Contract: up to two http(s) addresses, no repeats; [] for nothing usable.
 function frontDoor(row) {
     var r = row || {};
-    var web = function(u) { var t = (u || "").toString(); return /^https?:\/\//i.test(t) ? t : ""; };
+    // http(s) on a public host. The catalogue is publicly writable and no
+    // one clicked, so a row may not send the player knocking on the router.
+    var web = function(u) {
+        var t = (u || "").toString();
+        if (!/^https?:\/\//i.test(t)) return "";
+        var host = HostGuard.hostOf(t);
+        return host !== "" && !HostGuard.isPrivateHost(host) ? t : "";
+    };
     var url = web(r.url), res = web(r.url_resolved);
     var fmt = url === "" ? "" : StreamLogic.streamFormat(url);
     var kin = url !== "" && res !== "" && fmt !== "playlist" && fmt !== "hls"
               && StreamLogic.baseDomain(StreamLogic.hostOf(url)) === StreamLogic.baseDomain(StreamLogic.hostOf(res));
     var doors = kin ? [url, res] : [res, url];
+    // One door in two spellings is one audition, not two.
+    if (sameDoor(doors[0], doors[1])) doors = [doors[0]];
     return doors.filter(function(d, i) { return d !== "" && doors.indexOf(d) === i; });
 }
 
@@ -332,7 +351,7 @@ function uuidRung(reply, orig, firstOnly, logoGate) {
     var fav = logoGate(row.favicon);
     // http(s) only (frontDoor), as on the name rung: the catalogue is
     // publicly writable and this address goes straight into the player.
-    var doors = frontDoor(row).filter(function(d) { return d !== orig; });
+    var doors = frontDoor(row).filter(function(d) { return !sameDoor(d, orig); });
     if (firstOnly === true) doors = doors.slice(0, 1);
     return doors.map(function(d) { return { url: d, byUuid: true, favicon: fav }; });
 }
@@ -371,4 +390,325 @@ function unheard(answered, attempts, prior, nowMs) {
 // hold nothing (see unheard).
 function lockHolds(stamp, nowMs) {
     return stamp > 0 && nowMs - stamp < 600000;
+}
+
+// Two spellings of one door: the same scheme, host and path. The host's
+// letter case, a trailing slash and blanks around a pasted address are
+// noise. The scheme is not: a TLS port that closed leaves the plain one,
+// and that is a move the list has to learn. Nor is the path's case, which
+// an Icecast mount means. addrKey folds both, for the questions where a
+// person retyped an address; this is the one for "did the station move".
+// Contract: false for anything that is not an http(s) address, so two
+// empty addresses are never the same door.
+function sameDoor(a, b) {
+    var key = function(u) {
+        var m = (typeof u === "string" ? u.trim() : "").match(/^(https?:\/\/)([^\/?#]+)(.*)$/i);
+        return m ? m[1].toLowerCase() + m[2].toLowerCase() + m[3].replace(/\/$/, "") : "";
+    };
+    var ka = key(a);
+    return ka !== "" && ka === key(b);
+}
+
+function _bareAddr(host) {
+    return host.charAt(0) === "[" || /^\d+(\.\d+){3}$/.test(host);
+}
+
+// An address in the parts the questions below ask about, null for anything
+// that is not http(s). The port is "" where it is the scheme's own.
+function _addr(u) {
+    var m = (typeof u === "string" ? u.trim() : "")
+            .match(/^(https?):\/\/(?:[^\/?#@]*@)?(\[[^\]]*\]|[^\/:?#]+)(?::(\d+))?([^?#]*)/i);
+    if (!m) return null;
+    var scheme = m[1].toLowerCase(), port = m[3] || "";
+    if ((scheme === "http" && port === "80") || (scheme === "https" && port === "443")) port = "";
+    return { scheme: scheme, host: m[2].toLowerCase(), port: port, path: m[4] === "" ? "/" : m[4] };
+}
+
+function _port(u) {
+    var a = _addr(u);
+    return a ? a.port : "";
+}
+
+function _origin(a) {
+    return a.scheme + "://" + a.host + (a.port !== "" ? ":" + a.port : "");
+}
+
+// ── The same mount on another server ────────────────────────────────────
+// A broadcaster's CDN moves a mount from one edge to another and the
+// address a listener saved answers 404, while the station plays on. Sky
+// Media did it to five mounts around 2026-10-22: seven rows of one home
+// list went quiet, the directory had a usable row for two of them, and
+// every one played from skymedia-live.bitflip.ee/<mount> (measured
+// 2026-11-10). A mount's own name on the station's own domain is who the
+// station is, whatever server carries it this month.
+
+// Mount names every station uses say nothing about which station it is.
+var _PLAIN_MOUNTS = {
+    "stream": true, "streams": true, "live": true, "listen": true, "radio": true,
+    "play": true, "player": true, "audio": true, "sound": true, "music": true,
+    "mount": true, "relay": true, "proxy": true, "icecast": true, "shoutcast": true,
+    "autodj": true, "index": true, "playlist": true, "master": true, "main": true,
+    "default": true, "high": true, "medium": true, "mobile": true, "hifi": true,
+    "best": true, "good": true, "normal": true, "standard": true, "source": true,
+    "direct": true, "online": true, "onair": true, "webradio": true, "internet": true,
+    "channel": true, "station": true, "broadcast": true, "listenlive": true,
+    "livestream": true, "simulcast": true, "radiostream": true, "mpeg": true,
+    "aacp": true, "aacplus": true, "flac": true, "opus": true
+};
+
+// The last piece of an address's path when it is a name of its own: "RETRO",
+// "retro1.mp3", never "stream", "live.mp3", ";" or "128". Fewer than four
+// letters name nothing either ("NRJ" could be anyone's).
+// Contract: the piece as written, or "".
+function mountOf(url) {
+    var a = _addr(url);
+    if (!a) return "";
+    var piece = a.path.substring(a.path.lastIndexOf("/") + 1);
+    var core = piece.toLowerCase().replace(/\.(mp3|aacp?|og[ga]|opus|flac|m3u8?|pls|ts)$/, "")
+                    .replace(/[^a-zà-ɏЀ-ӿ]/g, "");
+    return core.length >= 4 && _PLAIN_MOUNTS[core] !== true ? piece : "";
+}
+
+// Is otherUrl the saved mount on a sibling server? The station's own domain
+// (no landlord), the same scheme, port and path, a mount with a name of its
+// own, and two hosts that differ only in their numbers, as edge02 and
+// edge43 do. A bare address has only itself for a domain, so it has no
+// sibling to be mistaken for.
+function mountTwin(savedUrl, otherUrl) {
+    var a = _addr(savedUrl), b = _addr(otherUrl);
+    if (!a || !b || mountOf(savedUrl) === "") return false;
+    var base = StreamLogic.baseDomain(a.host);
+    if (base === "" || sharedBase(base)) return false;
+    if (StreamLogic.baseDomain(b.host) !== base) return false;
+    if (a.scheme !== b.scheme || a.port !== b.port || a.path !== b.path) return false;
+    return a.host.replace(/\d+/g, "#") === b.host.replace(/\d+/g, "#");
+}
+
+// Where the saved mount would be under a relative's roof: the lead's own
+// server, the saved path. A lead is another address on the saved station's
+// domain: a row of the same family in the listener's list, or where a
+// directory row's door landed.
+// Contract: "" when the lead is no relative (another domain, a landlord, a
+// bare address), is the dead server itself, or the mount has no name.
+function kinGuess(savedUrl, leadUrl) {
+    var a = _addr(savedUrl), b = _addr(leadUrl);
+    if (!a || !b || mountOf(savedUrl) === "") return "";
+    var base = StreamLogic.baseDomain(a.host);
+    if (base === "" || _bareAddr(a.host) || sharedBase(base)) return "";
+    if (StreamLogic.baseDomain(b.host) !== base || _origin(a) === _origin(b)) return "";
+    return _origin(b) + a.path;
+}
+
+// A stream answered: a 2xx that is not a page. An error page behind a
+// polite 200 is the usual way a CDN says no. An old SHOUTcast names no
+// type at all and still plays.
+function aliveAnswer(status, contentType) {
+    if (!(status >= 200 && status < 300)) return false;
+    return !/^\s*(text\/|application\/(json|xml|xhtml))/i.test(contentType || "");
+}
+
+// May a guess that answered be taken for the saved station? Only when the
+// answer came from the saved mount's twin: the guess itself where nothing
+// redirected, else where Qt says it ended. A door that plays but does not
+// say where from proves nothing about whose sound it is.
+function kinAccepts(savedUrl, guessUrl, status, contentType, landedUrl) {
+    if (!aliveAnswer(status, contentType)) return false;
+    return mountTwin(savedUrl, (landedUrl || "") === "" ? guessUrl : landedUrl);
+}
+
+// Every address that may know where the saved mount went: the listener's
+// own rows on the saved station's domain first (no question asked of
+// anyone), then both addresses of each directory row, the resolved one
+// first because it is the likelier relative.
+function kinLeads(savedUrl, ownRows, dirRows) {
+    var a = _addr(savedUrl), out = [], i;
+    if (!a) return out;
+    var base = StreamLogic.baseDomain(a.host);
+    for (i = 0; i < (ownRows || []).length; i++) {
+        var own = _addr((ownRows[i] || {}).hostname);
+        if (own && StreamLogic.baseDomain(own.host) === base && !sameDoor(ownRows[i].hostname, savedUrl))
+            out.push(ownRows[i].hostname);
+    }
+    for (i = 0; i < (dirRows || []).length; i++) {
+        var r = dirRows[i] || {};
+        if (_addr(r.url_resolved)) out.push(r.url_resolved);
+        if (_addr(r.url)) out.push(r.url);
+    }
+    return out;
+}
+
+// What to ask, in order: guesses first (the saved mount under each
+// relative's roof, a request to the station's own CDN), then at most three
+// doors on other domains, asked only for where they land. Six guesses and
+// three doors bound a hunt nobody clicked for.
+// Contract: { guesses, doors }, both empty where a twin cannot exist.
+function kinPlan(savedUrl, leads) {
+    var plan = { "guesses": [], "doors": [] };
+    var a = _addr(savedUrl);
+    if (!a || mountOf(savedUrl) === "") return plan;
+    var base = StreamLogic.baseDomain(a.host);
+    if (base === "" || _bareAddr(a.host) || sharedBase(base)) return plan;
+    for (var i = 0; i < (leads || []).length; i++) {
+        var b = _addr(leads[i]);
+        if (!b || HostGuard.isPrivateHost(b.host) || sameDoor(leads[i], savedUrl)) continue;
+        if (StreamLogic.baseDomain(b.host) === base) {
+            var g = kinGuess(savedUrl, leads[i]);
+            if (g !== "" && plan.guesses.indexOf(g) === -1 && plan.guesses.length < 6) plan.guesses.push(g);
+        } else {
+            var door = _origin(b) + b.path;
+            if (plan.doors.indexOf(door) === -1 && plan.doors.length < 3) plan.doors.push(door);
+        }
+    }
+    return plan;
+}
+
+var _PLAIN_WORDS = { "radio": true, "raadio": true, "rádio": true, "radyo": true, "station": true,
+                     "online": true, "live": true, "music": true, "hits": true, "plus": true,
+                     "stream": true, "channel": true, "digital": true };
+
+// The wider question, for a station the name search knows nothing about:
+// the first word of its name that is not every station's word. "Raadio
+// Relax International" asks for "relax", and the directory's "Relax FM
+// Eesti" answers with the family's door.
+// Contract: a word of four letters or more, lower case, or "".
+function kinWord(name) {
+    var words = normName(name).split(/[^a-z0-9à-ɏЀ-ӿ]+/);
+    for (var i = 0; i < words.length; i++)
+        if (words[i].length >= 4 && _PLAIN_WORDS[words[i]] !== true && !/^\d+$/.test(words[i]))
+            return words[i];
+    return "";
+}
+
+// Two-letter domains that are sold to anyone and name no country.
+var _VANITY_TLDS = { "fm": true, "am": true, "tv": true, "io": true, "co": true, "me": true,
+                     "ly": true, "to": true, "cc": true, "ws": true, "nu": true, "tk": true,
+                     "ai": true, "gg": true, "im": true, "sh": true, "st": true, "la": true };
+
+// The country a saved address's own domain names: bitflip.ee is Estonian,
+// bbc.co.uk British. It narrows the wider question for a row that carries
+// no country of its own, which is most rows added by hand.
+// Contract: a two-letter code, or "" where the domain says nothing.
+function tldCountry(savedUrl) {
+    var a = _addr(savedUrl);
+    if (!a || _bareAddr(a.host)) return "";
+    var tld = a.host.substring(a.host.lastIndexOf(".") + 1);
+    if (!/^[a-z]{2}$/.test(tld) || _VANITY_TLDS[tld] === true) return "";
+    return tld === "uk" ? "GB" : tld.toUpperCase();
+}
+
+// The wider question as a directory path, "" when the name has no word
+// worth asking for. The country narrows it when one is known: "relax"
+// alone is answered by thirty stations from everywhere, "relax" in EE by
+// the family whose doors lead home.
+function kinSearchPath(name, cc) {
+    var word = kinWord(name);
+    if (word === "") return "";
+    var code = (typeof cc === "string" ? cc : "").toUpperCase();
+    return "/json/stations/search?name=" + encodeURIComponent(word)
+           + (/^[A-Z]{2}$/.test(code) ? "&countrycode=" + code : "")
+           + "&hidebroken=true&order=votes&reverse=true&limit=30";
+}
+
+// ── One failure is not a death ──────────────────────────────────────────
+// An encoder restarts, a link drops for a second, a laptop wakes. The heal
+// used to ask the directory two and a half seconds after any one error
+// and, for a row with a uuid or its own domain, write the answer over the
+// saved address at the first buffer: "Star FM" at 320 kb/s would have
+// become its 96 kb/s mount for good (worked through on the directory's
+// answers of 2026-11-10; no such move in fourteen days of this desk's log).
+
+// Has the saved address had its second chance? One fresh open, at most
+// once a minute, before anybody asks where the station went.
+function knockFirst(lastKnockMs, nowMs) {
+    var ago = nowMs - lastKnockMs;
+    return !(ago >= 0 && ago < 60000);
+}
+
+var DEATH_PROOF_MS = 300000;
+
+// When may a move that the identity gate allows be written? "now" over an
+// address first seen dead five minutes ago or more, "later" before that,
+// "never" for a stopgap. firstDeadMs: when this session first saw the
+// saved address fail, 0 when it never did.
+function moveWhen(verdict, firstDeadMs, nowMs) {
+    if (verdict !== "permanent") return "never";
+    var dead = nowMs - firstDeadMs;
+    return firstDeadMs > 0 && dead >= DEATH_PROOF_MS ? "now" : "later";
+}
+
+// How long until the second look at an address that is "later".
+function proofWaitMs(firstDeadMs, nowMs) {
+    var dead = nowMs - firstDeadMs;
+    if (!(firstDeadMs > 0) || !(dead >= 0)) return DEATH_PROOF_MS;
+    return Math.max(1000, DEATH_PROOF_MS - dead);
+}
+
+// How many looks, five minutes apart, an address may go unanswered before
+// its silence counts.
+var PROOF_LOOKS = 3;
+
+// What the second look makes of the old address's answer. looks: how many
+// looks this move has had, this one included.
+// Contract: "keep" when the address is a stream again; "move" when its
+// server says it is gone, or when nobody has answered there in PROOF_LOOKS
+// looks; "again" while it is not known.
+// Anything that was not a stream used to be a "move", a look that timed out
+// included, and a slow three seconds rewrote the listener's list. Only two
+// things are proof now. The server's own word: 403, 404 or 410. And silence
+// that lasts, status 0 on every look while the new address played on, which
+// is what a host that is gone for good looks like. A server that says
+// anything else is still there, and -1 is KinHunt's answer whose last hop
+// Qt does not name: on a Qt that never names it, a living address gives
+// nothing but those.
+function proofVerdict(status, contentType, looks) {
+    if (aliveAnswer(status, contentType)) return "keep";
+    if (status === 403 || status === 404 || status === 410) return "move";
+    return status === 0 && looks >= PROOF_LOOKS ? "move" : "again";
+}
+
+// Did the directory answer the question?
+// Contract: true for a 200 whose body is a JSON list, the empty one
+// included; false for anything else and for no reply at all.
+// A page or an object behind a 200 is a directory that is unwell. Taken for
+// an answer it stamped the ten-minute lock and the listener was told the
+// station is nowhere.
+function answered(reply) {
+    if (!reply || reply.status !== 200) return false;
+    try { return Array.isArray(JSON.parse(reply.responseText)); } catch (e) { return false; }
+}
+
+// A directory reply as its rows: [] for no reply, a status that is not 200,
+// a body that is not a JSON list. The kin rung reads every rung's rows for
+// doors, whatever the rung itself made of them.
+function replyRows(reply) {
+    if (!reply || reply.status !== 200) return [];
+    var rows = null;
+    try { rows = JSON.parse(reply.responseText); } catch (e) { return []; }
+    return Array.isArray(rows) ? rows : [];
+}
+
+// Can this saved address have a twin at all? A mount with a name of its
+// own on a domain that is the station's: no landlord, no bare address.
+function kinPossible(savedUrl) {
+    var a = _addr(savedUrl);
+    if (!a || mountOf(savedUrl) === "") return false;
+    var base = StreamLogic.baseDomain(a.host);
+    return base !== "" && !_bareAddr(a.host) && !sharedBase(base);
+}
+
+// Which row of the list moves when a heal is written. Two rows can hold the
+// same address: the one that carries the playing station's name and is
+// switched on, else one that is switched on, else the first.
+// Contract: an index into rows, -1 when no row holds oldUrl.
+function movedRow(rows, oldUrl, playingName) {
+    var want = normName(playingName), on = -1, any = -1;
+    for (var i = 0; i < (rows || []).length; i++) {
+        var r = rows[i] || {};
+        if ((r.hostname || "") !== oldUrl) continue;
+        if (any < 0) any = i;
+        if (r.active === false) continue;
+        if (on < 0) on = i;
+        if (want !== "" && normName(r.name) === want) return i;
+    }
+    return on >= 0 ? on : any;
 }

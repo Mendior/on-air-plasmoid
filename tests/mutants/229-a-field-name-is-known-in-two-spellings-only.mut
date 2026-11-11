@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The relayed-Ogg reader knows TITLE= and title= and no other spelling.
+
+history:
+  Vorbis comment field names are case-insensitive. The reader tried TITLE=
+  first and title= only when there was none, so an older block in capitals
+  outvoted a newer one in lower case (the new artist under the old song), and
+  Title= was not found at all. Measured 2026-11-10 against the real helper.
+
+target:
+  package/contents/ui/reader.py
+
+find:
+      low = blob.lower()
+
+replace:
+      low = blob.replace(b"TITLE=", b"title=").replace(b"ARTIST=", b"artist=")
+
+expect:
+  Killed by tests/test_reader_oggbuf.py::test_a_field_name_counts_whatever_its_case.
+  Line-neutral.
