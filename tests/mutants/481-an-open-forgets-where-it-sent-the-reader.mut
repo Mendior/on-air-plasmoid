@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An open of the single file does not note the place it sent the reader to.
+
+history:
+  The end can come before the reader was ever seen playing: the file is
+  opened, the reader is sent to the park and runs into the unfinished end
+  at once. The place it was sent to is all that is known of it then, and
+  without it the end reads as a buffer played out.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          _heardPosMs = shiftPosMs;
+
+replace:
+          _heardPosMs = -1;
+
+expect:
+  Killed by tst_timeshiftengine::test_an_end_before_the_reader_was_seen_reopens_where_it_was_sent.
+  Line-neutral.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The engine's clock adds whatever the wall clock says has passed between two beats.
+
+history:
+  A laptop that sleeps eight hours wakes with a beat eight hours late,
+  and a clock set back by NTP gives one that is negative. The writer cut
+  nothing in either. A beat longer than three seconds, or one that runs
+  backwards, counts as one second.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+      return (gone >= 0 && gone <= TICK_SANE_MS) ? gone : TICK_MS;
+
+replace:
+      return gone;
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_a_beat_adds_what_passed_unless_the_clock_jumped.

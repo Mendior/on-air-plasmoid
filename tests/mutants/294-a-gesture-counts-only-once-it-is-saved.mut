@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The listener's own level is the saved one until the save, a second after
+  the gesture.
+
+history:
+  The wheel took a widget from 80 % to 20 % beside a device; a move of the
+  room's slider inside that second worked the device's level out of the 80
+  and sent 0.200 to a device that stood at 0.060.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      var pct = (Number.isFinite(pendingPct) && pendingPct > 0) ? pendingPct
+
+replace:
+      var pct = (Number.isFinite(pendingPct) && pendingPct > 100) ? pendingPct
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_gesture_not_yet_saved_is_already_the_level
+  and tests/qml/tst_volumeroad.qml::test_the_rooms_slider_inside_that_second_works_from_the_level_the_wheel_just_set.
+  Line-neutral.

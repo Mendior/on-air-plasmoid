@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The box shows the first output that reads like the configured one.
+
+history:
+  Two speakers of one model have one description. The config holds the
+  output's id, and the row is found by it.
+
+target:
+  package/contents/ui/OutputLogic.js
+
+find:
+          if (_text(outs[i], "id") === wanted) return i + 1;
+
+replace:
+          if (_text(outs[i], "description") === wanted) return i + 1;
+
+expect:
+  Killed by tests/qml/tst_outputlogic.qml::test_two_outputs_of_one_description_are_told_apart_by_their_id.

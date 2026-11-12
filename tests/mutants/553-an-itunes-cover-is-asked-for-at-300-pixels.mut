@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The cover of a song found on iTunes is asked for 300 pixels wide.
+
+history:
+  The Playing page draws its cover about 310 units a side, which on a
+  screen scaled to 175% is 543 pixels: a cover of 300 was stretched 1.8
+  times on the page itself. Apple serves the same picture at 600 under the
+  same address with another size in it (asked once, 2026-11-12: 600 by 600,
+  148 kB where the 300 was 44 kB). This mutant asks for 300 again.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      return art ? { "url": art.replace("100x100bb", "600x600bb"), "kind": pick.kind } : null;
+
+replace:
+      return art ? { "url": art.replace("100x100bb", "300x300bb"), "kind": pick.kind } : null;
+
+expect:
+  Killed by tests/qml/tst_artkind.qml::test_itunes_song_answer_is_read_with_its_kind.
+  Line-neutral.

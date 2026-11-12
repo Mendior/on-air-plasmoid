@@ -1122,6 +1122,153 @@ function artPickByArtist(wantArtist, cands) {
     return -1;
 }
 
+// The three things a picture beside a song can be. "track" is the cover of
+// the record on air: the artist and the song both matched. "artist" is a
+// picture of who plays it, "release" the sleeve of another record of theirs.
+// Only the first is the song's cover. The other two are shown with a line
+// that says what they are, and go nowhere that line cannot go with them.
+var _ART_KINDS = { "track": true, "artist": true, "release": true };
+
+// A kind as one of those three words, "" for anything else.
+// Contract: artKind("track") = "track"; artKind("cover") = "";
+//   artKind(undefined) = "".
+function artKind(k) {
+    return typeof k === "string" && _ART_KINDS[k] === true ? k : "";
+}
+
+// Which row of a song search to take and what it is: { index, kind }.
+// "track" when a row is the artist with this song, read as the stream wrote
+// it or with artist and title swapped, artPickEither's two readings.
+// "release" when no row has the song and one is the artist whole with
+// another: artPick's rank 1, which the lookup used to take for the cover.
+// Measured 2026-11-12 on Elmari tantsuõhtu: "Alen Veziko - Päiksepoolsel
+// tänaval" wore the sleeve of his single "Nüüd taas sajab lund", and nothing
+// on the panel, the lock screen or a television said it was another record.
+// The swapped reading comes before a release is settled for, so a song that
+// is among the rows is never passed over for another record. Without an
+// artist nothing is the artist's, and the answer is no row.
+// Contract: artChoice("Alen Veziko", "Päiksepoolsel tänaval", [Alen Veziko /
+//   Nüüd taas sajab lund]) = { index: 0, kind: "release" };
+//   artChoice("Moon Taxi feat. Mari-Leen", "Rahutu tuhkatriinu", [Mari-Leen
+//   / Rahutu tuhkatriinu]) = { index: 0, kind: "track" }; no row of the
+//   artist's, no rows or no artist = { index: -1, kind: "" }.
+function artChoice(wantArtist, wantTitle, cands) {
+    var i = -1;
+    if (artFold(wantArtist) !== "") {
+        i = artPick(wantArtist, wantTitle, cands, true);
+        if (i < 0 && artFold(wantTitle) !== "") i = artPick(wantTitle, wantArtist, cands, true);
+        if (i >= 0) return { "index": i, "kind": "track" };
+        i = artPick(wantArtist, wantTitle, cands);
+    }
+    return { "index": i, "kind": i >= 0 ? "release" : "" };
+}
+
+// A Deezer entity without an image still returns a VALID URL: it just has
+// an empty image id ("…/images/artist//250x250-….jpg") and serves a grey
+// placeholder silhouette. Accepting one poisons the art cache with junk for
+// the whole session, so it is "no image". The empty id has a second
+// spelling: d41d8cd98f00b204e9800998ecf8427e is the MD5 of "", the same grey
+// silhouette wearing a hash (caught live: the artist fallback for an
+// unmatched track showed the silhouette instead of falling through to the
+// station's own logo).
+function artDeezerReal(url) {
+    var u = (url || "").toString();
+    if (u === "" || /\/images\/\w+\/\//.test(u)
+        || u.indexOf("d41d8cd98f00b204e9800998ecf8427e") !== -1) return "";
+    return u;
+}
+
+// The rows of a catalogue's answer under one of its keys, [] for an answer
+// that has none there or is no answer at all.
+function _artRows(data, key) {
+    var rows = data !== null && typeof data === "object" ? data[key] : null;
+    return Array.isArray(rows) ? rows : [];
+}
+
+// A row as an object, whatever stood in the list.
+function _artRow(r) {
+    return r !== null && typeof r === "object" ? r : {};
+}
+
+// The four readers below turn one parsed answer into the picture it offers
+// for the track on air, { url, kind }, or null. want is { artist, title } as
+// the stream gave them. None of them asks the network.
+
+// Deezer's song search. The row is artChoice's. Where its album has no
+// sleeve Deezer's picture of the row's artist stands in, and that is a
+// picture of the artist however well the song matched.
+function artFromDeezerSongs(data, want) {
+    var rows = _artRows(data, "data"), w = _artRow(want), cands = [];
+    for (var i = 0; i < rows.length; i++)
+        cands.push({ "artist": _artRow(_artRow(rows[i]).artist).name || "", "title": _artRow(rows[i]).title || "" });
+    var pick = artChoice(w.artist, w.title, cands);
+    if (pick.index < 0) return null;
+    var row = _artRow(rows[pick.index]), album = _artRow(row.album);
+    var sleeve = artDeezerReal(album.cover_big) || artDeezerReal(album.cover_medium);
+    if (sleeve) return { "url": sleeve, "kind": pick.kind };
+    var face = artDeezerReal(_artRow(row.artist).picture_medium);
+    return face ? { "url": face, "kind": "artist" } : null;
+}
+
+// The iTunes song search, artChoice's row again. A row without a picture
+// offers nothing: the next row is another record.
+function artFromItunesSongs(data, want) {
+    var rows = _artRows(data, "results"), w = _artRow(want), cands = [];
+    for (var i = 0; i < rows.length; i++)
+        cands.push({ "artist": _artRow(rows[i]).artistName || "", "title": _artRow(rows[i]).trackName || "" });
+    var pick = artChoice(w.artist, w.title, cands);
+    var art = pick.index >= 0 ? String(_artRow(rows[pick.index]).artworkUrl100 || "") : "";
+    return art ? { "url": art.replace("100x100bb", "600x600bb"), "kind": pick.kind } : null;
+}
+
+// Deezer's artist search: the first artist's picture, when the name is the
+// one asked for (artPhotoTakes).
+function artFromDeezerArtist(data, artistName) {
+    var first = _artRow(_artRows(data, "data")[0]);
+    if (!artPhotoTakes(artistName, first.name || "")) return null;
+    var face = artDeezerReal(first.picture_big) || artDeezerReal(first.picture_medium);
+    return face ? { "url": face, "kind": "artist" } : null;
+}
+
+// The iTunes songs filed under the artist, for a song no catalogue has: the
+// sleeve of the first that is theirs alone (artPickByArtist). It is another
+// record by definition, the song being the one thing nobody found.
+function artFromItunesArtist(data, artistName) {
+    var rows = _artRows(data, "results"), cands = [];
+    for (var i = 0; i < rows.length; i++)
+        cands.push({ "artist": _artRow(rows[i]).artistName || "", "title": _artRow(rows[i]).trackName || "",
+                     "art": String(_artRow(rows[i]).artworkUrl100 || "") });
+    var pick = artPickByArtist(artistName, cands);
+    return pick >= 0 ? { "url": cands[pick].art.replace("100x100bb", "600x600bb"), "kind": "release" } : null;
+}
+
+// What a request of the lookup's plan is sent for, by the plan's name for
+// it: the song's cover from the song searches, the artist's picture from
+// Deezer's artist search, another record from the artist's iTunes songs. A
+// name the plan does not use reads as a song search.
+function artBrings(svc) {
+    return svc === "deezerArtist" ? "artist" : svc === "itunesArtist" ? "release" : "track";
+}
+
+// The picture kept from an earlier answer that stands in for the next
+// request, or null when that request has to go out. spare is { artist,
+// release }, each a { url, kind } met on the way or absent; brings is
+// artBrings() of the next request, "" at the end of the plan.
+// Every song search is heard first: a picture that is not the song's cover
+// never ends the chain while one of them could still find the cover. After
+// them the artist's picture goes before another record, kept or asked for,
+// because a face under a song misleads nobody and a sleeve with another
+// title printed on it can.
+// Contract: artSpare({ release: r }, "track") = null; artSpare({ release: r
+//   }, "artist") = null; artSpare({ release: r }, "release") = r;
+//   artSpare({ artist: a, release: r }, "") = a; artSpare({}, "") = null.
+function artSpare(spare, brings) {
+    var s = _artRow(spare);
+    if (brings === "track") return null;
+    if (s.artist) return s.artist;
+    return brings === "artist" ? null : (s.release || null);
+}
+
 // How long a changed title waits before its cover is looked up, in ms.
 // first: the title follows an empty header. sinceMoveMs: how long before
 // this change the lookup key last moved.
@@ -1250,12 +1397,20 @@ function countryLabel(cc, apiName, localeName) {
 // inside that country when the name alone found nothing, and also when it
 // found under THIN_ANSWER rows: that is the one answer with rows in it that
 // still gets another question.
-// Contract: s = { count, gotAnswer, mode, inheritedScope, bareScope, inCountry,
-//   countryQuery, stemCount }. No answer from the network is never "no results".
+// The listener's own stations an answer named are left out of the web rows
+// and shown in the list instead (knownStation), and they are an answer too:
+// a genre page of fifty saved stations left the web rows at none, and the
+// word was shaved to its stem and asked again as a name, or the chip dropped.
+// Contract: s = { count, own, gotAnswer, mode, inheritedScope, bareScope,
+//   inCountry, countryQuery, stemCount }. count is the web rows, own the saved
+//   stations the answers named, and the two together are what was found; an
+//   own that is no count is none. No answer from the network is never "no results".
 function emptyNext(s) {
     if (!s || s.gotAnswer !== true) return "done";
     var inCountry = s.inCountry === true && s.mode === "all";
-    if (s.count > 0) return inCountry && s.count < THIN_ANSWER ? "incountry" : "done";
+    var n = function(v) { v = parseInt(v, 10); return v > 0 ? v : 0; };
+    var found = n(s.count) + n(s.own);
+    if (found > 0) return inCountry && found < THIN_ANSWER ? "incountry" : "done";
     if (s.inheritedScope === true) return "unscope";
     if (s.bareScope === true) return "astyped";
     if (inCountry) return "incountry";
@@ -1377,6 +1532,17 @@ function directoryPage(base, limit, offset) {
     if (!(o >= 0)) o = 0;
     return String(base || "").split("?")[0]
         + "?hidebroken=true&order=votes&reverse=true&limit=" + n + "&offset=" + o;
+}
+
+// A directory answer as its rows.
+// Contract: the list in the body when the status is 200 and the body is a
+// JSON array, the empty list included; null for anything else: another
+// status, a body that is not JSON, and JSON that is no list.
+function directoryRows(status, body) {
+    if (status !== 200) return null;
+    var rows = null;
+    try { rows = JSON.parse(body); } catch (e) { return null; }
+    return Array.isArray(rows) ? rows : null;
 }
 
 // How long to wait before a later page that failed is asked again.
@@ -1568,6 +1734,44 @@ function pageAfter(qs, from, parsed, consumed) {
     var m = /[?&]limit=(\d+)/.exec(String(qs));
     var size = m ? n(m[1]) : 0, got = n(parsed), walked = Math.min(n(consumed), got);
     return { at: n(from) + walked, more: walked < got || (size > 0 && got >= size) };
+}
+
+// Whether "Show more" may ask for another page. The list stops at a ceiling
+// of rows on screen: a result that deep is noise, and every page knocks on up
+// to thirty stream hosts. The popup held the ceiling against the cap it had
+// planned for the page and not against the rows that came. With 270 rows up
+// the cap went to the 300, the page gave 49 duplicates and one new station,
+// and at 271 rows the button was gone and a click asked nothing, with the
+// directory still holding more. The ceiling is for the rows that are shown.
+// Where the directory's list stands is pageAfter's and no part of it.
+// Contract: pageOpen(page, shown, ceiling) -> bool: page.more is true, and
+//   shown, the rows on screen, is under ceiling. A page that is none, a more
+//   that is not true and a shown that is no number are closed, and so is a
+//   ceiling nothing is under.
+function pageOpen(page, shown, ceiling) {
+    return !!page && page.more === true && typeof shown === "number" && shown < ceiling;
+}
+
+// Which of the two lists of an All search "Show more" pages: the name
+// answer's or the tag answer's. The popup took the tag list only when its
+// answer had put rows on the web list. The listener's own stations are left
+// out there, so a genre page of fifty saved stations put none in and paging
+// stayed with the names: under "jazz" with no station of that name it stayed
+// with an empty list, and the genre's fifty-first station could not be
+// reached. Two tagged rows, the other way round, took the paging from a name
+// list that went on and ended it there. It is read from the two answers now.
+// Under a genre word the tag list is the list (leadRows) and is paged while it
+// goes on; a plain word's names come first and the tag list follows when they
+// have run out. A list that has run out leaves the paging to the other one.
+// Contract: tagListPaged(genreWord, nameMore, tagRows, tagMore) -> bool.
+//   nameMore and tagMore are the two answers' pageAfter().more, the name
+//   list's taken after its held-back rows came in; tagRows is how many rows
+//   the tag answer carried, and one of no rows is never paged. The three
+//   flags count only when true.
+function tagListPaged(genreWord, nameMore, tagRows, tagMore) {
+    if (!(parseInt(tagRows, 10) > 0)) return false;
+    if (nameMore !== true) return true;
+    return genreWord === true && tagMore === true;
 }
 
 // pageOrder sorts one answer, but one search fills the list from several:

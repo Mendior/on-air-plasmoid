@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The answer of a play command that was replaced counts for the newer one.
+
+history:
+  A listener who switches stations quickly sends a device two play
+  commands, and the first one's refusal can come home before the second
+  has answered. Believed, it would end a cast that is about to succeed and
+  blame the device for a station nobody listens to any more. An answer
+  counts only for the command the device is still waited on for, by the
+  number that command carries.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      if (typeof uuid !== "string" || uuid === "" || s.pending[uuid] !== seq)
+
+replace:
+      if (typeof uuid !== "string" || uuid === "" || s.pending[uuid] === undefined)
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_a_late_answer_of_an_older_attempt_changes_nothing.
+  Line-neutral.

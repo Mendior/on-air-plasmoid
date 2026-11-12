@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The Automation page offers Auto-care while the delay is set by ear.
+
+history:
+  With "Set the delay by ear" on, the engine runs no automatic check and
+  the output menu does not offer the box. Up to 2026.43 the settings page
+  still did: it could be ticked there and nothing happened. 2026.44 greys
+  the box, says why, and leaves the stored choice as it is.
+
+target:
+  package/contents/ui/config/configAutomation.qml
+
+find:
+              enabled: !root._byEar
+
+replace:
+              enabled: true
+
+expect:
+  Killed by tests/qml/tst_automationpage.qml::test_tuning_by_ear_switches_the_box_off_and_says_why
+  and tests/qml/tst_automationpage.qml::test_a_choice_made_before_is_shown_and_kept.
+  Line-neutral.

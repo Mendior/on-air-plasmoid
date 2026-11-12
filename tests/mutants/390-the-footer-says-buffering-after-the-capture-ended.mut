@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The footer says live radio is still being buffered for every park.
+
+history:
+  It said "the station keeps recording" for every park, also where
+  nothing was fetched any more, and recording is the word for files the
+  listener keeps. It says buffering while the writer runs and plain Paused
+  after.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+      readonly property bool tsBuffering: _tsPaused && timeshift.writerUp   //
+
+replace:
+      readonly property bool tsBuffering: _tsPaused   //
+
+expect:
+  Killed by tests/test_invariants.py::test_a_pause_a_window_old_ends_the_capture_and_the_footer_says_what_is_true.
+  Line-neutral.

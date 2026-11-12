@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The settle swap stops taking a job number of its own and goes out under
+  whatever the last rebuild or swap carried.
+
+history:
+  The swap shares the rebuild's lock and its thirty seconds, and unlike a
+  rebuild it leaves the module map standing, so a second swap can go out
+  the moment the first one's time is up. With one number between them the
+  first swap's late answer is the second one's: the lock opens while the
+  second shell is still fading a speaker over, and the first one's module
+  is adopted next to it. The rebuild's launch line is a separate string and
+  bumping only that one leaves this road open.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          app.exec(": PW_LBSWAP " + ReloopLogic.stamp(_combineLoadSeq, ++_reloopJob) + "; " + cmds + "true"
+
+replace:
+          app.exec(": PW_LBSWAP " + ReloopLogic.stamp(_combineLoadSeq, _reloopJob) + "; " + cmds + "true"
+
+expect:
+  Killed by tst_syncengine::test_a_hung_swap_cannot_answer_for_the_swap_that_followed_it.
+  Line-neutral.

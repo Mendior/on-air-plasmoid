@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The MPRIS state carries the picture on the Playing page, not the song's
+  own cover.
+
+history:
+  The lock screen and the media controls show mpris:artUrl with nothing
+  beside it to say what it is. With "Alen Veziko - Päiksepoolsel tänaval"
+  on air it was the sleeve of "Nüüd taas sajab lund" (busctl, 2026-11-12).
+  The state is written from trackArtUrl now. This mutant writes it from the
+  picture the Playing page shows.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              art: root.trackArtUrl || root.imageurl
+
+replace:
+              art: root.albumArtUrl || root.imageurl
+
+expect:
+  Killed by tests/test_invariants.py::test_only_the_songs_own_cover_leaves_the_playing_page.
+  Line-neutral.

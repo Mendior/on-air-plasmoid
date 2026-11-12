@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Every start listens to its station again.
+
+history:
+  A station is read once a day at most. One more connection for twenty
+  seconds at every start is what the map of readings is kept to avoid.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          if (LoudLogic.due(cfg.stationLoudness, subject, Date.now() / 1000)) _ask(
+
+replace:
+          if (LoudLogic.due(cfg.stationLoudness, subject, Date.now() / 1000) || true) _ask(
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_station_is_read_once_a_day_until_there_are_five.
+  Line-neutral.

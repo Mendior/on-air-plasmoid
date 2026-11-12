@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The factor is set in one step while the station plays.
+
+history:
+  A reading arrives some twenty-five seconds into a station. Ten decibels in
+  one step there is the very jump the option exists to spare the listener.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          if (atOnce || !app || !app.isPlaying()) {
+
+replace:
+          if (atOnce || !app || !app.isPlaying() || cutNow !== wanted) {
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_reading_that_arrives_under_a_listener_is_eased_in.
+  Line-neutral.

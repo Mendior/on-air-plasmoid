@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A scheduled recording begins at the next half-minute look instead of at
+  its own moment.
+
+history:
+  The schedule was looked at every 30 seconds and a start waited for the
+  look. A recording set for 18:30 began at 18:30:09.8, and because what is
+  recorded is the rest of its window, the file was 290 seconds of 300
+  (measured 2026-11-11). A start that falls inside the coming period gets
+  a timer set to its moment; the wait is worked out by
+  RecLogic.startsWithin, and this is the line that makes it run.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+          recStartTimer.restart();
+
+replace:
+          recStartTimer.stop();
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_the_capture_starts_at_its_moment_and_asks_for_the_whole_window.
+  Line-neutral.

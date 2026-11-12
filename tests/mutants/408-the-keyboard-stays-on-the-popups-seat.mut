@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Space, M and typing reach nothing after the face comes back to the popup.
+
+history:
+  Plasma hands the keyboard to the item it was given as the full
+  representation, which is the seat. A face that arrives under a seat that
+  already has the keyboard has to be given it there and then.
+
+target:
+  package/contents/ui/PopupFace.qml
+
+find:
+          if (activeFocus) face.forceActiveFocus();
+
+replace:
+          if (activeFocus) seatItem.forceActiveFocus();
+
+expect:
+  Killed by tests/qml/tst_popupface.qml::test_a_face_seated_under_a_seat_that_has_the_keyboard_gets_it_at_once.

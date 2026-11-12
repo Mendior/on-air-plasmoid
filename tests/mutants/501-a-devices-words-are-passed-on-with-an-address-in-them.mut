@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  What a device says about its error is passed on with the marks an address
+  is made of, so a device that quotes the stream puts it into the line.
+
+history:
+  The failure line carries the device's own words now ("Resource not
+  found"), and a device can put anything there. A station's address can
+  hold a listener's token, and these lines are read into logs that get
+  pasted into reports. The words are cut at the first character that is no
+  letter, digit, space or one of , ' ( ) -, which leaves no room for a
+  scheme, a host or a query.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+  _PLAIN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ,'()-]*")
+
+replace:
+  _PLAIN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ,'()/:.?=-]*")
+
+expect:
+  Killed by tests/test_cast_fault.py::test_the_address_is_in_nothing_the_helper_says.

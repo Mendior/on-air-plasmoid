@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The answer of a reading that was ended is taken like any other.
+
+history:
+  A helper that was ended comes home with nothing. Taken as an answer, that
+  stamps the station as one that gave no number, and it is not asked about
+  again before the next day.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          if (_seq < 0 || KindLogic.seqOf(mine) !== _seq) return true;
+
+replace:
+          if (KindLogic.seqOf(mine) < 0) return true;
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_stop_ends_the_reading_and_removes_its_file.
+  Line-neutral.

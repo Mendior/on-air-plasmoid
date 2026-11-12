@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any failed load on a Cast receiver makes the widget say the device
+  refused the station's address and that another station may work.
+
+history:
+  "… cannot play this station. The device refused this station's address.
+  Another station may work." has to be true of every device that is told
+  so. For a renderer's UPnP 716 it was measured: the same Ruark played
+  another address minutes later (2026-11-12). What a television means by
+  the codes of a failed load has not been seen on a device: one that is
+  busy with another programme may answer the same way, and no other
+  station would work on it either. Until that is measured the widget
+  keeps "Could not cast to …" for it.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      if (_REFUSALS[f.upnp] === true && (f.action === "SetAVTransportURI" || f.action === "Play"))
+
+replace:
+      if (f.load !== "" || _REFUSALS[f.upnp] === true && (f.action === "SetAVTransportURI" || f.action === "Play"))
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_what_an_answer_says.

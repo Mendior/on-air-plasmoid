@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The place the reader is seen at may move back to the file's start.
+
+history:
+  Between the open and the seek to the park the player stands at 0 and
+  already says it plays. A tick in that moment would note 0 as the place
+  heard, and an end that names no place would reopen the buffer at its
+  start: the station from the moment it was put on.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          _heardPosMs = Math.max(_heardPosMs,
+
+replace:
+          _heardPosMs = (
+
+expect:
+  Killed by tst_timeshiftengine::test_the_place_seen_before_the_seek_landed_is_not_the_listeners.
+  Line-neutral.

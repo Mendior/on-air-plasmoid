@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The footer decides between "Playing" and "Connecting…" by the title again.
+
+history:
+  The rule is in ViewLogic.streamSounds and tested there, and the face
+  cannot be loaded in a test. The line that asks the rule is all that
+  stands between the two.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                            return fullRepresentation._sounds ? "♪ " + i18n("Playing") : i18n("Connecting…")
+
+replace:
+                            return root.title !== Plasmoid.title ? "♪ " + i18n("Playing") : i18n("Connecting…")
+
+expect:
+  Killed by tests/test_invariants.py::test_the_footer_says_playing_for_sound_and_not_for_a_title.
+  Line-neutral.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The step back is shown whenever the pill is.
+
+history:
+  Only a sliding buffer has an earlier place a new open can land in. On
+  the single file (FLAC, Ogg, the relay) a step would be a press that does
+  nothing.
+
+target:
+  package/contents/ui/ShiftPill.qml
+
+find:
+          visible: shiftPill.stepReady
+          enabledState: visible
+          iconName: "media-seek-backward"
+
+replace:
+          visible: true
+          enabledState: visible
+          iconName: "media-seek-backward"
+
+expect:
+  Killed by tests/qml/tst_shiftpill.qml::test_the_single_file_keeps_its_pill_and_has_no_steps.

@@ -625,7 +625,7 @@ TestCase {
     function test_every_way_out_takes_the_mark_along() {
         var e = makeEngine();
         var c = _captureSent(e);
-        var both = "rm -f '/run/user/1000/arp-rec-url-42' '/run/user/1000/arp-rec-stop-42'";
+        var both = "rm -f '" + e._recUrlFile + "' '/run/user/1000/arp-rec-stop-42'";
         verify(c.indexOf("cln() { " + both + "; }; ") !== -1, c);
         verify(c.indexOf("wait $pid; rc=$?; rm -f '/run/user/1000/arp-rec-42.pid'; cln; ") !== -1);
         // And the one a crashed panel left goes at the next start.
@@ -718,6 +718,218 @@ TestCase {
         tc.notified = [];
         verify(e.handleExec(": REC_START;", "__NO_FFMPEG__", "", 0));
         compare(tc.notified, ["ffmpeg is not installed"]);
+        e.destroy();
+    }
+
+    // ── Each recording's own address file ─────────────────────────────────
+    // The address went into one file per widget. A command already handed
+    // to the shell runs when the shell gets to it: measured with the real
+    // commands in a chosen order, the write of a recording called off, run
+    // after the next recording's write, put its own address there and the
+    // next capture recorded the station the listener had left, under the
+    // new station's name; its cleanup, run late, deleted the file and the
+    // capture ended empty. The answer's number guards the answer, not what
+    // the command does on disk.
+
+    // "'<file>'" as it stands in a command.
+    function _q(path) { return "'" + path.replace(/'/g, "'\\''") + "'"; }
+    function _cleanups() {
+        return tc.execLog.filter(function(c) { return c.indexOf(": REC_URLCLEAN;") === 0; });
+    }
+    // The start time a token carries after its number.
+    function _startedMs(token) { return parseInt(token.substring(token.indexOf(".") + 1), 10); }
+
+    function test_each_recording_has_an_address_file_of_its_own() {
+        var e = makeEngine();
+        e._recStart("Alpha FM", "https://a.example/stream", 3600, false);
+        var alpha = e._recUrlFile;
+        compare(alpha, "/run/user/1000/arp-rec-url-42-" + e._recToken);
+        verify(_urlWrites()[0].indexOf(" > " + _q(alpha) + " && echo __REC_URL_OK__") !== -1, _urlWrites()[0]);
+        // Called off before its write has answered: it takes its own file.
+        e.recStop();
+        compare(_cleanups().length, 1);
+        verify(_cleanups()[0].indexOf(": REC_URLCLEAN; rm -f " + _q(alpha) + "; true # ") === 0, _cleanups()[0]);
+        e._recStart("Beta FM", "https://b.example/stream", 3600, false);
+        var beta = e._recUrlFile;
+        compare(beta, "/run/user/1000/arp-rec-url-42-" + e._recToken);
+        verify(beta !== alpha, "two recordings share one address file");
+        var w = _urlWrites()[1];
+        verify(w.indexOf(" > " + _q(beta) + " && echo __REC_URL_OK__") !== -1, w);
+        verify(w.indexOf(_q(alpha)) === -1, "the next write names the last recording's file");
+        verify(e.handleExec(w, "__REC_URL_OK__", "", 0));
+        var c = _captures()[0];
+        verify(c.indexOf(" curl -sS -L --http0.9 -K " + _q(beta) + " ") !== -1, c);
+        verify(c.indexOf("cln() { rm -f " + _q(beta) + " '/run/user/1000/arp-rec-stop-42'; }; ") !== -1);
+        verify(c.indexOf(alpha) === -1, "the capture touches the last recording's file");
+        e.destroy();
+    }
+
+    function test_the_address_file_has_a_name_before_the_first_recording() {
+        // What the widget removes when it goes is never an empty path, and
+        // it is the name older versions wrote under.
+        var e = makeEngine();
+        compare(e._recUrlFile, "/run/user/1000/arp-rec-url-42");
+        compare(e._recUrlBase, "/run/user/1000/arp-rec-url-42");
+        e.destroy();
+    }
+
+    function test_the_same_number_after_a_restart_is_another_file() {
+        // The counter starts over with the panel. Recording 1 of this
+        // session must not be recording 1 of the last one.
+        var first = makeEngine();
+        first._recStart("Radio", "https://s.example/stream", 3600, false);
+        var was = first._recUrlFile;
+        var wasGen = first._recGen;
+        first.destroy();
+        wait(3);
+        var e = makeEngine();
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        compare(e._recGen, wasGen);
+        verify(e._recUrlFile !== was, "the same file for the same number: " + was);
+        verify(_startedMs(e._recToken) > _startedMs(was.substring(was.lastIndexOf("-") + 1)));
+        e.destroy();
+    }
+
+    function test_a_clock_set_back_does_not_make_the_next_recording_the_older_one() {
+        // Being older is read from the names. Had the clock been set back
+        // an hour between two recordings, the later one's name would carry
+        // the earlier time, and the first one's write, run late, would take
+        // the file of the recording that followed it.
+        var e = makeEngine();
+        e._recStart("Alpha FM", "https://a.example/stream", 3600, false);
+        var first = _startedMs(e._recToken);
+        compare(e._recLastMs, first);
+        e.recStop();
+        e._recLastMs = first + 3600000;       // the clock stood there then
+        e._recStart("Beta FM", "https://b.example/stream", 3600, false);
+        compare(_startedMs(e._recToken), first + 3600001);
+        verify(_urlWrites()[1].indexOf(RecLogic.olderFilesLine("'/run/user/1000/arp-rec-url-42-'", first + 3600001)) !== -1);
+        // And none is older than the session it belongs to.
+        var late = makeEngine();
+        late._recBornMs = Date.now() + 3600000;
+        late._recStart("Radio", "https://s.example/stream", 3600, false);
+        compare(_startedMs(late._recToken), late._recBornMs);
+        e.destroy(); late.destroy();
+    }
+
+    function test_a_write_takes_older_recordings_files_and_no_newer_one() {
+        // A file can be left when a write lands after its own cleanup, or
+        // when a capture shell is killed outright. The next recording's
+        // write takes every file older than itself, and being older is read
+        // from the name, so the same line run late takes nothing newer.
+        var e = makeEngine();
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        var w = _urlWrites()[0];
+        var takes = RecLogic.olderFilesLine("'/run/user/1000/arp-rec-url-42-'", _startedMs(e._recToken));
+        verify(takes !== "");
+        var at = w.indexOf("; umask 077; " + takes + "printf '%s' ");
+        verify(at !== -1, w);
+        e.destroy();
+    }
+
+    function test_the_start_of_the_panel_takes_what_older_sessions_left() {
+        var before = Date.now();
+        var e = makeEngine();
+        verify(e._recBornMs >= before && e._recBornMs <= Date.now());
+        e.start();
+        var takes = RecLogic.olderFilesLine("'/run/user/1000/arp-rec-url-42-'", e._recBornMs);
+        verify(takes !== "");
+        // Files of several old recordings, the one name older versions
+        // used, and then the pid and the mark as before.
+        verify(_lastExec().indexOf("fi; " + takes + "rm -f '/run/user/1000/arp-rec-url-42'; "
+                                   + "rm -f '/run/user/1000/arp-rec-42.pid' '/run/user/1000/arp-rec-stop-42'; true") !== -1,
+               _lastExec());
+        // Nothing this session writes is older than the session.
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        verify(_startedMs(e._recToken) >= e._recBornMs);
+        e.destroy();
+    }
+
+    function test_the_tick_calling_off_one_capture_and_starting_the_next_keeps_their_files_apart() {
+        // The one place the cleanup of one recording and the write of the
+        // next are handed over in the same breath: a capture that never got
+        // started before its window closed, and another entry due now.
+        var e = _scheduledCaptureRunning(150 * 60000, true);
+        var stale = e._recUrlFile;
+        e.addRecSchedule("Other", "https://o.example/live", 7, 30, 60, "once", 0);
+        var rl = e.recSchedules.slice();
+        rl[1].nextRun = Date.now() - 1000;
+        e.recSchedules = rl;
+        e._recScheduleTick();
+        compare(_cleanups().length, 1);
+        compare(_urlWrites().length, 1);
+        verify(_cleanups()[0].indexOf("rm -f " + _q(stale) + "; true") !== -1, _cleanups()[0]);
+        verify(e._recUrlFile !== stale, "the next capture was given the same file");
+        verify(_urlWrites()[0].indexOf(" > " + _q(e._recUrlFile) + " && ") !== -1);
+        verify(_cleanups()[0].indexOf(e._recUrlFile) === -1, "the cleanup names the next capture's file");
+        verify(e.recording);
+        e.destroy();
+    }
+
+    function test_a_due_entry_writes_no_address_while_the_recorder_is_taken() {
+        // A scheduled capture and one started by hand never hold a file
+        // each: the second is not started at all.
+        var e = makeEngine();
+        e.app._schedApplyTzChange = function(now) {};
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        var held = e._recUrlFile;
+        e.addRecSchedule("Rock FM", "https://r.example/live", 7, 30, 60, "once", 0);
+        var rl = e.recSchedules.slice();
+        rl[0].nextRun = Date.now() - 1000;
+        e.recSchedules = rl;
+        e._recScheduleTick();
+        compare(_urlWrites().length, 1);
+        compare(e._recUrlFile, held);
+        e.destroy();
+    }
+
+    function test_a_capture_stopped_by_the_tick_past_its_window_keeps_its_own_file() {
+        var e = _scheduledCaptureRunning(150 * 60000);
+        var own = e._recUrlFile;
+        e._recScheduleTick();
+        compare(_stops().length, 1);
+        // The stop is about the pid and the mark. The address file is the
+        // capture shell's to remove, and nothing else is told to.
+        compare(_cleanups().length, 0);
+        compare(e._recUrlFile, own);
+        e.destroy();
+    }
+
+    function test_a_refused_address_takes_only_its_own_file_name() {
+        // Refused before anything was written. The cleanup is for the file
+        // this recording would have had and for no other.
+        var e = makeEngine();
+        e._recStart("Radio", "https://s.example/\nstream", 3600, false);
+        verify(!e.recording);
+        compare(_urlWrites().length, 0);
+        compare(_cleanups().length, 1);
+        verify(/^: REC_URLCLEAN; rm -f '\/run\/user\/1000\/arp-rec-url-42-1\.\d+'; true # \d+$/.test(_cleanups()[0]),
+               _cleanups()[0]);
+        e.destroy();
+    }
+
+    function test_a_quote_and_a_space_in_the_run_dir_stay_inside_every_address_path() {
+        var e = makeEngine({}, { _mprisRunDir: "/run/o'neil x" });
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        var file = "'/run/o'\\''neil x/arp-rec-url-42-" + e._recToken + "'";
+        var w = _urlWrites()[0];
+        verify(w.indexOf("for f in '/run/o'\\''neil x/arp-rec-url-42-'*; do ") !== -1, w);
+        verify(w.indexOf(" > " + file + " && echo __REC_URL_OK__") !== -1, w);
+        verify(e.handleExec(w, "__REC_URL_OK__", "", 0));
+        verify(_captures()[0].indexOf(" -K " + file + " ") !== -1);
+        verify(_captures()[0].indexOf("cln() { rm -f " + file + " ") !== -1);
+        tc.execLog = [];
+        e.start();
+        verify(_lastExec().indexOf("for f in '/run/o'\\''neil x/arp-rec-url-42-'*; do ") !== -1, _lastExec());
+        verify(_lastExec().indexOf("rm -f '/run/o'\\''neil x/arp-rec-url-42'; ") !== -1);
+        e.destroy();
+    }
+
+    function test_a_very_large_recording_number_is_still_one_plain_name() {
+        var e = makeEngine();
+        e._recGen = 2147483646;
+        e._recStart("Radio", "https://s.example/stream", 3600, false);
+        verify(/^\/run\/user\/1000\/arp-rec-url-42-2147483647\.\d+$/.test(e._recUrlFile), e._recUrlFile);
         e.destroy();
     }
 
@@ -1094,6 +1306,92 @@ TestCase {
         var e = makeEngine();
         e.applyTzRetime(Date.now());
         compare(e.recSchedules.length, 0);
+        e.destroy();
+    }
+
+    // ── A start that does not wait for the regular look ───────────────────
+
+    // One five-minute entry whose start is msFromNow away.
+    function _startsIn(msFromNow) {
+        var e = makeEngine();
+        e.app._schedApplyTzChange = function(now) {};   // shared, lives in main
+        e.addRecSchedule("Rock FM", "https://old.example/live", 7, 30, 5, "once", 0);
+        var rl = e.recSchedules.slice();
+        rl[0].nextRun = Date.now() + msFromNow;
+        e.recSchedules = rl;
+        tc.execLog = []; tc.notified = [];
+        return e;
+    }
+
+    function test_a_start_inside_the_coming_half_minute_gets_a_wait_of_its_own() {
+        // The schedule was looked at every 30 s and a start waited for the
+        // look: 18:30 began at 18:30:09.8 and the file was 290 s of 300.
+        var e = _startsIn(20000);
+        // Putting the entry in the list set the wait: no look was needed.
+        verify(e._recStartWaitMs > 19000 && e._recStartWaitMs <= 20000, "waits " + e._recStartWaitMs);
+        // A look that comes round meanwhile sets it anew and starts nothing early.
+        e._recScheduleTick();
+        verify(e._recStartWaitMs > 19000 && e._recStartWaitMs <= 20000, "waits " + e._recStartWaitMs);
+        verify(!e.recording);
+        compare(tc.execLog.length, 0);
+        e.destroy();
+    }
+
+    function test_a_start_further_off_is_left_to_a_later_look() {
+        var e = _startsIn(45000);
+        compare(e._recStartWaitMs, -1);
+        e._recScheduleTick();
+        compare(e._recStartWaitMs, -1);
+        verify(!e.recording);
+        // Time passes and the list does not change: it is the look that
+        // finds the start inside the coming period and sets the wait. The
+        // entry is moved in place here, which tells the engine nothing.
+        e.recSchedules[0].nextRun = Date.now() + 10000;
+        compare(e._recStartWaitMs, -1);
+        e._recScheduleTick();
+        verify(e._recStartWaitMs > 9000 && e._recStartWaitMs <= 10000, "waits " + e._recStartWaitMs);
+        e.destroy();
+    }
+
+    function test_the_capture_starts_at_its_moment_and_asks_for_the_whole_window() {
+        var e = _startsIn(300);
+        verify(!e.recording);
+        // Nobody calls the look here: the wait itself has to.
+        tryVerify(function() { return e.recording; }, 3000, "the start was left to the next look, up to thirty seconds off");
+        verify(_urlAck(e, "__REC_URL_OK__"));
+        compare(_captures().length, 1);
+        var asked = / -t (\d+)/.exec(_captures()[0]);
+        verify(asked !== null);
+        // The whole five minutes, not what a late look would have left.
+        verify(parseInt(asked[1], 10) >= 299 && parseInt(asked[1], 10) <= 300, "asked for " + asked[1] + " s");
+        // The entry is under way: nothing more is waited for.
+        compare(e._recStartWaitMs, -1);
+        e.destroy();
+    }
+
+    function test_an_entry_taken_out_takes_its_wait_with_it() {
+        var e = _startsIn(400);
+        verify(e._recStartWaitMs > 0);
+        e.removeRecSchedule(0);
+        compare(e.recSchedules.length, 0);
+        compare(e._recStartWaitMs, -1);
+        wait(900);
+        verify(!e.recording);
+        compare(tc.execLog.filter(function(c) { return c.indexOf(": REC_URL ") === 0; }).length, 0);
+        e.destroy();
+    }
+
+    function test_a_start_that_is_held_back_is_not_asked_about_in_a_loop() {
+        // Another recording runs when the moment comes: the entry stays for
+        // the regular look, and the wait is not set to nothing over and over.
+        var e = _startsIn(300);
+        e._recStart("Test Radio", "https://s.example/stream", 3600, false);
+        verify(e.recording);
+        var before = tc.execLog.length;
+        wait(900);
+        compare(e._recStartWaitMs, -1);
+        compare(tc.execLog.length, before);
+        compare(tc.notified.filter(function(t) { return t === "Scheduled recording skipped"; }).length, 1);
         e.destroy();
     }
 }

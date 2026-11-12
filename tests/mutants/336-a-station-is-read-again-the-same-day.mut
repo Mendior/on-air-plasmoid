@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station is connected to for a reading ten seconds after the last one
+  came home.
+
+history:
+  One more connection to a station is not free: one that limits connections
+  answered 429 at five inside a second. A station is read once a day at
+  most, whether the last attempt gave a number or not.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      if (nowS - last < RETRY_S) return false;
+
+replace:
+      if (nowS - last < 0) return false;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_an_attempt_without_a_number_is_not_repeated_before_a_day_has_passed
+  and tests/qml/tst_loudlogic.qml::test_one_more_reading_a_day_until_there_are_five.
+  Line-neutral.

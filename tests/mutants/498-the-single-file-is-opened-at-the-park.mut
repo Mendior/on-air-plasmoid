@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The distance to the writer is not taken off where the single file is opened.
+
+history:
+  Measured 2026-11-12 on a Matroska buffer: 14 s of play, a pause of four,
+  Play. The reader was opened at the park, 7.8 s behind the writer, met the
+  file's unfinished end four times in 21 s and was reopened each time with
+  about a second heard twice. Opened twelve seconds behind, the distance
+  the sliding buffer keeps, it plays on without a break.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+  Math.min(place, capturedMs - gapMs)
+
+replace:
+  Math.min(place, capturedMs)
+
+expect:
+  Killed by tst_timeshiftlogic::test_the_single_file_is_opened_a_safe_distance_behind_its_writer.
+  Line-neutral.

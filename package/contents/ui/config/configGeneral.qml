@@ -291,7 +291,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.44");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -337,7 +337,7 @@ KCM.ScrollViewKCM {
         const xhr = new XMLHttpRequest();
         var guard = null;
         xhr.open("GET", url);
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.44");
         _activeLogoXhr = xhr;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== xhr.DONE)
@@ -594,14 +594,14 @@ KCM.ScrollViewKCM {
                     // a model row drags wrapper internals along with the
                     // roles) and the wrapper's objectName is not an edit.
                     const norm = (o) => {
-                        const plain = DoorLogic.normalize(JSON.parse(JSON.stringify(o)));
+                        var plain = DoorLogic.normalize(JSON.parse(JSON.stringify(o)));
                         delete plain.objectName;
-                        const keys = [];
-                        for (const k in plain)
+                        var keys = [];
+                        for (var k in plain)
                             if (plain[k] !== undefined) keys.push(k);
                         keys.sort();
-                        const flat = {};
-                        for (const k of keys) flat[k] = plain[k];
+                        var flat = {};
+                        for (var k of keys) flat[k] = plain[k];
                         return JSON.stringify(flat);
                     };
                     const merged = ReorderLogic.mergeExternal(base, ReorderLogic.savedRows(stationsModel), ext, norm);

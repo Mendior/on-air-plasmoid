@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  After the list of outputs changes, the box reads the default over a config that names another output.
+
+history:
+  With a Bluetooth and a USB speaker connected, the group of all outputs
+  was switched off and on again: sound and config came back to the group,
+  and the box went on reading "System default output" for more than a
+  minute, the group's row standing in its opened list. A ComboBox puts
+  itself on its first row whenever its model is replaced, and the row had
+  been worked out before that. It is bound again after every replacement.
+
+target:
+  package/contents/ui/OutputBox.qml
+
+find:
+      onModelChanged: currentIndex = Qt.binding(function() { return row })
+
+replace:
+      currentIndex: row
+
+expect:
+  Killed by tests/qml/tst_outputbox.qml::test_a_configured_output_that_leaves_the_list_and_returns_has_its_row_again.

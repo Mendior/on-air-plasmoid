@@ -104,6 +104,39 @@ function fallsShort(wantedSec, mediaSec, clockSec) {
     return false
 }
 
+// The start time a recording's token and its address file's name carry.
+// It is the clock's, but never before the session began and always after
+// the recording before it, so within one session the names sort by start
+// whatever is done to the clock meanwhile. What is no time at all (not a
+// number, negative, not finite) counts as zero and a fraction is cut off.
+function startStamp(nowMs, bornMs, lastMs) {
+    return Math.max(_wholeMs(nowMs), _wholeMs(bornMs), _wholeMs(lastMs) + 1)
+}
+
+// A time as a whole number of milliseconds, and zero for what is none.
+function _wholeMs(ms) {
+    return (typeof ms === "number" && isFinite(ms) && ms >= 0) ? Math.floor(ms) : 0
+}
+
+// The shell line that removes the address files of recordings started before
+// beforeMs. A file's name ends in its recording's start time, so which files
+// are older is read from the names and does not depend on when the line
+// runs: run late, it still takes nothing that was started after it.
+// quotedPrefix is the files' common beginning as shQuote gives it. The line
+// is empty, and nothing is removed, unless that is a quoted name (a bare *
+// would run through whatever folder the shell stands in) and beforeMs is a
+// whole number that prints as its digits.
+function olderFilesLine(quotedPrefix, beforeMs) {
+    if (typeof quotedPrefix !== "string" || quotedPrefix.length < 3
+        || quotedPrefix.charAt(0) !== "'" || quotedPrefix.charAt(quotedPrefix.length - 1) !== "'")
+        return ""
+    // Past 2^53 a number's last digits are not the ones that were meant.
+    if (beforeMs !== _wholeMs(beforeMs) || beforeMs > 9007199254740991)
+        return ""
+    return "for f in " + quotedPrefix + "*; do t=${f##*.}; [ \"$t\" -lt " + beforeMs
+           + " ] 2>/dev/null && rm -f \"$f\"; done; "
+}
+
 // HLS/playlist wrappers don't survive a plain "-c copy"; anything that
 // is not an http(s) stream (local files, odd schemes) can't be recorded.
 function canRecordUrl(url) {
@@ -125,3 +158,33 @@ function typedMinutes(text, fallback) {
     if (digits === "") return fallback;
     return parseInt(digits.substring(0, 6), 10);
 }
+
+// How long until the next scheduled start that falls before the regular
+// check comes round again, in ms; -1 when none does.
+//
+// schedules: the entries, each with nextRun, the start as ms of the clock.
+// nowMs: the clock. withinMs: the regular check's period.
+//
+// The schedule was looked at every 30 seconds and a start waited for the
+// look: a recording set for 18:30 began at 18:30:09.8, and since what is
+// recorded is the rest of its window, the file was 290 seconds of 300
+// (measured 2026-11-11). A start that falls inside the coming period gets a
+// timer of its own, set by this. One that is due already is the regular
+// check's to deal with, and one further off is found by a later check, so a
+// machine that slept through its timers loses nothing.
+//
+// What is no list reads as empty, an entry without a readable start is
+// passed over, and the answer is a whole number of ms, at least 1.
+function startsWithin(schedules, nowMs, withinMs) {
+    if (!Array.isArray(schedules)) return -1
+    if (typeof withinMs !== "number" || !(withinMs > 0)) return -1
+    var nearest = -1
+    for (var i = 0; i < schedules.length; i++) {
+        var s = schedules[i]
+        if (s === null || typeof s !== "object" || typeof s.nextRun !== "number") continue
+        var wait = s.nextRun - nowMs
+        if (wait > 0 && wait <= withinMs && (nearest < 0 || wait < nearest)) nearest = wait
+    }
+    return nearest < 0 ? -1 : Math.max(1, Math.ceil(nearest))
+}
+

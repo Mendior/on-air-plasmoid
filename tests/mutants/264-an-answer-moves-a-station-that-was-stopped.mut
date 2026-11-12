@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The helper's answer sends a saved station to the relay although the
+  listener stopped it while the question was out.
+
+history:
+  The question about a stream goes out beside the start and comes back up
+  to three seconds later. A stop in between takes the standing order down
+  and disarms the relay, and an answer that armed it again would bring the
+  tap up and play a station the listener had just silenced. The answer may
+  move only the order that asked: stop, park, another station, a night.
+
+target:
+  package/contents/ui/StreamKind.qml
+
+find:
+          if (_audition !== "" ? app._previewUrl !== _audition : (app._previewUrl !== "" || app._wantsPlaying !== true)) return false;
+
+replace:
+          if (_audition !== "" ? app._previewUrl !== _audition : (app._previewUrl !== "")) return false;
+
+expect:
+  Killed by tests/qml/tst_streamkind.qml::test_an_answer_for_an_order_that_ended_moves_nothing.
+  Line-neutral.

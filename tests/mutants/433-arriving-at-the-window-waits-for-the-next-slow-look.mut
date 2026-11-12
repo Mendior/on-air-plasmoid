@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Somebody coming to the player's window is not told to the poll.
+
+history:
+  At the slow rate the last reading can be half a minute old. On a desktop
+  face the pointer's arrival re-arms the poll at once; the window is the
+  other seat that never closes and needs the same word.
+
+target:
+  package/contents/ui/PlayerWindow.qml
+
+find:
+      onFaceWatchedChanged: if (faceWatched && WindowLogic.standing(seat, planar)) arrived()
+
+replace:
+      onFaceWatchedChanged: if (faceWatched && planar) arrived()
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_arriving_at_a_window_or_a_desktop_face_is_told_once_each_time.

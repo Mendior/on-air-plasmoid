@@ -123,3 +123,42 @@ function revealFooter(view) {
 function offlineWord(connected, local, active) {
     return connected === false && !(local === true && active === true);
 }
+
+// Whether the footer may say "Playing" over a stream that is on and has no
+// bitrate to show.
+// It used to ask for a title, and without one said "Connecting…": measured
+// on a real panel on 2026-11-12, an Ogg Vorbis station played back from its
+// buffer after a pause has neither a title nor a bitrate, and the word stood
+// over 44 s of music. A live station that sends no titles and names no
+// bitrate read the same for as long as it played. A title was only ever a
+// sign that sound had begun; the player's position having left zero is the
+// sound itself, and before the first sound it stands at zero.
+// Contract: streamSounds(titled, local, posMs) is true when titled or local
+//   is exactly true (a title has arrived; the source is a file of the
+//   listener's), or posMs is a number above 0. Anything else is false, also
+//   a position that is no number.
+function streamSounds(titled, local, posMs) {
+    return titled === true || local === true || (typeof posMs === "number" && isFinite(posMs) && posMs > 0);
+}
+
+// A list row that is a button, under the keyboard. Return, Enter and Space
+// press it, and a press is the row's own clicked(): the one the pointer and a
+// screen reader's press end in too, so the row has a single way to act.
+// Contract: pressRow(event, row) returns false and touches nothing for any
+//   other key, or without an event or a row. For the three keys it takes the
+//   event (accepted = true) and returns true, and it clicks the row once,
+//   unless the key is being held down or the row is not on screen.
+// A held key repeats some 25 times a second, and an episode row plays on one
+// press and stops on the next. A row whose list was hidden keeps the focus
+// (measured on Qt 6.12: activeFocus stays true), so after a show is opened
+// the next Enter would fetch its feed again under the episode list. And the
+// event is taken even then: a Space left alone goes on to the delegate, which
+// is a button itself and would click on the release.
+function pressRow(event, row) {
+    if (!event || !row) return false;
+    var key = event.key;
+    if (key !== Qt.Key_Return && key !== Qt.Key_Enter && key !== Qt.Key_Space) return false;
+    if (event.isAutoRepeat !== true && row.visible === true) row.clicked();
+    event.accepted = true;
+    return true;
+}

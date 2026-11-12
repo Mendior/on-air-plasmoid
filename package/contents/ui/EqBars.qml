@@ -28,6 +28,11 @@ Row {
     // upswing, so existing callers keep their old feel.
     property int baseDuration: 260
     property bool animating: visible
+    // What the bars stand for is paused: two of them standing still, the
+    // pause sign every player wears, and the third gone.
+    property bool paused: false
+    readonly property bool _moving: animating && !paused
+    function restOf(index) { return paused ? (index < 2 ? maxHeight * 0.7 : 0) : minHeight }
 
     // Sampling clock (seconds). Bar heights are pure functions of this.
     property real _t: 0
@@ -38,7 +43,7 @@ Row {
     Timer {
         interval: 120
         repeat: true
-        running: eqRoot.animating
+        running: eqRoot._moving
         onTriggered: eqRoot._t += 0.12
     }
 
@@ -57,7 +62,7 @@ Row {
                 radius: width / 2
                 color: eqRoot.barColor
                 height: {
-                    if (!eqRoot.animating) return eqRoot.minHeight;
+                    if (!eqRoot._moving) return eqRoot.restOf(barSlot.index);
                     // Full cycle ≈ 2 × baseDuration (like the old up+down pair),
                     // slightly detuned per bar so they never move in lockstep.
                     var freq = 1000 / (2 * (eqRoot.baseDuration + barSlot.index * 67));

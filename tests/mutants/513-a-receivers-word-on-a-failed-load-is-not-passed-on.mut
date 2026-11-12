@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A Cast receiver that says it could not load the stream is reported as one
+  that merely did not take it in time.
+
+history:
+  A Chromecast or a television answers a stream it cannot load with a
+  LOAD_FAILED and a code of its own, and the Cast library hands that to
+  whoever listens. The helper did not listen, so every failure read "the
+  device did not take the stream within 12s", whether the receiver was
+  busy with something else or had tried the address and given up. The
+  code goes into the failure line and from there into the journal, so
+  that the next television that refuses a station leaves a record of what
+  it said. Nothing else is built on it yet.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+              if watch.failed:
+
+replace:
+              if False:
+
+expect:
+  Killed by tests/test_cast_play.py::test_a_receiver_that_could_not_load_the_stream_says_which_error.

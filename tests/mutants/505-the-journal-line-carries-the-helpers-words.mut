@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  What the widget writes down about a failed cast carries the helper's own
+  words after the fields.
+
+history:
+  A failed cast leaves one line in the journal now, so that the next report
+  can say which action a device refused and with which code. Journals get
+  pasted into reports, and a station's address can hold a listener's token.
+  The line is made of the fields the helper named, each of which may hold
+  only what such a field holds; the words behind them can be anything a
+  device chose to say.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+          return { "kind": "refused", "log": f.action + " refused, UPnP " + f.upnp };
+
+replace:
+          return { "kind": "refused", "log": f.action + " refused, UPnP " + f.upnp + " " + out };
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_the_address_is_never_in_what_is_written_down.

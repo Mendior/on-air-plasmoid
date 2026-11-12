@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The helper adds segments to a list without looking whether they are there.
+
+history:
+  The player ends a list at the first segment it cannot open. A list
+  that names a segment the writer has not finished, or one it never wrote,
+  ends the listener's buffer there.
+
+target:
+  package/contents/ui/tsslide.sh
+
+find:
+      while [ "$n" -le "$upto" ] && [ -s "$dir/seg-$n.ts" ]; do n=$((n + 1)); done
+
+replace:
+      while [ "$n" -le "$upto" ]; do n=$((n + 1)); done
+
+expect:
+  Killed by tests/test_tsslide.py::test_grow_does_not_step_over_a_gap.

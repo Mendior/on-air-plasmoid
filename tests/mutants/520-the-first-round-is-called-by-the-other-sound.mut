@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The measurement's first round is named after the sound it does not make.
+
+history:
+  With the sweep chosen the row read "clicks through every speaker" for
+  the whole first round, seen on a real panel on 2026-11-12. A hand-started
+  run with the sweep never falls back to clicks, so the setting says which
+  sound is playing.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                                      : Plasmoid.configuration.syncUltrasonic !== false ? i18n("Round 1 of 2 — measuring with a tone too high to hear…")
+
+replace:
+                                      : Plasmoid.configuration.syncUltrasonic === false ? i18n("Round 1 of 2 — measuring with a tone too high to hear…")
+
+expect:
+  Killed by tests/test_invariants.py::test_the_way_out_of_a_measurement_stands_where_its_button_stood.
+  Line-neutral.

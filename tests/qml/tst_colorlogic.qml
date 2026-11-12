@@ -171,4 +171,51 @@ TestCase {
                 CL.readable("#6FCF97", "#eff0f1", "#6FCF97"))
         verify(Qt.colorEqual(CL.readable(qmlEmerald, qmlDarkWindow, qmlEmerald), qmlEmerald))
     }
+
+    // The colour mode, read from the two keys a config can hold.
+    function test_every_pair_of_the_two_keys_reads_as_one_mode_data() {
+        return [
+            { tag: "green, nothing older", mode: 0, follow: false, want: 0 },
+            { tag: "green, written before the list: system accent", mode: 0, follow: true, want: 1 },
+            { tag: "system accent", mode: 1, follow: true, want: 1 },
+            { tag: "system accent, the old key off", mode: 1, follow: false, want: 1 },
+            { tag: "plain", mode: 2, follow: false, want: 2 },
+            { tag: "plain over an old yes", mode: 2, follow: true, want: 2 },
+            { tag: "no mode key, old yes", mode: undefined, follow: true, want: 1 },
+            { tag: "no mode key, old no", mode: undefined, follow: false, want: 0 },
+            { tag: "neither key", mode: undefined, follow: undefined, want: 0 },
+            { tag: "green, no old key", mode: 0, follow: undefined, want: 0 },
+            { tag: "system accent, no old key", mode: 1, follow: undefined, want: 1 },
+            { tag: "plain, no old key", mode: 2, follow: undefined, want: 2 },
+        ]
+    }
+    function test_every_pair_of_the_two_keys_reads_as_one_mode(data) {
+        compare(CL.accentMode(data.mode, data.follow), data.want)
+    }
+
+    function test_a_mode_this_version_does_not_know_leaves_it_to_the_old_key() {
+        // 3 is what a newer version might write; the rest is damage.
+        var odd = [3, 7, -1, 1.5, 2.0001, NaN, Infinity, null, "", "1", "2", "plain", true, [], {}]
+        for (var i = 0; i < odd.length; i++) {
+            compare(CL.accentMode(odd[i], true), 1, String(odd[i]) + " with the old key on")
+            compare(CL.accentMode(odd[i], false), 0, String(odd[i]) + " with the old key off")
+        }
+    }
+
+    function test_only_a_plain_yes_is_the_old_key() {
+        var odd = [undefined, null, 0, 1, "true", "", "yes", [], {}]
+        for (var i = 0; i < odd.length; i++)
+            compare(CL.accentMode(0, odd[i]), 0, String(odd[i]))
+        compare(CL.accentMode(), 0)
+    }
+
+    function test_the_answer_is_always_one_of_the_three() {
+        var modes = [0, 1, 2, 3, -5, 1e9, undefined, null, "x"]
+        var olds = [true, false, undefined]
+        for (var i = 0; i < modes.length; i++)
+            for (var j = 0; j < olds.length; j++) {
+                var got = CL.accentMode(modes[i], olds[j])
+                verify(got === 0 || got === 1 || got === 2, String(modes[i]) + "/" + String(olds[j]) + " gave " + got)
+            }
+    }
 }

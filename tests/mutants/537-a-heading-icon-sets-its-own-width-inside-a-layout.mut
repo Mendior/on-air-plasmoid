@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The sleep timer's heading icon sets width itself again, inside the
+  RowLayout that manages it.
+
+history:
+  Five heading icons (library, music folder, sleep timer, alarms,
+  recordings) were written "width: Kirigami.Units.iconSizes.small; height:
+  width" inside a RowLayout. A layout sizes its items by their implicit
+  size, and Kirigami.Icon's is 32: the icons were drawn at 32 by 32 in rows
+  32 to 36 high, not at the 16 the code named, the sleep timer's since its
+  page was laid out on 2026-07-20 (measured in the popup offscreen at
+  scales 1 and 1.75 and with a 16 pt font, 2026-11-12). Qt calls a width or
+  height set on a layout's item undefined behaviour, the family the tab
+  bar's 5K bug came from. The code now asks the layout for the size that
+  was drawn, and the same measurement reads the same afterwards.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                                  source: "chronometer"
+                                  Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+
+replace:
+                                  source: "chronometer"
+                                  width: Kirigami.Units.iconSizes.small
+
+expect:
+  Killed by the lint's qmllint pass, scripts/qmllint_gate.py: qmllint names
+  the line under Quick.layout-positioning and no counted row accounts for
+  it. tests/test_qmllint_gate.py::test_a_listed_exception_excuses_exactly_what_it_counts
+  holds that a message without a row fails.

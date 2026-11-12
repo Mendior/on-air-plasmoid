@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A position that stands is noted in the log and the stream is left where it is.
+
+history:
+  Measured 2026-11-12 on Qt 6.12 with FFmpeg 9: a station that closed the
+  connection, and one that held it and sent nothing, left the player saying
+  it plays with the position at 29976 ms for as long as it was watched,
+  170 s. The player's own error armed a heal that turned back because the
+  player said it plays. The watch over the position is what hands such a
+  stream on.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+          app._streamDied();
+
+replace:
+          return false;
+
+expect:
+  Killed by test_invariants::test_a_stream_that_stands_is_handed_to_the_road_every_other_death_takes,
+  which the gate runs first, and by tst_standwatch::test_a_position_that_stands_hands_the_stream_over_once.
+  Line-neutral.

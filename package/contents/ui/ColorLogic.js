@@ -130,3 +130,17 @@ function pillText(fg, bg) {
     var surface = pillSurface(fg, bg);
     return surface === "" ? fg : readable(fg, surface, "", MIN_TEXT);
 }
+
+// Which colours the widget wears: 0 the built-in emerald, 1 the system
+// accent, 2 plain. The player and the Appearance page both ask here. The
+// page used to show the stored accentMode as it was, so a config from before
+// the list existed, accentMode 0 with followSystemAccent true, played in the
+// system accent under a box that said "On Air green".
+// Contract: accentMode(mode, followSystem) is mode when that is 1 or 2.
+//   Anything else, 0 and a missing or unknown value alike, leaves the
+//   answer to the old boolean: 1 for a plain true, else 0. A mode a newer
+//   version may write is not known here and reads the same way.
+function accentMode(mode, followSystem) {
+    if (mode === 1 || mode === 2) return mode;
+    return followSystem === true ? 1 : 0;
+}

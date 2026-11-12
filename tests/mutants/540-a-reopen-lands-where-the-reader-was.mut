@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A reader that met the file's unfinished end is opened again where it stood.
+
+history:
+  That is how one end became four: opened again 300 ms back, the reader was
+  as near to the writer as before and met the end again a few seconds on.
+  A reopen is put the same twelve seconds behind the writer as a resume.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+              shiftPosMs = _openPlace(place - reopenOverlapMs, captured);
+
+replace:
+              shiftPosMs = Math.max(0, place - reopenOverlapMs);
+
+expect:
+  Killed by tst_timeshiftengine::test_an_end_past_the_capture_reopens_where_the_listener_was.
+  Line-neutral.

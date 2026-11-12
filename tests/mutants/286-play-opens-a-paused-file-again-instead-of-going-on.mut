@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Play after a pause never goes on in the player: the kept file is always
+  opened again.
+
+history:
+  A file the player still holds, paused, plays on from its needle at once.
+  Opening it again is for the roads where that cannot work: an episode that
+  streams, whose server drops a connection nobody reads from, and a pause
+  something else took out of the player. Taking that road for every file
+  costs a reload and the start's fade on each Play, and the place is only
+  good to the second.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      var lifts = shifted === true || (pausedFile === true && inPlace === true);
+
+replace:
+      var lifts = shifted === true;
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_file_the_player_still_holds_simply_plays_on
+  and tests/qml/tst_transportroads.qml::test_play_after_the_pause_goes_on_in_place.
+  Line-neutral.

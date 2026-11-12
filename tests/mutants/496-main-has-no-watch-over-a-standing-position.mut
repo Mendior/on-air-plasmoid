@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  main.qml does not build the watch.
+
+history:
+  The rule and the watch are tested on their own; neither does anything
+  until main.qml builds the watch with the widget, the engine and the
+  player.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+      StandWatch { id: standWatch; app: root; engine: timeshift; player: playMusic }
+
+replace:
+      Item { id: standWatch }
+
+expect:
+  Killed by test_invariants::test_a_stream_that_stands_is_handed_to_the_road_every_other_death_takes.
+  Line-neutral.

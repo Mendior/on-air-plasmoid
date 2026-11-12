@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A device's refusal stays in the footer over a file that was picked afterwards and never played.
+
+history:
+  The refusal's name was kept until the next cast. A file from My Music
+  picked after it reads its own state in the footer only if the name is
+  gone by then, and a file that is missing never starts the player, so
+  waiting for sound is not enough: "Could not cast to Ruark R5se" would
+  stand where the file's own error belongs. The player being handed
+  another source ends the word.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              root._castFailedName = "";   // the player was given something else: a device's refusal was about the attempt before
+
+replace:
+              // the player was given something else: a device's refusal was about the attempt before
+
+expect:
+  Killed by tests/test_invariants.py::test_a_device_that_refused_the_stream_is_not_cast_to.
+  Line-neutral.

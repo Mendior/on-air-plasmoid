@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A parked station's writer runs on however long the pause lasts.
+
+history:
+  Until 2026.44 a pause cost the line one window: the single file's
+  writer ended at its cap. The segment writer has none, so a pause somebody
+  forgot went on fetching the station until Stop, and after one window the
+  paused place was pushed out of the folder all the same. The capture ends
+  thirty seconds before the place would leave: measured on the rig with a
+  window of two minutes, no curl and no ffmpeg from 90 s after the pause on
+  and a folder that stood still.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (slide && writerUp && !shifted && _stage === "" && SlideLogic.parkEndsCapture(shiftPosMs, runMs, keepMs)) _endCapture();
+
+replace:
+          if (false) _endCapture();
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_pause_that_reaches_the_windows_edge_ends_the_capture_and_keeps_what_was_cut.

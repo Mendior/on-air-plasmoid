@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A cutting writer whose stream stood still for half a minute joins the station again and goes on.
+
+history:
+  Measured on the rig with a station silent for 40 s: curl gave up after
+  30 s, asked again, and the writer went on cutting with a hole in its
+  segments while the engine's clock had run through the stall. A pause made
+  three minutes later came back 21 s past its word, under a pill that read
+  0:44 for 0:30. Without the second ask the writer ends, the engine is told,
+  and the next buffer starts a clock of its own: the same pause lands a second
+  before its word.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+          + " --speed-limit 1 --speed-time 30 | { exec 3<&0; "
+
+replace:
+          + " --retry 20 --retry-delay 2 --speed-limit 1 --speed-time 30 | { exec 3<&0; "
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_the_writer_looks_before_it_cuts_and_never_names_the_address
+  and, in the slow set, by tests/test_slide_writer.py::test_a_station_that_stops_sending_ends_the_writer.

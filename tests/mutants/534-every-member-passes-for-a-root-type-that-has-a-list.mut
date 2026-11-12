@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The list of what a root inherits lets any name through for a type that
+  has a list at all.
+
+history:
+  A root has members it never declares: main.qml's `expanded` comes from
+  PlasmoidItem, `width` from Item. The cross-file check keeps them in
+  INHERITED, seven names on 2026-11-12, each found in the type descriptions
+  Qt and Plasma install. Widening that list is the quiet way to make a red
+  line go away, and a list that admits everything turns the check into one
+  that only looks at files whose root is a type nobody listed.
+
+target:
+  tests/test_cross_file_members.py
+
+find:
+          if member in f.members or member in inherited:
+
+replace:
+          if member in f.members or kind in ROOT_IS:
+
+expect:
+  Killed by tests/test_cross_file_members.py::test_a_member_has_to_be_at_the_root_of_the_file_the_name_leads_to
+  and by tests/test_cross_file_members.py::test_a_misspelt_member_is_named_with_its_line_and_the_file_it_was_looked_for_in
+  on the shipped files.

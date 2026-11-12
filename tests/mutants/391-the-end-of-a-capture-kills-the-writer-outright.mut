@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The capture's end sends the writer a kill it cannot answer.
+
+history:
+  ffmpeg answers an interrupt by closing the segment it is cutting and
+  ending its own list; killed outright it leaves a segment half written, and
+  its command reports a death where there was an orderly end.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+  " && kill -INT \"$p\" 2>/dev/null; true # " + a.seq;
+
+replace:
+  " && kill -KILL \"$p\" 2>/dev/null; true # " + a.seq;
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_the_end_of_a_capture_signals_the_writer_and_removes_nothing.

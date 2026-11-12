@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The measurement's shell asks whether it was called off before it starts
+  calibrate.py and never again.
+
+history:
+  One look is not enough, and where it fails is narrow. The shell is told
+  there is no mark, and before it has written the pid a cancel arrives:
+  the mark goes down a moment too late for the look, and the cancel finds
+  no pid file to kill by. Both sides have done their part and the
+  measurement runs to its end. The look after the pid closes it from the
+  shell's side: a cancel that was too late for the first look is seen by
+  the second, and one that is too late for the second finds the pid.
+  The test drops a cancel in after every look the shell makes, one run
+  each, so the narrow one is among them wherever it sits.
+
+target:
+  package/contents/ui/CalibLogic.js
+
+find:
+              + (guarded === true ? " off && kill \"$cp\" 2>/dev/null;" : "")
+
+replace:
+              + (guarded === true ? "" : "")
+
+expect:
+  Killed by tests/test_calibrate_cancel.py::test_a_cancel_landing_right_after_any_look_at_the_mark_is_still_obeyed.
+  Line-neutral.

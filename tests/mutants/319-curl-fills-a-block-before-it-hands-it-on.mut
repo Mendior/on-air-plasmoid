@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The writer's curl buffers its output.
+
+history:
+  A stop travels up the writer's pipe a block at a time: ffmpeg, cat and
+  curl each learn of it with the next one. Measured on a 2 kB/s station, where
+  curl took two seconds to fill 4 KiB: the three were gone 3, 5 and 7 s after
+  the stop, and within 2 s with -N.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+          + "curl -sS -N -L --http0.9 -K "
+
+replace:
+          + "curl -sS -L --http0.9 -K "
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_the_writer_looks_before_it_cuts_and_never_names_the_address.

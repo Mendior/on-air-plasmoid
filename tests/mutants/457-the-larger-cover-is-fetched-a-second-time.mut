@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The larger view of the cover asks for the picture under an address of
+  its own, and Qt fetches it again for that.
+
+history:
+  Qt keeps a decoded picture under its address, its size and its fill
+  mode, and a second Image that differs in any of them gets no share of
+  the first one's. The larger view was first written with
+  PreserveAspectFit beside the cover's crop, and a server on the loopback
+  counted two requests for one click. The cover and its larger view are
+  one component now, so the address is the one thing left that can set
+  them apart. This mutant gives the larger view one of its own.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+              source: touch.larger ? touch.art : ""
+
+replace:
+              source: touch.larger ? touch.art + "#larger" : ""
+
+expect:
+  Killed by tests/test_cover_larger_fetch.py::test_the_larger_cover_is_the_picture_the_page_already_holds.
+  Line-neutral.

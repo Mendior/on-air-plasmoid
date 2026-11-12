@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A rebuild's answer is recognised by its enable alone again, so a hung
+  rebuild that answers late is taken for the one sent after it.
+
+history:
+  The lock on the loopback rebuild is cleared after thirty seconds without
+  an answer, and a rebuild that was waiting goes out. The hung shell is
+  still alive and still answers, under the same enable number as its
+  successor. Driven with stand-in commands on 2026-11-11: answering last,
+  its modules were adopted beside the newer pair, 201,202,301,302 for two
+  speakers with a map that knew only 301 and 302. Answering first, it
+  released the lock the newer rebuild was still holding.
+
+target:
+  package/contents/ui/ReloopLogic.js
+
+find:
+      return m !== null && m[1] === String(gen) && m[2] === String(job);
+
+replace:
+      return m !== null && m[1] === String(gen);
+
+expect:
+  Killed by tst_syncengine::test_a_hung_rebuild_answering_last_is_not_adopted_next_to_its_successor.
+  Line-neutral.

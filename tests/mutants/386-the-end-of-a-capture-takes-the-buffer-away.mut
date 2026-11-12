@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  When a pause is a window old the engine stops its buffer as a Stop would.
+
+history:
+  The end of a capture is not the end of the pause: the listener left a
+  place and Play has to come back to it. The writer is signalled, the folder
+  stays, and the arm is the one a writer leaves that ended by itself under a
+  park.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          writerUp = false;
+          slideFrozen = true;
+      }
+
+replace:
+          disarm();
+      }
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_pause_that_reaches_the_windows_edge_ends_the_capture_and_keeps_what_was_cut.

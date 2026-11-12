@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A cached picture that does not say what it is of is painted anyway.
+
+history:
+  Every entry is filed with its kind. One without, or with a word that is
+  no kind, cannot be shown honestly, and the old shape of an entry was
+  exactly that: an address and a time. Such an entry is looked up again.
+  This mutant paints it.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+          if (hit.url !== "" && SearchLogic.artKind(hit.kind) === "") return false;
+
+replace:
+          if (hit.url !== "" && SearchLogic.artKind(hit.kind) === "") hit.kind = "track";
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_a_cache_entry_without_a_kind_is_looked_up_again.
+  Line-neutral.

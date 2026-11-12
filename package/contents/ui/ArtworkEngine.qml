@@ -15,7 +15,8 @@ import "TrackLogic.js" as TrackLogic
 // chain per flap, and the Deezer-first/iTunes-fallback pipeline. What stays
 // in main.qml is everything that owns a PLAYER fact: the local sidecar-cover
 // road (its guard reaches in through app.playerSourceString) and the
-// metadata handler's stale-clear, which writes back through the aliases.
+// metadata handler, which clears a stale cover through artClearUnless and
+// artClear. Nobody but _artShow writes the picture.
 Item {
     id: engine
 
@@ -26,8 +27,19 @@ Item {
     // Plasmoid's configuration in production; a plain object in tests.
     required property var cfg
 
+    // The picture beside the song and what it is of: one of
+    // SearchLogic.artKind's three words while there is a picture, "" with
+    // none. Both are written in _artShow and nowhere else.
     property string albumArtUrl: ""
+    property string albumArtKind: ""
+    // The picture for every place that cannot say what it shows, the lock
+    // screen and a television among them: the song's own cover, and nothing
+    // where the picture is of the artist or off another record.
+    readonly property string trackArtUrl: albumArtKind === "track" ? albumArtUrl : ""
 
+    // What is known about a lookup key: { url, t, kind }, url "" for a track
+    // nobody has a picture for. It is a property of this engine and is
+    // written nowhere else, so it starts empty with every panel start.
     property var _artCache: ({})
 
     // FIFO queue to bound _artCache — plasmashell runs for weeks, and an
@@ -101,6 +113,35 @@ Item {
         r.again();
     }
 
+    // Writes the picture, its kind and the key of the track it belongs to.
+    // "track" is the word that lets a picture out to the lock screen and a
+    // television, so it is taken away before the address changes and given
+    // only after: whoever reads the two between the writes never finds one
+    // picture under another's kind.
+    function _artShow(url, kind, key) {
+        if (kind !== "track" || !url) albumArtKind = url ? kind : "";
+        albumArtUrl = url;
+        albumArtKind = url ? kind : "";
+        _albumArtKey = url ? key : "";
+    }
+
+    // No picture: a title went away, or a lookup came to a dead end.
+    function artClear() {
+        _artShow("", "", "");
+    }
+
+    // A new track's lookup begins. Another track's cover goes at once, so it
+    // does not pose over the new song while the network answers or fails to;
+    // a cover that already belongs to this key stays.
+    function artClearUnless(key) {
+        if (albumArtUrl !== "" && _albumArtKey !== key) artClear();
+    }
+
+    // The sidecar cover of the local file that plays: that file's own cover.
+    function artLocal(url) {
+        _artShow(url, "track", "");
+    }
+
     // Both doors are a title change as main.qml sees it: this one for a
     // title the cache settled or a header that went empty, the next for a
     // title that needs the network. Each stamps the moment, so the wait is
@@ -120,88 +161,95 @@ Item {
         artLookupDebounce.restart();
     }
 
-    // definitive=false means the empty result came from a transient failure
-    // (timeout, HTTP error, rate limit) — it is NOT cached, so the next play
-    // of the same track simply tries again. Definitive empties are cached
-    // with a timestamp and expire after _artNegativeTtlMs.
-    function _artFinish(cacheKey, url, definitive) {
+    // kind says what the picture is of, and a picture that comes without one
+    // of the three words is no picture: it could not be shown honestly.
+    // definitive=false means a transient failure (timeout, HTTP error, rate
+    // limit) was met on the way. An empty result is then NOT cached, so the
+    // next play of the same track simply tries again, and neither is a
+    // picture that only stands in for the song's cover, because the request
+    // that failed may have been the one that had the cover. Definitive
+    // empties are cached with a timestamp and expire after _artNegativeTtlMs.
+    function _artFinish(cacheKey, url, definitive, kind) {
+        kind = url ? SearchLogic.artKind(kind) : "";
+        if (url && kind === "") {
+            url = "";
+            definitive = false;
+        }
         // Event-only log — keys and URLs are the listening history, which
         // has no business sitting in the journal.
-        console.log("[ARP] artFinish " + (url ? "art found" : "no art")
+        console.log("[ARP] artFinish " + (url ? "art found (" + kind + ")" : "no art")
                     + (definitive ? "" : " (transient, not cached)"));
-        if (url || definitive) {
+        if (definitive) {
             if (_artCache[cacheKey] === undefined) {
                 _artCacheKeys.push(cacheKey);
                 if (_artCacheKeys.length > 200) {
                     delete _artCache[_artCacheKeys.shift()];
                 }
             }
-            _artCache[cacheKey] = { "url": url || "", "t": Date.now() };
+            _artCache[cacheKey] = { "url": url || "", "t": Date.now(), "kind": kind };
         }
         var currentKey = app.trackArtistTitleKey();
         if (url && currentKey === cacheKey) {
-            albumArtUrl = url;
-            _albumArtKey = cacheKey;
+            _artShow(url, kind, cacheKey);
             console.log("[ARP] albumArtUrl set");
         } else if (!url && definitive && currentKey === cacheKey) {
             // A definitive miss for the CURRENT track clears the panel —
             // the previous track's cover posing over a new song is worse
             // than the honest vinyl.
-            albumArtUrl = "";
-            _albumArtKey = "";
+            artClear();
         }
     }
 
-    // A Deezer entity without an image still returns a VALID URL — it just
-    // has an empty image id ("…/images/artist//250x250-….jpg") and serves a
-    // grey placeholder silhouette. Accepting one poisons the art cache with
-    // junk for the whole session; treat it as "no image". The empty id has
-    // a second spelling: d41d8cd98f00b204e9800998ecf8427e is the MD5 of ""
-    // — the same grey silhouette wearing a hash (caught live: artist
-    // fallback for an unmatched track showed the silhouette instead of
-    // falling through to the station's own logo).
-    function _deezerRealArt(url) {
-        var u = (url || "").toString();
-        if (u === "" || /\/images\/\w+\/\//.test(u)
-            || u.indexOf("d41d8cd98f00b204e9800998ecf8427e") !== -1) return "";
-        return u;
-    }
-
-    function _queryDeezerArtist(artistName, cacheKey, onResult) {
-        console.log("[ARP] DeezerArtist query");
+    // One request to a catalogue: the address goes out and done(status, body)
+    // comes back once, status 0 for a request that timed out or never left.
+    // The tests put a catalogue of their own here.
+    property var _fetch: function(address, done) {
         var xhr = new XMLHttpRequest;
         var guard = null;
-        xhr.open("GET", "https://api.deezer.com/search/artist?q=" + encodeURIComponent(artistName) + "&limit=1");
+        xhr.open("GET", address);
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== xhr.DONE) return;
-            app._clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (!data.error) {
-                        if (data.data && data.data.length > 0) {
-                            var artist = data.data[0];
-                            // The photo of SOME artist is not a fallback,
-                            // it is a wrong picture with a friendly face —
-                            // the name has to be the one we asked for.
-                            if (SearchLogic.artPhotoTakes(artistName, artist.name || "")) {
-                                var artUrl = _deezerRealArt(artist.picture_big)
-                                             || _deezerRealArt(artist.picture_medium);
-                                if (artUrl) {
-                                    onResult(artUrl, true);
-                                    return;
-                                }
-                            }
-                        }
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
+            engine.app._clearXhrTimeout(guard);
+            done(xhr.status, xhr.responseText);
         };
-        guard = app._armXhrTimeout(xhr, 2500);
+        guard = engine.app._armXhrTimeout(xhr, 2500);
         xhr.send();
+    }
+
+    // Asks one catalogue and hands the chain what its answer offers. read is
+    // given the parsed answer and returns a picture with its kind, null for
+    // an answer without one, or undefined for an answer that is no answer.
+    // onResult is (url, definitive, kind): definitive=true means the service
+    // really answered, with a picture or a real "no match"; definitive=false
+    // is a transient failure, a timeout or an abort (status 0), an HTTP error
+    // (iTunes rate-limits at ~20 req/min with 403), a quota error or a body
+    // nobody can parse, and must not be negative-cached.
+    // An answer the reader trips over counts as transient too, but it says
+    // so: the engine once called a library it had not imported, every call
+    // threw in here unseen, and the covers were dead until somebody looked.
+    function _ask(address, read, onResult) {
+        _fetch(address, function(status, body) {
+            var got;
+            if (status === 200) {
+                try {
+                    got = read(JSON.parse(body));
+                } catch(e) {
+                    console.warn("[ARP] art answer not read: " + e);
+                }
+            }
+            if (got === undefined) onResult("", false, "");
+            else onResult(got ? got.url : "", true, got ? got.kind : "");
+        });
+    }
+
+    // The photo of SOME artist is not a fallback, it is a wrong picture with
+    // a friendly face: the name has to be the one we asked for, which
+    // SearchLogic.artFromDeezerArtist sees to.
+    function _queryDeezerArtist(artistName, cacheKey, onResult) {
+        console.log("[ARP] DeezerArtist query");
+        _ask("https://api.deezer.com/search/artist?q=" + encodeURIComponent(artistName) + "&limit=1", function(data) {
+            return data.error ? undefined : SearchLogic.artFromDeezerArtist(data, artistName);
+        }, onResult);
     }
 
     // The artist's own sleeve for a song no catalogue has: the iTunes songs
@@ -214,37 +262,9 @@ Item {
     // iTunes song search, and a miss is cached like any other.
     function _queryItunesArtist(artistName, cacheKey, onResult) {
         console.log("[ARP] iTunes artist query");
-        var xhr = new XMLHttpRequest;
-        var guard = null;
-        xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(artistName) + "&entity=song&limit=25");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            app._clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data.results && data.results.length > 0) {
-                        var rows = [];
-                        for (var ri = 0; ri < data.results.length; ri++)
-                            rows.push({ "artist": (data.results[ri] || {}).artistName || "",
-                                        "title": (data.results[ri] || {}).trackName || "",
-                                        "art": (data.results[ri] || {}).artworkUrl100 || "" });
-                        var pick = SearchLogic.artPickByArtist(artistName, rows);
-                        if (pick >= 0) {
-                            onResult(rows[pick].art.replace("100x100bb", "300x300bb"), true);
-                            return;
-                        }
-                    }
-                    if (data.results !== undefined) {
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
-        };
-        guard = app._armXhrTimeout(xhr, 2500);
-        xhr.send();
+        _ask("https://itunes.apple.com/search?term=" + encodeURIComponent(artistName) + "&entity=song&limit=25", function(data) {
+            return data.results === undefined ? undefined : SearchLogic.artFromItunesArtist(data, artistName);
+        }, onResult);
     }
 
     function _primaryArtist(artist) {
@@ -269,21 +289,18 @@ Item {
     // album, and together they cost 36 requests. Both callers pass the
     // parsed artist; a call without one asks nothing and paints nothing.
     function _artFromCache(query, artist) {
-        if (TrackLogic.stationTalk(query, app.currentStation)) {
-            albumArtUrl = "";
-            _albumArtKey = "";
-            return true;
-        }
-        if (!artist) {
-            albumArtUrl = "";
-            _albumArtKey = "";
+        if (TrackLogic.stationTalk(query, app.currentStation) || !artist) {
+            artClear();
             return true;
         }
         var hit = _artCache[query];
         if (hit === undefined) return false;
         if (hit.url === "" && Date.now() - hit.t >= _artNegativeTtlMs) return false;
-        albumArtUrl = hit.url;
-        _albumArtKey = hit.url ? query : "";
+        // Every entry was filed by _artFinish in this session and says what
+        // its picture is of. One that does not is not taken for a song's
+        // cover: the track is looked up again.
+        if (hit.url !== "" && SearchLogic.artKind(hit.kind) === "") return false;
+        _artShow(hit.url, hit.kind, query);
         return true;
     }
 
@@ -292,28 +309,18 @@ Item {
         if (app._localArtForSource !== ""
             && app.playerSourceString() === app._localArtForSource)
             return;
-        if (!cfg.albumArtEnabled) {
-            albumArtUrl = "";
-            return;
-        }
-        if (!trackString || trackString.length === 0) {
-            albumArtUrl = "";
+        if (!cfg.albumArtEnabled || !trackString || trackString.length === 0) {
+            artClear();
             return;
         }
         var parsed = TrackLogic.parseTrackString(TrackLogic.preCleanTrack(trackString, app.currentStation));
         var query = TrackLogic.normalizeQuery((parsed.artist + " " + parsed.title).trim() || trackString);
         if (query.length === 0) {
-            albumArtUrl = "";
-            _albumArtKey = "";
+            artClear();
             return;
         }
         if (_artFromCache(query, parsed.artist)) return;
-        // A NEW track's lookup begins: the old track's cover must not pose
-        // over it while the network answers (or fails to).
-        if (albumArtUrl !== "" && _albumArtKey !== query) {
-            albumArtUrl = "";
-            _albumArtKey = "";
-        }
+        artClearUnless(query);
 
         // What the stream said it is playing — every candidate a music
         // service offers is judged against this, never accepted on faith.
@@ -323,9 +330,11 @@ Item {
     }
 
     // The requests a lookup will try, in order, each {fn, q, svc}: svc names
-    // the service for the tests ("deezer", "itunes", "deezerArtist",
-    // "itunesArtist"). The chain stops at the first one that finds a cover,
-    // so a later entry only ever runs when every earlier one came back empty.
+    // the service ("deezer", "itunes", "deezerArtist", "itunesArtist"), and
+    // SearchLogic.artBrings says what each is sent for. The chain stops at
+    // the first one that finds the song's cover, so a later entry only ever
+    // runs when no earlier one had it. The song searches all come before the
+    // two that can only bring a stand-in.
     // One request at a time, Deezer first: its rate limit is far
     // friendlier than iTunes' (~20 req/min per IP), so the common case
     // costs a single Deezer call and iTunes only ever sees fallbacks.
@@ -393,32 +402,55 @@ Item {
         return uniqAttempts;
     }
 
-    // Runs the plan one request at a time for the lookup key query: the first
-    // cover found settles it and nothing after it is asked. Each fn is called
-    // as fn(q, query, onResult(url, definitive), want). again, when given,
-    // starts this same lookup over, for the one later attempt after a chain
-    // that ended on a transient failure.
+    // Runs the plan one request at a time for the lookup key query. Each fn
+    // is called as fn(q, query, onResult(url, definitive, kind), want). The
+    // song's own cover settles it at once and nothing after it is asked.
+    // A picture of the artist or another record's sleeve that a song search
+    // brings is kept and the chain goes on: it used to end there, and the
+    // next service, which had the song, was never asked. What was kept
+    // answers in place of a later request (SearchLogic.artSpare), or at the
+    // plan's end. again, when given, starts this same lookup over, for the
+    // one later attempt after a chain that met a transient failure.
     function _runAttempts(attempts, query, want, again) {
         var sawTransient = false;
+        var spare = {};
+
+        // The song's cover is final whatever happened on the way. Anything
+        // else, a miss included, is final only when every service answered;
+        // after a timeout it is shown, not filed, and the lookup gets its
+        // later attempt.
+        function settle(url, kind) {
+            var sure = kind === "track" || !sawTransient;
+            _artFinish(query, url, sure, kind);
+            if (!sure) _artRetryArm(true, query, again);
+        }
 
         function runNext() {
             // The track changed while the chain was running: stop burning
             // requests on it. Nothing is cached (the chain is incomplete);
             // the track's next play starts fresh.
             if (app.trackArtistTitleKey() !== query) return;
-            if (attempts.length === 0) {
-                // Cache the miss only when every source really said "no
-                // match" — a timeout/quota blip must retry on the next play.
-                _artFinish(query, "", !sawTransient);
-                _artRetryArm(sawTransient, query, again);
+            var brings = attempts.length > 0 ? SearchLogic.artBrings(attempts[0].svc) : "";
+            var kept = SearchLogic.artSpare(spare, brings);
+            if (kept || attempts.length === 0) {
+                settle(kept ? kept.url : "", kept ? kept.kind : "");
                 return;
             }
             var step = attempts.shift();
-            step.fn(step.q, query, function(url, definitive) {
-                if (url) {
-                    _artFinish(query, url, true);
+            step.fn(step.q, query, function(url, definitive, kind) {
+                // The listener switched the online covers off while this
+                // request was in the air. lookupAlbumArt's door only stands
+                // before the first request, so the empty answer used to send
+                // the next one. The chain ends here whatever came home: a
+                // cover is not painted either, and nothing is cached, the
+                // same as for a chain a track change cut short.
+                if (!cfg.albumArtEnabled) return;
+                kind = url ? SearchLogic.artKind(kind) : "";
+                if (kind === "track" || (kind !== "" && kind === brings)) {
+                    settle(url, kind);
                     return;
                 }
+                if (kind !== "" && !spare[kind]) spare[kind] = { "url": url, "kind": kind };
                 if (!definitive) sawTransient = true;
                 runNext();
             }, want);
@@ -426,89 +458,24 @@ Item {
         runNext();
     }
 
+    // Five candidates, and the one whose ARTIST is ours, not simply the
+    // first. Nothing matching is an honest "no cover": see
+    // SearchLogic.artFromDeezerSongs. Deezer reports quota and rate problems
+    // as 200 + {"error"}, which is a transient failure and not "no such
+    // track".
     function _queryDeezer(query, cacheKey, onResult, want) {
         console.log("[ARP] Deezer query");
-        var xhr = new XMLHttpRequest;
-        var guard = null;
-        xhr.open("GET", "https://api.deezer.com/search?q=" + encodeURIComponent(query) + "&limit=10");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            app._clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    // Deezer reports quota/rate problems as 200 + {"error"} —
-                    // that is a transient failure, not "no such track".
-                    if (!data.error) {
-                        if (data.data && data.data.length > 0) {
-                            // Five candidates, and the one whose ARTIST is
-                            // ours — not simply the first. Nothing matching
-                            // is an honest "no cover": see artPick.
-                            var cands = [];
-                            for (var ci = 0; ci < data.data.length; ci++)
-                                cands.push({ "artist": ((data.data[ci] || {}).artist || {}).name || "",
-                                             "title": (data.data[ci] || {}).title || "" });
-                            var pi = SearchLogic.artPickEither(want.artist, want.title, cands);
-                            if (pi >= 0) {
-                                var album = data.data[pi].album || {};
-                                var artUrl = _deezerRealArt(album.cover_big)
-                                             || _deezerRealArt(album.cover_medium)
-                                             || _deezerRealArt((data.data[pi].artist || {}).picture_medium);
-                                if (artUrl) {
-                                    onResult(artUrl, true);
-                                    return;
-                                }
-                            }
-                        }
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
-        };
-        guard = app._armXhrTimeout(xhr, 2500);
-        xhr.send();
+        _ask("https://api.deezer.com/search?q=" + encodeURIComponent(query) + "&limit=10", function(data) {
+            return data.error ? undefined : SearchLogic.artFromDeezerSongs(data, want);
+        }, onResult);
     }
 
-    // All three query callbacks are (url, definitive): definitive=true means
-    // the service really answered (with a result or a real "no match");
-    // definitive=false is a transient failure — timeout/abort (status 0),
-    // an HTTP error (iTunes rate-limits at ~20 req/min with 403), a quota
-    // error or an unparseable body — and must not be negative-cached.
     function _queryItunes(query, cacheKey, onResult, want) {
         console.log("[ARP] iTunes query");
-        var xhr = new XMLHttpRequest;
-        var guard = null;
-        xhr.open("GET", "https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=song&limit=10&media=music");
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== xhr.DONE) return;
-            app._clearXhrTimeout(guard);
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data.results && data.results.length > 0) {
-                        var icands = [];
-                        for (var ii = 0; ii < data.results.length; ii++)
-                            icands.push({ "artist": data.results[ii].artistName || "",
-                                          "title": data.results[ii].trackName || "" });
-                        var ip = SearchLogic.artPickEither(want.artist, want.title, icands);
-                        var artUrl = ip >= 0 ? (data.results[ip].artworkUrl100 || "") : "";
-                        if (artUrl) {
-                            onResult(artUrl.replace("100x100bb", "300x300bb"), true);
-                            return;
-                        }
-                    }
-                    if (data.results !== undefined) {
-                        onResult("", true);
-                        return;
-                    }
-                } catch(e) {}
-            }
-            onResult("", false);
-        };
-        guard = app._armXhrTimeout(xhr, 2500);
-        xhr.send();
+        _ask("https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=song&limit=10&media=music",
+             function(data) {
+            return data.results === undefined ? undefined : SearchLogic.artFromItunesSongs(data, want);
+        }, onResult);
     }
 
 }

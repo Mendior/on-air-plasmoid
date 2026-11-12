@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heading's pulse asks Plasma's popup whether the face is on screen.
+
+history:
+  The face's animations ran while root.expanded was true, which is the
+  popup and nothing else. With the face in a window of its own the popup
+  is shut: the pulse under the station's name would stand still there, and
+  run on in a popup that only holds a placeholder. Every such place reads
+  root.faceShown.
+
+target:
+  package/contents/ui/Heading.qml
+
+find:
+                  running: isPlaying() && root.faceShown && !root.thrifty
+
+replace:
+                  running: isPlaying() && root.expanded && !root.thrifty
+
+expect:
+  Killed by tests/test_invariants.py::test_the_face_asks_whether_it_is_on_screen_in_one_place.

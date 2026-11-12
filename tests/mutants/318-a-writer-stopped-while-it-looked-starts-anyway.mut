@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A writer that was stopped before it had a pid starts its ffmpeg all the same.
+
+history:
+  The stop signals the pid it finds written down. A writer still
+  looking at the stream's first bytes has written none, so the stop takes the
+  address file and the writer asks for that file before it starts anything.
+  Measured before that: a stop 0.3 s after the start left curl and ffmpeg
+  running until the guard's tick.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+          + "[ -e " + q(a.cfgPath) + " ] || exit 0; "
+
+replace:
+          + ""
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_a_writer_that_was_stopped_while_it_looked_starts_nothing
+  and, in the slow set, by tests/test_slide_writer.py::test_a_stop_that_comes_while_the_writer_is_still_looking_leaves_nothing.

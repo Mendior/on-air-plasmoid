@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A second face is built when a seat asks for one that already lives.
+
+history:
+  Two faces are two search fields, two sets of station probes and two key
+  handlers on one player. Built again on each move, the face started the
+  list from the top, closed an open menu and asked the directory
+  everything once more: 80 requests and 114 log errors over ten round
+  trips, against none for the one face that is moved.
+
+target:
+  package/contents/ui/PlayerWindow.qml
+
+find:
+          if (!faceItem && face) faceItem = face.createObject(seatItem);
+
+replace:
+          if (face) faceItem = face.createObject(seatItem);
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_the_face_outlives_a_popup_seat_and_sits_in_the_next_one.

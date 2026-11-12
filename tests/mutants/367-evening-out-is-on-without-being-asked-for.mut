@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The option is on in a fresh install.
+
+history:
+  With it on a loud station loses up to ten decibels, which a listener with
+  weak speakers did not ask for, and every saved station is connected to a
+  second time.
+
+target:
+  package/contents/config/main.xml
+
+find:
+  when the newest is thirty days old.</label>
+              <default>false</default>
+
+replace:
+  when the newest is thirty days old.</label>
+              <default>true</default>
+
+expect:
+  Killed by tests/test_invariants.py::test_the_loudness_engine_has_its_instance_its_answers_and_its_sweep.
+  Line-neutral.

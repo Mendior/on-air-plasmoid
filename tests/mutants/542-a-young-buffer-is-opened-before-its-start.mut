@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A buffer younger than the distance is opened at a place below nought.
+
+history:
+  Five seconds of play and a pause of two leave seven seconds captured,
+  and twelve seconds behind the writer is five seconds before the file
+  begins. The open is held at the file's start.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+      return Math.max(0, Math.min(place,
+
+replace:
+      return (Math.min(place,
+
+expect:
+  Killed by tst_timeshiftlogic::test_a_buffer_younger_than_the_gap_is_opened_at_its_start.
+  Line-neutral.

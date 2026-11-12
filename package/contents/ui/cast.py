@@ -52,7 +52,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, unescape
 
 NO_LIB = "__NO_PYCHROMECAST__"
 OK = "__CAST_OK__"
@@ -111,6 +111,115 @@ def _udn_safe(text):
     return "".join(c for c in (text or "") if c.isalnum() or c in ":._-")
 
 
+# ── What a failure says ──────────────────────────────────────────────────────
+# A FAIL line used to carry the first 200 characters of whatever came back. A
+# Ruark R5se refusing a station answers HTTP 500 with a SOAP fault whose
+# errorCode sits 270 characters in (measured 2026-11-12: 716, "Resource
+# not found", for three addresses, while a fourth played), so the one fact
+# that tells "this address was refused" from "the device is not there" never
+# left this file. The line now names what is known, as fields in front of the
+# words:
+#
+#   __CAST_FAIL__ upnp=716 action=SetAVTransportURI http=500 Resource not found
+#   __CAST_FAIL__ action=Play http=404
+#   __CAST_FAIL__ reach=timeout action=SetAVTransportURI
+#   __CAST_FAIL__ reach=nodesc renderer description unavailable
+#   __CAST_FAIL__ load=104 action=play the receiver could not load the stream
+#
+# upnp is the device's own error code, http its status, action what it was
+# asked, reach how a device that gave no answer failed to, load a Cast
+# receiver's own code for a stream it could not load. The stream's
+# address is in none of them, and neither is the body of an answer: a station
+# address can carry a listener's token, and these lines end up in logs.
+
+_PLAIN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ,'()-]*")
+# Two patterns, not an XML parser: a fault out of cheap firmware need not be
+# well-formed, and the answer of a device nobody vouches for is not handed to
+# a parser that expands entities. An element may carry a prefix or attributes,
+# each of a bounded length: left open, an opening that never closes was
+# followed to the end of the answer, and half a megabyte of them took a minute.
+_UPNP_CODE_RE = re.compile(r"<(?:[\w.-]{1,40}:)?errorCode(?:\s[^>]{0,200})?>\s{0,40}(\d{1,6})\s{0,40}</")
+_UPNP_WORDS_RE = re.compile(r"<(?:[\w.-]{1,40}:)?errorDescription(?:\s[^>]{0,200})?>([^<]{0,400})</")
+
+
+def _plain(text: str) -> str:
+    """A device's words about its error, cut down to plain ones.
+
+    The leading run of letters, digits, spaces and , ' ( ) - and sixty
+    characters of it at most. A renderer can put anything there, the address
+    it was sent included; what could be one, or a part of one, ends the run.
+    """
+    said = _PLAIN_RE.match(_clean(unescape(text or "", {"&apos;": "'", "&quot;": '"'})))
+    return said.group(0)[:60].strip() if said else ""
+
+
+def _upnp_error(body: str) -> tuple[str, str]:
+    """The UPnP error a SOAP fault names, as (code, words); "" for each one
+    the body does not give."""
+    code = _UPNP_CODE_RE.search(body or "")
+    words = _UPNP_WORDS_RE.search(body or "")
+    return (code.group(1) if code else ""), (_plain(words.group(1)) if words else "")
+
+
+class SoapFault(urllib.error.HTTPError):
+    """A renderer answered one SOAP action with a status of 300 or more.
+
+    action is what it was asked, code the HTTP status, upnp and words the
+    error its body names ("" when it names none). Still an HTTPError, so
+    what tells a fault from a dead control address by the status goes on
+    working; the body itself is not kept.
+    """
+
+    def __init__(self, control_url: str, status: int, headers, action: str, body: str) -> None:
+        self.action = action
+        self.upnp, self.words = _upnp_error(body)
+        super().__init__(control_url, status, self.words or "no UPnP error named", headers, None)
+
+
+class Unreached(Exception):
+    """A device gave no answer to speak of. action is what it was asked, how
+    is one word: timeout, refused, dropped (it hung up or sent no HTTP), down
+    (no route, no such name, anything else the network said)."""
+
+    def __init__(self, action: str, how: str) -> None:
+        super().__init__("%s: %s" % (action, how))
+        self.action = action
+        self.how = how
+
+
+def _reach(exc: BaseException) -> str:
+    """The one word for how a connection failed (see Unreached)."""
+    # RequestTimeout is what the Cast library's wait() raises on a device
+    # that is off. Known by its name: the library is optional here.
+    if isinstance(exc, TimeoutError) or type(exc).__name__ == "RequestTimeout":
+        return "timeout"
+    if isinstance(exc, ConnectionRefusedError):
+        return "refused"
+    if isinstance(exc, (ConnectionError, http.client.HTTPException)):
+        return "dropped"
+    return "down"
+
+
+def _fail(exc: BaseException, secret: str = "") -> str:
+    """The FAIL line for a command that came to nothing.
+
+    A SoapFault and an Unreached are spelled out as fields. Anything else
+    keeps the line it always had, the sentinel and the exception's own words,
+    with secret (the stream's address, where the command has one) taken out
+    of them should they quote it.
+    """
+    if isinstance(exc, SoapFault):
+        fields = ["upnp=%s" % exc.upnp] if exc.upnp else []
+        fields += ["action=%s" % exc.action, "http=%d" % exc.code]
+        return " ".join([FAIL] + fields + ([exc.words] if exc.words else []))
+    if isinstance(exc, Unreached):
+        return "%s reach=%s action=%s" % (FAIL, exc.how, exc.action)
+    words = str(exc)
+    if secret:
+        words = words.replace(secret, "")
+    return "%s %s" % (FAIL, words.replace("\r", " ").replace("\n", " ")[:200])
+
+
 # ── Google Cast ──────────────────────────────────────────────────────────────
 
 def _stop_browser(browser):
@@ -142,22 +251,68 @@ def _disconnect(cast):
         _dbg("disconnect", exc)
 
 
-def _media_session_open(mc):
-    """Has the receiver actually opened a media session?
+def _took(mc, url):
+    """Does the receiver hold a media session for the stream it was asked for?
 
-    Not `mc.is_active` — that one is inherited from BaseController and answers
-    a different question: whether the media namespace is among the running
-    app's namespaces. The default media receiver has that namespace up before
-    (and after) it holds any session, so a device that silently refused the
-    stream still reads as active. block_until_active waits on
-    session_active_event, and this is the same event read back, so the verdict
-    matches what the wait was for. Older pychromecast without the event falls
-    back to the session id the status carries.
+    Not `mc.is_active`: that one is inherited from BaseController and says the
+    media namespace is among the running app's namespaces, which the default
+    media receiver has up before (and after) it holds any session. Not
+    session_active_event either. Any session sets it, the one a television
+    was already in included, and pychromecast leaves it set when the app goes
+    away. Measured 2026-11-11 on a television in the middle of a YouTube
+    programme: OK after 420 ms, and YouTube played on.
+
+    The status names what each session plays, and a receiver hands the
+    address back as it was given (the same television, idle: the stream's own
+    address from the first status on, while the player still said IDLE). So
+    the question is put to the content. A new session id would not do: the
+    status asked for at connect can land after the stream went out and brings
+    an id never seen before, and a device asked again for the stream it
+    already plays may keep its session. That last one is OK here. The device
+    plays what was asked for, whichever session that is.
+
+    The status is read through mc each time: the library swaps the object for
+    an empty one when the receiver app quits.
     """
-    event = getattr(mc, "session_active_event", None)
-    if event is not None:
-        return bool(event.is_set())
-    return bool(getattr(getattr(mc, "status", None), "media_session_id", None))
+    status = getattr(mc, "status", None)
+    return (bool(url)
+            and getattr(status, "media_session_id", None) is not None
+            and getattr(status, "content_id", None) == url)
+
+
+class _LoadWatch:
+    """Hears a receiver say that it could not load what it was sent.
+
+    Shaped as the Cast library's status listener: since 14.0 the media
+    controller calls load_media_failed(item, code) on each of them when a
+    LOAD_FAILED comes back, with the receiver's own error code (104 is "the
+    source is not supported"). Older versions never call it, and then
+    failed stays False. code is the last one given that is a number a
+    receiver could mean, None otherwise.
+    """
+
+    def __init__(self) -> None:
+        self.failed = False
+        self.code: int | None = None
+
+    def new_media_status(self, status) -> None:
+        """A status came; what it holds is read from the controller."""
+
+    def load_media_failed(self, queue_item_id, error_code) -> None:
+        """The receiver could not load an item; error_code is its reason."""
+        self.failed = True
+        whole = isinstance(error_code, int) and not isinstance(error_code, bool)
+        self.code = error_code if whole and 0 <= error_code <= 9999 else None
+
+
+def _wait_taken(mc, url, seconds):
+    """Wait for the receiver to take the stream; False when it never does."""
+    deadline = time.monotonic() + seconds
+    while not _took(mc, url):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.05)
+    return True
 
 
 def _discover_cast(seconds):
@@ -240,7 +395,13 @@ def cmd_play(host, port, uuid, model, url, ctype, title, art, start_at=None):
         return
     cast = None
     try:
-        cast = _connect_host(pychromecast, host, port, uuid, model)
+        try:
+            cast = _connect_host(pychromecast, host, port, uuid, model)
+        except ValueError:
+            # A uuid or a port that is none: this never reached the network.
+            raise
+        except Exception as exc:
+            raise Unreached("connect", _reach(exc)) from exc
         mc = cast.media_controller
         # stream_type LIVE tells the receiver there is no seekable duration —
         # correct for radio, and it hides a bogus scrubber on the device. A
@@ -255,6 +416,10 @@ def cmd_play(host, port, uuid, model, url, ctype, title, art, start_at=None):
         kw = {}
         if vod and start_at > 0.0:
             kw["current_time"] = float(start_at)
+        watch = _LoadWatch()
+        listen = getattr(mc, "register_status_listener", None)
+        if callable(listen):
+            listen(watch)
         mc.play_media(
             url,
             content_type=ctype or "audio/mpeg",
@@ -263,19 +428,24 @@ def cmd_play(host, port, uuid, model, url, ctype, title, art, start_at=None):
             stream_type="BUFFERED" if vod else "LIVE",
             **kw,
         )
-        mc.block_until_active(timeout=CONNECT_TIMEOUT)
-        # block_until_active returns on timeout without raising, and OK used
-        # to follow regardless: a receiver that never opened a media session
-        # was reported as casting. One more wait for the slow ones, then the
-        # truth — the widget can retry a FAIL, it cannot see a phantom OK.
-        if not _media_session_open(mc):
-            mc.block_until_active(timeout=CONNECT_TIMEOUT)
-        if not _media_session_open(mc):
-            _out("%s no media session after %.0fs" % (FAIL, 2 * CONNECT_TIMEOUT))
+        # OK used to follow the wait whatever came of it, and then whatever
+        # session the receiver happened to hold. Two connect timeouts for the
+        # slow ones, then the truth — the widget can retry a FAIL, it cannot
+        # see a phantom OK.
+        if not _wait_taken(mc, url, 2 * CONNECT_TIMEOUT):
+            # What the receiver said about the load names the failure and
+            # does not decide it: the wait above ran its full length, and a
+            # stream that was taken after all is OK. No television has been
+            # watched refusing a stream yet, so nothing is built on its word.
+            if watch.failed:
+                field = "load=%d " % watch.code if watch.code is not None else ""
+                _out("%s %saction=play the receiver could not load the stream" % (FAIL, field))
+            else:
+                _out("%s the device did not take the stream within %.0fs" % (FAIL, 2 * CONNECT_TIMEOUT))
             return
         _out(OK)
     except Exception as exc:
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc, url))
     finally:
         # Disconnect WITHOUT stopping the receiver: the device keeps streaming.
         _disconnect(cast)
@@ -305,7 +475,7 @@ def cmd_stop(host, port, uuid, model):
     except Exception as exc:
         # A stop that raised on a reached device very likely left it playing —
         # a silent DONE would tell the UI otherwise, so the failure is visible.
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc))
     finally:
         _disconnect(cast)
 
@@ -323,7 +493,7 @@ def cmd_volume(host, port, uuid, model, level):
         cast.set_volume(vol)
         _out(OK)
     except Exception as exc:
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc))
     finally:
         _disconnect(cast)
 
@@ -844,16 +1014,19 @@ def _soap(control_url, service_type, action, args_xml, timeout=5.0):
         # Same cap rationale as _http_get: a SOAP reply is a few KB, and a
         # dripping or endless body must not hold the helper's memory open.
         data = resp.read(512 * 1024).decode("utf-8", "replace")
-        # Parity with urlopen: a SOAP fault (HTTP 500 etc.) must raise, the
-        # callers' except blocks turn it into FAIL sentinels / fallbacks.
-        # >= 300 because http.client does not follow redirects — a 3xx here
-        # would otherwise pass as a silent bogus success.
-        if resp.status >= 300:
-            raise urllib.error.HTTPError(control_url, resp.status,
-                                         data[:200], resp.headers, None)
-        return data
+        status, headers = resp.status, resp.headers
+    except (OSError, http.client.HTTPException) as exc:
+        raise Unreached(action, _reach(exc)) from exc
     finally:
         conn.close()
+    # Parity with urlopen: a SOAP fault (HTTP 500 etc.) must raise, the
+    # callers' except blocks turn it into FAIL sentinels / fallbacks.
+    # >= 300 because http.client does not follow redirects — a 3xx here
+    # would otherwise pass as a silent bogus success. The fault is read out
+    # of the whole answer, not out of its first 200 characters.
+    if status >= 300:
+        raise SoapFault(control_url, status, headers, action, data)
+    return data
 
 
 # DLNA.ORG_PN profile tokens. Several renderers (Frontier Silicon based
@@ -915,7 +1088,7 @@ def cmd_dlna_play(location, url, ctype, title, art=""):
     try:
         dev = _describe_renderer(location)
         if not dev:
-            _out("%s renderer description unavailable" % FAIL)
+            _out("%s reach=nodesc renderer description unavailable" % FAIL)
             return
         avt = dev["avtransport"]
         # A renderer that is already playing something may reject a new URI;
@@ -946,7 +1119,7 @@ def cmd_dlna_play(location, url, ctype, title, art=""):
                       "<InstanceID>0</InstanceID>", timeout=3.0)
         except Exception as exc2:
             _dbg("dlna-play cleanup-stop", exc2)
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc, url))
 
 
 def cmd_dlna_stop(location):
@@ -965,13 +1138,13 @@ def cmd_dlna_stop(location):
         # is not the renderer answering Stop: every status used to pass as
         # "idle", and a box that never heard the command was called stopped.
         if exc.code != 500:
-            _out("%s HTTP %d" % (FAIL, exc.code))
+            _out(_fail(exc))
             return
         _dbg("dlna-stop fault (idle renderer)", exc)
     except Exception as exc:
         # Descriptor answered but the control URL did not — the renderer may
         # still be streaming, so surface the failure rather than a quiet DONE.
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc))
         return
     _out(DONE)
 
@@ -988,7 +1161,7 @@ def cmd_dlna_volume(location, level):
               "<DesiredVolume>%d</DesiredVolume>" % vol)
         _out(OK)
     except Exception as exc:
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc))
 
 
 # Volume READS back the device's current level so the group-volume balance
@@ -1011,7 +1184,7 @@ def cmd_get_volume(host, port, uuid, model):
             raise RuntimeError("the device answered without a status")
         _out("%s %.3f" % (VOL, max(0.0, min(1.0, float(cast.status.volume_level)))))
     except Exception as exc:
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc))
     finally:
         _disconnect(cast)
 
@@ -1030,7 +1203,7 @@ def cmd_dlna_get_volume(location):
             return
         _out("%s %.3f" % (VOL, max(0.0, min(1.0, int(m.group(1)) / 100.0))))
     except Exception as exc:
-        _out("%s %s" % (FAIL, str(exc).replace("\n", " ")[:200]))
+        _out(_fail(exc))
 
 
 # ── entry points ─────────────────────────────────────────────────────────────
@@ -1064,7 +1237,7 @@ def _alarm_bail(signum, frame):
     # be holding it — the one mechanism meant to end a wedged helper must
     # not be able to wedge with it. Raw write, hard exit.
     try:
-        os.write(1, ("%s helper timed out\n" % FAIL).encode())
+        os.write(1, ("%s reach=timeout helper timed out\n" % FAIL).encode())
     except OSError:
         pass
     os._exit(1)

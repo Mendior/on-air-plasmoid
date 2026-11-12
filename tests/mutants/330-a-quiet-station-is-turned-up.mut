@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station quieter than the target is turned up to it.
+
+history:
+  Turning up clips a stream that is already near full scale and raises the
+  noise of a station that chose to be quiet. The quietest of the twenty
+  measured stood at -21.1 LUFS and has to play as it is.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return Math.max(-MAX_CUT_DB, Math.min(0, TARGET_LUFS - lufs));
+
+replace:
+      return Math.max(-MAX_CUT_DB, TARGET_LUFS - lufs);
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_a_station_at_or_under_the_target_is_never_turned_up.
+  Line-neutral.

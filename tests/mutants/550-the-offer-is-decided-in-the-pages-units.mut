@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Whether a larger view is offered is decided without the screen's ratio.
+
+history:
+  On a screen scaled to 175% a cover of 300 was shown 600 wide in the
+  page's units, 1050 of the screen's pixels: three and a half times its
+  own, where the edges were seen to smear from three (measured on the
+  panel, 2026-11-12). The limit is divided by the screen's ratio now. The
+  offer asks the same rule, and has to hand it the same ratio: without it
+  a view is promised at 600 and then drawn at 343, a tenth larger than the
+  cover. This mutant decides the offer as on a screen that is not scaled.
+
+target:
+  package/contents/ui/CoverLogic.js
+
+find:
+      var page = coverScale(natW, natH, w, h), view = largerScale(natW, natH, roomW, roomH, ratio);
+
+replace:
+      var page = coverScale(natW, natH, w, h), view = largerScale(natW, natH, roomW, roomH, 1);
+
+expect:
+  Killed by tests/qml/tst_coverlogic.qml::test_a_view_only_a_little_larger_is_not_offered.
+  Line-neutral.

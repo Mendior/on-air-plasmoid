@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Once an address has five readings it is never read again.
+
+history:
+  A station's level moves with what it plays (one of the twenty had a range
+  of 11.5 LU), so the oldest reading is replaced when the newest is thirty
+  days old.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return e[3].length < KEEP || nowS - e[1] > STALE_S;
+
+replace:
+      return e[3].length < KEEP;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_five_readings_serve_until_the_newest_is_thirty_days_old.
+  Line-neutral.

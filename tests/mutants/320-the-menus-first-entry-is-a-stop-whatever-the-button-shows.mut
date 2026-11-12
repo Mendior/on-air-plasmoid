@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The first entry of the panel icon's right-click menu sends Stop instead
+  of the big button's own press.
+
+history:
+  The entry shows the big button's face, Play, Pause or Stop, and must do
+  what that face promises: over an episode it reads Pause and has to keep
+  the place, over a silent widget it reads Play and has to start. One road
+  for every face, transport("PlayPause"), is what makes the two agree; an
+  entry with its own idea of the press would stop an episode it offered to
+  pause and do nothing where it offered to play.
+
+target:
+  package/contents/ui/PanelAction.qml
+
+find:
+              app.transport("PlayPause");
+
+replace:
+              app.transport("Stop");
+
+expect:
+  Killed by tests/qml/tst_panelaction.qml::test_the_first_entry_says_and_does_what_the_big_button_does.
+  Line-neutral.

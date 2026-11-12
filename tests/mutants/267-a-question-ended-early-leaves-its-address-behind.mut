@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A question that is ended between its two commands leaves the stream's
+  address lying in the runtime folder.
+
+history:
+  The address is written into a file first and the helper, which removes
+  the file, is run on the write's acknowledgement. Another station picked
+  in between ends the question, the late acknowledgement is dropped, and
+  no helper comes for the file. Measured with a real shell: the file was
+  there after the late write, mode 600, and gone after the sweep. The
+  sweep removes the file of the write that came home, by the number that
+  write carries, and never the file of the question in flight.
+
+target:
+  package/contents/ui/StreamKind.qml
+
+find:
+                  if (sweep !== "") app.exec(sweep);
+
+replace:
+                  if (sweep !== "") void sweep;
+
+expect:
+  Killed by tests/qml/tst_streamkind.qml::test_a_question_nobody_waits_for_removes_the_address_it_wrote.
+  Line-neutral.

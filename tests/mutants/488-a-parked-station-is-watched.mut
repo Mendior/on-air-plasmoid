@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The watch is not told that a pause holds the station.
+
+history:
+  Whatever silences a station by the listener's own hand must not be read
+  as a death: a park woken by a recovery road is the report issue #13 was
+  about. The player is stopped under a park, and the watch is told of the
+  park as well, so that it does not depend on that alone.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+  parked: app._tsPaused,
+
+replace:
+  parked: false,
+
+expect:
+  Killed by tst_standwatch::test_what_is_not_the_broadcast_stops_the_timer.
+  Line-neutral.

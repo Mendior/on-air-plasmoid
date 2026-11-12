@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A cancel goes back to looking for a pid and nothing else: it leaves no
+  mark for a measurement that is still getting ready.
+
+history:
+  The calibration is one shell command that asks every speaker for its
+  level, parks it at 55 % and only then starts calibrate.py and writes the
+  pid down. Driven on 2026-11-11 with the engine's own command, stand-ins
+  for pactl and python, and the first level query held back: at Cancel
+  there was no pid file, nothing was signalled, and when the query came
+  back the shell parked all three speakers and started the measurement
+  that had been called off. Once the pid was written the same cancel
+  worked. The mark is the only word that reaches a shell in that state.
+
+target:
+  package/contents/ui/CalibLogic.js
+
+find:
+      return (t === "" ? "" : " [ -n \"$XDG_RUNTIME_DIR\" ] && printf '%s' '" + t + "' > " + markFile + ";")
+
+replace:
+      return ("")
+
+expect:
+  Killed by tests/test_calibrate_cancel.py::test_cancel_during_the_first_query_parks_nothing_and_starts_nothing.
+  Line-neutral.

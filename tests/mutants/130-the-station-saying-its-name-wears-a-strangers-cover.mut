@@ -15,10 +15,10 @@ target:
   package/contents/ui/ArtworkEngine.qml
 
 find:
-          if (TrackLogic.stationTalk(query, app.currentStation)) {
+          if (TrackLogic.stationTalk(query, app.currentStation) || !artist) {
 
 replace:
-          if (TrackLogic.stationTalk(query, "")) {
+          if (TrackLogic.stationTalk(query, "") || !artist) {
 
 expect:
   Killed by tests/qml/tst_artworkengine.qml::test_the_station_name_split_like_a_song_asks_nobody_for_a_cover.

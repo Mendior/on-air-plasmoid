@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Resizing the window writes its width to the config dozens of times a second.
+
+history:
+  Every write of a config key goes to disk. The size is written once, when
+  the drag has come to rest.
+
+target:
+  package/contents/ui/PlayerWindow.qml
+
+find:
+      onWidthChanged: if (visible) sizeKeeper.restart()
+
+replace:
+      onWidthChanged: if (visible && cfg) cfg.windowWidth = width
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_a_drag_is_written_once_when_it_has_come_to_rest.

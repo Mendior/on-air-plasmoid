@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The handoff every other start goes through leaves a paused episode
+  standing.
+
+history:
+  2026.44 lets a pause keep an episode or a My Music file, and a Play that
+  names nothing brings it back. That memory has to end with the first thing
+  chosen after it: a station picked by hand, a search result, another file,
+  the wake-up. All of them pass _podHandoff before anything can fail, so the
+  drop sits there. Without it the station is stopped, Play is pressed, and
+  the episode from before comes on in its place.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          _pausedFile = null;
+
+replace:
+          _pausedFile = _pausedFile;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_transport_words_go_through_one_door_and_a_pause_keeps_its_file.
+  tests/qml/tst_transportroads.qml::test_a_station_picked_by_hand_ends_the_pause_for_good
+  walks the same road around a copy of these lines. Line-neutral.

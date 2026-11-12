@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The footer's rule takes only a title or a file for sound, as it did.
+
+history:
+  A station played back from its buffer has no title and no bitrate. The
+  footer read "Connecting…" over 44 s of music on a real panel on
+  2026-11-12, and a live station without titles read the same.
+
+target:
+  package/contents/ui/ViewLogic.js
+
+find:
+    return titled === true || local === true || (typeof posMs === "number" && isFinite(posMs) && posMs > 0);
+
+replace:
+    return titled === true || local === true;
+
+expect:
+  Killed by tests/qml/tst_viewlogic.qml::test_a_stream_whose_position_moved_sounds.
+  Line-neutral.

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A watch that was never armed gives a verdict.
+
+history:
+  An Ogg FLAC stream taken straight off the socket stands at 278 ms from
+  its first second while the player says it plays, and the relay's rescue
+  takes it six seconds in. A position has to be seen three seconds further
+  on before its standing says anything; without that, every start whose
+  output takes no sound would be opened again and again.
+
+target:
+  package/contents/ui/StandLogic.js
+
+find:
+      if (m.armed && full === true && nowMs
+
+replace:
+      if (full === true && nowMs
+
+expect:
+  Killed by tst_standlogic::test_a_position_never_seen_to_move_is_no_witness.
+  Line-neutral.

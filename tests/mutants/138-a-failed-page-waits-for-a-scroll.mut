@@ -14,19 +14,15 @@ target:
   package/contents/ui/config/configSearch.qml
 
 find:
-                  } catch (e) {
-                      _pageFailed()
-                  }
-              } else {
+              if (servers === null) {
                   _pageFailed()
+                  return
               }
 
 replace:
-                  } catch (e) {
-                      _pageFailed()
-                  }
-              } else {
+              if (servers === null) {
                   stat = 1
+                  return
               }
 
 expect:

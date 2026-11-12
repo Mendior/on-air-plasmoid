@@ -175,5 +175,42 @@ Item {
             compare(VL.offlineWord(false, undefined, true), true)
             compare(VL.offlineWord(false), true)
         }
+
+        // ── The footer's word over a stream with no bitrate ─────────────────────
+
+        function test_a_stream_whose_position_moved_sounds_data() {
+            return [
+                { tag: "buffer played back, no title", titled: false, local: false, pos: 12000, want: true },
+                { tag: "live, no titles, no bitrate", titled: false, local: false, pos: 300, want: true },
+                { tag: "the frozen 278 ms of a live Ogg FLAC", titled: false, local: false, pos: 278, want: true },
+                { tag: "one millisecond in", titled: false, local: false, pos: 1, want: true },
+                { tag: "before the first sound", titled: false, local: false, pos: 0, want: false },
+                { tag: "a title before any position", titled: true, local: false, pos: 0, want: true },
+                { tag: "a file of the listener's at its start", titled: false, local: true, pos: 0, want: true },
+                { tag: "a title and a position", titled: true, local: false, pos: 5000, want: true }
+            ];
+        }
+        function test_a_stream_whose_position_moved_sounds(data) {
+            compare(VL.streamSounds(data.titled, data.local, data.pos), data.want);
+        }
+
+        function test_a_position_that_is_no_place_proves_no_sound_data() {
+            return [
+                { tag: "negative", pos: -1 }, { tag: "not a number", pos: NaN }, { tag: "undefined", pos: undefined },
+                { tag: "null", pos: null }, { tag: "text", pos: "12000" }, { tag: "infinite", pos: Infinity },
+                { tag: "an object", pos: ({}) }
+            ];
+        }
+        function test_a_position_that_is_no_place_proves_no_sound(data) {
+            compare(VL.streamSounds(false, false, data.pos), false);
+        }
+
+        function test_only_a_plain_true_is_a_title_or_a_file() {
+            compare(VL.streamSounds("yes", false, 0), false, "a truthy title flag is not a title");
+            compare(VL.streamSounds(false, 1, 0), false, "a truthy file flag is not a file");
+            compare(VL.streamSounds(undefined, undefined, 0), false);
+            compare(VL.streamSounds(), false, "nothing handed in");
+            compare(VL.streamSounds(false, false, Number.MAX_SAFE_INTEGER), true, "a station left on for days");
+        }
     }
 }

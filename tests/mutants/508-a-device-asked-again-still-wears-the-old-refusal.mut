@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A device that refused one station keeps its warning while the next
+  station is offered to it, and after it took that one.
+
+history:
+  The mark on a device's row is about the station it was last asked to
+  play. The Ruark that refused three addresses played a fourth
+  (2026-11-12): with the mark left standing, its row would say "Cannot
+  play this station" over a station it plays.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      s.pending[uuid] = seq;
+      delete s.on[uuid];
+      delete s.refused[uuid];
+
+replace:
+      s.pending[uuid] = seq;
+      delete s.on[uuid];
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_a_device_that_refused_is_marked_until_it_is_asked_again_or_leaves.

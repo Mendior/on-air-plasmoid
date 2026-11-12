@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A position that went back is read as one that stands.
+
+history:
+  The stall timer opens the same address again, and the position starts
+  from nought under the same source. With a dead output the new open's
+  position never moves, and counted on the old open's movement it would be
+  a verdict every twenty seconds.
+
+target:
+  package/contents/ui/StandLogic.js
+
+find:
+      if (!mem || !_num(posMs) || posMs < mem.pos) {
+
+replace:
+      if (!mem || !_num(posMs)) {
+
+expect:
+  Killed by tst_standlogic::test_a_position_that_went_back_begins_the_watch_again.
+  Line-neutral.

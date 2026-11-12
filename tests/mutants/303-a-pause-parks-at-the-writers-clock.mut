@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A pause parks at the second the writer has reached, not the one the listener heard.
+
+history:
+  The writer is ahead of the sound by the station's burst and the
+  player's own buffer. On the bench a pause parked at the writer's clock came
+  back 4.2 s past the word it was pressed on. The park is the player's place
+  on the broadcast, a second back.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+          return Math.max(0, Math.min(runMs, posMs - PARK_LAG_MS));
+
+replace:
+          return runMs;
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_a_pause_parks_where_the_player_is_and_not_where_the_writer_is.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A key held down on a podcast row presses it on every repeat.
+
+history:
+  2026.44 lets Return, Enter and Space press a show row and a found-episode
+  row, which until then only a pointer could. A held key repeats some 25
+  times a second, and an episode row plays on one press and stops on the
+  next: whether it was left playing would depend on when the key was let go.
+  Only the first press of a held key acts.
+
+target:
+  package/contents/ui/ViewLogic.js
+
+find:
+      if (event.isAutoRepeat !== true && row.visible === true) row.clicked();
+
+replace:
+      if (row.visible === true) row.clicked();
+
+expect:
+  Killed by tests/qml/tst_viewrules.qml::test_a_key_held_down_presses_the_row_once
+  and tests/qml/tst_rowkeys.qml::test_a_key_held_down_on_an_episode_leaves_it_playing.
+  Line-neutral.

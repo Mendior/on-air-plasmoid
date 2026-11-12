@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The writer's guard is started with the stream's pipe as its input.
+
+history:
+  The guard is born inside the pipe that carries the stream. Holding
+  that pipe open, it kept curl from ever seeing that the writer had gone:
+  measured, curl and the run's shell outlived a stop until the guard's next
+  look, up to five seconds on.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+  "bash " + q(a.guardPath) + " watch \"$$\" \"$PPID\" \"$fp\" </dev/null >/dev/null 2>&1 3<&- & "
+
+replace:
+  "bash " + q(a.guardPath) + " watch \"$$\" \"$PPID\" \"$fp\" >/dev/null 2>&1 3<&- & "
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_the_writer_looks_before_it_cuts_and_never_names_the_address.

@@ -6,6 +6,7 @@
 import QtQuick
 
 import "TimeshiftLogic.js" as TimeshiftLogic
+import "SlideLogic.js" as SlideLogic
 
 // Pausing live radio, as a state machine and nothing else. A background
 // writer (curl|ffmpeg, built in TimeshiftLogic) copies the stream into a
@@ -71,6 +72,78 @@ Item {
         repeat: false
         onTriggered: engine._relayRestarts = 0
     }
+    // ── The sliding buffer ──────────────────────────────────────────────
+    // A plain arm whose address does not rule MP3 and AAC out gets a writer
+    // that looks at the stream first (SlideLogic.buildWriter): bare MP3 or
+    // AAC is cut into two-second segments in a folder that keeps the last
+    // window, anything else goes into the single file as before. `cut` says
+    // the arm has that writer, `slide` that it answered with segments.
+    // Until it answers, nothing can be parked.
+    property bool cut: false
+    property bool slide: false
+    // The folder holds enough for an open to land in: the Playing page
+    // offers its steps (SlideLogic.STEP_READY_MS).
+    property bool steppable: false
+    property string slideDir: ""
+    property string filePath: ""
+    property string headPath: ""
+    property string kindPath: ""
+    readonly property string slideScriptPath: Qt.resolvedUrl("tsslide.sh").toString().substring(7)
+    readonly property string probeScriptPath: Qt.resolvedUrl("streamkind.py").toString().substring(7)
+    // What this session has learnt about the new road; reset() leaves these
+    // alone. slideOff: the player could not open or search a list once, and
+    // every arm takes the single file from then on. _slideDead: stations
+    // whose cutting writer ended, which it never does by itself.
+    // slideProven: one list has loaded and could be searched.
+    property bool slideOff: false
+    property var _slideDead: ({})
+    property bool slideProven: false
+    // The engine's own clock, in beats of a second (SlideLogic.beat). The
+    // player's position on a list is no use: it stops at the length the
+    // list had when it was opened while the sound goes on (measured). runMs
+    // is how long this arm's writer has run, which is where in the buffer
+    // "now" is; placeMs is where the listener is while shifted.
+    property double runMs: 0
+    property double placeMs: -1
+    property double _runAt: 0
+    property double _placeAt: 0
+    // How far the listener on the broadcast is behind the writer's clock,
+    // as the last park from live found it (SlideLogic.parkAt). The pill
+    // counts "behind live" from there, not from the clock.
+    property double liveLagMs: 0
+    // The writer's clock at the moment the player last joined the
+    // broadcast: 0 for the start both made together, the clock's reading
+    // at each return to live after that. The player's position counts from
+    // there. -1 when a return was not dated, and the position says nothing.
+    property double liveBaseMs: 0
+    // The list the player is on: its name and the last segment it names.
+    property string listName: ""
+    property int listLast: -1
+    property int _listN: 0
+    // A wish for a place, on its way through the folder: "have" while the
+    // folder is asked what it holds, "list" while the list is written. One
+    // at a time; a press that comes meanwhile only moves the wish.
+    property double _wantMs: -1
+    property string _stage: ""
+    property bool _wishIsResume: false
+    property var _plan: null
+    property double _planWant: -1
+    property int _haveSeq: -1
+    property int _listSeq: -1
+    property int _growSeq: -1
+    property int _growBeats: 0
+    property int _kindSeq: -1
+    property int _kindTries: 0
+    // The cutting writer ended while a listener sat in what it had caught:
+    // the segments stay for them and nothing new comes.
+    property bool slideFrozen: false
+    property bool _toldOld: false
+    // How much the arm's folder keeps (the window it was started with),
+    // and how long ago its writer ended, counted by the same beats as the
+    // clock: the broadcast went on, and the pill has to say so.
+    property double keepMs: 0
+    property double goneMs: 0
+
     // The writer has exited (window cap, stream end): the file is frozen
     // but intact — a shifted listener keeps every second already caught.
     property bool windowFull: false
@@ -121,6 +194,85 @@ Item {
     // landing there again means the reopen gained nothing and the buffer
     // is truly drained.
     property double _lastReopenPosMs: -1
+    // The last place the single file's reader was seen at, which is where
+    // an open sent it until a tick has seen it further on. An end that
+    // names no place is judged by this one (TimeshiftLogic.endPlaceMs).
+    property double _heardPosMs: -1
+
+    // The horizon watchdog. Qt estimates a growing buffer's duration when it
+    // OPENS the file and never revises it — and on this stack (Qt 6.11.1 +
+    // FFmpeg 9, measured live on the home machine 2026-08-11, twice) the
+    // player reaching that frozen horizon does NOT deliver EndOfMedia: the
+    // position pins, playbackState stays PlayingState and mediaStatus stays
+    // BufferedMedia. Since playerEndOfMedia() sits behind EndOfMedia alone,
+    // the engine's whole reopen-or-return machinery was dead code on this
+    // road: a resumed pause played its parked minutes and then went silent
+    // FOREVER while the widget still said "playing". Nothing else watches —
+    // the buffer road deliberately stops the stall timer, the connect
+    // watchdog and the heal road, because an ending buffer is the engine's
+    // business. So the engine has to notice the freeze itself.
+    // It watches the single file only. On a list the position stands still
+    // by design while the sound goes on, and the engine's own clock is what
+    // says when the list runs short (_beat).
+    property double _tsLastPosMs: -1
+    property double _tsFrozenSinceMs: 0
+    Timer {
+        id: tsHorizonWatch
+        interval: 1000
+        repeat: true
+        running: engine.shifted && !engine.slide
+        onTriggered: {
+            var player = engine.app.playMusicRef;
+            if (player) engine._horizonTick(engine.app.isPlaying(), player.position, Date.now());
+        }
+    }
+
+    // A fresh open means a fresh horizon: the watchdog starts counting from
+    // this reader, not from the one it just replaced.
+    function _freshHorizon() {
+        _tsLastPosMs = -1;
+        _tsFrozenSinceMs = 0;
+        _heardPosMs = shiftPosMs;
+    }
+
+    // What the single file can hold by now: wall time since its writer
+    // started, or what it held when the writer ended.
+    function _captured(nowMs) {
+        return windowFull ? frozenCapturedMs : (nowMs - bufStartMs);
+    }
+
+    // Contract: true when the frozen horizon was handed to playerEndOfMedia.
+    function _horizonTick(playing, pos, now) {
+        // The watch is for a player that says it plays: one that is paused
+        // in place stands still for a good reason, and starts counting anew.
+        if (!shifted || slide || playing !== true) {
+            _tsLastPosMs = -1;
+            _tsFrozenSinceMs = 0;
+            return false;
+        }
+        // Forward only: for a moment after an open the player still stands
+        // at the file's start, and that is not where the listener is.
+        _heardPosMs = Math.max(_heardPosMs, TimeshiftLogic.endPlaceMs(pos, _captured(now), _heardPosMs));
+        // Any forward movement is a healthy reader; only a position that
+        // stands still while the player claims to be playing counts.
+        if (pos !== _tsLastPosMs) {
+            _tsLastPosMs = pos;
+            _tsFrozenSinceMs = now;
+            return false;
+        }
+        if (_tsFrozenSinceMs <= 0) { _tsFrozenSinceMs = now; return false; }
+        // Three seconds of a pinned position: a live decoder does not
+        // sit that still, and the cost of being wrong is one reopen at
+        // the same spot, which the engine's own stall guard absorbs.
+        if (now - _tsFrozenSinceMs < 3000) return false;
+        console.log("[ARP] timeshift: horizon reached without EndOfMedia — "
+                    + "position frozen at " + pos + " for "
+                    + (now - _tsFrozenSinceMs) + " ms; handing to the engine");
+        _tsFrozenSinceMs = 0;
+        _tsLastPosMs = -1;
+        playerEndOfMedia(pos, now);
+        return true;
+    }
 
     // The writer is mid-frame at the file's very end; the last moments
     // stay out of reach (matches the flush cadence measured on the bench).
@@ -158,15 +310,39 @@ Item {
         // trusts it for anything that is not known to be Ogg-family.
         var ext = isRelay ? (relayOggFamily ? "ogg" : "mka")
                           : TimeshiftLogic.bufferExtension(url);
-        bufPath = dir + "/buffer-" + seq + "." + ext;
+        // A plain arm that may be MP3 or AAC gets the writer that looks at
+        // the stream before it cuts; until that writer has answered, there
+        // is no buffer path to speak of. Whatever the address or a kind
+        // already learnt rules out keeps the writer it always had, command
+        // for command.
+        var looks = !isRelay && !slideOff && _slideDead[url] !== true
+                    && SlideLogic.mayCut(url, typeof app.tsKnownKind === "function" ? app.tsKnownKind(url) : "");
+        filePath = dir + "/buffer-" + seq + ".mka";
+        bufPath = looks ? "" : dir + "/buffer-" + seq + "." + ext;
         cfgFilePath = dir + "/url-" + seq + ".cfg";
         pidPath = dir + "/writer-" + seq + ".pid";
         var windowMin = Math.max(5, Math.min(240, cfg.timeshiftWindowMin || 60));
         var cmds = TimeshiftLogic.buildBufferCommands({
-            url: url, cfgPath: cfgFilePath, outPath: bufPath, pidPath: pidPath,
+            url: url, cfgPath: cfgFilePath, outPath: looks ? filePath : bufPath, pidPath: pidPath,
             dirPath: dir, windowSec: windowMin * 60, guardPath: guardScriptPath,
             needKiB: TimeshiftLogic.bufferNeedKiB(windowMin, isRelay === true), seq: seq
         });
+        var looking = "";
+        if (looks) {
+            slideDir = dir + "/buffer-" + seq + ".hls";
+            keepMs = SlideLogic.listSize(windowMin) * SlideLogic.SEG_MS;
+            headPath = dir + "/head-" + seq + ".bin";
+            kindPath = dir + "/kind-" + seq + ".txt";
+            looking = SlideLogic.buildWriter({
+                cfgPath: cfgFilePath, dirPath: dir, slidePath: slideDir, outPath: filePath, pidPath: pidPath,
+                headPath: headPath, kindPath: kindPath, probePath: probeScriptPath, guardPath: guardScriptPath,
+                windowMin: windowMin, needKiB: TimeshiftLogic.bufferNeedKiB(windowMin, false), seq: seq
+            });
+            // A writer that could not be built leaves the arm on the single file.
+            if (looking === "") { looks = false; bufPath = filePath; }
+            else cmds.run = looking;
+        }
+        cut = looks;
         active = true;
         relay = isRelay === true;
         if (relay) {
@@ -224,6 +400,32 @@ Item {
         return true;
     }
 
+    // How many times running the buffer had no title for the reader, and
+    // whether ICY has answered that it has none (TimeshiftLogic.titleRoad).
+    property int _bufTitleMisses: 0
+    property bool _icyRefused: false
+
+    // Contract: true when a title poll for url is to read the buffer file.
+    function titlesInBuffer(url) {
+        return relay && relayOggFamily && active && bufPath !== "" && url === streamUrl
+               && TimeshiftLogic.titleRoad(_bufTitleMisses, _icyRefused) === "buffer";
+    }
+
+    // Every title answer for url passes here: fromBuffer says which reader
+    // it came from, text is what it printed.
+    // Contract: true when the answer is to be dropped, which is ICY's "no
+    // titles here" about the Ogg stream this relay carries: the buffer goes
+    // on being read, and the station is not written off.
+    function titleAnswer(fromBuffer, text, url) {
+        if (fromBuffer) {
+            _bufTitleMisses = text === "" ? _bufTitleMisses + 1 : 0;
+            return false;
+        }
+        if (text !== "__NO_ICY__" || !(relay && relayOggFamily && active && url === streamUrl)) return false;
+        _icyRefused = true;
+        return true;
+    }
+
     // Playback of the tap fell over (serve died, port stolen, the player
     // erred out). Returns whether the engine took the recovery: a bounded
     // burst of quiet re-arms, then the caller's heal road owns it.
@@ -258,13 +460,42 @@ Item {
     // whenever a buffer was ever built this arm — a writer that already
     // exited leaves a file worth removing all the same.
     function disarm() {
-        if (bufPath !== "" && (active || writerUp || windowFull))
+        // The looking writer's arm has more to take away than one file: the
+        // segments' folder with the lists in it, the bytes it looked at and
+        // the word it left, and the single file if that is what it wrote.
+        if (cut && slideDir !== "" && (active || writerUp || windowFull || slideFrozen))
+            app.exec(SlideLogic.buildStop({ pidPath: pidPath, slidePath: slideDir, cfgPath: cfgFilePath, headPath: headPath,
+                                            kindPath: kindPath, outPath: filePath, seq: app.nextSeq() }));
+        else if (bufPath !== "" && (active || writerUp || windowFull))
             app.exec(TimeshiftLogic.buildStopCommand(pidPath, bufPath, cfgFilePath, app.nextSeq(),
                                                      srvPidPath, srvPortPath));
         reset(false);
     }
 
     function reset(quiet) {
+        // A list's path is no buffer once its folder is gone.
+        if (cut) bufPath = "";
+        cut = false;
+        slide = false;
+        steppable = false;
+        slideFrozen = false;
+        keepMs = 0;
+        goneMs = 0;
+        runMs = 0;
+        liveLagMs = 0;
+        liveBaseMs = 0;
+        placeMs = -1;
+        _runAt = 0;
+        _placeAt = 0;
+        listName = "";
+        listLast = -1;
+        _growSeq = -1;
+        _growBeats = 0;
+        _kindSeq = -1;
+        _kindTries = 0;
+        _toldOld = false;
+        _endWish();
+        openGuard.stop();
         active = false;
         writerUp = false;
         shifted = false;
@@ -282,6 +513,8 @@ Item {
         _pendingRun = "";
         _armSeq = -1;
         _lastReopenPosMs = -1;
+        _bufTitleMisses = 0;
+        _icyRefused = false;
         if (!quiet) { streamUrl = ""; stationName = ""; }
     }
 
@@ -290,11 +523,32 @@ Item {
     // what plays now is the broadcast — but the caught minutes stay for
     // the next pause. Mirrors backToLive's bookkeeping without touching
     // the player.
-    function noteLivePlayback() {
+    function noteLivePlayback(nowMs) {
+        // The player joins the broadcast anew and counts its position from
+        // nought; the writer's clock at this moment is where that nought is.
+        liveBaseMs = nowMs > 0 ? _runNow(nowMs) : -1;
         shifted = false;
         shiftPosMs = -1;
         _lastReopenPosMs = -1;
-        if (windowFull || !writerUp) active = false;
+        if (cut) {
+            _endWish();
+            openGuard.stop();
+            placeMs = -1;
+            listName = "";
+            listLast = -1;
+            if (slide) bufPath = "";
+        }
+        // A cutting writer that ended left its segments for the listener
+        // who was in them. That listener is back on the broadcast now, and
+        // the station's next buffer is a new one: the single file.
+        if (slideFrozen) {
+            armCommon(streamUrl, stationName, 0, false);
+            return;
+        }
+        // An arm whose address write has not answered has no writer yet,
+        // and is not a dead one: the widget's own start of the station
+        // comes here a moment after the arm above, and retired it.
+        if (windowFull || (!writerUp && _pendingRun === "")) active = false;
     }
 
     // The pause button while live. Returns the parked file position, or
@@ -313,8 +567,11 @@ Item {
         id: parkableTimer
         interval: minShiftMs
         repeat: false
+        // A looking writer's arm has a buffer once it has said the single
+        // file; a sliding one is timed by its own clock, in _beat.
         onTriggered: engine.parkable = engine.active && engine.writerUp
                                        && engine.bufStartMs > 0
+                                       && (!engine.cut || (!engine.slide && engine.bufPath !== ""))
     }
 
     // Called wherever the buffer's life changes: the writer coming up
@@ -331,7 +588,25 @@ Item {
     onWriterUpChanged: _reviseParkable(writerUp)
     onActiveChanged: if (!active) _reviseParkable(false)
 
-    function pauseGesture(nowMs) {
+    // livePosMs is the player's position on the broadcast, which only the
+    // sliding buffer reads.
+    function pauseGesture(nowMs, livePosMs) {
+        var ran;
+        // The looking writer has not said what it cuts: nothing to park in.
+        if (cut && !slide && bufPath === "") return -1;
+        if (slide) {
+            // The place is where the player is on the broadcast, which is a
+            // place in the buffer because both joined the station together
+            // (SlideLogic.parkAt). Where exactly an open may land is the
+            // folder's to say, when Play comes.
+            if (!active || !writerUp || runMs < minShiftMs) return -1;
+            ran = _runNow(nowMs);
+            shiftPosMs = SlideLogic.parkAt(ran, liveBaseMs >= 0 && livePosMs > 0 ? liveBaseMs + livePosMs : 0);
+            liveLagMs = ran - shiftPosMs;
+            _toldOld = false;
+            console.log("[ARP] timeshift: parked at " + shiftPosMs + " ms of the sliding buffer");
+            return shiftPosMs;
+        }
         // writerUp stays required, and the frozen-capture branch below
         // stays unreachable for a live listener ON PURPOSE — checked
         // 2026-08-11 rather than assumed: the writer's exit ack retires
@@ -339,7 +614,7 @@ Item {
         // station loses its pause icon honestly instead of offering a
         // park it cannot serve.
         if (!active || !writerUp || bufStartMs <= 0) return -1;
-        var captured = windowFull ? frozenCapturedMs : (nowMs - bufStartMs);
+        var captured = _captured(nowMs);
         if (captured < minShiftMs) return -1;
         shiftPosMs = TimeshiftLogic.clampSeekMs(captured, captured, edgeGuardMs);
         console.log("[ARP] timeshift: parked at " + shiftPosMs + " ms of "
@@ -347,17 +622,36 @@ Item {
         return shiftPosMs;
     }
 
-    // Play resumes: hand the player the buffer at the parked sentence.
-    function resumeGesture() {
+    // Play resumes: hand the player the buffer at the parked sentence. nowMs
+    // is the caller's clock, which only the single file reads: its reader is
+    // opened no nearer to the writer than the sliding buffer's opens are
+    // (TimeshiftLogic.OPEN_GAP_MS), so after a pause of less than nine
+    // seconds Play lands that far behind the broadcast and not at the park.
+    // Without a clock the park is all there is to go by.
+    function resumeGesture(nowMs) {
         if (!active || shiftPosMs < 0) {
             console.log("[ARP] timeshift: resume refused — active=" + active
                         + " shiftPos=" + shiftPosMs);
             return false;
         }
+        if (slide) {
+            // The folder is asked what it holds, a list is written for the
+            // place, and the player opens that: two answers away.
+            _wish(shiftPosMs, true);
+            return true;
+        }
         shifted = true;
+        shiftPosMs = _openPlace(shiftPosMs, typeof nowMs === "number" ? _captured(nowMs) : NaN);
         _lastReopenPosMs = -1;
+        _freshHorizon();
         app.tsPlayBuffer("file://" + bufPath, shiftPosMs);
         return true;
+    }
+
+    // Where the single file is opened for the place asked. A file whose
+    // writer has ended has no unfinished end to keep clear of.
+    function _openPlace(placeMs, capturedMs) {
+        return TimeshiftLogic.openPlaceMs(placeMs, capturedMs, windowFull ? 0 : TimeshiftLogic.OPEN_GAP_MS);
     }
 
     // The listener jumps back to the broadcast. The writer keeps running —
@@ -402,8 +696,10 @@ Item {
             armRelay(streamUrl, stationName, nowMs);
             return;
         }
-        noteLivePlayback();
-        app.tsPlayLive(streamUrl);
+        // Held before the note: a frozen sliding buffer is replaced there.
+        var live = streamUrl;
+        noteLivePlayback(nowMs);
+        app.tsPlayLive(live);
     }
 
     // The player hit the duration Qt froze at open. If the file has grown
@@ -411,13 +707,22 @@ Item {
     // drained for real, the shift is over and live takes back over.
     function playerEndOfMedia(posMs, nowMs) {
         if (!shifted) return false;
-        var captured = windowFull ? frozenCapturedMs : (nowMs - bufStartMs);
-        console.log("[ARP] timeshift: horizon at " + posMs + " ms, captured "
-                    + captured + " — " + (captured - posMs) + " ms behind");
-        var stalled = _lastReopenPosMs >= 0 && posMs - _lastReopenPosMs < 500;
-        if (!stalled && captured - posMs > edgeGuardMs + 1000) {
-            shiftPosMs = Math.max(0, posMs - reopenOverlapMs);
+        // A list has no end mark, so the player only ends on one that was
+        // taken away or never grew: whatever the buffer held is played.
+        if (slide) {
+            backToLive(nowMs);
+            return true;
+        }
+        var captured = _captured(nowMs);
+        // The player's position is not always a place (endPlaceMs says when).
+        var place = TimeshiftLogic.endPlaceMs(posMs, captured, _heardPosMs);
+        console.log("[ARP] timeshift: horizon at " + place + " ms, captured " + captured + " — " + (captured - place)
+                    + " ms behind" + (place === posMs ? "" : "; the player gave " + posMs + ", which is past the capture"));
+        var stalled = _lastReopenPosMs >= 0 && place - _lastReopenPosMs < 500;
+        if (!stalled && place >= 0 && captured - place > edgeGuardMs + 1000) {
+            shiftPosMs = _openPlace(place - reopenOverlapMs, captured);
             _lastReopenPosMs = shiftPosMs;
+            _freshHorizon();
             app.tsPlayBuffer("file://" + bufPath, shiftPosMs);
             return true;
         }
@@ -431,10 +736,212 @@ Item {
         return true;
     }
 
+    // ── The sliding buffer's gestures ───────────────────────────────────
+
+    // Contract: how far behind the broadcast the place posMs is, as "m:ss".
+    // posMs is the single file's position; while the buffer slides it is
+    // not read, the engine's own clock answers.
+    function behindText(posMs, nowMs) {
+        if (slide) return SlideLogic.clockText(SlideLogic.behindMs(runMs + goneMs - liveLagMs, shifted ? placeMs : shiftPosMs));
+        // A reset engine (bufStartMs 0) would read as an epoch of lag.
+        if (bufStartMs <= 0 || posMs < 0) return "0:00";
+        return SlideLogic.clockText(TimeshiftLogic.behindLiveMs(bufStartMs, nowMs, posMs));
+    }
+
+    // A pause pressed by a listener who is inside the sliding buffer.
+    // Contract: true when the place was parked (the caller stops the player
+    // and raises its own park flag); false on the single file, where the
+    // player pauses in place as it always did.
+    function parkInPlace() {
+        if (!slide || !shifted) return false;
+        // A list cannot be paused on: the writer removes its oldest
+        // segments under a player that stands still, and a player kept on
+        // a list is one more thing that could run out of it.
+        shiftPosMs = _stage !== "" ? _wantMs : placeMs;
+        shifted = false;
+        _toldOld = false;
+        _endWish();
+        openGuard.stop();
+        return true;
+    }
+
+    // One press of a step button; deltaMs is negative for back.
+    // Contract: true when the engine took the press. Parked, the park moves
+    // and nothing sounds. Shifted, the place moves and the player is given a
+    // new list, or the broadcast when the step lands at its edge. False
+    // when there is no sliding buffer to step in.
+    function stepGesture(deltaMs, nowMs) {
+        if (!slide || !active || typeof deltaMs !== "number" || !isFinite(deltaMs) || deltaMs === 0) return false;
+        if (shifted || _stage !== "") {
+            // A press that comes while a wish is on its way steps on from
+            // the wish, not from a place the player has not reached yet:
+            // ten presses are five minutes, and one open.
+            _wish(Math.max(0, (_stage !== "" ? _wantMs : placeMs) + deltaMs), _stage !== "" && _wishIsResume);
+            return true;
+        }
+        // Live, with nothing parked: the caller parks first.
+        if (shiftPosMs < 0) return false;
+        // Parked: the park moves, between the buffer's start and where the
+        // broadcast is, and stays silent.
+        shiftPosMs = Math.max(0, Math.min(runMs - liveLagMs, shiftPosMs + deltaMs));
+        return true;
+    }
+
+    // The player has loaded what tsPlayBuffer gave it.
+    // Contract: true when the caller may send it to its place. False when
+    // it was a list and the player cannot search one: the session's single
+    // check, after which the station is back on the broadcast and its next
+    // buffer is the single file.
+    function sourceLoaded(seekable, durationMs) {
+        if (!slide || !shifted || slideProven) return true;
+        // Measured on Qt 6.12 with FFmpeg 9: a list of this kind loads with
+        // its length and can be searched. Whether an older pair does was
+        // not measured, so the first list of a session is asked.
+        if (seekable === true && durationMs > 0) {
+            slideProven = true;
+            return true;
+        }
+        _slideFell("this player cannot search a list");
+        return false;
+    }
+
+    // The player reported an error.
+    // Contract: true when it was on a list of the sliding buffer, which the
+    // engine has then left for the broadcast and the single file.
+    function listPlaybackFell(nowMs) {
+        if (!slide || !shifted) return false;
+        _slideFell("the player gave up on a list");
+        return true;
+    }
+
+    // One beat of the clock; the timer calls it once a second while a
+    // cutting writer's arm is alive.
+    function _beat(nowMs) {
+        var ran = SlideLogic.beat(_runAt, nowMs);
+        _runAt = nowMs;
+        // A writer that has ended cut nothing in this second, and the
+        // broadcast went on by it.
+        if (writerUp) runMs += ran;
+        else if (slideFrozen) goneMs += ran;
+        // A parked place is not pushed out of the window: the capture ends
+        // just before, and what was cut stays for Play (PARK_END_MS).
+        if (slide && writerUp && !shifted && _stage === "" && SlideLogic.parkEndsCapture(shiftPosMs, runMs, keepMs)) _endCapture();
+        if (slide && !parkable && active && writerUp && runMs >= minShiftMs) parkable = true;
+        if (slide && !steppable && active && writerUp && runMs >= SlideLogic.STEP_READY_MS) steppable = true;
+        if (!slide || !shifted) return;
+        var heard = SlideLogic.beat(_placeAt, nowMs);
+        _placeAt = nowMs;
+        if (app.isPlaying()) placeMs += heard;
+        if (_stage !== "") return;
+        // One question to the folder at a time; one that got no answer in
+        // five beats is asked again.
+        if (_growSeq >= 0 && ++_growBeats >= 5) _growSeq = -1;
+        var more = _growSeq < 0 ? SlideLogic.growBy(listLast, placeMs) : null;
+        if (more) {
+            _growSeq = app.nextSeq();
+            _growBeats = 0;
+            app.exec(SlideLogic.buildGrow({ scriptPath: slideScriptPath, slidePath: slideDir, seq: _growSeq, listName: listName,
+                                            text: SlideLogic.entriesText(more.from, more.upto), from: more.from, upto: more.upto }));
+        }
+        // The writer has stalled or ended and the list is running short.
+        // The player is taken off it while its reader still has list to
+        // read: stopped once the reader waits for more, it would hold the
+        // whole shell (SlideLogic.LEAVE_GAP_MS).
+        if (SlideLogic.mustLeave((listLast + 1) * SlideLogic.SEG_MS, placeMs)) {
+            console.log("[ARP] timeshift: the buffer has no more — back to the broadcast");
+            backToLive(nowMs);
+        }
+    }
+
+    // The capture ends and the folder stays, as after a writer that ended by
+    // itself under a park: Play finds the place, what was kept is heard out,
+    // and the broadcast that follows gets a new buffer (noteLivePlayback).
+    function _endCapture() {
+        console.log("[ARP] timeshift: the pause is a window old; the capture ends and what was cut stays");
+        app.exec(SlideLogic.buildEnd({ pidPath: pidPath, seq: app.nextSeq() }));
+        writerUp = false;
+        slideFrozen = true;
+    }
+
+    // The writer's clock to the millisecond, between two beats.
+    function _runNow(nowMs) {
+        return runMs + (writerUp ? SlideLogic.beat(_runAt, nowMs) : 0);
+    }
+
+    // The folder has not answered a wish in time (wishGuard).
+    function _wishLate() {
+        if (_stage !== "") _slideFell("the folder did not answer");
+    }
+
+    // A list was opened a while ago (openGuard): does it sound?
+    function _openLate() {
+        if (slide && shifted && _stage === "" && !app.isPlaying()) _slideFell("a list did not start to sound");
+    }
+
+    // A place is wished for: a park's on Play, a step's. resume says the
+    // wish is a park's own place, which is the one a notice is owed for
+    // when the window has slid past it.
+    function _wish(wantMs, resume) {
+        _wantMs = wantMs;
+        _wishIsResume = resume === true;
+        if (_stage === "") _askFolder();
+    }
+
+    function _askFolder() {
+        _stage = "have";
+        _haveSeq = app.nextSeq();
+        wishGuard.restart();
+        app.exec(SlideLogic.buildHave({ scriptPath: slideScriptPath, slidePath: slideDir, seq: _haveSeq }));
+    }
+
+    function _endWish() {
+        _stage = "";
+        _wantMs = -1;
+        _plan = null;
+        _planWant = -1;
+        _haveSeq = -1;
+        _listSeq = -1;
+        wishGuard.stop();
+    }
+
+    // Something about the new road failed. The folder goes, the listener
+    // who was in it or on the way into it is given the broadcast (one gap,
+    // the length of a station's start), and for the rest of the session
+    // every buffer is the single file.
+    function _slideFell(why) {
+        console.log("[ARP] timeshift: the sliding buffer gave way to the single file — " + why);
+        slideOff = true;
+        var live = streamUrl;
+        disarm();
+        if (live !== "" && !app._orderLapsed()) app.tsPlayLive(live);
+    }
+
+    Timer {
+        id: beatTimer
+        interval: SlideLogic.TICK_MS
+        repeat: true
+        running: engine.cut && engine.active
+        onTriggered: engine._beat(Date.now())
+    }
+    // The folder's two answers come in a few hundredths of a second; three
+    // seconds without one is a helper that will not answer.
+    Timer {
+        id: wishGuard
+        interval: 3000
+        onTriggered: engine._wishLate()
+    }
+    // A list sounded 0.1 s after it was opened on the bench.
+    Timer {
+        id: openGuard
+        interval: 4000
+        onTriggered: engine._openLate()
+    }
+
     // Acks from the two shell roads. nowMs rides in as a parameter so the
     // tests own the clock, the same convention AlarmLogic settled on.
     // exitCode is additive (2026-08-09) — see SyncEngine.handleExec.
     function handleExec(cmd, stdout, nowMs, exitCode) {
+        var word, have, plan, upto, put, at, tell, grown;
         if (cmd.indexOf(": TS_URL;") === 0) {
             // Another arm's leftover ack changes nothing here.
             if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;
@@ -444,6 +951,14 @@ Item {
                 bufStartMs = nowMs;
                 writerUp = true;
                 app.exec(run);
+                if (cut) {
+                    // The looking writer says what it cuts once it has the
+                    // stream's first bytes; this waits for the word.
+                    _runAt = nowMs;
+                    _kindTries = 0;
+                    _kindSeq = app.nextSeq();
+                    app.exec(SlideLogic.buildKindWait({ kindPath: kindPath, seq: _kindSeq }));
+                }
                 if (relay && _srvPendingRun !== "") {
                     // The tap launches beside the writer; its UP ack — not a
                     // guessed timer — is what points the player at the port.
@@ -493,6 +1008,28 @@ Item {
             // and must not tear the CURRENT arm down.
             if (_seqOf(cmd) !== _armSeq || _armSeq < 0) return true;
             writerUp = false;
+            if (slide && stdout.indexOf("__TS_EXIT__") !== -1) {
+                // A cutting writer has no cap and never ends by itself: it
+                // was killed, the station closed, or the stream stood still
+                // for half a minute. One that has to be started again starts
+                // a new buffer with a new clock. It slides again unless this
+                // writer ended in its first minute: then it could not cut
+                // this station, and the single file takes it for the session.
+                console.log("[ARP] timeshift: the segment writer ended — " + String(stdout).trim());
+                if (SlideLogic.endedYoung(runMs)) _slideDead[streamUrl] = true;
+                // A listener parked in the segments, or hearing them, keeps
+                // every one that was cut.
+                if (shifted || shiftPosMs >= 0 || _stage !== "") {
+                    slideFrozen = true;
+                    return true;
+                }
+                // Replaced only under a listener who hears the station; a
+                // room nobody is in is left without a buffer. A writer is
+                // not sound, so the order is not asked about here.
+                if (app.isPlaying() && !app._tsPaused) armCommon(streamUrl, stationName, nowMs, false);
+                else disarm();
+                return true;
+            }
             if (stdout.indexOf("__TS_EXIT__") !== -1) {
                 // The ack carries the writer's own evidence, and a birth
                 // death must not be filed as a filled window: zero bytes
@@ -516,14 +1053,25 @@ Item {
                                stationName, "dialog-warning");
                     var backTo = streamUrl;
                     var wasShifted = shifted;
+                    // The tap usually answers before a refused shell kills
+                    // the writer: measured on an MP3 stream the directory
+                    // called FLAC, the UP ack at 0.26 s and this one at
+                    // 0.35 s. The player had been sent to the tap by then
+                    // and was still opening it, which is not "playing".
+                    var onTap = serveUp;
                     reset(true);
                     active = false;
                     _relayBirthDeathUrl = backTo;
                     _relayBirthDeathAt = nowMs;
-                    // Live sound only for a room that was audibly playing:
-                    // a parked or shifted listener chose silence, and a
-                    // writer's death is no licence to override them.
-                    if (backTo !== "" && !wasShifted && app.isPlaying() && !app._orderLapsed())
+                    // Live sound only for a room that was audibly playing,
+                    // or one this arm itself had just sent to its tap: a
+                    // parked or shifted listener chose silence, and a
+                    // writer's death is no licence to override them. Left
+                    // on the dead tap the player stood silent until the tap
+                    // gave up ten seconds on, and what came after was the
+                    // heal road's knock (15 s on the bench) or, for an
+                    // audition, nothing at all.
+                    if (backTo !== "" && !wasShifted && !app._tsPaused && (app.isPlaying() || onTap) && !app._orderLapsed())
                         app.tsPlayLive(backTo);
                     return true;
                 }
@@ -571,6 +1119,101 @@ Item {
             return true;
         }
         if (cmd.indexOf(": TS_STOP;") === 0) return true;
+        // The signal's own answer says nothing; the writer's end comes by TS_RUN.
+        if (cmd.indexOf(": TS_END;") === 0) return true;
+        if (cmd.indexOf(": TS_KIND;") === 0) {
+            if (!cut || !active || _seqOf(cmd) !== _kindSeq) return true;
+            word = SlideLogic.parseKind(stdout);
+            if (word === "file") {
+                // Neither MP3 nor AAC: the single file, and from here on
+                // the arm is the one it always was.
+                bufPath = filePath;
+                if (writerUp) _reviseParkable(true);
+            } else if (word !== "") {
+                slide = true;
+                // The clock starts here, with the stream's first bytes, and
+                // not with the command: a writer armed while the station is
+                // silent waits for them, and so does the player. A start the
+                // widget made in that wait was dated on a clock not begun.
+                runMs = 0;
+                _runAt = nowMs;
+                if (liveBaseMs > 0) liveBaseMs = 0;
+                console.log("[ARP] timeshift: the buffer slides, in segments of " + word);
+            } else if (writerUp && ++_kindTries < 3) {
+                // No word in twenty seconds: a station that is slow to send.
+                // Asked twice more, then left without a buffer to park in.
+                _kindSeq = app.nextSeq();
+                app.exec(SlideLogic.buildKindWait({ kindPath: kindPath, seq: _kindSeq }));
+            }
+            return true;
+        }
+        if (cmd.indexOf(": TS_HAVE;") === 0) {
+            if (_stage !== "have" || _seqOf(cmd) !== _haveSeq) return true;
+            have = SlideLogic.parseHave(stdout);
+            plan = have ? SlideLogic.openPlan(_wantMs, have.first, have.last) : null;
+            // Too little in the folder to open anything, or a step forward
+            // that lands where the broadcast is: live is the honest answer.
+            if (!plan || !plan.ok || (shifted && SlideLogic.stepWhat(placeMs, _wantMs - placeMs,
+                                                                     (have.last + 1) * SlideLogic.SEG_MS) === "live")) {
+                backToLive(nowMs);
+                return true;
+            }
+            _plan = plan;
+            _planWant = _wantMs;
+            _stage = "list";
+            _listSeq = app.nextSeq();
+            _listN++;
+            // The list reaches as far past the place as it is kept filled
+            // later, not to the newest segment: it only has to stay ahead
+            // of the player's reader.
+            upto = Math.min(have.last, SlideLogic.segOf(plan.startMs + SlideLogic.AHEAD_MS - 1));
+            app.exec(SlideLogic.buildWrite({ scriptPath: slideScriptPath, slidePath: slideDir, seq: _listSeq,
+                                             listName: "play-" + _listN + ".m3u8",
+                                             text: SlideLogic.listText(plan.firstSeg, upto), upto: upto }));
+            return true;
+        }
+        if (cmd.indexOf(": TS_LIST;") === 0) {
+            if (_stage !== "list" || _seqOf(cmd) !== _listSeq) return true;
+            put = SlideLogic.parseList(stdout);
+            if (!put) {
+                _slideFell("a list could not be written");
+                return true;
+            }
+            // A press came while the list was being written: the wish has
+            // moved, and this list is for a place nobody wants any more.
+            if (_wantMs !== _planWant) {
+                _askFolder();
+                return true;
+            }
+            at = _plan;
+            tell = _wishIsResume && at.clamped === "old" && !_toldOld;
+            _endWish();
+            listName = "play-" + _listN + ".m3u8";
+            listLast = put.last;
+            placeMs = at.startMs;
+            _placeAt = nowMs;
+            shiftPosMs = at.startMs;
+            shifted = true;
+            // The list's path is the buffer's path for everyone who asks
+            // whether what the player holds is the buffer.
+            bufPath = slideDir + "/" + listName;
+            _growSeq = -1;
+            _growBeats = 0;
+            openGuard.restart();
+            if (tell) {
+                _toldOld = true;
+                app.notify(i18n("The paused place is no longer kept — playing from the oldest moment"), stationName, "dialog-information");
+            }
+            app.tsPlayBuffer("file://" + bufPath, at.seekMs);
+            return true;
+        }
+        if (cmd.indexOf(": TS_GROW;") === 0) {
+            if (_seqOf(cmd) !== _growSeq) return true;
+            _growSeq = -1;
+            grown = SlideLogic.parseList(stdout);
+            if (grown && slide && shifted && grown.last > listLast) listLast = grown.last;
+            return true;
+        }
         if (cmd.indexOf(": TS_SWEEP;") === 0) {
             // Nothing to act on — the sweep is done when it answers. A line
             // in the journal when it found something, so a crash that left a

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A check that comes right after a fall passes its verdict before the knock could be answered.
+
+history:
+  The heal road knocks 2.5 s after a stream is taken for dead, and on the
+  bench the first sound came 1.25 s after the request. A station that fell
+  22 s after the fire has its first check 3 s later: without the wait the
+  tone replaces a station that would have been back within the second.
+
+target:
+  package/contents/ui/AlarmEngine.qml
+
+find:
+              if (wait > 0) {
+
+replace:
+              if (wait > 8000) {
+
+expect:
+  Killed by tst_alarmengine::test_a_check_that_comes_before_the_knock_had_its_time_waits_for_it.
+  Line-neutral.

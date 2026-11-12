@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The capture is ended also under a listener who plays inside the buffer.
+
+history:
+  A listener inside the buffer moves with the window and is never pushed
+  out of it. Only a place that stands still is: a park.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (slide && writerUp && !shifted && _stage === "" && SlideLogic.parkEndsCapture(shiftPosMs, runMs, keepMs)) _endCapture();
+
+replace:
+          if (slide && writerUp && _stage === "" && SlideLogic.parkEndsCapture(shiftPosMs, runMs, keepMs)) _endCapture();
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_only_a_park_in_a_running_sliding_buffer_ends_a_capture.

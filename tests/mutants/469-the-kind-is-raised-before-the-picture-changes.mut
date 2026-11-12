@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The picture's kind is written after its address in every case, so for a
+  moment the old kind stands beside the new address.
+
+history:
+  The kind and the address are two properties, and whatever reads them
+  between the two writes sees a pair that never existed. Going from a
+  song's cover to another record's sleeve, that pair is the sleeve under
+  "track", which is the one word that lets a picture out to the lock
+  screen. The kind is taken away before the address changes and given
+  after it. This mutant writes the address first.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+          if (kind !== "track" || !url) albumArtKind = url ? kind : "";
+
+replace:
+          if (!url) albumArtKind = "";
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_the_kind_goes_with_its_picture_from_song_to_song.
+  Line-neutral.

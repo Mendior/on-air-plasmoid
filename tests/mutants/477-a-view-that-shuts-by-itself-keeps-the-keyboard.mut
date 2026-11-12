@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The larger view gives the focus back only when it is closed by hand.
+
+history:
+  The song ends while its cover is shown larger, and the next has no
+  picture: the view shuts by itself. An item nobody sees keeps the focus in
+  Qt, and the next Space was spent on closing a view that was already shut.
+  The focus goes back whichever way the view shuts. This mutant returns it
+  only from closeLarger.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+      onLargerChanged: if (!larger) _handBack(largerView)
+
+replace:
+      onLargerChanged: if (!larger && largerOffered) _handBack(largerView)
+
+expect:
+  Killed by tests/test_invariants.py::test_space_after_a_click_on_the_cover_is_still_the_pages,
+  which runs first and pins the line, and behind it by
+  tests/qml/tst_covertouch.qml::test_a_view_that_shuts_by_itself_gives_the_keyboard_back,
+  which presses the keys.
+  Line-neutral.

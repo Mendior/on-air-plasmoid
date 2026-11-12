@@ -289,6 +289,7 @@ Item {
         // never resurrect whatever played last evening.
         app._wantsPlaying = true;
         _alarmStandingOrder = true;
+        _alarmFiredAt = Date.now();
         app._healRetryAttempts = 0;
         app.lastPlay = -1;
         app.healRetryTimerRef.stop();
@@ -309,6 +310,7 @@ Item {
         // still apply on top.
         app._castSetVolume(app.targetVolume());
         _alarmFallbackArmed = true;
+        _alarmFellAt = 0;
         alarmFallbackTimer.restart();
         // Keep the station list's playing-row marker honest when the alarm
         // station is in the visible list (same courtesy the heal path pays).
@@ -337,6 +339,37 @@ Item {
     // picked; a wake-up they SET is a different promise and keeps its road
     // back either way. Cleared by the same "I'm up" as the chime.
     property bool _alarmStandingOrder: false
+
+    // When the station alarm that rings was fired (epoch ms), 0 with none.
+    property double _alarmFiredAt: 0
+
+    // Does a station alarm ring at nowMs? From its fire until somebody
+    // answers it, and for AlarmLogic.WAKE_WINDOW_MS at the most. main's stand
+    // watch asks with every look, and stationFell() below with every fall.
+    function rings(nowMs) {
+        return _alarmStandingOrder && AlarmLogic.wakeRings(_alarmFiredAt, nowMs);
+    }
+
+    // When the heal road took the ringing alarm's station for dead (epoch
+    // ms), 0 when it has not since the tone's check last passed.
+    property double _alarmFellAt: 0
+
+    // main's heal road says so, with the station dead in its hands and about
+    // to knock on it or look it up: the tone's check is passed again once the
+    // knock has had AlarmLogic.WAKE_GRACE_MS.
+    // Contract: nothing happens unless a station alarm rings at nowMs and no
+    // fall is already waiting for its check. Otherwise the fall is dated
+    // nowMs; a check that is already on its way keeps its time and gives the
+    // knock its grace when it comes, and with none on its way one is armed
+    // WAKE_GRACE_MS from now.
+    function stationFell(nowMs) {
+        if (!rings(nowMs) || _alarmFellAt > 0) return;
+        _alarmFellAt = nowMs;
+        if (_alarmFallbackArmed) return;
+        _alarmFallbackArmed = true;
+        alarmFallbackTimer.interval = AlarmLogic.WAKE_GRACE_MS;
+        alarmFallbackTimer.restart();
+    }
 
     // Set by the CAST_PLAY dispatcher on a device's __CAST_OK__ — the only
     // evidence that "casting" is more than an optimistic flag. Reset by
@@ -457,7 +490,17 @@ Item {
     // mediaStatus=Buffering: an audible station ruled dead by a status flag).
     function _fallbackTrigger() {
             if (!_alarmFallbackArmed) return;
+            // A fall the knock has not had its time to answer: the verdict
+            // waits for the rest of that time.
+            var wait = AlarmLogic.wakeGraceLeftMs(_alarmFellAt, Date.now());
+            if (wait > 0) {
+                alarmFallbackTimer.interval = wait;
+                alarmFallbackTimer.restart();
+                return;
+            }
+            var fell = _alarmFellAt > 0;
             _alarmFallbackArmed = false;
+            _alarmFellAt = 0;
             // The verdict this timer is about to pass, with the evidence it
             // passed it on — a wake tone replacing a station the sleeper
             // says was AUDIBLE needs this line to be judged (2026-08-10).
@@ -477,11 +520,13 @@ Item {
             // BufferingMedia (4), never reaching BufferedMedia — measured
             // 2026-08-10 23:08:46, playing=true position=24917 status=4,
             // and the tone replaced a station the sleeper could hear. Five
-            // seconds of played media is a stream that STARTED; one that
-            // dies later is the heal road's case (the standing order is
-            // armed), not the tone's.
-            if (app.isPlaying() && (app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia
-                                || app.playMusicRef.position > 5000)) return;
+            // seconds of played media is a stream that STARTED. One that
+            // dies later is the heal road's first, and comes back here
+            // through stationFell(): the player was stopped on the way, so
+            // what it has played by then is the new connection's own
+            // (AlarmLogic.wakeSounds).
+            if (AlarmLogic.wakeSounds(app.isPlaying(), app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia,
+                                      app.playMusicRef.position, fell)) return;
             // The tone is the LAST word — nothing may replace it. A heal
             // audition launched a beat ago has an XHR in flight whose
             // callback would call startWithFade on the found stream and kill
@@ -531,6 +576,8 @@ Item {
     function standDown() {
         _alarmFallbackArmed = false;
         _alarmStandingOrder = false;
+        _alarmFiredAt = 0;
+        _alarmFellAt = 0;
         alarmFallbackTimer.stop();
     }
 

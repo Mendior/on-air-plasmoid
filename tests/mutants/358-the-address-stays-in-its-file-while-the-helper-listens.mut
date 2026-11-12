@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The helper leaves the address in the file for as long as it listens.
+
+history:
+  The file is the helper's leash for twenty seconds. What it is kept for is
+  its being there, not what is in it, and an address can carry a listener's
+  token.
+
+target:
+  package/contents/ui/loudness.py
+
+find:
+              fh.seek(0)
+              fh.truncate()
+
+replace:
+              fh.seek(0)
+              fh.flush()
+
+expect:
+  Killed by tests/test_loudness.py::test_the_address_is_gone_from_the_file_at_once_and_never_on_a_command_line.
+  Line-neutral.

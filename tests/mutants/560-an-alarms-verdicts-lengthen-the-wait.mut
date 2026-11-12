@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  While an alarm rings every verdict doubles the wait before the next one.
+
+history:
+  Bench, 2026-11-12: an alarm's station gave every connection 8 s of
+  sound and then held it open. The verdicts came 5, 10 and 20 s after the
+  player's error, and the silences between the 8 s of station grew from
+  31 s to 66 s and past 85 s, with a sleeper to wake.
+
+target:
+  package/contents/ui/StandLogic.js
+
+find:
+      if (waking === true) n = 0;
+
+replace:
+      if (waking === null) n = 0;
+
+expect:
+  Killed by tst_standlogic::test_while_an_alarm_rings_no_verdict_lengthens_the_wait.
+  Line-neutral.

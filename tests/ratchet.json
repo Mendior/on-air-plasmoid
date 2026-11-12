@@ -7,9 +7,9 @@
         "connectsource:    grep -rn 'connectSource(\"' package --include='*.qml' | wc -l"
     ],
     "lines": {
-        "package/contents/ui/main.qml": 7719,
-        "package/contents/ui/FullRepresentation.qml": 6941,
-        "package/contents/ui/SyncEngine.qml": 5826
+        "package/contents/ui/main.qml": 7637,
+        "package/contents/ui/FullRepresentation.qml": 6824,
+        "package/contents/ui/SyncEngine.qml": 5791
     },
     "direct_exec_calls": 42,
     "direct_connectsource_calls": 2

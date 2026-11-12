@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Choosing an output in the box sets the one listed above it.
+
+history:
+  The first row is the system's default, so a row's number is one past its
+  output's place in the list. A pick has to do what the row says.
+
+target:
+  package/contents/ui/OutputBox.qml
+
+find:
+      onActivated: (index) => chosen(OutputLogic.idAt(outs, index))
+
+replace:
+      onActivated: (index) => chosen(OutputLogic.idAt(outs, index - 1))
+
+expect:
+  Killed by tests/qml/tst_outputbox.qml::test_choosing_a_row_names_the_output_standing_in_it_once.

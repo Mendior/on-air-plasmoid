@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The sleeve of the artist's other record from iTunes is asked for 300 pixels wide.
+
+history:
+  The artist's own songs on iTunes are a second place the same address
+  is built, for the sleeve that stands in when no catalogue has the song.
+  It is shown on the same cover, at the same size. This mutant leaves that
+  one at 300.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      return pick >= 0 ? { "url": cands[pick].art.replace("100x100bb", "600x600bb"), "kind": "release" } : null;
+
+replace:
+      return pick >= 0 ? { "url": cands[pick].art.replace("100x100bb", "300x300bb"), "kind": "release" } : null;
+
+expect:
+  Killed by tests/qml/tst_artkind.qml::test_the_artists_itunes_songs_are_another_release.
+  Line-neutral.

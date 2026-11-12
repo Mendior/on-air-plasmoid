@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stall retry no longer asks whether a pause keeps the episode it is
+  about to restart.
+
+history:
+  Since 2026.44 an episode pauses where it stands, so the player goes on
+  holding its source. An episode that stalls arms a 15 second retry, whose
+  answer is to open the stream again and play. A pause pressed inside those
+  seconds left the timer armed, and the timer has no way to know the
+  silence is wanted unless it asks: the same door a parked station got in
+  2026.36, when a tap dying under a park read as a stall and played the
+  room awake.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (root._tsPaused || root._pausedFile !== null || _orderLapsed()) return;
+
+replace:
+              if (root._tsPaused || false || _orderLapsed()) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_every_automatic_road_to_sound_asks_whether_the_order_lapsed
+  and tests/test_invariants.py::test_the_big_button_shows_what_its_press_does_and_a_pause_stays_on_the_page.
+  tests/qml/tst_transportroads.qml::test_no_road_that_goes_on_by_itself_goes_on_over_a_pause
+  walks the same door around a copy of this line. Line-neutral.

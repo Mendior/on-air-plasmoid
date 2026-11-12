@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  When the cover's menu shuts, the focus goes to the menu's button,
+  whoever had it before.
+
+history:
+  Seen on the panel on 2026-11-12: a click on the menu's button, one more
+  to shut the menu, and Space opened the menu again; the Space after that
+  opened Last.fm in the browser. The listener had pressed it to pause. The
+  focus returns to where it was before the menu opened. This mutant gives
+  it to the button.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+          if (to && to.visible && to.enabled) to.forceActiveFocus()
+          else _toFace(from)
+
+replace:
+          if (linksButton.visible) linksButton.forceActiveFocus()
+          else _toFace(from)
+
+expect:
+  Killed by tests/test_invariants.py::test_space_after_a_click_on_the_cover_is_still_the_pages,
+  which runs first and pins the line, and behind it by
+  tests/qml/tst_covertouch.qml::test_space_after_the_menu_was_clicked_open_and_shut_is_the_pages,
+  which presses the keys.
+  Line-neutral.

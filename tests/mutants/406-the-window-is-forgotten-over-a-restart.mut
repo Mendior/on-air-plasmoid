@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  After a restart the face is back in the popup although it was left in its window.
+
+history:
+  The window is plasmashell's and goes down with it. The config key, read
+  once at start, is the only thing that brings the face back to it after a
+  restart or a login.
+
+target:
+  package/contents/ui/PlayerWindow.qml
+
+find:
+      Component.onCompleted: detached = !!cfg && cfg.detached === true
+
+replace:
+      Component.onCompleted: detached = false
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_a_face_that_was_in_the_window_is_there_again_after_a_start.

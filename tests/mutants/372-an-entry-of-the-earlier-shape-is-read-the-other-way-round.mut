@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any whole number from 0 up passes for a time.
+
+history:
+  Before there were several readings an entry began with its one reading.
+  Such an entry whose reading is a small whole number would be taken for a
+  time and a reading of 0 LUFS, and its station turned down by fifteen
+  decibels.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return Number.isFinite(n) && (n === 0 || n >= EPOCH_S) && Math.floor(n) === n;
+
+replace:
+      return Number.isFinite(n) && n >= 0 && Math.floor(n) === n;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_an_entry_that_is_not_one_is_not_read.
+  Line-neutral.

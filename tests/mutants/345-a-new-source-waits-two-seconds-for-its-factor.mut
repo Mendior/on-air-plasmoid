@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A source given to a player that was not seen to stop eases to its factor.
+
+history:
+  A start has its station's factor before it sounds. Eased, a loud station
+  begins at the previous station's level and glides down, which is the reach
+  for the volume all over again.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          function onSourceChanged() {
+              loud._follow(true);
+
+replace:
+          function onSourceChanged() {
+              loud._follow(false);
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_switch_takes_the_new_stations_factor_with_the_new_station.
+  Line-neutral.

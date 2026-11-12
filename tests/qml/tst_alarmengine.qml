@@ -10,6 +10,7 @@ import QtQuick
 import QtTest
 import "../../package/contents/ui"
 import "../../package/contents/ui/RetryLogic.js" as RL
+import "../../package/contents/ui/AlarmLogic.js" as AL
 
 TestCase {
     id: tc
@@ -277,6 +278,254 @@ TestCase {
         compare(e.app._wantsPlaying, false);            // standing order ended
         verify(tc.timerLog.indexOf("heal.stop") !== -1);
         verify(tc.timerLog.indexOf("watchdog.stop") !== -1);
+        e.destroy();
+    }
+
+    // ── a station that falls silent after it has played ──────────────────
+    // Bench, 2026-11-12: the station held its connection and sent nothing 8 s
+    // into the alarm. The check 25 s after the fire read playing=true,
+    // position=7968 and stood the tone down, and the heal road then knocked
+    // 30, 82 and 165 s into a silence nothing ended.
+
+    // The alarm fired, the station played, and the check at 25 s let it be.
+    // (Passed by hand, so the timer the fire started is still running; the
+    // interval is what tells a later arming from it.)
+    function _rings(e) {
+        _fireStation(e);
+        e._alarmFiredAt = Date.now() - 60000;           // a minute ago
+        tc.playingNow = true;
+        e.app.playMusicRef.mediaStatus = 4;
+        e.app.playMusicRef.position = 23760;
+        e._fallbackTrigger();
+        compare(tc.faded.length, 1);
+        verify(!e._alarmFallbackArmed);
+        compare(e._fallbackIntervalForTest(), 25000);
+    }
+
+    // The heal road stopped the player and has the station in its hands.
+    function _falls(e, atMs) {
+        tc.playingNow = false;
+        e.app.playMusicRef.mediaStatus = 2;
+        e.app.playMusicRef.position = 0;
+        e.stationFell(atMs);
+    }
+
+    function test_a_station_that_falls_while_the_alarm_rings_has_the_tone_asked_about_again() {
+        var e = makeEngine();
+        _rings(e);
+        var t0 = Date.now();
+        _falls(e, t0);
+        verify(e._alarmFallbackArmed);
+        verify(e._fallbackRunningForTest());
+        compare(e._fallbackIntervalForTest(), 8000);
+        compare(e._alarmFellAt, t0);
+        compare(tc.faded.length, 1);                    // nothing sounds yet: the knock has its time
+        e.destroy();
+    }
+
+    function test_a_station_that_stays_silent_through_the_grace_ends_in_the_tone() {
+        var e = makeEngine();
+        _rings(e);
+        _falls(e, Date.now() - 8000);
+        // The knock went out and the connection hangs: the player says it plays, at nothing.
+        tc.playingNow = true;
+        e.app.playMusicRef.mediaStatus = 4;
+        var seqBefore = e.app._healSeq;
+        e._fallbackTrigger();
+        compare(tc.faded.length, 2);
+        verify(String(tc.faded[1].hostname).indexOf("alarm-fallback") !== -1);
+        verify(e.app._healSeq > seqBefore);             // the heal road is retired, the tone is the last word
+        compare(e.app._wantsPlaying, false);
+        verify(!e._alarmFallbackArmed);
+        compare(e._alarmFellAt, 0);
+        e.destroy();
+    }
+
+    function test_a_station_that_is_back_inside_the_grace_keeps_the_tone_away() {
+        var e = makeEngine();
+        _rings(e);
+        _falls(e, Date.now() - 8000);
+        tc.playingNow = true;
+        e.app.playMusicRef.mediaStatus = 4;
+        e.app.playMusicRef.position = 4250;             // knocked 2.5 s after the fall, first sound 1.25 s on
+        var seqBefore = e.app._healSeq;
+        e._fallbackTrigger();
+        compare(tc.faded.length, 1);                    // no tone over a station that sounds
+        compare(e.app._healSeq, seqBefore);
+        compare(e.app._wantsPlaying, true);
+        verify(!e._alarmFallbackArmed);
+        compare(e._alarmFellAt, 0);
+        // And the next silence is asked about the same way.
+        var t1 = Date.now();
+        _falls(e, t1);
+        verify(e._alarmFallbackArmed);
+        verify(e._fallbackRunningForTest());
+        compare(e._fallbackIntervalForTest(), 8000);
+        compare(e._alarmFellAt, t1);
+        e.destroy();
+    }
+
+    function test_a_new_connection_that_has_hardly_played_is_not_the_station_back() {
+        var e = makeEngine();
+        _rings(e);
+        _falls(e, Date.now() - 8000);
+        tc.playingNow = true;
+        e.app.playMusicRef.mediaStatus = 5;             // a burst filled the buffer
+        e.app.playMusicRef.position = 2400;
+        e._fallbackTrigger();
+        compare(tc.faded.length, 2);
+        verify(String(tc.faded[1].hostname).indexOf("alarm-fallback") !== -1);
+        e.destroy();
+    }
+
+    function test_a_check_that_comes_before_the_knock_had_its_time_waits_for_it() {
+        // The station fell 22 s after the fire; the first check is 3 s away
+        // and the knock has only just gone out.
+        var e = makeEngine();
+        _fireStation(e);
+        var t0 = Date.now();
+        _falls(e, t0);
+        compare(e._fallbackIntervalForTest(), 25000);   // the check on its way keeps its time
+        verify(e._fallbackRunningForTest());
+        e._fallbackTrigger();
+        compare(tc.faded.length, 1);                    // no verdict yet
+        verify(e._alarmFallbackArmed);
+        verify(e._fallbackRunningForTest());
+        verify(e._fallbackIntervalForTest() > 7000 && e._fallbackIntervalForTest() <= 8000, e._fallbackIntervalForTest());
+        compare(e._alarmFellAt, t0);
+        // With the grace over the verdict is passed: nothing plays.
+        e._alarmFellAt = Date.now() - 8000;
+        e._fallbackTrigger();
+        compare(tc.faded.length, 2);
+        e.destroy();
+    }
+
+    function test_a_station_dead_from_the_first_second_gets_the_tone_at_the_first_check_as_before() {
+        var e = makeEngine();
+        _fireStation(e);
+        e._alarmFiredAt = Date.now() - 25000;
+        _falls(e, Date.now() - 22000);                  // refused at once; the heal road took it 2.5 s later
+        compare(e._fallbackIntervalForTest(), 25000);
+        e._fallbackTrigger();
+        compare(tc.faded.length, 2);
+        verify(String(tc.faded[1].hostname).indexOf("alarm-fallback") !== -1);
+        e.destroy();
+    }
+
+    function test_a_second_fall_inside_the_grace_moves_nothing() {
+        var e = makeEngine();
+        _rings(e);
+        var t0 = Date.now();
+        _falls(e, t0);
+        _falls(e, t0 + 3000);                           // the knock was refused and the heal road is back
+        compare(e._alarmFellAt, t0);
+        compare(AL.wakeGraceLeftMs(e._alarmFellAt, t0 + 8000), 0);
+        e.destroy();
+    }
+
+    function test_a_station_alarm_rings_from_its_fire_for_half_an_hour_or_until_it_is_answered() {
+        var e = makeEngine();
+        verify(!e.rings(Date.now()));
+        var before = Date.now();
+        _fireStation(e);
+        var fired = e._alarmFiredAt;
+        verify(fired >= before && fired <= Date.now());
+        verify(e.rings(fired));
+        verify(e.rings(fired + 1800000));
+        verify(!e.rings(fired + 1800001));
+        verify(!e.rings(fired - 1));                    // a clock set back
+        e.standDown();
+        compare(e._alarmFiredAt, 0);
+        verify(!e.rings(fired + 1000));
+        // The order alone does not ring, nor a fire time without the order.
+        e._alarmStandingOrder = true;
+        verify(!e.rings(fired + 1000));
+        e._alarmStandingOrder = false;
+        e._alarmFiredAt = fired;
+        verify(!e.rings(fired + 1000));
+        e.destroy();
+    }
+
+    function test_half_an_hour_after_the_fire_a_fall_is_the_heal_roads_alone() {
+        var e = makeEngine();
+        _rings(e);
+        e._alarmFiredAt = Date.now() - 1800001;
+        verify(e._alarmStandingOrder);                  // nobody answered, and the order still stands
+        _falls(e, Date.now());
+        verify(!e._alarmFallbackArmed);
+        compare(e._alarmFellAt, 0);
+        compare(e._fallbackIntervalForTest(), 25000);
+        e._fallbackTrigger();
+        compare(tc.faded.length, 1);
+        // A second inside the half hour it is still the alarm's.
+        e._alarmFiredAt = Date.now() - 1799000;
+        _falls(e, Date.now());
+        verify(e._alarmFallbackArmed);
+        compare(e._fallbackIntervalForTest(), 8000);
+        e.destroy();
+    }
+
+    function test_with_no_station_alarm_ringing_a_fall_arms_nothing() {
+        var e = makeEngine();
+        _falls(e, Date.now());                          // ordinary listening
+        verify(!e._alarmFallbackArmed);
+        verify(!e._fallbackRunningForTest());
+        compare(e._alarmFellAt, 0);
+        _rings(e);
+        e.standDown();                                  // "I'm up"
+        _falls(e, Date.now());
+        verify(!e._alarmFallbackArmed);
+        verify(!e._fallbackRunningForTest());
+        compare(e._alarmFellAt, 0);
+        e._fallbackTrigger();
+        compare(tc.faded.length, 1);
+        e.destroy();
+        // The chime by choice and a podcast alarm leave no standing order.
+        e = makeEngine();
+        e._alarmFire({ station: "Chime", url: "chime:", volumePct: 40 });
+        _falls(e, Date.now());
+        compare(e._alarmFellAt, 0);
+        verify(!e._fallbackRunningForTest());
+        e.destroy();
+        e = makeEngine();
+        e.app._podDownloads = { "ep1.mp3": { title: "Ep 1", key: "k1", show: "Show", art: "", feed: "https://f.example/rss", at: 2 } };
+        e._alarmFire({ station: "Show", url: "podcast:https://f.example/rss", volumePct: 40 });
+        var faded = tc.faded.length, plays = tc.podPlays.length;
+        _falls(e, Date.now());
+        compare(e._alarmFellAt, 0);
+        compare(e._fallbackIntervalForTest(), 25000);
+        compare(tc.faded.length, faded);
+        compare(tc.podPlays.length, plays);
+        e.destroy();
+    }
+
+    function test_standing_down_forgets_the_fall() {
+        var e = makeEngine();
+        _rings(e);
+        _falls(e, Date.now() - 8000);
+        e.standDown();
+        compare(e._alarmFellAt, 0);
+        verify(!e._alarmFallbackArmed);
+        verify(!e._fallbackRunningForTest());
+        e._fallbackTrigger();
+        compare(tc.faded.length, 1);
+        e.destroy();
+    }
+
+    function test_the_next_alarm_begins_without_the_last_ones_fall() {
+        var e = makeEngine();
+        _fireStation(e);
+        _falls(e, Date.now());
+        _fireStation(e);
+        compare(e._alarmFellAt, 0);
+        compare(e._fallbackIntervalForTest(), 25000);
+        verify(e._fallbackRunningForTest());
+        // So the first check is the old one: Buffered alone stands the tone down.
+        tc.playingNow = true;
+        e.app.playMusicRef.mediaStatus = 5;
+        e.app.playMusicRef.position = 1200;
+        e._fallbackTrigger();
+        compare(tc.faded.length, 2);                    // the two fires; no tone
         e.destroy();
     }
 

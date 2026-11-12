@@ -15,15 +15,13 @@ history:
   reach, which is what any "tidy the magic number" edit would do.
 
 target:
-  package/contents/ui/AlarmEngine.qml
+  package/contents/ui/AlarmLogic.js
 
 find:
-              if (app.isPlaying() && (app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia
-                                  || app.playMusicRef.position > 5000)) return;
+  var WAKE_STARTED_MS = 5000;
 
 replace:
-              if (app.isPlaying() && (app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia
-                                  || app.playMusicRef.position > 99999999)) return;
+  var WAKE_STARTED_MS = 99999999;
 
 expect:
   Killed by tst_alarmengine.qml

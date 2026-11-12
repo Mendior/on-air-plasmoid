@@ -6,7 +6,7 @@
 
 import QtQuick
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.components as PlasmaComponents3
 
 Item {
     id: circleRoot
@@ -31,6 +31,9 @@ Item {
     // Read-only hover state for callers (e.g. the station row resurfaces
     // its position number while a reorder arrow is hovered).
     readonly property bool hovered: pressArea.containsMouse
+    // The pointer is on the button, pressable or not. A row that has a tip of
+    // its own holds it back while one of its buttons is pointed at.
+    readonly property bool pointed: tipHover.hovered
 
     signal clicked()
 
@@ -171,9 +174,15 @@ Item {
         }
     }
 
-    PlasmaCore.ToolTipArea {
-        anchors.fill: parent
-        active: tooltipText !== ""
-        mainText: tooltipText
+    // The tip is drawn inside the button's own window. A tip that is a window
+    // of its own (PlasmaCore.ToolTipArea) is placed by the button's position
+    // inside its window, read as a place on the screen: right in a popup
+    // Plasma positions itself, and in the player's own window the Stop button
+    // at (800, 686) got its tip at (162, 473). Its own hover, not the press
+    // area's: a button that is switched off still says what it is.
+    HoverHandler { id: tipHover }
+    PlasmaComponents3.ToolTip {
+        text: circleRoot.tooltipText
+        visible: tipHover.hovered && text.length > 0
     }
 }

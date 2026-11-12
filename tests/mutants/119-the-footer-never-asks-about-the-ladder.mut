@@ -3,7 +3,7 @@
 
 summary:
   The footer stops asking whether the retry ladder is waiting, so a station
-  being tried again reads "Choose station and enjoy…".
+  being tried again reads "Choose a station to start listening".
 
 history:
   The decision is tested in RetryLogic; FullRepresentation.qml has no tests

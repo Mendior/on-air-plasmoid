@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any cutting writer that ends gives its station to the single file until the widget is restarted.
+
+history:
+  A writer ends with its stream now, so an outage of half a minute ends
+  one on a station that cuts perfectly well. Marked as one that cannot be cut,
+  the station would keep the single file for the session after the first lid
+  closed. Only a writer that ended in its first minute is taken for that.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+                  if (SlideLogic.endedYoung(runMs)) _slideDead[streamUrl] = true;
+
+replace:
+                  _slideDead[streamUrl] = true;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_cutting_writer_that_ends_after_a_minute_is_replaced_by_one_that_slides_again.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An address StreamKind has learnt to be FLAC or Ogg still gets the writer that cuts segments.
+
+history:
+  MPEG-TS segments hold MP3 and AAC. Measured: FLAC and Vorbis written
+  into them come out unplayable, with ffmpeg exiting 0. The writer looks at
+  the bytes itself and would send such a stream to the single file, but a kind
+  that is already known spares the look and the head file.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+      return known !== "flac" && known !== "ogg" && known !== "ogg-flac";
+
+replace:
+      return true;
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_only_an_address_that_may_be_mp3_or_aac_is_cut.

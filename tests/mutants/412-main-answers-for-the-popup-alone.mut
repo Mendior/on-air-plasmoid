@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  main.qml calls the face shown only while the popup is open.
+
+history:
+  The closing flush and the volume poll in main.qml hang on
+  root.faceShown. Fed by the popup alone, closing the popup under a window
+  that is up would flush and slow the poll while the listener is looking
+  at the window.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+      readonly property bool faceShown: playerWindow.faceShown
+
+replace:
+      readonly property bool faceShown: playerWindow.popupOpen
+
+expect:
+  Killed by tests/test_invariants.py::test_the_face_asks_whether_it_is_on_screen_in_one_place.
+  Line-neutral.

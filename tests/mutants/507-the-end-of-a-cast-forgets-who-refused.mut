@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  When a cast ends, the record of who refused the station goes with it.
+
+history:
+  A device that refuses stays ticked, and its row in the output menu now
+  says "Cannot play this station" until it is asked again or unticked. The
+  one device refusing is what ends the cast, so a record emptied at the end
+  would take the mark down in the very moment it was put up: the Ruark's
+  row would never show it when the Ruark is the only device.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      out.refused = _copy(session).refused;
+
+replace:
+      out.refused = {};
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_the_end_of_a_cast_keeps_the_marks_and_nothing_else.

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A drawing is never asked for its shape and is read like any picture.
+
+history:
+  When the cover began to be read with no fitting mode, so that a small
+  logo could say its own size, a drawing was caught in it. An SVG named so
+  came back 600 by 600 whatever its shape and a logo of 200 by 80 was drawn
+  squeezed into the square; one kept without its extension came back at the
+  200 by 80 it declares and was drawn blurred. A drawing is asked for its
+  shape and rendered into a box of that shape. This mutant gives it no box.
+
+target:
+  package/contents/ui/CoverImage.qml
+
+find:
+      readonly property var _box: CoverLogic.box(_shape.width, _shape.height, 600)
+
+replace:
+      readonly property var _box: CoverLogic.box(0, 0, 600)
+
+expect:
+  Killed by tests/test_cover_larger_fetch.py::test_a_drawing_from_the_network_is_asked_for_its_shape_once,
+  which runs first, with a drawing from the network, and behind it by
+  tests/qml/tst_coverimage.qml::test_a_drawing_keeps_its_shape_and_is_rendered_for_the_frame,
+  which reads drawings that are local files.
+  Line-neutral.

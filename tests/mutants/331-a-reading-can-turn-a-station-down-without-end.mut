@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The cut has no ceiling.
+
+history:
+  The largest cut the survey called for was 10.2 dB. A reading that asks for
+  more than 15 is more likely a fault in the reading than a station, and
+  without the ceiling one bad number makes a station inaudible for a month.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return Math.max(-MAX_CUT_DB, Math.min(0, TARGET_LUFS - lufs));
+
+replace:
+      return Math.min(0, TARGET_LUFS - lufs);
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_no_reading_turns_a_station_down_more_than_fifteen.
+  Line-neutral.

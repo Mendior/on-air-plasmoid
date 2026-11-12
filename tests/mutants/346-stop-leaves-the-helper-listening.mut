@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A reading in flight runs on after Stop.
+
+history:
+  Stop means off. A helper that goes on holding a connection to the station
+  for up to twenty seconds after it is a connection the listener was told
+  had ended.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          function on_WantsPlayingChanged() { if (loud.app._wantsPlaying !== true) loud._end(); }
+
+replace:
+          function on_WantsPlayingChanged() { if (loud.app._wantsPlaying !== true) settle.stop(); }
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_stop_ends_the_reading_and_removes_its_file.
+  Line-neutral.

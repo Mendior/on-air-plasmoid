@@ -4,7 +4,10 @@
  *  SPDX-License-Identifier: LGPL-2.0-or-later
  */
 
+import "CalibLogic.js" as CalibLogic
 import QtQuick
+import "ReloopLogic.js" as ReloopLogic
+import "SyncJournal.js" as SyncJournal
 
 // ── The whole-room sync engine ───────────────────────────────────────────────
 // One null sink feeds one loopback per real hardware output, each with a real
@@ -12,10 +15,10 @@ import QtQuick
 // and channel modes, exclusions, microphone calibration, the Bluetooth join
 // watchdog, and the etiquette around the system default sink.
 //
-// The engine deliberately imports nothing but QtQuick: every touch on the
-// outside world goes through `app` (main.qml's facade — exec/notify/player/
-// devices/cast) and every setting through `cfg`. That boundary is what lets
-// tests drive the whole state machine with a mock app and a plain object.
+// The engine imports QtQuick and its own pure logic, nothing else: every
+// touch on the outside world goes through `app` (main.qml's facade — exec/
+// notify/player/devices/cast) and every setting through `cfg`. That boundary
+// lets tests drive the whole state machine with a mock app and a plain object.
 Item {
     id: engine
 
@@ -524,17 +527,13 @@ Item {
                 rlIds.push(rlM[1]);
                 if (rlM[2]) rlPairs[rlM[1]] = rlM[2];
             }
-            // A rebuild from a superseded enable-generation (its ack
-            // outlived a disable→re-enable): its modules are strays, and
-            // the CURRENT generation's serialization state is not its to
-            // touch — clearing the busy flag here would let two rebuilds
-            // of the live generation overlap.
-            var rlSeqM = cmd.match(/^: PW_RELOOP (\d+);/);
-            if (!rlSeqM || parseInt(rlSeqM[1], 10) !== _combineLoadSeq) {
-                var unrl = "";
-                for (var rsi = 0; rsi < rlIds.length; rsi++)
-                    unrl += "pactl unload-module " + rlIds[rsi] + " 2>/dev/null; ";
-                if (unrl !== "") app.exec(": PW_UNCOMBINE; " + unrl + "true");
+            // A rebuild that is no longer the newest (its ack outlived a
+            // disable→re-enable, or its thirty seconds and the rebuild sent
+            // after them): its modules are strays, and the live job's
+            // serialization state is not its to touch — clearing the busy
+            // flag here would let two rebuilds overlap.
+            if (!ReloopLogic.owns(cmd, _combineLoadSeq, _reloopJob)) {
+                if (rlIds.length) app.exec(": PW_UNCOMBINE; " + ReloopLogic.unload(rlIds) + "true");
                 return true;
             }
             _combineReloopBusy = false;
@@ -544,10 +543,7 @@ Item {
             // strand the modules for the whole session.
             if (!_combineActive) {
                 _combineReloopPending = false;
-                var unr = "";
-                for (var ri = 0; ri < rlIds.length; ri++)
-                    unr += "pactl unload-module " + rlIds[ri] + " 2>/dev/null; ";
-                if (unr !== "") app.exec(": PW_UNCOMBINE; " + unr + "true");
+                if (rlIds.length) app.exec(": PW_UNCOMBINE; " + ReloopLogic.unload(rlIds) + "true");
                 return true;
             }
             if (_combineReloopPending) {
@@ -583,12 +579,8 @@ Item {
             // Generation discipline, word for word from the reloop ack: a
             // stale swap's modules are strays, and the live generation's
             // busy flag is not a stale ack's to clear.
-            var swSeqM = cmd.match(/^: PW_LBSWAP (\d+);/);
-            if (!swSeqM || parseInt(swSeqM[1], 10) !== _combineLoadSeq) {
-                var swUn = "";
-                for (var su = 0; su < swNew.length; su++)
-                    swUn += "pactl unload-module " + swNew[su].id + " 2>/dev/null; ";
-                if (swUn !== "") app.exec(": PW_UNCOMBINE; " + swUn + "true");
+            if (!ReloopLogic.owns(cmd, _combineLoadSeq, _reloopJob)) {
+                if (swNew.length) app.exec(": PW_UNCOMBINE; " + ReloopLogic.unload(swNew) + "true");
                 return true;
             }
             _combineReloopBusy = false;
@@ -600,10 +592,7 @@ Item {
             _settleSwapChans = ({});
             if (!_combineActive) {
                 _combineReloopPending = false;
-                var swUnd = "";
-                for (var sd = 0; sd < swNew.length; sd++)
-                    swUnd += "pactl unload-module " + swNew[sd].id + " 2>/dev/null; ";
-                if (swUnd !== "") app.exec(": PW_UNCOMBINE; " + swUnd + "true");
+                if (swNew.length) app.exec(": PW_UNCOMBINE; " + ReloopLogic.unload(swNew) + "true");
                 return true;
             }
             // Adopt the fresh ids FIRST, so any rebuild below unloads them
@@ -1966,7 +1955,7 @@ Item {
 
     // ── Group volume: one master, per-device balance ─────────────────────────
     // The volume slider stays the MASTER for everything at once; each device
-    // additionally carries a balance factor (0.05–1.0) so a boomy soundbar
+    // additionally carries a balance factor (0.001–1.0) so a boomy soundbar
     // and quiet desk speakers can hold their relative levels while one
     // slider drives the room: effective = master × balance.
     //
@@ -1998,7 +1987,7 @@ Item {
 
     function trimOf(id) {
         var t = _deviceTrims[id];
-        return (typeof t === "number" && t >= 0.05 && t <= 1) ? t : 1.0;
+        return (typeof t === "number" && t >= 0.001 && t <= 1) ? t : 1.0;
     }
 
     // Balance key for a local sink: the Bluetooth MAC when there is one (the
@@ -2064,18 +2053,18 @@ Item {
         setDeviceChannel(id, order[(order.indexOf(channelOf(id)) + 1) % 4]);
     }
 
-    function setDeviceTrim(id, factor) {
-        var f = Math.max(0.05, Math.min(1, factor));
+    function setDeviceTrim(id, factor, stored) {
+        var f = Math.max(stored === true ? 0.001 : 0.05, Math.min(1, factor));
         var m = {};
         for (var k in _deviceTrims) m[k] = _deviceTrims[k];
-        if (f >= 0.995) delete m[id]; // full level = no entry, the default
-        else m[id] = Math.round(f * 100) / 100;
+        if (f >= (stored === true ? 1 : 0.995)) delete m[id]; // full level = no entry, the default
+        else m[id] = stored === true ? f : Math.round(f * 100) / 100;
         _deviceTrims = m;
         _trimRev++;
         trimsPersistTimer.restart();
-        // Live targets follow the slider immediately (debounced): the
-        // matching loopback's sink-input locally, the device volume for a
-        // casting network target. Idle devices just keep the stored value.
+        // Live targets follow the slider immediately (debounced): the loopback's
+        // sink-input locally, the device volume for a casting network target. Idle ones keep the stored
+        // value, and so does a device whose balance is only read against another master (stored).
         if (_combineActive) {
             var mod = _combineModuleForKey(id);
             if (mod !== "") {
@@ -2083,7 +2072,7 @@ Item {
                 trimApplyTimer.restart();
             }
         }
-        if (app.castTrimActive(id)) {
+        if (stored !== true && app.castTrimActive(id)) {
             _trimPendingCast[id] = true;
             trimApplyTimer.restart();
         }
@@ -2175,11 +2164,11 @@ Item {
     // Adopt a joining network device's measured loudness as its balance:
     // its level / master ratio, stored only when no balance exists (a
     // remembered choice — or one set during the read's round-trip — always
-    // wins) and only when it differs meaningfully from full level.
+    // wins) and only below full level. The caller cuts it; it is not rounded here.
     function adoptTrim(key, factor) {
         if (_deviceTrims[key] !== undefined) return;
-        var f = Math.max(0.05, Math.min(1, Math.round(factor * 100) / 100));
-        if (f >= 0.995) return;
+        var f = Math.max(0.001, Math.min(1, factor));
+        if (f >= 1) return;
         var m = {};
         for (var k in _deviceTrims) m[k] = _deviceTrims[k];
         m[key] = f;
@@ -2847,7 +2836,7 @@ Item {
             // Nothing measurable left means nothing to play: say so.
             console.log("[ARP] sync: fewer than two members carry the"
                         + " inaudible band — nothing to compare, not playing");
-            driftLastText = i18n("Auto-check %1: only one speaker can hear the inaudible tone — nothing to compare",
+            driftLastText = i18n("Auto-check %1: fewer than two speakers can reproduce the test tone — nothing to compare",
                                  Qt.formatTime(new Date(), "hh:mm"));
             return;
         }
@@ -3222,6 +3211,15 @@ Item {
     // desktop each own their own run and neither may stop the other's.
     readonly property string _calibPidFile:
         "\"$XDG_RUNTIME_DIR/onair_calib_" + app.instanceId + ".pid\""
+    // The cancel mark. A cancel writes the running measurement's token here
+    // before it looks for a pid, and the measurement's shell reads it before
+    // each step that changes the room: a shell still asking the speakers for
+    // their levels has no pid to be found by (CalibLogic.js).
+    readonly property string _calibOffFile:
+        "\"$XDG_RUNTIME_DIR/onair_calib_" + app.instanceId + ".off\""
+    // When this engine came up. The run counter starts over with the panel,
+    // and the token carries this so that a mark from before is nobody's.
+    property double _calibBornMs: Date.now()
     // The periodic probe writes its own name. It used to share the file
     // above, and then a calibration started while a probe was in flight had
     // its pid overwritten and, seconds later, deleted by the probe's own
@@ -3230,28 +3228,11 @@ Item {
     readonly property string _driftPidFile:
         "\"$XDG_RUNTIME_DIR/onair_drift_" + app.instanceId + ".pid\""
 
-    // The one way calibrate.py is launched. The python goes to the
-    // BACKGROUND so its pid can be written down, and the shell then waits
-    // for it exactly as if it had run in front — the restore lines that
-    // follow are unchanged and still only reachable through this wait.
-    // Why the bookkeeping: cancelling used to `pgrep -f 'python3
-    // .*calibrate\.py'`, which matches the sh and the timeout wrappers too
-    // (their command line CARRIES that text), so the cancel killed the very
-    // shell holding the saved sink levels and left the room parked at 55%
-    // with the loopbacks at full. Measured on this machine: killing the
-    // timeout pid alone ends the python (wait → 143) and the shell runs its
-    // restore to the end.
-    // ONAIR_LEASH_PID is this shell's own pid: the script watches it and
-    // ends itself when the session that asked for the measurement is gone.
-    // Its old test (getppid()==1) could never fire — `timeout` sits between
-    // the two, so the shell is what gets reparented, never the python.
+    // The one way calibrate.py is launched; CalibLogic.runCmd has the why.
+    // The drift probe brings its own pid file and has its own kill, so it
+    // is the one caller that is not behind the cancel mark.
     function _calibRunCmd(budgetSec, script, argvStr, pidFile) {
-        var f = pidFile || _calibPidFile;
-        return " ONAIR_LEASH_PID=$$ timeout " + budgetSec + " python3 '" + script + "'" + argvStr + " &"
-             + " cp=$!;"
-             + " if [ -n \"$XDG_RUNTIME_DIR\" ]; then echo \"$cp\" > " + f + "; fi;"
-             + " wait \"$cp\";"
-             + " if [ -n \"$XDG_RUNTIME_DIR\" ]; then rm -f " + f + "; fi;";
+        return CalibLogic.runCmd(budgetSec, script, argvStr, pidFile || _calibPidFile, !pidFile);
     }
 
     // Whether the calibration has both of its reference speakers IN the
@@ -3476,18 +3457,13 @@ Item {
         // staleness gate minutes later and act on a group that no longer
         // exists: a CALIB_OK arming the verify against nothing, or a 'no
         // click heard' launching an unasked-for 85% run over the music.
+        var gone = CalibLogic.token(_calibBornMs, _calibRunSeq);
         _calibRunSeq++;
         if (rebuildToo && _rebuildHeld) { _rebuildHeld = false; _combineRebuildLoopbacks(); }
         else _rebuildHeld = false;
-        // By pid, from the run's own file: OUR run, not every calibrate.py
-        // this user happens to have, and not the shell that still owes the
-        // room its volume restore. A missing or unreadable file is a no-op,
-        // which is what makes this safe to call from every road.
-        app.exec(": PW_CALIBKILL; f=" + _calibPidFile + ";"
-                 + " if [ -n \"$XDG_RUNTIME_DIR\" ] && [ -r \"$f\" ]; then"
-                 + " p=$(cat \"$f\" 2>/dev/null);"
-                 + " case \"$p\" in ''|*[!0-9]*) ;; *) kill \"$p\" 2>/dev/null;; esac;"
-                 + " fi; true # " + app.nextSeq());
+        // The mark for the run that was in flight, then its pid if it has one.
+        app.exec(": PW_CALIBKILL;" + CalibLogic.cancelCmd(_calibPidFile, _calibOffFile, gone)
+                 + " true # " + app.nextSeq());
     }
 
     // The drift probe writes its pid and, until now, nobody ever read it
@@ -3676,29 +3652,7 @@ Item {
                 post += _sinkInputVolCmd(mod, pct);
             }
         }
-        var setup = "", restore = "", argv = "";
-        for (var si = 0; si < calSinks.length; si++) {
-            var esc = calSinks[si].replace(/'/g, "'\\''");
-            setup += " s" + si + "='" + esc + "';"
-                  + " v" + si + "=$(pactl get-sink-volume \"$s" + si + "\" | grep -o '[0-9]*%' | tr '\\n' ' ');"
-                  // The restored volume rides along for the loudness math:
-                  // the clicks are measured at the park level, but playback
-                  // happens at THIS level — the handler folds it back in.
-                  + " echo \"CALIBVOL $s" + si + " ${v" + si + ":-" + park + "%}\";"
-                  + " pactl set-sink-volume \"$s" + si + "\" " + park + "%;";
-            // Unquoted on purpose: $vN holds one %-value PER CHANNEL and
-            // word-splitting hands pactl each as its own argument, so a
-            // left/right balance survives the round-trip. An unreadable
-            // volume falls back to the park the calibration itself used.
-            restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-" + park + "%};";
-            argv += " \"$s" + si + "\"";
-            // The microphone the last calibration MEASURED as the best ear
-            // in this machine, asked for again by name. Empty on the first
-            // run (or after the device left), and calibrate.py then picks —
-            // the desktop's default source is a routing preference, not a
-            // judgement about which microphone hears the room.
-            if (si === 1) argv += " " + _micArg();
-        }
+        var ps = CalibLogic.parkShell(calSinks, park, _micArg());
         // The timeout must beat the guard timer: only the SHELL knows the
         // saved sink levels ($vN) and the balance percentages to put back —
         // if a hung pw-record lived past the guard, the sinks would stay
@@ -3721,13 +3675,13 @@ Item {
         // startup() replays whatever a dead session left behind.
         // XDG_RUNTIME_DIR only (0700, ours): the twin of this file is
         // replayed with sh at startup, so it must never live in a shared,
-        // predictable /tmp path. No runtime dir → the save is skipped and
-        // the calibration's own restore commands still put levels back.
+        // predictable /tmp path. No runtime dir, or one that cannot be
+        // written → the save is skipped; the restore lines do not need it.
         var parkFile = _parkFile;
-        var parkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + parkFile + ";";
+        var parkSave = CalibLogic.parkOpen(parkFile);
         for (var pf = 0; pf < calSinks.length; pf++)
-            parkSave += " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
-                      + " \"$s" + pf + "\" \"${v" + pf + ":-" + park + "%}\" >> " + parkFile + ";";
+            parkSave += CalibLogic.parkAdd(parkFile, "'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
+                      + " \"$s" + pf + "\" \"${v" + pf + ":-" + park + "%}\"");
         // The setting is a promise, not a preference — and it holds for the
         // button too. A listener who ticked "measure with a tone too high to
         // hear" and then pressed Calibrate was still getting the clicks,
@@ -3737,13 +3691,14 @@ Item {
         app.exec(": PW_CALIB " + calSeq + " " + _btMacOfSink(bt) + " P" + park + " ;"
             + _ultraEnv()
             + (cfg.syncUltrasonic !== false ? " export ONAIR_ULTRA_ONLY=1;" : "")
-            + setup
-            + parkSave
-            + " " + pre
-            + _calibRunCmd(calBudget, script, argv)
-            + restore
-            + " " + post
-            + " rm -f " + parkFile + "; true # " + app.nextSeq());
+            + CalibLogic.offDef(_calibOffFile, CalibLogic.token(_calibBornMs, calSeq))
+            + ps.setup
+            // Past this point the shell has written the park file and may
+            // have raised a loopback, and only then are those its to undo.
+            + " off || { g=1;" + parkSave + " " + pre + " };"
+            + _calibRunCmd(calBudget, script, ps.argv)
+            + ps.restore
+            + " [ -n \"$g\" ] && { " + post + " rm -f " + parkFile + "; }; true # " + app.nextSeq());
         // Said AFTER the work is on its way (state before speech), because
         // it must be said: two rounds of clicks with a quiet check between
         // them read as "done" halfway through, and a calibration interrupted
@@ -4010,6 +3965,11 @@ Item {
     // live loopbacks — audible phasing, the exact artifact this feature
     // exists to prevent.
     property bool _combineReloopBusy: false
+    // Counts the rebuilds and settle swaps this engine has sent. Each
+    // carries its number out and back, and only the newest one's answer is
+    // the room's: the thirty seconds below can send a second while the
+    // first shell is still alive (ReloopLogic.js).
+    property int _reloopJob: 0
     // A rebuild or swap whose shell dies without an ack used to leave this
     // flag standing, and every later rebuild waited on it for the rest of
     // the session. Thirty seconds is longer than any honest shell here.
@@ -4097,7 +4057,7 @@ Item {
         // ack lands after a disable→re-enable would otherwise be adopted
         // into the NEW generation next to its own fresh build — every
         // speaker with two differently-delayed loopbacks, audible phasing.
-        app.exec(": PW_RELOOP " + _combineLoadSeq + "; " + un + loadCmds
+        app.exec(": PW_RELOOP " + ReloopLogic.stamp(_combineLoadSeq, ++_reloopJob) + "; " + un + loadCmds
                         + reclaim + " true"
                         + " # " + app.nextSeq());
         // Fresh loopbacks mean a fresh A2DP operating point — read every
@@ -4164,6 +4124,7 @@ Item {
     }
 
     function setSyncOffset(ms) {
+        var mapWas = cfg.syncOffsetMap;
         cfg.syncOffsetMs = Math.round(ms);
         // The slider speaks for the CONNECTED device(s) — remember the value
         // per MAC so each speaker keeps its own lag across sessions.
@@ -4188,6 +4149,9 @@ Item {
             }
             if (touched) cfg.syncOffsetMap = JSON.stringify(map);
         } catch (e) {}
+        // The one writer of the map that used to leave no line behind it.
+        var said = SyncJournal.handSet(mapWas, cfg.syncOffsetMap);
+        if (said !== "") console.log(said);
         // The hand on this slider is the ear speaking: the listener just
         // declared THIS deployment right. The sweeps' next few readings on
         // it are therefore not drift to correct but the sweeps' own error,
@@ -4899,7 +4863,7 @@ Item {
     function _settleTimerRunningForTest() { return settleFixTimer.running; }
 
     function _settleRearm() {
-        if (_settleReadsLeft <= 0) return;
+        if (_settleReadsLeft <= 0) { console.log(SyncJournal.settleOver(_settleEarsRuns.length)); return; }
         settleFixTimer.interval = 90 * 1000;
         settleFixTimer.restart();
     }
@@ -5206,7 +5170,7 @@ Item {
         _settleSwapLags = lags;
         _combineReloopBusy = true;
         reloopBusyGuard.restart();
-        app.exec(": PW_LBSWAP " + _combineLoadSeq + "; " + cmds + "true"
+        app.exec(": PW_LBSWAP " + ReloopLogic.stamp(_combineLoadSeq, ++_reloopJob) + "; " + cmds + "true"
                  + " # " + app.nextSeq());
         return "swapped";
     }
@@ -5387,14 +5351,15 @@ Item {
         // session's leftovers.
         // XDG_RUNTIME_DIR only, same reason as the calibration's park file.
         var vParkFile = _parkFile;
-        var vParkSave = " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + vParkFile + ";"
-                      + " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n' "
-                      + _combineSinkName + " \"${cm:-100%}\" >> " + vParkFile + ";";
+        var vParkSave = CalibLogic.parkOpen(vParkFile)
+                      + CalibLogic.parkAdd(vParkFile, "'pactl set-sink-volume '\\''%s'\\'' %s\\n' "
+                      + _combineSinkName + " \"${cm:-100%}\"");
         for (var vf = 0; vf < sinks.length && vf < 8; vf++)
-            vParkSave += " printf 'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
-                       + " \"$w" + vf + "\" \"${y" + vf + ":-" + park + "%}\" >> " + vParkFile + ";"
-                       + " printf 'pactl set-sink-mute '\\''%s'\\'' 0\\n' \"$w" + vf + "\" >> " + vParkFile + ";";
-        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + _ultraEnv() + setup + vParkSave + " " + pre2
+            vParkSave += CalibLogic.parkAdd(vParkFile, "'pactl set-sink-volume '\\''%s'\\'' %s\\n'"
+                       + " \"$w" + vf + "\" \"${y" + vf + ":-" + park + "%}\"")
+                       + CalibLogic.parkAdd(vParkFile, "'pactl set-sink-mute '\\''%s'\\'' 0\\n' \"$w" + vf + "\"");
+        app.exec(": PW_VERIFY " + _calibRunSeq + ";" + _ultraEnv()
+                 + CalibLogic.offDef(_calibOffFile, CalibLogic.token(_calibBornMs, _calibRunSeq)) + setup + vParkSave + " " + pre2
                  // The same promise the calibration makes two thousand lines
                  // up, and for the same reason: the setting reads "measure
                  // with a tone too high to hear", not "prefer to". This used

@@ -112,8 +112,20 @@
             <default>false</default>
         </entry>
         <entry name="timeshiftEnabled" type="Bool">
-            <label>Pause live radio: while a station plays, a background copy is kept on this computer so pausing resumes exactly where the listener left off, behind the broadcast. The buffer is deleted when playback stops.</label>
+            <label>Pause live radio: while a station plays, a background copy is kept on this computer so Play picks up within a few seconds of where the listener paused, behind the broadcast. A pause longer than the buffer holds ends the copying and keeps what was copied. The buffer is deleted when playback stops.</label>
             <default>false</default>
+        </entry>
+        <entry name="streamKinds" type="String">
+            <label>What each saved station's stream was found to be, as a JSON object from address to ogg-flac, ogg, flac or other, so that its next start does not have to ask. At most 64 addresses; anything unreadable counts as empty.</label>
+            <default>{}</default>
+        </entry>
+        <entry name="evenLoudness" type="Bool">
+            <label>Even out loudness between stations: a saved station louder than -18 LUFS is turned down on this computer by the difference, by 15 dB at most, and none is turned up. To learn how loud a station is, it is listened to in the background for 20 seconds, at most once a day, until 5 readings are kept, and again when the newest is thirty days old.</label>
+            <default>false</default>
+        </entry>
+        <entry name="stationLoudness" type="String">
+            <label>How loud each saved station was found to be, as a JSON object from address to [the second the newest reading was taken, the second of a later attempt that gave no number, then up to 5 readings in LUFS, oldest first]. At most 512 addresses; anything unreadable counts as empty.</label>
+            <default>{}</default>
         </entry>
         <entry name="timeshiftWindowMin" type="Int">
             <label>How many minutes of live radio the pause buffer can hold before it stops growing.</label>
@@ -278,6 +290,18 @@
         <entry name="pin" type="bool">
             <label>Keep the popup open when focus moves to another window (the header's pin button)</label>
             <default>false</default>
+        </entry>
+        <entry name="detached" type="bool">
+            <label>The player sits in a window of its own instead of the popup (the header's window button)</label>
+            <default>false</default>
+        </entry>
+        <entry name="windowWidth" type="Int">
+            <label>Width of the player's own window as the listener left it, in pixels (0 = the size the popup opens at)</label>
+            <default>0</default>
+        </entry>
+        <entry name="windowHeight" type="Int">
+            <label>Height of the player's own window as the listener left it, in pixels (0 = the size the popup opens at)</label>
+            <default>0</default>
         </entry>
         <entry name="showMusicTab" type="bool">
             <label>Show the My Music tab</label>

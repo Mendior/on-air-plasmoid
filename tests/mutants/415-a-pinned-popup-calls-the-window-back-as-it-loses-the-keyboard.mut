@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The popup asks for the window again when the listener clicks away from it.
+
+history:
+  An opened popup that finds its face away asks for the window, once, as
+  it gets the keyboard. Asked again as it loses it, a pinned popup would
+  call the window back over whatever the listener had just clicked on.
+
+target:
+  package/contents/ui/PopupFace.qml
+
+find:
+          if (activeFocus && away) house.requestActivate();
+
+replace:
+          if (away) house.requestActivate();
+
+expect:
+  Killed by tests/qml/tst_popupface.qml::test_the_window_is_asked_forward_as_the_popup_gets_the_keyboard_and_not_as_it_loses_it.

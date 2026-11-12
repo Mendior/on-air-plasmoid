@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station the heal moved to a new address loses its reading at the moment
+  the list is rewritten.
+
+history:
+  The move is written while the station plays. Without the old address's
+  number it would swell to full level there, by up to fifteen decibels, and
+  come down again half a minute later.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+          if (!rows[i] || rows[i].hostname !== url || typeof rows[i].prev !== "string") continue;
+
+replace:
+          if (!rows[i] || rows[i].hostname !== url || typeof rows[i].prev !== "number") continue;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_a_station_that_moved_keeps_its_reading_until_it_has_a_new_one.
+  Line-neutral.

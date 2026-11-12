@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A picture of the artist found after a song search timed out is cached
+  like a final answer.
+
+history:
+  A found picture never expires from the cache. When the request that
+  timed out was the one that had the cover, filing the artist's picture
+  leaves the song without its cover until the panel restarts. A stand-in
+  met after a transient failure is shown and not filed, and the lookup gets
+  its one later attempt. This mutant files it.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+              var sure = kind === "track" || !sawTransient;
+
+replace:
+              var sure = kind !== "" || !sawTransient;
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_a_stand_in_found_after_a_timeout_is_shown_and_the_song_is_asked_for_again.
+  Line-neutral.

@@ -62,8 +62,11 @@ FRAME = bytes([0xFF, 0xFB, 0x90, 0xC4]) + bytes(413)
 FRAMES_PER_SEC = 44100 / 1152
 
 # Recording Alpha is started, its capture sent, stopped and answered for;
-# recording Beta is started after it. Everything the engine gave the shell on
-# the way is printed as one line of JSON.
+# recording Beta is started after it. Then one more pair, for the address
+# file: Old FM is called off before its address write has answered, and New
+# FM is started right after, on another mount of the same station. Last, the
+# cleanup a panel runs when it starts. Everything the engine gave the shell
+# on the way is printed as one line of JSON.
 _DRIVER = """
 import QtQuick
 import QtTest
@@ -100,9 +103,24 @@ TestCase {
         tc.sent = [];
         e._recStart("Beta FM", %(url)s, 60, false);
         e.handleExec(tc.sent[0], "__REC_URL_OK__", "", 0);
+        var beta = tc.sent;
+        e.handleExec(": REC_START;", "__REC_DONE__ rc=0 bytes=9999999", "", 0);
+        tc.sent = [];
+        e._recStart("Old FM", %(url)s.replace("live.mp3", "old.mp3"), 60, false);
+        var oldFile = e._recUrlFile;
+        e.recStop();
+        e._recStart("New FM", %(url)s.replace("live.mp3", "new.mp3"), 60, false);
+        e.handleExec(tc.sent[2], "__REC_URL_OK__", "", 0);
+        var pair = tc.sent;
+        var newFile = e._recUrlFile;
+        tc.sent = [];
+        e.start();
         console.log("ONAIR_REC " + JSON.stringify({
             write: alpha[0], capture: alpha[1], stop: alpha[2], token: token,
-            nextWrite: tc.sent[0], nextCapture: tc.sent[1],
+            nextWrite: beta[0], nextCapture: beta[1],
+            oldWrite: pair[0], oldCleanup: pair[1], newWrite: pair[2], newCapture: pair[3],
+            oldFile: oldFile, newFile: newFile, sessionStart: tc.sent[0],
+            urlBase: String(e._recUrlBase), bornMs: String(e._recBornMs),
             pidFile: e._recPidFile, markFile: e._recStopFile
         }));
     }
@@ -113,12 +131,14 @@ TestCase {
 class Rig:
     """One station, one set of folders and the engine's commands for them."""
 
-    def __init__(self, tmp: Path, url: str, hits: Callable[[], int]) -> None:
+    def __init__(self, tmp: Path, url: str, asked: list[str]) -> None:
         self.tmp = tmp
         self.url = url
-        self.hits = hits
+        # The mounts the station was asked for, in the order it was asked.
+        self.asked = asked
         self.out = tmp / "Music dir"
-        self.run = tmp / "run"
+        # A quote and a space, so every path the commands quote is tried.
+        self.run = tmp / "run o'neil"
         self.stubs = tmp / "stubs"
         self.run.mkdir()
         self.stubs.mkdir()
@@ -215,12 +235,24 @@ class Rig:
         self.shells.append(proc)
         return proc
 
+    def hits(self) -> int:
+        return len(self.asked)
+
+    def run_now(self, name: str) -> str:
+        """One of the engine's short commands, run to its end; what it said."""
+        done = self.shell(self.cmd[name])
+        out, _ = done.communicate(timeout=20)
+        assert done.returncode == 0, name
+        return out
+
     def start_capture(
         self, write: str = "write", capture: str = "capture"
     ) -> subprocess.Popen[str]:
-        wrote = self.shell(self.cmd[write])
-        assert "__REC_URL_OK__" in wrote.communicate(timeout=20)[0]
+        assert "__REC_URL_OK__" in self.run_now(write)
         return self.shell(self.cmd[capture])
+
+    def run_files(self) -> list[str]:
+        return sorted(p.name for p in self.run.iterdir())
 
     def stop(self) -> None:
         assert self.shell(self.cmd["stop"]).wait(timeout=20) == 0
@@ -321,9 +353,7 @@ def _rig(tmp_path: Path, live: bool) -> Iterator[Rig]:
         target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
     ).start()
     made = Rig(
-        tmp_path,
-        "http://127.0.0.1:%d/live.mp3" % server.server_address[1],
-        lambda: len(asked),
+        tmp_path, "http://127.0.0.1:%d/live.mp3" % server.server_address[1], asked
     )
     try:
         yield made
@@ -469,3 +499,83 @@ def test_without_ffprobe_the_capture_is_written_and_names_no_seconds(rig: Rig) -
     assert re.search(r"^__REC_DONE__ rc=0 bytes=\d+ secs=$", out, re.MULTILINE), out
     assert [f.suffix for f in rig.recordings()] == [".mp3"]
     assert sorted(p.name for p in rig.run.iterdir()) == []
+
+
+# ── One address file for each recording ──────────────────────────────────
+# The address used to go into one file per widget. A command handed to the
+# shell runs when the shell gets to it, and the number an answer carries
+# guards the answer only. Run in these orders on 2026-11-11, the recording
+# before wrote its address over the new one's and New FM's file held Old FM's
+# stream, or deleted the file and the capture ended "__REC_EMPTY__ rc=".
+
+
+def test_in_the_order_they_were_sent_the_new_station_is_recorded(rig: Rig) -> None:
+    # The control: nothing below fails because the pair cannot record.
+    rig.release_df()
+    assert "__REC_URL_OK__" in rig.run_now("oldWrite")
+    rig.run_now("oldCleanup")
+    out = rig.ended(rig.start_capture("newWrite", "newCapture"))
+    assert re.search(r"^__REC_DONE__ rc=0 bytes=\d+", out, re.MULTILINE), out
+    assert rig.asked == ["/new.mp3"]
+    assert [f.name[:10] for f in rig.recordings()] == ["REC New FM"]
+    assert rig.run_files() == []
+
+
+def test_a_late_write_of_the_recording_before_changes_no_station(rig: Rig) -> None:
+    rig.release_df()
+    assert "__REC_URL_OK__" in rig.run_now("newWrite")
+    assert "__REC_URL_OK__" in rig.run_now("oldWrite")
+    out = rig.ended(rig.shell(rig.cmd["newCapture"]))
+    assert rig.asked == ["/new.mp3"], "New FM's capture asked for " + str(rig.asked)
+    assert re.search(r"^__REC_DONE__ rc=0 bytes=\d+", out, re.MULTILINE), out
+    assert [f.name[:10] for f in rig.recordings()] == ["REC New FM"]
+
+
+def test_a_late_cleanup_of_the_recording_before_leaves_the_address(rig: Rig) -> None:
+    rig.release_df()
+    assert "__REC_URL_OK__" in rig.run_now("newWrite")
+    rig.run_now("oldCleanup")
+    out = rig.ended(rig.shell(rig.cmd["newCapture"]))
+    assert rig.asked == ["/new.mp3"], out
+    assert re.search(r"^__REC_DONE__ rc=0 bytes=\d+", out, re.MULTILINE), out
+    assert rig.run_files() == []
+
+
+def test_an_address_written_after_its_own_cleanup_goes_with_the_next(rig: Rig) -> None:
+    # The cleanup overtook the write it was meant for: Old FM's address is
+    # on disk with nobody left to read it.
+    rig.run_now("oldCleanup")
+    assert "__REC_URL_OK__" in rig.run_now("oldWrite")
+    left = Path(rig.cmd["oldFile"])
+    assert left.exists() and "old.mp3" in left.read_text()
+    assert rig.cmd["newFile"] != rig.cmd["oldFile"], "one file for both recordings"
+    assert "__REC_URL_OK__" in rig.run_now("newWrite")
+    assert rig.run_files() == [Path(rig.cmd["newFile"]).name]
+    assert "new.mp3" in Path(rig.cmd["newFile"]).read_text()
+
+
+def test_the_start_of_the_panel_takes_what_older_sessions_left(rig: Rig) -> None:
+    base, born = rig.cmd["urlBase"], int(rig.cmd["bornMs"])
+    # Three recordings of sessions before this one, and the one name older
+    # versions wrote under.
+    gone = ["%s-3.%d" % (base, born - 86400000), "%s-12.%d" % (base, born - 1), base]
+    # One of this session, whatever its number, and names that are no
+    # recording's: no time, no number, a number no shell can read.
+    kept = [
+        "%s-1.%d" % (base, born),
+        "%s-1.%d" % (base, born + 5000),
+        base + "-",
+        base + "-7.",
+        base + "-x.y",
+        base + "-1.99999999999999999999999",
+        base + "-1." + "9" * 200,
+        # Widget 70's, whose number begins the way widget 7's does.
+        base + "0-1.5",
+    ]
+    for name in gone + kept:
+        Path(name).write_text('url = "http://127.0.0.1:9/left.mp3"')
+    (Path(base + "-2.5")).mkdir()
+    rig.run_now("sessionStart")
+    assert rig.run_files() == sorted(
+        [Path(k).name for k in kept] + [Path(base).name + "-2.5"]
+    )

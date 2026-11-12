@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A level asked for while a device has not yet answered is never sent to
+  it, so an alarm's level misses a device that is slow to take the stream.
+
+history:
+  A device that is still being asked is not sent a level any more: it may
+  refuse, and then it was turned down for nothing. But an alarm asks for
+  its level right after it starts the station, 400 ms before the timer
+  sends it, and a television took 389 ms to answer (2026-11-12). Dropped,
+  the level would leave a speaker that was turned down the night before
+  whispering through the alarm. What was asked for is kept for the device
+  and goes out with its answer.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      for (var k in s.pending) s.owed[k] = pct;
+
+replace:
+      for (var k in s.pending) delete s.owed[k];
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_a_level_asked_for_while_a_device_is_asked_goes_out_with_its_answer.

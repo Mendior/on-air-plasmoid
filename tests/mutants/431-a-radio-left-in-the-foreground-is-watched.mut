@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The level poll stays at full rate all night in a window that was the last one touched.
+
+history:
+  A radio is started and left. Its window keeps the keyboard until
+  something else takes it, which on a machine nobody is at is never. The
+  keyboard alone is not somebody at the window.
+
+target:
+  package/contents/ui/WindowLogic.js
+
+find:
+      if (seat === "window") return hovered === true && active === true;
+
+replace:
+      if (seat === "window") return active === true;
+
+expect:
+  Killed by tests/qml/tst_windowlogic.qml::test_in_the_window_it_takes_the_pointer_and_the_keyboard.

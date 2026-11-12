@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A settle round that runs out of reads without a verdict just stops.
+
+history:
+  The round after a rebuild has five reads to make a verdict of three.
+  Ten refusals at the gate end it with a line, and so does a probe that
+  refuses every retry. Reads spent on answers that could not be read, or
+  were skipped, or never came, ended it with nothing. On 2026-11-11 the
+  five probes after a restart all came back unsteady between 18:20 and
+  18:28; the round was over, the room was 50 ms out and stayed there
+  until 21:50, and the journal read as if the round were still going.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          if (_settleReadsLeft <= 0) { console.log(SyncJournal.settleOver(_settleEarsRuns.length)); return; }
+
+replace:
+          if (_settleReadsLeft <= 0) return;
+
+expect:
+  Killed by tests/test_sync_journal.py::test_a_settle_round_whose_probes_all_came_back_unreadable_says_it_is_over.
+  Line-neutral.

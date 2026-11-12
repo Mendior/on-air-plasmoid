@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The cover is a button, shows a hand and opens the larger view for any
+  picture.
+
+history:
+  Twice the pixels of a 32-pixel logo is 64, and the cover on the page is
+  at least 126. A view that shows the picture smaller than the page does is
+  not offered: no button for the keyboard, no hand, no click. This mutant
+  offers it for every picture.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+      readonly property bool largerOffered: art !== ""
+          && CoverLogic.largerAdds(natural.width, natural.height, width, height, roomW, roomH, ratio)
+
+replace:
+      readonly property bool largerOffered: art !== ""
+          || CoverLogic.largerAdds(natural.width, natural.height, width, height, roomW, roomH, ratio)
+
+expect:
+  Killed by tests/qml/tst_covertouch.qml::test_a_small_logo_is_not_offered_larger.
+  Line-neutral.

@@ -261,4 +261,80 @@ TestCase {
         compare(label.substring(0, 6), "&&x&&x")
         compare(label.replace(/&&/g, "&"), raw)
     }
+
+    // A row that is a button, under the keyboard. The row here is a stand-in
+    // that counts its clicks; tst_rowkeys presses the keys on real delegates.
+    function fakeRow(shown) {
+        return { visible: shown, clicks: 0, clicked: function() { this.clicks++ } }
+    }
+    function press(key, held) {
+        return { key: key, isAutoRepeat: held === true, accepted: false }
+    }
+
+    function test_return_enter_and_space_each_press_the_row_once() {
+        var keys = [Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space]
+        for (var i = 0; i < keys.length; i++) {
+            var row = fakeRow(true)
+            var ev = press(keys[i])
+            compare(VL.pressRow(ev, row), true)
+            compare(row.clicks, 1)
+            compare(ev.accepted, true)
+        }
+    }
+
+    function test_a_key_held_down_presses_the_row_once() {
+        // One press, then what the keyboard sends while the key stays down.
+        var row = fakeRow(true)
+        VL.pressRow(press(Qt.Key_Space), row)
+        for (var i = 0; i < 50; i++) {
+            var ev = press(Qt.Key_Space, true)
+            compare(VL.pressRow(ev, row), true)
+            compare(ev.accepted, true, "a repeat left alone reaches the button under the row")
+        }
+        compare(row.clicks, 1)
+        // Let go and press again: that is a second press.
+        VL.pressRow(press(Qt.Key_Space), row)
+        compare(row.clicks, 2)
+    }
+
+    function test_a_row_that_is_not_on_screen_is_not_pressed() {
+        var row = fakeRow(false)
+        var ev = press(Qt.Key_Return)
+        compare(VL.pressRow(ev, row), true)
+        compare(row.clicks, 0)
+        compare(ev.accepted, true)
+        // Only a plain true is a row on screen.
+        var odd = [undefined, null, 0, 1, "true"]
+        for (var i = 0; i < odd.length; i++) {
+            var r = fakeRow(odd[i])
+            VL.pressRow(press(Qt.Key_Space), r)
+            compare(r.clicks, 0, String(odd[i]))
+        }
+    }
+
+    function test_any_other_key_is_left_alone() {
+        var keys = [Qt.Key_Tab, Qt.Key_Backtab, Qt.Key_Escape, Qt.Key_M, Qt.Key_Up, Qt.Key_Down,
+                    Qt.Key_Select, Qt.Key_Shift, 0, -1, undefined, null, "Return"]
+        for (var i = 0; i < keys.length; i++) {
+            var row = fakeRow(true)
+            var ev = press(keys[i])
+            compare(VL.pressRow(ev, row), false, String(keys[i]))
+            compare(row.clicks, 0)
+            compare(ev.accepted, false)
+        }
+    }
+
+    function test_no_event_or_no_row_is_nothing_to_press() {
+        var row = fakeRow(true)
+        compare(VL.pressRow(null, row), false)
+        compare(VL.pressRow(undefined, row), false)
+        compare(VL.pressRow({}, row), false)
+        compare(row.clicks, 0)
+        var ev = press(Qt.Key_Return)
+        compare(VL.pressRow(ev, null), false)
+        compare(VL.pressRow(ev, undefined), false)
+        compare(VL.pressRow(ev), false)
+        compare(ev.accepted, false)
+        compare(VL.pressRow(), false)
+    }
 }

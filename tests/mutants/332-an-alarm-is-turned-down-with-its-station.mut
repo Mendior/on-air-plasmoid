@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A wake-up alarm on a loud station rings ten decibels under the level its
+  form names.
+
+history:
+  The alarm's own level is what the room gets, and an alarm has to be heard:
+  the factor stands aside while that level stands.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      if (typeof f.alarmPct !== "number" || !(f.alarmPct < 0)) return 0;
+      if (f.casting !== false
+
+replace:
+      if (typeof f.alarmPct !== "number") return 0;
+      if (f.casting !== false
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_nothing_is_cut_while_an_alarms_level_stands.
+  Line-neutral.

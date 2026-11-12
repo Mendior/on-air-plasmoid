@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The larger picture is sized without the screen's ratio.
+
+history:
+  The rule knows the ratio only when it is handed it. The offer and the
+  size of the larger picture are two calls, and with the ratio in one and
+  not the other a cover is offered larger and then drawn past its limit.
+  This mutant sizes the picture as on a screen that is not scaled.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+  CoverLogic.largerScale(touch.natural.width, touch.natural.height, touch.roomW, touch.roomH, touch.ratio)
+
+replace:
+  CoverLogic.largerScale(touch.natural.width, touch.natural.height, touch.roomW, touch.roomH, 1)
+
+expect:
+  Killed by tests/qml/tst_covertouch.qml::test_the_limit_counts_the_screens_pixels.
+  Line-neutral.

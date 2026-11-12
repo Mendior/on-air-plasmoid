@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Escape closes the larger cover and is then passed on to the page behind
+  it.
+
+history:
+  The Playing page answers Escape itself: it goes back to the station
+  list, and from there the popup closes. With the larger cover up, one
+  Escape has to mean "put the picture back" and nothing more, or closing
+  the picture also throws the listener off the page they were looking at.
+  The larger view takes the key. This mutant lets it through.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+                  touch.closeLarger()
+                  event.accepted = true
+              } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+
+replace:
+                  touch.closeLarger()
+                  event.accepted = false
+              } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+
+expect:
+  Killed by tests/qml/tst_covertouch.qml::test_the_keyboard_shows_the_cover_larger_and_escape_puts_it_back.
+  Line-neutral.

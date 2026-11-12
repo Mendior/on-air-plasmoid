@@ -243,7 +243,7 @@ PlasmaComponents3.ItemDelegate {
                 EqBars {
                     anchors.centerIn: parent
                     visible: listItem.isCurrent && listItem.isBuffered && !listItem.hovered
-                    animating: visible && root.expanded && !root.thrifty
+                    animating: visible && root.faceShown && !root.thrifty
                     bars: 3
                     barWidth: 3
                     minHeight: 4
@@ -578,7 +578,7 @@ PlasmaComponents3.ItemDelegate {
             tooltipText: root.downloading
                          ? i18n("Downloading…")
                          : grabButton.hasTrack
-                           ? i18n("Download this track (for offline listening)")
+                           ? i18n("Find and download this track (for offline listening)")
                            : i18n("Waiting for track info…")
             onClicked: root.downloadCurrentTrack()
 

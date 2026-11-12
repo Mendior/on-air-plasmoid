@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  What the cache keeps about a picture says "track" whatever it was.
+
+history:
+  The cache held an address and a time. A song that comes round again is
+  painted from it without a lookup, so a stand-in found once was the song's
+  cover for the rest of the session, on the panel and on the lock screen.
+  The entry carries the kind now. This mutant files every picture as the
+  track.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+              _artCache[cacheKey] = { "url": url || "", "t": Date.now(), "kind": kind };
+
+replace:
+              _artCache[cacheKey] = { "url": url || "", "t": Date.now(), "kind": url ? "track" : "" };
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_another_single_of_the_artist_is_another_release_and_never_the_songs_cover.
+  Line-neutral.

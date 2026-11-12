@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A relayed stream's titles are looked for in its buffer file only, however
+  often the buffer has none.
+
+history:
+  The relay's Ogg shell holds an Ogg stream's comment tags, and the title
+  reader was pointed at the buffer for every stream in one. A plain FLAC
+  station has no tags there and sends its titles in ICY. Measured on
+  2026-11-11 on two such stations: titles straight off the socket, none in
+  25 s through the relay. After three empty reads running the poll goes
+  to the ICY reader instead.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+      return (icyRefused !== true && misses >= BUFFER_TITLE_MISSES) ? "icy" : "buffer";
+
+replace:
+      return (icyRefused !== true && misses >= BUFFER_TITLE_MISSES) ? "buffer" : "buffer";
+
+expect:
+  Killed by tests/qml/tst_timeshiftlogic.qml::test_titles_come_from_the_buffer_until_it_has_none_three_times.
+  Line-neutral.

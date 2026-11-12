@@ -1,6 +1,6 @@
 {
   "include": ["package/contents/ui", "scripts", "tests"],
-  "exclude": ["**/__pycache__", ".claude"],
+  "exclude": ["**/__pycache__"],
   "pythonVersion": "3.12",
   "typeCheckingMode": "standard",
   "reportMissingImports": "warning"

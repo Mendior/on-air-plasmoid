@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  StreamKind says it is free while its question waits for the player to
+  play.
+
+history:
+  The loudness helper would go out first and the question after it, two
+  connections beside the start's own.
+
+target:
+  package/contents/ui/StreamKind.qml
+
+find:
+      readonly property bool busy: _seq >= 0 || _waitUrl !== ""
+
+replace:
+      readonly property bool busy: _seq >= 0
+
+expect:
+  Killed by tests/qml/tst_streamkind.qml::test_it_says_so_while_its_question_stands.
+  Line-neutral.

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A step pressed while a list is being written is lost: the list for the place before it is opened.
+
+history:
+  Every press moves the wish and only the last one is opened. A list
+  takes a few milliseconds to be put in place, and a press in that time used
+  to be answered with the place of the press before.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+              if (_wantMs !== _planWant) {
+                  _askFolder();
+                  return true;
+              }
+              at = _plan;
+
+replace:
+              if (false) {
+                  _askFolder();
+                  return true;
+              }
+              at = _plan;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_press_while_the_list_is_written_starts_over.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The level poll stays at full rate in a window the listener has left for another.
+
+history:
+  A window stays up beside other work for a day. The listener clicks a
+  station and goes back to typing in another window: the pointer is still
+  on the player. With the pointer alone as the sign, that was a shell
+  asking the sound server every two seconds for as long as the typing
+  lasted, and a window minimised from the keyboard kept its last "the
+  pointer is here" for good. In a window it takes the pointer and the
+  keyboard.
+
+target:
+  package/contents/ui/WindowLogic.js
+
+find:
+      if (seat === "window") return hovered === true && active === true;
+
+replace:
+      if (seat === "window") return hovered === true;
+
+expect:
+  Killed by tests/qml/tst_windowlogic.qml::test_in_the_window_it_takes_the_pointer_and_the_keyboard.

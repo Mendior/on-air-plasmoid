@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any failed play marks the device's row "Cannot play this station", a
+  device that is switched off among them.
+
+history:
+  The row's words are a statement about the station: the device answered
+  and turned its address down. A speaker that is off, a television that did
+  not take the stream in time or a missing library say nothing of the
+  kind, and "Cannot play this station" on their rows would send a listener
+  looking for another station when the device needs switching on.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      else if (kind === "refused") s.refused[uuid] = true;
+
+replace:
+      else s.refused[uuid] = true;
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_only_a_refusal_of_the_address_marks_a_device.

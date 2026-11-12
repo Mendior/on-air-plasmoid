@@ -72,7 +72,7 @@ RowLayout {
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
                 // longDuration is 0 when animations are disabled system-wide
-                running: isPlaying() && root.expanded && !root.thrifty
+                running: isPlaying() && root.faceShown && !root.thrifty
                          && Kirigami.Units.longDuration > 0
                 NumberAnimation { from: 0.95; to: 0.45; duration: 1400; easing.type: Easing.InOutSine }
                 NumberAnimation { from: 0.45; to: 0.95; duration: 1400; easing.type: Easing.InOutSine }

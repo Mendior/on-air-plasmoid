@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A paired speaker's Forget button is shown under the pointer and at no
+  other time.
+
+history:
+  Up to 2026.43 the button's opacity rose on a hover or once its question
+  was asked, and it was visible only above zero: Tab could not land on a
+  button that was not there, so a speaker could not be unpaired from the
+  keyboard. 2026.44 shows it while the speaker's tick or the button itself
+  has the focus.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                                      opacity: (btRowHover.hovered || armed || activeFocus || btRowDelegate.activeFocus) ? 0.75 : 0.0
+
+replace:
+                                      opacity: (btRowHover.hovered || armed) ? 0.75 : 0.0
+
+expect:
+  Killed by tests/test_invariants.py::test_a_paired_speaker_and_its_forget_are_reached_with_tab.
+  The behaviour itself is tests/qml/tst_btforget.qml::test_forget_is_shown_for_the_speaker_under_the_focus_only,
+  on a copy of the row. Line-neutral.

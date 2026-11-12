@@ -14,6 +14,7 @@ import org.kde.plasma.plasmoid
 import org.kde.kcmutils as KCM
 import org.kde.iconthemes as KIconThemes
 import Qt.labs.platform as Labs
+import "../ColorLogic.js" as ColorLogic
 import "../PathLogic.js" as PathLogic
 
 KCM.SimpleKCM {
@@ -23,14 +24,26 @@ KCM.SimpleKCM {
     property alias cfg_defaultVolume: volumeSlider.value
     property alias cfg_fadeEnabled: fadeCheck.checked
     property alias cfg_fadeDuration: fadeDurationSpin.value
+    property alias cfg_evenLoudness: evenLoudnessCheck.checked
     property alias cfg_albumArtEnabled: albumArtCheck.checked
     property alias cfg_blurBackdrop: blurCheck.checked
     property alias cfg_mprisEnabled: mprisCheck.checked
     property alias cfg_autoBitrate: autoBitrateCheck.checked
     property alias cfg_autoHeal: autoHealCheck.checked
     property alias cfg_reportClicks: reportClicksCheck.checked
-    property alias cfg_followSystemAccent: accentCheck.checked
+    // Two keys for one answer: followSystemAccent is from before the Accent
+    // list existed, and a config can still hold a yes there under accentMode
+    // 0. Both controls show _accent, the reading the player uses too, and a
+    // choice in either writes both keys. Left as it was, the old yes would
+    // outvote a later "On Air green", and a version from before the list
+    // reads nothing else.
+    property bool cfg_followSystemAccent: false
     property int cfg_accentMode: 0
+    readonly property int _accent: ColorLogic.accentMode(cfg_accentMode, cfg_followSystemAccent)
+    function _chooseAccent(mode) {
+        cfg_accentMode = mode
+        cfg_followSystemAccent = (mode === 1)
+    }
     property alias cfg_saveOnBattery: batteryCheck.checked
     property alias cfg_aiHelperEnabled: aiCheck.checked
     property alias cfg_downloadDir: dirField.text
@@ -82,14 +95,8 @@ KCM.SimpleKCM {
             id: accentModeBox
             Kirigami.FormData.label: i18n("Accent:")
             model: [i18n("On Air green"), i18n("System accent colour"), i18n("Plain — no colour of its own")]
-            currentIndex: root.cfg_accentMode
-            onActivated: {
-                root.cfg_accentMode = currentIndex;
-                // The old boolean stays in the file for configs written
-                // before this list existed; the moment someone chooses
-                // here, their choice is the only thing that speaks.
-                accentCheck.checked = (currentIndex === 1);
-            }
+            currentIndex: root._accent
+            onActivated: root._chooseAccent(currentIndex)
         }
 
         Item {
@@ -323,6 +330,19 @@ KCM.SimpleKCM {
         }
 
         QQC2.CheckBox {
+            id: evenLoudnessCheck
+            Kirigami.FormData.label: i18n("Loudness:")
+            text: i18n("Even out loudness between stations")
+        }
+        QQC2.Label {
+            text: i18n("Saved stations that are louder than the rest are turned down on this computer; to learn how loud a station is, it is listened to in the background for 20 seconds, at most once a day.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            wrapMode: Text.WordWrap
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+        }
+
+        QQC2.CheckBox {
             id: autoBitrateCheck
             Kirigami.FormData.label: i18n("Stream quality:")
             text: i18n("Automatically switch to the highest-bitrate variant of a station")
@@ -373,12 +393,10 @@ KCM.SimpleKCM {
             id: accentCheck
             Kirigami.FormData.label: i18n("Accent color:")
             text: i18n("Follow the system accent color instead of the built-in emerald")
-            // The list above is the one that speaks; a click here has to keep
-            // it in step, or the two disagreed until the dialog was reopened.
-            onToggled: {
-                root.cfg_accentMode = checked ? 1 : 0;
-                accentModeBox.currentIndex = root.cfg_accentMode;
-            }
+            // The Accent list's second answer as a box of its own, from
+            // before there was a list. It shows and writes what the list does.
+            checked: root._accent === 1
+            onToggled: root._chooseAccent(checked ? 1 : 0)
         }
 
         QQC2.CheckBox {

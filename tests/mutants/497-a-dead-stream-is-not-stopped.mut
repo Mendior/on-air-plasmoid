@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A stream found dead is shown as an error and left in the player.
+
+history:
+  The heal turns back when the player says it plays, which is why a dead
+  stream stayed dead: the error road reached the heal and the heal found
+  a player in PlayingState. Stopping it is what lets the road go on.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          var audition = root._healPendingUrl !== "" && _icyStreamTarget(playMusic.source) === root._healPendingUrl;
+          playMusic.stop();
+
+replace:
+          var audition = root._healPendingUrl !== "" && _icyStreamTarget(playMusic.source) === root._healPendingUrl;
+          playMusic.pause();
+
+expect:
+  Killed by test_invariants::test_a_stream_that_stands_is_handed_to_the_road_every_other_death_takes.
+  Line-neutral.

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The cut stays on while a device plays along with this computer.
+
+history:
+  A device takes the stream itself and nobody turns it down. With this
+  computer ten decibels under it on one station and level with it on the
+  next, the balance the listener set between the two is gone.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      if (f.casting !== false && f.local !== false) return 0;
+
+replace:
+      if (f.casting === null) return 0;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_nothing_is_cut_while_a_device_plays_along
+  and tests/qml/tst_loudness.qml::test_the_factor_stands_aside_while_a_device_plays_along.
+  Line-neutral.

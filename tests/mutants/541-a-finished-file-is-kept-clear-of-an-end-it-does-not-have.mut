@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A file whose writer has ended is opened twelve seconds short of its last sound.
+
+history:
+  A pause that outlasts the window leaves a finished file, and Play resumes
+  at the pause. Kept clear of an unfinished end the file no longer has, the
+  listener would be put back twelve seconds for nothing, and the last
+  twelve seconds before a window's cap could not be reached by a reopen.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+  windowFull ? 0 : TimeshiftLogic.OPEN_GAP_MS
+
+replace:
+  windowFull ? TimeshiftLogic.OPEN_GAP_MS : TimeshiftLogic.OPEN_GAP_MS
+
+expect:
+  Killed by tst_timeshiftengine::test_a_file_that_no_longer_grows_is_resumed_at_the_park.
+  Line-neutral.

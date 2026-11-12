@@ -36,6 +36,21 @@ function relayExtension(url) {
     return (fmt === "ogg" || fmt === "opus" || fmt === "flac") ? "ogg" : "mka";
 }
 
+// Where a relayed Ogg stream's titles are read. Its comment tags sit in the
+// buffer file, and reading them there opens no second connection. A stream
+// can be in an Ogg shell and still have none: a plain FLAC station the
+// rescue or an audition's label sent through the relay keeps its titles in
+// ICY (measured 2026-11-11 on two such stations: titles straight off the
+// socket, none in 25 s through the relay). So a buffer that came back empty
+// a few times running hands the question to the ICY reader, instead of the
+// buffer and not beside it, until ICY itself says it has none.
+// Contract: "icy" when misses is BUFFER_TITLE_MISSES or more and icyRefused
+// is not true; "buffer" otherwise, also for a count that is no number.
+var BUFFER_TITLE_MISSES = 3;
+function titleRoad(misses, icyRefused) {
+    return (icyRefused !== true && misses >= BUFFER_TITLE_MISSES) ? "icy" : "buffer";
+}
+
 // The buffer always copies, never re-encodes — it runs in the background
 // for as long as the radio plays, so its CPU cost has to stay near zero.
 // Judged strictly on the extension: a fuzzy "probably mp3" written into a
@@ -108,6 +123,48 @@ function sleeveKept(returnAtMs, nowMs, wantsPlaying) {
 // cap and the start of the file may have been trimmed away by then.
 function resumePositionMs(pausedAtPosMs, capturedMs, edgeGuardMs) {
     return clampSeekMs(pausedAtPosMs, capturedMs, edgeGuardMs);
+}
+
+// Where the reader stood when the player said the single file had ended.
+// The player's position is that place as long as it lies inside what was
+// captured. On a Matroska buffer it does not: the header is written with
+// the whole window as the file's length, and a reader that runs into the
+// unfinished end is reported at that length. Measured 2026-11-12 with a
+// five-minute window and a pause of four seconds: the end came 3.6 s after
+// Play, the position read 300000 ms with 22 s captured, and the listener
+// was put back on the broadcast. For that end the engine keeps the last
+// place it saw the reader at.
+// Contract: posMs when it is a number from 0 to capturedMs; else heardMs
+// when it is a number from 0 up; else -1, a reader nobody can place.
+function endPlaceMs(posMs, capturedMs, heardMs) {
+    if (typeof posMs === "number" && typeof capturedMs === "number" && posMs >= 0 && posMs <= capturedMs) return posMs;
+    return (typeof heardMs === "number" && heardMs >= 0 && isFinite(heardMs)) ? heardMs : -1;
+}
+
+// How far behind its writer the single file's reader is put when the file
+// is opened. Nearer than that it runs into the file's unfinished end, is
+// reopened a little further back, and runs into it again. Measured
+// 2026-11-12 on a Matroska buffer after a pause of four seconds: the reader
+// started 7.8 s behind the writer and met the end four times in 21 s, each
+// time with about a second heard twice (at 7.8, 8.6, 9.2 and 10.4 s
+// behind), and from 10.4 s on it played without a break. The sliding buffer
+// opens this far short of its newest segment for the same reason, and the
+// number is the same one (SlideLogic.OPEN_GAP_MS).
+var OPEN_GAP_MS = 12000;
+
+// Where the single file is opened: the place asked for, moved back until it
+// is gapMs behind what was captured, and never before the file's start. A
+// place that far behind already stays as it is: a park is three seconds
+// behind the writer, so a pause of nine or more resumes where it was pressed.
+// Contract: min(placeMs, capturedMs - gapMs), and 0 when that is below 0.
+// A placeMs that is no number from 0 up reads as 0. With a capturedMs or a
+// gapMs that is no number, or a gap below 0, there is nothing to measure
+// against and the place stays where it was.
+function openPlaceMs(placeMs, capturedMs, gapMs) {
+    var place = (typeof placeMs === "number" && isFinite(placeMs) && placeMs > 0) ? placeMs : 0;
+    if (typeof capturedMs !== "number" || !isFinite(capturedMs)) return place;
+    if (typeof gapMs !== "number" || !isFinite(gapMs) || gapMs < 0) return place;
+    return Math.max(0, Math.min(place, capturedMs - gapMs));
 }
 
 // The writer, mirrored from the recorder's proven pipeline: curl owns the

@@ -59,7 +59,7 @@ QtObject {
         try {
             xhr = _request();
             xhr.open("GET", url);
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.44");
         } catch (e) {
             finish(0, "", "");
             return;
@@ -96,11 +96,14 @@ QtObject {
 
     // The second look at an address a move is about to replace:
     // onDone("keep" | "move" | "again"), HealLogic.proofVerdict's word.
-    // The looks are counted on the move itself, so they end with it.
+    // What is counted is looks in a row that nobody answered, kept on the
+    // move itself so the count ends with it. Every look used to count: busy,
+    // then rate-limited, then one timeout made three, and the station moved
+    // on a single unanswered look.
     function proof(move, onDone) {
         hunt.probe(move.oldUrl, function(status, ctype) {
-            move.looks = (move.looks || 0) + 1;
-            onDone(HealLogic.proofVerdict(status, ctype, move.looks));
+            move.silent = status === 0 ? (move.silent || 0) + 1 : 0;
+            onDone(HealLogic.proofVerdict(status, ctype, move.silent));
         });
     }
 

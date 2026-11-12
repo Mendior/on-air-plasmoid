@@ -17,10 +17,10 @@ target:
   package/contents/ui/HealLogic.js
 
 find:
-      return status === 0 && looks >= PROOF_LOOKS ? "move" : "again";
+      return status === 0 && silent >= PROOF_LOOKS ? "move" : "again";
 
 replace:
-      return looks >= PROOF_LOOKS ? "move" : "again";
+      return silent >= PROOF_LOOKS ? "move" : "again";
 
 expect:
   Killed by tests/qml/tst_heallogic.qml::test_a_server_that_answers_something_else_is_still_there

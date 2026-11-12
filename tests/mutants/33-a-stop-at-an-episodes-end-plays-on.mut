@@ -18,10 +18,10 @@ target:
   package/contents/ui/main.qml
 
 find:
-                      if (!fadeOutAnimation.running && !root._podPlayUpNextHead()
+                      if (!fadeOutAnimation.running && root._pausedFile === null && !root._podPlayUpNextHead()
 
 replace:
-                      if (!root._podPlayUpNextHead()
+                      if (root._pausedFile === null && !root._podPlayUpNextHead()
 
 expect:
   Killed by tests/test_invariants.py::test_a_stop_in_an_episodes_last_seconds_starts_nothing.

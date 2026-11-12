@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Of an even count of readings the louder of the two in the middle serves.
+
+history:
+  A reading that is too loud turns the station down too far. With an advert
+  at -8 on the first day and the programme at -14 on the second, the louder
+  one would keep the programme 6 dB too quiet.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return heard[Math.floor((heard.length - 1) / 2)];
+
+replace:
+      return heard[Math.floor(heard.length / 2)];
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_the_number_is_the_median_of_the_readings
+  and tests/qml/tst_loudlogic.qml::test_one_loud_reading_does_not_decide_once_there_are_more.
+  Line-neutral.

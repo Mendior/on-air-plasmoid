@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A held M mutes, unmutes and mutes again with the key's repeats.
+
+history:
+  A held key repeats some 25 times a second, and the branch had no guard:
+  a second's hold was 26 toggles, and where it ended was the luck of the
+  count.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+              if (!event.isAutoRepeat) root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+
+replace:
+              if (!event.isAutoRepeat || true) root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+
+expect:
+  Killed by tests/test_invariants.py::test_m_held_down_is_one_mute.
+  The behaviour itself is tests/qml/tst_heldkey.qml::test_m_held_down_mutes_once,
+  on a copy of the handler. Line-neutral.

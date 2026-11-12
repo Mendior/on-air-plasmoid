@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  When a rebuild's thirty seconds run out its job number is retired on the
+  spot, whether or not anything was sent after it.
+
+history:
+  It reads like the tidy version of the rule, and it is the wrong one. A
+  rebuild empties the module list when it goes out, so if it is slow rather
+  than dead and nothing was queued behind it, the loopbacks it loads are
+  the only ones the room has. Treating its answer as a stranger's unloads
+  every one of them: the group plays into a null sink nobody listens to
+  until something else happens to ask for a rebuild. Only a newer job makes
+  an older one stale.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          _combineReloopBusy = false;
+          // A rebuild queued behind the hung shell is the newest word on what
+
+replace:
+          _combineReloopBusy = false; _reloopJob++;
+          // A rebuild queued behind the hung shell is the newest word on what
+
+expect:
+  Killed by tst_syncengine::test_a_hung_rebuild_with_no_successor_is_still_adopted_when_it_answers.
+  Line-neutral.

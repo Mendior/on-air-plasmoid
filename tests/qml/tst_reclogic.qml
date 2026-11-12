@@ -245,6 +245,112 @@ TestCase {
         verify(!RecLogic.fallsShort(2592000, 999999999, NaN))
     }
 
+    // ── the start time in a recording's name ──────────────────────────────
+
+    readonly property double born: 1794300000000
+
+    function test_the_stamp_is_the_clock_when_the_clock_runs_forward() {
+        compare(RecLogic.startStamp(born + 5000, born, 0), born + 5000)
+        compare(RecLogic.startStamp(born + 9000, born, born + 5000), born + 9000)
+    }
+
+    function test_two_recordings_in_one_millisecond_are_a_millisecond_apart() {
+        compare(RecLogic.startStamp(born + 5000, born, born + 5000), born + 5001)
+        compare(RecLogic.startStamp(born + 5000, born, born + 5001), born + 5002)
+        // The session's own first millisecond is not before the session.
+        compare(RecLogic.startStamp(born, born, 0), born)
+    }
+
+    function test_a_clock_set_back_makes_no_recording_older_than_the_one_before() {
+        // An hour back since the last recording, and since the panel came up.
+        compare(RecLogic.startStamp(born - 3600000, born, born + 5000), born + 5001)
+        compare(RecLogic.startStamp(born - 3600000, born, 0), born)
+    }
+
+    function test_what_is_no_time_counts_as_zero() {
+        compare(RecLogic.startStamp(NaN, born, 0), born)
+        compare(RecLogic.startStamp(undefined, born, 7), born)
+        compare(RecLogic.startStamp(null, born, born), born + 1)
+        compare(RecLogic.startStamp("1794300009000", born, 0), born)
+        compare(RecLogic.startStamp(-5, born, 0), born)
+        compare(RecLogic.startStamp(Infinity, born, 0), born)
+        compare(RecLogic.startStamp(born + 5000, NaN, undefined), born + 5000)
+        compare(RecLogic.startStamp(born + 5000, "x", -3), born + 5000)
+        compare(RecLogic.startStamp(born + 5000, born, Infinity), born + 5000)
+        // Nothing known at all is still a whole number, and not zero.
+        compare(RecLogic.startStamp(), 1)
+        compare(RecLogic.startStamp(NaN, NaN, NaN), 1)
+        compare(RecLogic.startStamp(-5, -7, -3), 1)
+    }
+
+    function test_the_stamp_is_always_a_whole_number() {
+        compare(RecLogic.startStamp(born + 0.75, born, 0), born)
+        compare(RecLogic.startStamp(born + 5000.9, born + 0.5, born + 4999.5), born + 5000)
+        // The far end of what a date can be.
+        compare(RecLogic.startStamp(8640000000000000, born, 0), 8640000000000000)
+    }
+
+    // ── the address files of older recordings ─────────────────────────────
+
+    readonly property string urlFiles: "'/run/user/1000/arp-rec-url-42-'"
+
+    function test_older_files_are_taken_by_the_time_in_their_name() {
+        compare(RecLogic.olderFilesLine(urlFiles, 1794300000000),
+                "for f in '/run/user/1000/arp-rec-url-42-'*; do t=${f##*.};"
+                + " [ \"$t\" -lt 1794300000000 ] 2>/dev/null && rm -f \"$f\"; done; ")
+        // A folder with a quote and a space in its name, quoted as shQuote does.
+        compare(RecLogic.olderFilesLine("'/run/o'\\''neil x/arp-rec-url-42-'", 5),
+                "for f in '/run/o'\\''neil x/arp-rec-url-42-'*; do t=${f##*.};"
+                + " [ \"$t\" -lt 5 ] 2>/dev/null && rm -f \"$f\"; done; ")
+    }
+
+    function test_the_edges_of_a_time_that_can_stand_in_a_command() {
+        // Before zero there is nothing, and the line says so harmlessly.
+        verify(RecLogic.olderFilesLine(urlFiles, 0).indexOf(" -lt 0 ]") !== -1)
+        verify(RecLogic.olderFilesLine(urlFiles, 1).indexOf(" -lt 1 ]") !== -1)
+        // The largest whole number a double holds exactly, digit for digit.
+        verify(RecLogic.olderFilesLine(urlFiles, 9007199254740991).indexOf(" -lt 9007199254740991 ]") !== -1)
+    }
+
+    function test_a_time_that_is_no_whole_number_takes_nothing() {
+        // No line at all: nothing half-meant goes to the shell.
+        compare(RecLogic.olderFilesLine(urlFiles, NaN), "")
+        compare(RecLogic.olderFilesLine(urlFiles, -1), "")
+        compare(RecLogic.olderFilesLine(urlFiles, 1.5), "")
+        compare(RecLogic.olderFilesLine(urlFiles, Infinity), "")
+        compare(RecLogic.olderFilesLine(urlFiles, "1794300000000"), "")
+        compare(RecLogic.olderFilesLine(urlFiles, "0; rm -rf ~"), "")
+        compare(RecLogic.olderFilesLine(urlFiles, null), "")
+        compare(RecLogic.olderFilesLine(urlFiles, undefined), "")
+        compare(RecLogic.olderFilesLine(urlFiles), "")
+    }
+
+    function test_without_a_quoted_beginning_nothing_is_taken() {
+        // A bare * would run through whatever folder the shell stands in.
+        compare(RecLogic.olderFilesLine("", 5), "")
+        compare(RecLogic.olderFilesLine("''", 5), "")
+        compare(RecLogic.olderFilesLine(null, 5), "")
+        compare(RecLogic.olderFilesLine(undefined, 5), "")
+        compare(RecLogic.olderFilesLine(42, 5), "")
+        compare(RecLogic.olderFilesLine("/run/user/1000/arp-rec-url-42-", 5), "")
+        compare(RecLogic.olderFilesLine("'/run/user/1000/arp-rec-url-42-", 5), "")
+        compare(RecLogic.olderFilesLine("/run/user/1000/arp-rec-url-42-'", 5), "")
+        compare(RecLogic.olderFilesLine("  ", 5), "")
+    }
+
+    function test_a_time_too_large_to_be_written_out_takes_nothing() {
+        // From 1e21 a number prints as 1e+21, and past 2^53 its last
+        // digits are not the ones that were meant.
+        compare(RecLogic.olderFilesLine(urlFiles, 1e21), "")
+        compare(RecLogic.olderFilesLine(urlFiles, 9007199254740993), "")
+        compare(RecLogic.olderFilesLine(urlFiles, Number.MAX_VALUE), "")
+        // A very long folder name is only a long line.
+        var deep = "'/" + new Array(5001).join("d") + "/arp-rec-url-42-'"
+        var line = RecLogic.olderFilesLine(deep, 5)
+        compare(line.indexOf("for f in " + deep + "*; do "), 0)
+        verify(line.length > deep.length && line.length < deep.length + 100)
+    }
+
     function test_only_plain_http_streams_are_recordable() {
         verify(RecLogic.canRecordUrl("http://s1.radio.ee/live.mp3"))
         verify(RecLogic.canRecordUrl("https://s1.radio.ee/live"))
@@ -294,5 +400,59 @@ TestCase {
     function test_a_very_long_run_of_digits_is_still_a_number() {
         var out = RecLogic.typedMinutes(new Array(5001).join("9"), 180)
         compare(out, 999999)
+    }
+
+    // --- startsWithin: a start that will not wait for the regular look -------
+
+    function test_a_start_inside_the_coming_period_gets_its_own_wait() {
+        var T = 1794400200000;   // a start on the clock, 18:30:00.000
+        // The look comes round 20 s before the start: the start is 20 s off,
+        // not left to the look after it, which would be 10 s late.
+        compare(RecLogic.startsWithin([{ nextRun: T }], T - 20000, 30000), 20000);
+        compare(RecLogic.startsWithin([{ nextRun: T }], T - 1, 30000), 1);
+        compare(RecLogic.startsWithin([{ nextRun: T }], T - 30000, 30000), 30000);
+        // The nearest of several, wherever it stands in the list.
+        compare(RecLogic.startsWithin([{ nextRun: T + 9000 }, { nextRun: T + 4000 }, { nextRun: T + 25000 }], T, 30000), 4000);
+        // A fraction of a ms is not waited for twice.
+        compare(RecLogic.startsWithin([{ nextRun: T + 0.4 }], T, 30000), 1);
+        compare(RecLogic.startsWithin([{ nextRun: T + 1500.7 }], T, 30000), 1501);
+    }
+
+    function test_a_start_that_is_due_or_far_off_is_left_to_the_regular_look() {
+        var T = 1794400200000;
+        // Due now, or overdue: the look that is running deals with it, and a
+        // wait of nothing would only call the look again and again.
+        compare(RecLogic.startsWithin([{ nextRun: T }], T, 30000), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T }], T + 5000, 30000), -1);
+        // Further off than the period: a later look finds it.
+        compare(RecLogic.startsWithin([{ nextRun: T }], T - 30001, 30000), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T }], T - 86400000, 30000), -1);
+        // An overdue entry does not hide one that is coming.
+        compare(RecLogic.startsWithin([{ nextRun: T - 60000 }, { nextRun: T + 7000 }], T, 30000), 7000);
+        compare(RecLogic.startsWithin([], T, 30000), -1);
+    }
+
+    function test_what_is_no_schedule_no_clock_or_no_period_waits_for_nothing() {
+        var T = 1794400200000;
+        var noList = [undefined, null, 7, "x", {}];
+        for (var i = 0; i < noList.length; i++) compare(RecLogic.startsWithin(noList[i], T, 30000), -1);
+        // Entries nobody can read are passed over, and do not hide a good one.
+        var odd = [null, 7, "x", {}, { nextRun: "soon" }, { nextRun: NaN }, { nextRun: Infinity }, { nextRun: -5 }, { nextRun: T + 3000 }];
+        compare(RecLogic.startsWithin(odd, T, 30000), 3000);
+        compare(RecLogic.startsWithin(odd.slice(0, 8), T, 30000), -1);
+        // A start written as text is not a start, though it would count as one.
+        compare(RecLogic.startsWithin([{ nextRun: String(T + 3000) }], T, 30000), -1);
+        // No clock, no period.
+        compare(RecLogic.startsWithin([{ nextRun: T + 3000 }], NaN, 30000), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T + 3000 }], undefined, 30000), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T + 3000 }], T, 0), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T + 3000 }], T, -30000), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T + 3000 }], T, NaN), -1);
+        compare(RecLogic.startsWithin([{ nextRun: T + 3000 }], T, "30000"), -1);
+        // A list as long as a list may get.
+        var many = [];
+        for (var k = 0; k < 5000; k++) many.push({ nextRun: T + 86400000 + k });
+        many.push({ nextRun: T + 12 });
+        compare(RecLogic.startsWithin(many, T, 30000), 12);
     }
 }

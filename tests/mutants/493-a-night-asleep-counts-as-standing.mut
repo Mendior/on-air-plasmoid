@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A look that comes hours late counts the whole gap as time the position stood.
+
+history:
+  The timer stands still while the machine sleeps, so the first look after
+  a wake finds the position where it was and hours gone. A connection that
+  survived a short sleep would be cut at that look; the standing starts
+  anew instead, and a stream that is dead is found twenty seconds on.
+
+target:
+  package/contents/ui/StandLogic.js
+
+find:
+  late = nowMs - m.tickAt > 2 * TICK_MS || nowMs < m.tickAt;
+
+replace:
+  late = false;
+
+expect:
+  Killed by tst_standlogic::test_a_look_that_comes_late_starts_the_standing_anew.
+  Line-neutral.

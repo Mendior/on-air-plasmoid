@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The start sweep no longer removes a segment folder.
+
+history:
+  A crashed panel runs no teardown. The single file it left was swept at
+  the next start; a folder of segments is not a file, and a window of an hour
+  at 128 kbit/s is 65 MB of them, left for good.
+
+target:
+  package/contents/ui/tsguard.sh
+
+find:
+          [[ $1 =~ /buffer-[0-9]+\.hls$ ]] && rm -rf -- "$1"
+
+replace:
+          [[ $1 =~ /buffer-[0-9]+\.hls$ ]] && true -- "$1"
+
+expect:
+  Killed by tests/test_tsguard.py::test_the_sweep_takes_a_crashed_sessions_segment_folder.

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The picture for a cast device is the first candidate that is known at
+  all, and when the device cannot fetch that one it gets no picture.
+
+history:
+  main.qml chose between the episode's cover, the track's cover and the
+  station's logo and only then asked whether the winner was an http(s)
+  address. A local sidecar cover (file://) in front of a station that has
+  a logo on the web sent the television nothing. The choice moved to
+  CastLogic.picture, which passes a candidate the device cannot fetch
+  over for the next. This mutant stops at the first one that is set.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+          if (typeof known[i] === "string" && /^https?:\/\/[^\s\/]/i.test(known[i])) return known[i];
+
+replace:
+          if (typeof known[i] === "string" && known[i] !== "") return /^https?:\/\/[^\s\/]/i.test(known[i]) ? known[i] : "";
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_the_picture_is_the_first_thing_known_that_a_device_can_fetch.
+  Line-neutral.

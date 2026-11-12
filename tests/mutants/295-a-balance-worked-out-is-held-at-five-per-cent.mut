@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A balance the widget works out by itself is held to the 5 % a row's
+  slider starts at.
+
+history:
+  Room 10 %, widget 80 %, balance 0.1: the device stands at 0.008. Without
+  this computer the same loudness is a balance of 0.01; held at 0.05, one
+  notch down on the wheel sent the device 0.038.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      return Math.max(0.001, Math.min(1, Math.floor(exact * 1e6 + 1e-3) / 1e6));
+
+replace:
+      return Math.max(0.05, Math.min(1, Math.floor(exact * 1e6 + 1e-3) / 1e6));
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_leaving_a_quiet_room_does_not_raise_the_device
+  and tests/qml/tst_volumeroad.qml::test_leaving_a_quiet_room_does_not_raise_the_television.
+  Line-neutral.

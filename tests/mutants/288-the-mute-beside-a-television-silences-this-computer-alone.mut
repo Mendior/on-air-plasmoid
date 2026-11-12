@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  With this computer and a device playing together, the "Play on" menu's
+  Mute switches the room's mute and the device plays on.
+
+history:
+  The mute on the room's knob is pactl's own switch, and its answer comes
+  back on the same round trip. A click made beside a playing device marks
+  that answer as one the devices follow: silent when it says muted, back at
+  the master times their balance when it says not. Without the mark the
+  mute is for half of what plays.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+          if (road === "sink") { to.sinkMute = true; to.castFollows = both; }
+
+replace:
+          if (road === "sink") { to.sinkMute = true; to.castFollows = false; }
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_the_mute_beside_a_device_is_for_both
+  and tests/qml/tst_volumeroad.qml::test_together_the_mute_silences_both_and_the_unmute_brings_both_back.
+  Line-neutral.

@@ -97,7 +97,7 @@ TestCase {
         // and it will still be right when edge43 is gone too.
         compare(r.url, "https://skymedia-live.bitflip.ee/RETRO");
         compare(tc.opened, ["https://skymedia-live.bitflip.ee/RETRO"]);
-        compare(tc.sent[0].headers["User-Agent"], "OnAir/2026.43");
+        compare(tc.sent[0].headers["User-Agent"], "OnAir/2026.44");
         compare(r.calls, 1);
     }
 
@@ -282,12 +282,57 @@ TestCase {
         return said;
     }
 
+    // The verdicts of looks at one move whose old address answers
+    // differently each time: a route per look, in order.
+    function lookedThrough(h, move, answers) {
+        var said = [];
+        for (var i = 0; i < answers.length; i++) {
+            var before = said.length, timers = tc.armed.length;
+            tc.routes[move.oldUrl] = answers[i];
+            h.proof(move, function(v) { said.push(v); });
+            tryVerify(function() { return tc.armed.length === timers + 1; }, 1000);
+            if (answers[i].hang) tc.armed[timers].xhr.abort();
+            tryVerify(function() { return said.length === before + 1; }, 1000);
+        }
+        return said;
+    }
+
+    function test_only_silence_in_a_row_counts_as_silence() {
+        // Three looks were enough whatever the first two had been: busy,
+        // then rate-limited, then one timeout, and the station was moved on
+        // the strength of a single unanswered look.
+        var gone = { hang: true }, busy = { status: 503, type: "text/html" }, limited = { status: 429, type: "" };
+        var h = make();
+        var move = { oldUrl: "https://edge02.cdn.bitflip.ee:8888/RETRO" };
+        compare(lookedThrough(h, move, [busy, limited, gone]), ["again", "again", "again"]);
+        // Two more unanswered looks after that one make three in a row.
+        compare(lookedThrough(h, move, [gone, gone]), ["again", "move"]);
+    }
+
+    function test_an_answer_between_two_silences_starts_the_count_again() {
+        var gone = { hang: true }, busy = { status: 503, type: "text/html" };
+        var h = make();
+        var move = { oldUrl: "https://edge02.cdn.bitflip.ee:8888/RETRO" };
+        compare(lookedThrough(h, move, [gone, gone, busy, gone, gone]), ["again", "again", "again", "again", "again"]);
+        compare(lookedThrough(h, move, [gone]), ["move"]);
+    }
+
+    function test_an_answer_with_no_place_does_not_count_towards_silence() {
+        // On a Qt that names no last hop a living stream gives these, and
+        // one timeout after two of them moved the station.
+        var gone = { hang: true }, unplaced = { status: 200, type: "audio/mpeg", noResponseUrl: true };
+        var h = make();
+        var move = { oldUrl: "https://edge02.cdn.bitflip.ee:8888/RETRO" };
+        compare(lookedThrough(h, move, [unplaced, unplaced, gone]), ["again", "again", "again"]);
+    }
+
     function test_the_second_look_moves_at_once_what_the_server_calls_gone() {
         var h = make();
         var move = { oldUrl: "https://edge02.cdn.bitflip.ee:8888/RETRO" };
         tc.routes[move.oldUrl] = { status: 404, type: "text/html" };
         compare(looked(h, move, 1), ["move"]);
-        compare(move.looks, 1);
+        // The server spoke: that is its word, not a silence to count.
+        compare(move.silent, 0);
     }
 
     function test_the_second_look_keeps_an_address_that_plays_again() {

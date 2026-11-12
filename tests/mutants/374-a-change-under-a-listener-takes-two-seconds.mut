@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The ease is two seconds long.
+
+history:
+  Ten decibels in two seconds are an event: the listener hears the radio
+  drop, some twenty seconds into a station. Over eight they are 1.25 dB a
+  second.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+  var EASE_MS = 8000;
+
+replace:
+  var EASE_MS = 2000;
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_reading_that_arrives_under_a_listener_is_eased_in.
+  Line-neutral.

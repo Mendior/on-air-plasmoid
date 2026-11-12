@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Whatever ffmpeg heard is printed, however little it was.
+
+history:
+  Against sixty seconds, five seconds missed one station by 6.3 dB and ten
+  by 3.1; twenty were within 1.3 on every one. A reading of less is not the
+  number the rules rest on.
+
+target:
+  package/contents/ui/loudness.py
+
+find:
+      if heard(text) < seconds - SHORT_BY:
+
+replace:
+      if heard(text) < 0:
+
+expect:
+  Killed by tests/test_loudness.py::test_a_stream_that_ends_early_is_no_reading.
+  Line-neutral.

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A play or a step opens its list right up to the newest segment.
+
+history:
+  Measured on Qt 6.12 with FFmpeg 9: the list's reader runs 4.0 to 4.5 s
+  ahead of the sound, and a player stopped on a list whose reader has run out
+  of segments holds the whole widget until the list grows. An open has to land
+  twelve seconds short of the newest segment, which leaves the next beats time
+  to grow the list before the reader is at its end.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+      var oldest = first * SEG_MS + KEEP_MS, newest = (last + 1) * SEG_MS - OPEN_GAP_MS;
+
+replace:
+      var oldest = first * SEG_MS + KEEP_MS, newest = (last + 1) * SEG_MS;
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_an_open_keeps_clear_of_both_ends.

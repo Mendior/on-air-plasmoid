@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A device's refusal is read out of the first 200 characters of its answer,
+  where the reason is not.
+
+history:
+  A Ruark R5se answered three station addresses with HTTP 500 and a SOAP
+  fault naming UPnP error 716, "Resource not found", and played a fourth
+  (2026-11-12). The helper kept the first 200 characters of the answer and
+  the errorCode sits 270 in, so all the widget could say was "Could not
+  cast", the same words it has for a speaker that is switched off. The
+  fault is now read out of the whole answer and the line names the code.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+          raise SoapFault(control_url, status, headers, action, data)
+
+replace:
+          raise SoapFault(control_url, status, headers, action, data[:200])
+
+expect:
+  Killed by tests/test_cast_fault.py::test_a_refused_address_is_named_by_the_code_the_device_gave.

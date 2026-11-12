@@ -90,7 +90,12 @@ Item {
         function rig(cfgProps) {
             var mock = mockAppComp.createObject(harness);
             var cfg = mockCfgComp.createObject(harness, cfgProps || {});
-            var e = engineComp.createObject(harness, { app: mock, cfg: cfg });
+            // These are the single file's tests. Since 2026.44 an address
+            // that may be MP3 or AAC goes to the sliding buffer first
+            // (tst_slideengine.qml); slideOff is the engine after that road
+            // failed once, where every arm is the single file again, as a
+            // relay's arm and a FLAC station's always are.
+            var e = engineComp.createObject(harness, { app: mock, cfg: cfg, slideOff: true });
             return { e: e, mock: mock, cfg: cfg };
         }
 
@@ -122,6 +127,24 @@ Item {
             var off = rig({ timeshiftEnabled: false });
             verify(!off.e.armForStation(stream, "Jazz FM", 0));
             compare(off.mock.execLog.length, 0);
+        }
+
+        function test_a_second_start_before_the_address_is_down_keeps_the_arm() {
+            // A start of the station the engine already holds is a note,
+            // not a new arm. One that came before the address write had
+            // answered found no writer yet, took the arm for a dead one,
+            // and the station played on without a buffer.
+            var r = rig();
+            verify(r.e.armForStation(stream, "Jazz FM", 1000000));
+            r.e.noteLivePlayback(1000010);
+            verify(r.e.active);
+            r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000020);
+            compare(r.mock.execLog.length, 2);
+            verify(r.e.writerUp);
+            // A writer that has run and ended is still retired by the note.
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1060000);
+            r.e.noteLivePlayback(1060010);
+            verify(!r.e.active);
         }
 
         function test_a_failed_url_write_folds_quietly() {
@@ -167,6 +190,58 @@ Item {
             compare(r.mock.played[1].pos, 96700);
         }
 
+        // The watchdog over the frozen horizon lived in main.qml until
+        // 2026.44, where nothing could call it. Measured on Qt 6.11.1 with
+        // FFmpeg 9: at the length the file had when it was opened the
+        // position stands still, the player goes on saying it plays and no
+        // EndOfMedia comes.
+        function test_a_position_that_stands_three_seconds_is_the_horizon() {
+            var r = rig();
+            armed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
+            verify(!r.e._horizonTick(true, 95000, 1198000));
+            verify(!r.e._horizonTick(true, 96000, 1199000));
+            verify(!r.e._horizonTick(true, 97000, 1200000));
+            // The position stands from here on.
+            verify(!r.e._horizonTick(true, 97000, 1201000));
+            verify(!r.e._horizonTick(true, 97000, 1202000));
+            compare(r.mock.played.length, 1);
+            verify(r.e._horizonTick(true, 97000, 1203000));
+            compare(r.mock.played.length, 2);
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 96700);
+            // The reopen is a fresh horizon, not a second one at once.
+            verify(!r.e._horizonTick(true, 96700, 1204000));
+            verify(!r.e._horizonTick(true, 96700, 1205000));
+            compare(r.mock.played.length, 2);
+        }
+
+        function test_a_player_that_does_not_play_is_not_at_the_horizon() {
+            var r = rig();
+            armed(r);
+            r.e.pauseGesture(1100000);
+            r.e.resumeGesture();
+            verify(!r.e._horizonTick(true, 50000, 1150000));
+            // A minute of a player that stands because it was told to.
+            for (var s = 1; s <= 60; s++) verify(!r.e._horizonTick(false, 50000, 1150000 + s * 1000));
+            // Playing again, the three seconds count from the first tick.
+            verify(!r.e._horizonTick(true, 50000, 1211000));
+            verify(!r.e._horizonTick(true, 50000, 1212000));
+            verify(!r.e._horizonTick(true, 51000, 1213000));
+            compare(r.mock.played.length, 1);
+            // A listener on the broadcast has no horizon at all.
+            var live = rig();
+            armed(live);
+            for (s = 1; s <= 10; s++) verify(!live.e._horizonTick(true, 7000, 1100000 + s * 1000));
+            compare(live.mock.played.length, 0);
+            // Only a plain true is a player that plays.
+            var junk = [undefined, null, 1, "true"];
+            for (var i = 0; i < junk.length; i++)
+                for (s = 1; s <= 5; s++) verify(!r.e._horizonTick(junk[i], 51000, 1220000 + i * 10000 + s * 1000));
+            compare(r.mock.played.length, 1);
+        }
+
         function test_a_drained_buffer_returns_to_live() {
             var r = rig();
             armed(r);
@@ -190,6 +265,258 @@ Item {
             verify(r.e.playerEndOfMedia(96900, 1300000));
             var last = r.mock.played[r.mock.played.length - 1];
             compare(last.kind, "live");
+        }
+
+        // A short pause on a Matroska buffer, as measured 2026-11-12 (five-minute
+        // window, 14 s of play, 4 s paused): the reader runs into the file's
+        // unfinished end 3.6 s after Play and the player names the length in
+        // the header, 300000 ms, as its position. That used to read as a
+        // listener far past the broadcast, and the station went back to live.
+        function shortPause(r) {
+            armed(r);
+            compare(r.e.pauseGesture(1014208), 11208);
+            verify(r.e.resumeGesture());
+            compare(r.mock.played[0].pos, 11208);
+        }
+
+        function test_an_end_past_the_capture_reopens_where_the_listener_was() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            verify(!r.e._horizonTick(true, 12400, 1019400));
+            verify(!r.e._horizonTick(true, 13400, 1020400));
+            verify(!r.e._horizonTick(true, 14400, 1021400));
+            verify(r.e.playerEndOfMedia(300000, 1022166));
+            compare(r.mock.played.length, 2);
+            compare(r.mock.played[1].kind, "buffer");
+            // The listener was at 14.4 s, 7.8 s behind the writer: the file is
+            // opened where the writer is twelve seconds ahead, not at 14.1 s.
+            compare(r.mock.played[1].pos, 10166);
+            verify(r.e.shifted);
+            verify(r.e.active);
+            compare(r.e.shiftPosMs, 10166);
+        }
+
+        function test_an_end_before_the_reader_was_seen_reopens_where_it_was_sent() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            verify(r.e.playerEndOfMedia(300000, 1022166));
+            compare(r.mock.played.length, 2);
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 10166);
+            // The second end in a row from the same place: the file has no more.
+            verify(r.e.playerEndOfMedia(300000, 1023000));
+            compare(r.mock.played.length, 3);
+            compare(r.mock.played[2].kind, "live");
+            verify(!r.e.shifted);
+        }
+
+        function test_the_place_seen_before_the_seek_landed_is_not_the_listeners() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            // The file is open and the player has not been sent to the park yet.
+            verify(!r.e._horizonTick(true, 0, 1018500));
+            verify(r.e.playerEndOfMedia(300000, 1022166));
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 10166);
+        }
+
+        function test_the_headers_length_is_not_a_place_the_reader_was_seen_at() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            verify(!r.e._horizonTick(true, 14400, 1021400));
+            // The player has put its position at the header's length and
+            // still says it plays: the end itself comes a moment later.
+            verify(!r.e._horizonTick(true, 300000, 1022000));
+            verify(r.e.playerEndOfMedia(300000, 1022166));
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 10166);
+        }
+
+        function test_a_reader_paused_in_place_keeps_the_place_it_was_seen_at() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            verify(!r.e._horizonTick(true, 14400, 1021400));
+            for (var s = 1; s <= 30; s++) verify(!r.e._horizonTick(false, 14400, 1021400 + s * 1000));
+            verify(r.e.playerEndOfMedia(300000, 1060000));
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 14100);
+        }
+
+        function test_a_reopen_that_gains_nothing_on_such_a_file_gives_up() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            verify(!r.e._horizonTick(true, 14400, 1021400));
+            verify(r.e.playerEndOfMedia(300000, 1022166));      // opened again at 10166
+            // The writer stands. The reader plays up to the same end again...
+            verify(!r.e._horizonTick(true, 12000, 1024000));
+            verify(!r.e._horizonTick(true, 14400, 1026400));
+            verify(r.e.playerEndOfMedia(300000, 1026600));
+            compare(r.mock.played.length, 3);
+            compare(r.mock.played[2].kind, "buffer");
+            compare(r.mock.played[2].pos, 14100);
+            // ...and from 14100 it has the overlap to play and nothing more.
+            verify(!r.e._horizonTick(true, 14350, 1026900));
+            verify(r.e.playerEndOfMedia(300000, 1027100));
+            compare(r.mock.played.length, 4);
+            compare(r.mock.played[3].kind, "live");
+            verify(!r.e.shifted);
+        }
+
+        function test_a_reopen_that_gained_half_a_second_goes_on() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            // Late enough for the reader to be more than the gap behind the writer.
+            verify(!r.e._horizonTick(true, 14400, 1039000));
+            verify(r.e.playerEndOfMedia(300000, 1040000));      // opened again at 14100
+            compare(r.mock.played[1].pos, 14100);
+            verify(!r.e._horizonTick(true, 14600, 1040700));
+            verify(r.e.playerEndOfMedia(300000, 1045600));
+            compare(r.mock.played.length, 3);
+            compare(r.mock.played[2].kind, "buffer");
+            compare(r.mock.played[2].pos, 14300);
+        }
+
+        function test_what_was_seen_of_one_shift_is_not_the_next_ones() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            verify(!r.e._horizonTick(true, 14400, 1021400));
+            r.e.backToLive(1022000);
+            compare(r.mock.played[1].kind, "live");
+            // A minute on the broadcast, a new pause, and the end before any tick.
+            compare(r.e.pauseGesture(1090000), 87000);
+            verify(r.e.resumeGesture());
+            verify(r.e.playerEndOfMedia(300000, 1100000));
+            compare(r.mock.played[3].kind, "buffer");
+            compare(r.mock.played[3].pos, 86700);
+        }
+
+        function test_such_a_file_played_to_its_real_end_returns_to_live() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            shortPause(r);
+            // The writer was killed 20 s in and left the header as it was.
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=137 bytes=640000", 1020000);
+            compare(r.e.frozenCapturedMs, 20000);
+            verify(!r.e._horizonTick(true, 18900, 1027700));
+            verify(r.e.playerEndOfMedia(300000, 1028800));
+            compare(r.mock.played[1].kind, "live");
+            verify(!r.e.shifted);
+        }
+
+        function test_a_relays_matroska_buffer_is_reopened_not_started_over() {
+            var r = rig({ timeshiftEnabled: false });
+            verify(r.e.armRelay(stream, "Jazz FM", 1000000, false));
+            r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
+            verify(r.e.bufPath.indexOf(".mka") > 0);
+            compare(r.e.pauseGesture(1014208), 11208);
+            verify(r.e.resumeGesture());
+            verify(!r.e._horizonTick(true, 14400, 1021400));
+            var n = r.mock.execLog.length;
+            verify(r.e.playerEndOfMedia(3600000, 1022166));
+            compare(r.mock.execLog.length, n);
+            compare(r.mock.played[r.mock.played.length - 1].kind, "buffer");
+            compare(r.mock.played[r.mock.played.length - 1].pos, 10166);
+            verify(r.e.shifted);
+        }
+
+        // The reader of a single file is put twelve seconds behind its writer,
+        // the distance the sliding buffer opens at. Measured 2026-11-12: after
+        // a pause of four seconds the reader was 7.8 s behind, met the file's
+        // unfinished end four times in 21 s and was reopened each time with
+        // about a second heard twice.
+        function test_a_short_pause_is_resumed_a_safe_distance_behind_the_writer() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            armed(r);
+            compare(r.e.pauseGesture(1014208), 11208);
+            verify(r.e.resumeGesture(1018208));
+            compare(r.mock.played.length, 1);
+            compare(r.mock.played[0].kind, "buffer");
+            compare(r.mock.played[0].pos, 6208);
+            compare(r.e.shiftPosMs, 6208);
+            verify(r.e.shifted);
+            // An end before the reader was seen is judged from where it was sent.
+            verify(r.e.playerEndOfMedia(300000, 1040000));
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 5908);
+        }
+
+        function test_a_pause_longer_than_the_gap_is_resumed_where_it_was_pressed() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            armed(r);
+            compare(r.e.pauseGesture(1014208), 11208);
+            verify(r.e.resumeGesture(1044208));
+            compare(r.mock.played[0].pos, 11208);
+            // Nine seconds is the pause that needs nothing: the park is three behind.
+            var nine = rig({ timeshiftWindowMin: 5 });
+            armed(nine);
+            nine.e.pauseGesture(1014208);
+            verify(nine.e.resumeGesture(1023208));
+            compare(nine.mock.played[0].pos, 11208);
+            var under = rig({ timeshiftWindowMin: 5 });
+            armed(under);
+            under.e.pauseGesture(1014208);
+            verify(under.e.resumeGesture(1023207));
+            compare(under.mock.played[0].pos, 11207);
+        }
+
+        function test_a_buffer_younger_than_the_gap_is_resumed_at_its_start() {
+            var r = rig({ timeshiftWindowMin: 5 });
+            armed(r);
+            // Five seconds of play, a pause of two: seven seconds captured.
+            compare(r.e.pauseGesture(1005000), 2000);
+            verify(r.e.resumeGesture(1007000));
+            compare(r.mock.played.length, 1);
+            compare(r.mock.played[0].kind, "buffer");
+            compare(r.mock.played[0].pos, 0);
+            compare(r.e.shiftPosMs, 0);
+            verify(r.e.shifted);
+            // It meets the unfinished end five seconds on, and is opened again
+            // where the writer is twelve seconds ahead: still the start.
+            verify(!r.e._horizonTick(true, 4700, 1011700));
+            verify(r.e.playerEndOfMedia(300000, 1012000));
+            compare(r.mock.played.length, 2);
+            compare(r.mock.played[1].kind, "buffer");
+            compare(r.mock.played[1].pos, 0);
+            // A second later the same end would open it a second in.
+            var later = rig({ timeshiftWindowMin: 5 });
+            armed(later);
+            later.e.pauseGesture(1005000);
+            later.e.resumeGesture(1007000);
+            verify(!later.e._horizonTick(true, 4700, 1012700));
+            verify(later.e.playerEndOfMedia(300000, 1013000));
+            compare(later.mock.played[1].pos, 1000);
+            // And two seconds sooner the start again, not a place before it.
+            var sooner = rig({ timeshiftWindowMin: 5 });
+            armed(sooner);
+            sooner.e.pauseGesture(1005000);
+            sooner.e.resumeGesture(1007000);
+            verify(!sooner.e._horizonTick(true, 4700, 1009700));
+            verify(sooner.e.playerEndOfMedia(300000, 1010000));
+            compare(sooner.mock.played[1].kind, "buffer");
+            compare(sooner.mock.played[1].pos, 0);
+            compare(sooner.e.shiftPosMs, 0);
+        }
+
+        function test_a_file_that_no_longer_grows_is_resumed_at_the_park() {
+            var r = rig();
+            armed(r);
+            compare(r.e.pauseGesture(1100000), 97000);
+            // The writer ends half a second into the pause.
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=0 bytes=3200000", 1100500);
+            verify(r.e.windowFull);
+            verify(r.e.resumeGesture(1101000));
+            compare(r.mock.played[0].kind, "buffer");
+            compare(r.mock.played[0].pos, 97000);
+        }
+
+        function test_a_resume_that_is_given_no_clock_opens_at_the_park() {
+            var r = rig();
+            armed(r);
+            compare(r.e.pauseGesture(1100000), 97000);
+            var junk = [undefined, null, NaN, "1101000", {}];
+            for (var i = 0; i < junk.length; i++) {
+                verify(r.e.resumeGesture(junk[i]), String(junk[i]));
+                compare(r.mock.played[i].pos, 97000, String(junk[i]));
+            }
         }
 
         function test_the_window_cap_freezes_the_buffer_not_the_listener() {
@@ -480,6 +807,141 @@ Item {
             r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1005000);
             compare(r.mock.played.length, before + 1);
             compare(r.mock.played[before].kind, "live");
+        }
+
+        function test_a_player_still_opening_the_tap_goes_live_when_the_writer_dies_at_birth() {
+            // Measured on the bench, 2026-11-11, an MP3 stream the directory
+            // called FLAC: the tap answered 0.26 s after the start, the
+            // writer died 0.09 s later, and the player, sent to the tap and
+            // still opening it, was not "playing" yet. It was left there,
+            // silent, until the tap gave up ten seconds on.
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            compare(r.mock.played[r.mock.played.length - 1].kind, "relay");
+            r.mock.playingNow = false;
+            var before = r.mock.played.length;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=234 bytes=0", 1002090);
+            compare(r.mock.played.length, before + 1);
+            compare(r.mock.played[before].kind, "live");
+            compare(r.mock.played[before].url, "http://s1.radio.ee/gold.flac");
+            verify(!r.e.active);
+            compare(r.mock.notes.length, 1);
+        }
+
+        function test_a_writer_dead_before_the_tap_answers_leaves_the_start_alone() {
+            // The other order of the two acks: nobody moved the player, so
+            // the start it is still making goes on by itself, and the tap's
+            // late answer finds no relay to play.
+            var r = rig({ timeshiftEnabled: false });
+            verify(r.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 1000000));
+            r.e.handleExec(r.mock.execLog[0], "__TS_URL_OK__", 1000000);
+            r.mock.playingNow = false;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=234 bytes=0", 1000200);
+            compare(r.mock.played.length, 0);
+            r.e.handleExec(r.mock.execLog[2], "__TS_SRV_UP__ port=34567", 1000300);
+            compare(r.mock.played.length, 0);
+            verify(!r.e.relay);
+        }
+
+        function test_a_parked_or_lapsed_room_stays_quiet_when_the_writer_dies_at_birth() {
+            // A park can stand over a writer with nothing on disk: the pause
+            // counts seconds, not bytes, and a server that accepts and then
+            // sends nothing keeps the writer waiting half a minute.
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            r.mock.playingNow = false;
+            r.mock._tsPaused = true;
+            var before = r.mock.played.length;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1012000);
+            compare(r.mock.played.length, before);
+            // And a night: the order lapsed while the tap was being opened.
+            r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            r.mock.playingNow = false;
+            r.mock.lapsed = true;
+            before = r.mock.played.length;
+            r.e.handleExec(r.mock.execLog[1], "__TS_EXIT__ rc=1 bytes=0", 1002090);
+            compare(r.mock.played.length, before);
+            verify(r.mock.lapsedAsked > 0);
+        }
+
+        function test_a_relayed_stream_with_no_titles_in_its_buffer_is_asked_over_icy() {
+            // A plain FLAC station in an Ogg shell: its titles are in ICY.
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var url = "http://s1.radio.ee/gold.flac";
+            verify(r.e.titlesInBuffer(url))
+            verify(!r.e.titleAnswer(true, "", url))
+            verify(!r.e.titleAnswer(true, "", url))
+            verify(r.e.titlesInBuffer(url))
+            verify(!r.e.titleAnswer(true, "", url))
+            // Three empty reads running: the next poll goes to the station.
+            verify(!r.e.titlesInBuffer(url))
+            // ICY has a title: it is shown like any other, and ICY stays the road.
+            verify(!r.e.titleAnswer(false, "Artist - Song\t", url))
+            verify(!r.e.titlesInBuffer(url))
+            verify(!r.e.titleAnswer(false, "", url))
+            verify(!r.e.titlesInBuffer(url))
+        }
+
+        function test_a_title_in_the_buffer_keeps_the_buffer_road() {
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var url = "http://s1.radio.ee/gold.flac";
+            r.e.titleAnswer(true, "", url);
+            r.e.titleAnswer(true, "", url);
+            verify(!r.e.titleAnswer(true, "Artist - Song\t", url))
+            r.e.titleAnswer(true, "", url);
+            r.e.titleAnswer(true, "", url);
+            // Not three running: the count began again at the title.
+            verify(r.e.titlesInBuffer(url))
+        }
+
+        function test_icy_saying_it_has_none_sends_the_reader_back_to_the_buffer() {
+            // An Ogg FLAC station with no titles anywhere: one ICY question,
+            // and it must not write the station off, or a title in a later
+            // chain would never be looked for.
+            var r = rig({ timeshiftEnabled: false });
+            relayed(r);
+            var url = "http://s1.radio.ee/gold.flac";
+            for (var i = 0; i < 3; i++) r.e.titleAnswer(true, "", url);
+            verify(!r.e.titlesInBuffer(url))
+            verify(r.e.titleAnswer(false, "__NO_ICY__", url), "ICY's no was not dropped")
+            verify(r.e.titlesInBuffer(url))
+            for (i = 0; i < 10; i++) r.e.titleAnswer(true, "", url);
+            verify(r.e.titlesInBuffer(url), "ICY is asked again and again")
+            // A new arm starts counting afresh.
+            verify(r.e.armRelay(url, "Gold", 2000000));
+            verify(r.e.titlesInBuffer(url), "a fresh arm does not read its own buffer first")
+            for (i = 0; i < 3; i++) r.e.titleAnswer(true, "", url);
+            verify(!r.e.titlesInBuffer(url))
+        }
+
+        function test_only_a_relayed_ogg_stream_has_titles_in_its_buffer() {
+            // ICY's no about anything else is the station's own answer.
+            var r = rig({ timeshiftEnabled: false });
+            verify(!r.e.titlesInBuffer("http://s1.radio.ee/gold.flac"))
+            verify(!r.e.titleAnswer(false, "__NO_ICY__", "http://s1.radio.ee/gold.flac"))
+            relayed(r);
+            verify(!r.e.titlesInBuffer("http://other.example/x"))
+            verify(!r.e.titlesInBuffer(""))
+            verify(!r.e.titlesInBuffer(undefined))
+            verify(!r.e.titleAnswer(false, "__NO_ICY__", "http://other.example/x"))
+            verify(!r.e.titleAnswer(false, "__NO_ICY__", undefined))
+            // A Matroska shell has no comment tags to read.
+            var m = rig({ timeshiftEnabled: false });
+            verify(m.e.armRelay("https://atma.fm/channel1", "Atma", 1000000));
+            verify(!m.e.titlesInBuffer("https://atma.fm/channel1"))
+            verify(!m.e.titleAnswer(false, "__NO_ICY__", "https://atma.fm/channel1"))
+            // A plain pause buffer is not a relay, also when the station
+            // before it was one and left its Ogg verdict standing.
+            var p = rig({ timeshiftEnabled: true });
+            verify(p.e.armForStation("http://s1.radio.ee/live.ogg", "L", 1000000));
+            verify(!p.e.titlesInBuffer("http://s1.radio.ee/live.ogg"))
+            verify(p.e.armRelay("http://s1.radio.ee/gold.flac", "Gold", 2000000));
+            verify(p.e.titlesInBuffer("http://s1.radio.ee/gold.flac"))
+            verify(p.e.armForStation("http://s2.radio.ee/other.mp3", "Rock FM", 3000000));
+            verify(!p.e.titlesInBuffer("http://s2.radio.ee/other.mp3"))
         }
 
         function test_a_fallen_tap_rearms_a_bounded_number_of_times() {

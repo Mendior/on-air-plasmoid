@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A search result whose retry ladder has said its last word still counts as
+  on its way to sound, for as long as its address stands.
+
+history:
+  The last word leaves the address standing, for the row's mark and the
+  Playing page's star. With the address alone as the fact, the big button
+  read Stop over a silent widget after every dead result, the desk's Play
+  did nothing, and the radio took two presses to come back.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      return typeof address === "string" && address !== "" && !(typeof lastWord === "string" && lastWord !== "");
+
+replace:
+      return typeof address === "string" && address !== "";
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_an_audition_is_on_its_way_from_its_click_until_its_ladder_has_spoken
+  and tests/qml/tst_transportroads.qml::test_after_the_last_word_one_press_of_the_button_tries_the_result_again.
+  Line-neutral.

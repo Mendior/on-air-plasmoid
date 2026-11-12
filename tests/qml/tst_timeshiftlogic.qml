@@ -6,6 +6,7 @@
 import QtQuick
 import QtTest
 
+import "../../package/contents/ui/SlideLogic.js" as SL
 import "../../package/contents/ui/TimeshiftLogic.js" as TS
 
 TestCase {
@@ -215,5 +216,117 @@ TestCase {
         // A clock that went backwards is no reason to keep anything.
         verify(!TS.sleeveKept(1000000, 999000, true))
         verify(!TS.sleeveKept(undefined, 1000, true))
+    }
+
+    function test_titles_come_from_the_buffer_until_it_has_none_three_times() {
+        compare(TS.titleRoad(0, false), "buffer")
+        compare(TS.titleRoad(2, false), "buffer")
+        compare(TS.titleRoad(3, false), "icy")
+        compare(TS.titleRoad(4, false), "icy")
+        compare(TS.titleRoad(100000, false), "icy")
+        compare(TS.BUFFER_TITLE_MISSES, 3)
+        // ICY said it has none: the buffer again, however often it was empty.
+        compare(TS.titleRoad(3, true), "buffer")
+        compare(TS.titleRoad(100000, true), "buffer")
+        // Only a plain true is that answer.
+        compare(TS.titleRoad(3, undefined), "icy")
+        compare(TS.titleRoad(3, null), "icy")
+        compare(TS.titleRoad(3, "yes"), "icy")
+        // A count that is no count is no reason to open a connection.
+        var junk = [undefined, null, NaN, "x", {}, [], -1];
+        for (var i = 0; i < junk.length; i++) compare(TS.titleRoad(junk[i], false), "buffer", String(junk[i]))
+    }
+
+    // Measured 2026-11-12 on a Matroska buffer with a five-minute window:
+    // 22 s into the capture the reader ran into the file's unfinished end
+    // and the player gave its position as 300000 ms, the length the header
+    // was written with.
+    function test_the_end_of_a_single_file_is_where_the_reader_stood() {
+        // The player's word, while it is a place inside what was captured.
+        compare(TS.endPlaceMs(15000, 22166, 14200), 15000)
+        compare(TS.endPlaceMs(0, 22166, 14200), 0)
+        compare(TS.endPlaceMs(22166, 22166, 14200), 22166)
+        compare(TS.endPlaceMs(97000, 200000, -1), 97000)
+        // One millisecond past the capture it is no place any more.
+        compare(TS.endPlaceMs(22167, 22166, 14200), 14200)
+        compare(TS.endPlaceMs(300000, 22166, 14200), 14200)
+        compare(TS.endPlaceMs(3600000, 22166, 0), 0)
+        compare(TS.endPlaceMs(Number.MAX_VALUE, 22166, 14200), 14200)
+        compare(TS.endPlaceMs(Infinity, 22166, 14200), 14200)
+        // Nothing was seen of the reader either.
+        compare(TS.endPlaceMs(300000, 22166, -1), -1)
+        compare(TS.endPlaceMs(300000, 22166, -0.5), -1)
+        // The last place seen is the engine's own, and is not judged again.
+        compare(TS.endPlaceMs(300000, 22166, 25000), 25000)
+    }
+
+    function test_an_end_that_is_no_number_is_no_place() {
+        var junk = [undefined, null, NaN, "15000", {}, [], -1, -0.001, true];
+        for (var i = 0; i < junk.length; i++) {
+            compare(TS.endPlaceMs(junk[i], 22166, 14200), 14200, "position " + String(junk[i]))
+            compare(TS.endPlaceMs(300000, 22166, junk[i]), -1, "heard " + String(junk[i]))
+            compare(TS.endPlaceMs(junk[i], 22166, junk[i]), -1, "both " + String(junk[i]))
+        }
+        compare(TS.endPlaceMs(300000, 22166, Infinity), -1)
+        // A capture nobody can measure vouches for no position.
+        var none = [undefined, null, NaN, "22166", -1];
+        for (i = 0; i < none.length; i++) compare(TS.endPlaceMs(15000, none[i], 14200), 14200, "captured " + String(none[i]))
+        compare(TS.endPlaceMs(), -1)
+    }
+
+    // Measured 2026-11-12: 14 s of play and a pause of four put the reader
+    // 7.8 s behind the writer, and it met the file's unfinished end four
+    // times in 21 s. From 10.4 s behind it played on without a break.
+    function test_the_single_file_is_opened_a_safe_distance_behind_its_writer() {
+        compare(TS.OPEN_GAP_MS, 12000)
+        // The distance the sliding buffer opens short of its newest segment.
+        compare(TS.OPEN_GAP_MS, SL.OPEN_GAP_MS)
+        // The park of that pause, and the 18.2 s captured when Play came.
+        compare(TS.openPlaceMs(11208, 18208, 12000), 6208)
+        // A pause longer than the gap is resumed where it was pressed.
+        compare(TS.openPlaceMs(11208, 44208, 12000), 11208)
+        compare(TS.openPlaceMs(11208, 23208, 12000), 11208)
+        compare(TS.openPlaceMs(11208, 23207, 12000), 11207)
+        // A place the gap or more behind already is left alone.
+        compare(TS.openPlaceMs(6208, 18208, 12000), 6208)
+        compare(TS.openPlaceMs(6209, 18208, 12000), 6208)
+        compare(TS.openPlaceMs(6207, 18208, 12000), 6207)
+        compare(TS.openPlaceMs(96700, 200000, 12000), 96700)
+    }
+
+    function test_a_buffer_younger_than_the_gap_is_opened_at_its_start() {
+        compare(TS.openPlaceMs(2000, 7000, 12000), 0)
+        compare(TS.openPlaceMs(0, 5000, 12000), 0)
+        compare(TS.openPlaceMs(2000, 11999, 12000), 0)
+        compare(TS.openPlaceMs(2000, 12000, 12000), 0)
+        compare(TS.openPlaceMs(2000, 12001, 12000), 1)
+        compare(TS.openPlaceMs(2000, 0, 12000), 0)
+        compare(TS.openPlaceMs(2000, -5000, 12000), 0)
+    }
+
+    function test_a_file_that_no_longer_grows_is_opened_where_it_was_asked() {
+        // No writer, no unfinished end: the gap is nought.
+        compare(TS.openPlaceMs(97000, 100000, 0), 97000)
+        compare(TS.openPlaceMs(100000, 100000, 0), 100000)
+        // Never past what was captured, all the same.
+        compare(TS.openPlaceMs(150000, 100000, 0), 100000)
+    }
+
+    function test_an_open_with_nothing_to_measure_against_keeps_its_place() {
+        var junk = [undefined, null, NaN, "18208", {}, [], Infinity, -Infinity];
+        for (var i = 0; i < junk.length; i++) {
+            compare(TS.openPlaceMs(11208, junk[i], 12000), 11208, "captured " + String(junk[i]))
+            compare(TS.openPlaceMs(11208, 18208, junk[i]), 11208, "gap " + String(junk[i]))
+            compare(TS.openPlaceMs(junk[i], 18208, 12000), 0, "place " + String(junk[i]))
+            compare(TS.openPlaceMs(junk[i], junk[i], junk[i]), 0, "all " + String(junk[i]))
+        }
+        // A gap below nought would put the reader ahead of its writer.
+        compare(TS.openPlaceMs(11208, 18208, -1), 11208)
+        compare(TS.openPlaceMs(11208, 18208, -12000), 11208)
+        compare(TS.openPlaceMs(11208, 5000, -1), 11208)
+        // A place below nought is the file's start.
+        compare(TS.openPlaceMs(-1, 18208, 12000), 0)
+        compare(TS.openPlaceMs(-300, 44208, 12000), 0)
+        compare(TS.openPlaceMs(), 0)
     }
 }

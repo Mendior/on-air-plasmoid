@@ -19,6 +19,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
 import "ColorLogic.js" as ColorLogic
+import "CoverLogic.js" as CoverLogic
 import "EpisodeState.js" as EpisodeState
 import "FaviconLogic.js" as FaviconLogic
 import "HostGuard.js" as HostGuard
@@ -31,8 +32,6 @@ import "ViewLogic.js" as ViewLogic
 
 PlasmaExtras.Representation {
     id: fullRepresentation
-
-    readonly property var appletInterface: Plasmoid.self
 
     // The floor the content actually needs, not a constant. A hard 16 gu
     // was narrower than the tabs in plenty of font environments, and the
@@ -167,6 +166,9 @@ PlasmaExtras.Representation {
     // for a file that is already on disk and belongs to a show.
     readonly property bool _podcastPlaying: root._podPlayingUrl !== ""
                                             && playMusic.source.toString() === root._podPlayingUrl
+    // Whether a stream that is on can be heard (ViewLogic.streamSounds). Its own property, so that the player's position,
+    // which moves many times a second, wakes one comparison and the footer's text only when the answer changes.
+    readonly property bool _sounds: ViewLogic.streamSounds(root.title !== Plasmoid.title, _localPlayback, playMusic.position)
 
     readonly property int _nowBitrate: {
         if (!_streamActive) return 0
@@ -221,8 +223,8 @@ PlasmaExtras.Representation {
     property string _webLastTyped: ""
     // Rows the list will show — "Show more" raises it page by page.
     property int webResultCap: 30
-    // Where "Show more" stops for good — a result this deep is noise, and
-    // every extra page still knocks on up to thirty stream hosts.
+    // The most rows the list shows, where "Show more" stops for good: a result
+    // this deep is noise, and every page still knocks on up to thirty stream hosts.
     readonly property int webResultCapMax: 300
     // The last query string sent, offset-free — "Show more" re-issues it.
     property string _webLastQs: ""
@@ -377,7 +379,7 @@ PlasmaExtras.Representation {
             }
         }
         xhr.open("GET", url)
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.43")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.44")
         guard = root._armXhrTimeout(xhr, 6000)
         fullRepresentation._probeLiveXhrs.push(xhr)
         xhr.send()
@@ -409,7 +411,7 @@ PlasmaExtras.Representation {
         var inCc = (askedInCountry || tail.indexOf("&countrycode=") !== -1)
                    ? null : SearchLogic.nameInCountry(q, _countryCodeOf)
         var next = SearchLogic.emptyNext({
-            count: webResultsModel.count, gotAnswer: gotAnswer,
+            count: webResultsModel.count, own: fullRepresentation._webHeld.length, gotAnswer: gotAnswer,
             mode: fullRepresentation.webSearchMode,
             inheritedScope: fullRepresentation._webScopeInherited, bareScope: fullRepresentation._webScopeBare,
             inCountry: inCc !== null, countryQuery: _countryCodeOf(q) !== "", stemCount: stems.length })
@@ -591,8 +593,8 @@ PlasmaExtras.Representation {
             // The search that asked for the list went out without it. If the
             // list reads the text in the field another way ("portugal" as a
             // country) and nothing newer is being typed, that search runs again.
-            const key = () => SearchLogic.readingKey(root.searchFilter, fullRepresentation.webSearchMode, _countryCodeOf)
-            const was = key()
+            var key = () => SearchLogic.readingKey(root.searchFilter, fullRepresentation.webSearchMode, _countryCodeOf)
+            var was = key()
             try {
                 fullRepresentation._countryMapApiFolded =
                     SearchLogic.countryMapFromApi(JSON.parse(xhr.responseText))
@@ -757,18 +759,17 @@ PlasmaExtras.Representation {
                 && webResultsModel.count < fullRepresentation.webResultCap
                 && (SearchLogic.words(q).length <= 3 || scoped !== null || scopeCc !== ""
                     || facet !== null)) {
-                var beforeTag = webResultsModel.count
                 root._rbFetch(tagQs + tail, 4000, function(xhr2) {
                     if (seq !== fullRepresentation._webSearchSeq) return
-                    _webAppendResults(xhr2)
-                    // If the tag pass put rows in, "Show more" must page IT, from
-                    // the tag list's own place: marked here, before the name rows
-                    // come back in and leave their own walk's numbers behind.
-                    var tagIn = webResultsModel.count > beforeTag
-                    if (tagIn) _webMark(0, tagQs + tail)
-                    // Room left: the name rows the lead filter held back, below the genre's
-                    // own. When the tag list gave none, theirs is the list that is paged.
-                    if (lead && _webAppendResults(xhr) && !tagIn) _webMark(0)
+                    // The tag answer's own place, read before the name rows the lead filter
+                    // held back come in below the genre's own and leave their walk's numbers.
+                    var tagOk = _webAppendResults(xhr2), tagRows = fullRepresentation._webLastParsed
+                    var tagPage = SearchLogic.pageAfter(tagQs + tail, 0, tagRows, fullRepresentation._webLastConsumed)
+                    if (lead && _webAppendResults(xhr)) _webMark(0)
+                    // Which of the two lists "Show more" pages is read from the two answers,
+                    // not from the rows the dedup left of them (SearchLogic.tagListPaged).
+                    if (tagOk && SearchLogic.tagListPaged(lead !== null, fullRepresentation._webPage.more, tagRows, tagPage.more))
+                        _webMark(0, tagQs + tail, tagPage)
                     // "jazz" can be a genre with zero NAME matches — a query
                     // that only produced tag hits is still a successful
                     // query, and history exists for successful queries.
@@ -928,16 +929,16 @@ PlasmaExtras.Representation {
     // The answer just walked is the list "Show more" pages, asked from row
     // `from`, and qs its query where another list was paged until now.
     // SearchLogic.pageAfter says where its next page starts and whether the
-    // directory may hold one.
-    function _webMark(from, qs) {
+    // directory may hold one; page is that answer where it was read earlier.
+    function _webMark(from, qs, page) {
         if (qs) fullRepresentation._webLastQs = qs
-        fullRepresentation._webPage = SearchLogic.pageAfter(fullRepresentation._webLastQs, from, fullRepresentation._webLastParsed, fullRepresentation._webLastConsumed)
+        fullRepresentation._webPage = page || SearchLogic.pageAfter(fullRepresentation._webLastQs, from, fullRepresentation._webLastParsed, fullRepresentation._webLastConsumed)
     }
 
     // The next page of whatever is showing — same query, same generation.
     function loadMoreWeb() {
         if (fullRepresentation._webLastQs === "" || fullRepresentation.webSearching) return
-        if (fullRepresentation.webResultCap >= fullRepresentation.webResultCapMax) return
+        if (!SearchLogic.pageOpen(fullRepresentation._webPage, webResultsModel.count, fullRepresentation.webResultCapMax)) return
         const seq = fullRepresentation._webSearchSeq
         const from = fullRepresentation._webPage.at
         // Thirty more than are on screen: rows an earlier page lost to the
@@ -1114,7 +1115,7 @@ PlasmaExtras.Representation {
 
     // ── 2026 aurora background: two slowly drifting light blobs ──────────
     // NB: every infinite animation in this file prices itself by visibility:
-    // paused with the popup closed (root.expanded — a hidden popup must not
+    // paused with the popup closed (root.faceShown — a hidden popup must not
     // burn CPU 24/7, a standard KDE reviewer requirement) and held by
     // thrifty on battery. On a desktop containment expanded is pinned true
     // for the applet's whole life, so the blobs take one brake more: an
@@ -1156,7 +1157,7 @@ PlasmaExtras.Representation {
                 // running, not paused: a paused SequentialAnimation keeps its
                 // current child ticking (measured: the blob drifted ten seconds
                 // past paused=true) — only running=false stops the frames.
-                running: root.expanded && !root.thrifty
+                running: root.faceShown && !root.thrifty
                          && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.width * 0.35; duration: 26000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: -blobA.width * 0.3; duration: 26000; easing.type: Easing.InOutSine }
@@ -1166,7 +1167,7 @@ PlasmaExtras.Representation {
                 // running, not paused: a paused SequentialAnimation keeps its
                 // current child ticking (measured: the blob drifted ten seconds
                 // past paused=true) — only running=false stops the frames.
-                running: root.expanded && !root.thrifty
+                running: root.faceShown && !root.thrifty
                          && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.height * 0.2; duration: 19000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: -blobA.height * 0.25; duration: 19000; easing.type: Easing.InOutSine }
@@ -1197,7 +1198,7 @@ PlasmaExtras.Representation {
                 // running, not paused: a paused SequentialAnimation keeps its
                 // current child ticking (measured: the blob drifted ten seconds
                 // past paused=true) — only running=false stops the frames.
-                running: root.expanded && !root.thrifty
+                running: root.faceShown && !root.thrifty
                          && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.width * 0.1; duration: 31000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: fullRepresentation.width - blobB.width * 0.4; duration: 31000; easing.type: Easing.InOutSine }
@@ -1207,7 +1208,7 @@ PlasmaExtras.Representation {
                 // running, not paused: a paused SequentialAnimation keeps its
                 // current child ticking (measured: the blob drifted ten seconds
                 // past paused=true) — only running=false stops the frames.
-                running: root.expanded && !root.thrifty
+                running: root.faceShown && !root.thrifty
                          && !(root.planar && !fullRepresentation._streamActive)
                 NumberAnimation { to: fullRepresentation.height * 0.35; duration: 23000; easing.type: Easing.InOutSine }
                 NumberAnimation { to: fullRepresentation.height - blobB.height * 0.35; duration: 23000; easing.type: Easing.InOutSine }
@@ -1379,10 +1380,8 @@ PlasmaExtras.Representation {
                     down: true
                     Accessible.name: i18n("Searching only in %1 — tap to search everywhere",
                                           fullRepresentation.webScopeName)
-                    PlasmaCore.ToolTipArea {
-                        anchors.fill: parent
-                        mainText: i18n("Results are limited to %1 — tap to search everywhere again",
-                                       fullRepresentation.webScopeName)
+                    PlasmaComponents3.ToolTip {
+                        text: i18n("Results are limited to %1 — tap to search everywhere again", fullRepresentation.webScopeName)
                     }
                     onClicked: {
                         fullRepresentation.webScopeCc = ""
@@ -1757,23 +1756,20 @@ PlasmaExtras.Representation {
                                     }
                                 }
 
-                                // One exit for both the pointer star and Ctrl+Return: add,
-                                // drop the row, and let the cap follow the count down: on a
-                                // list at its 300 the star makes room for one more row.
+                                // One exit for both the pointer star and Ctrl+Return: add and
+                                // drop the row. The ceiling counts the rows on screen, so on a
+                                // list at its 300 that alone makes room for one more.
                                 function starThisRow() {
                                     var wasIndex = webItem.index
                                     // remove() destroys this delegate and the scope these names live
                                     // in, so hold them first. Measured 2026-09-18: the star threw on
-                                    // the next line, the cap never shrank, and "Show more" went
-                                    // missing over a page the directory still had more of.
+                                    // the line after it, and nothing that stood below ran.
                                     var rep = fullRepresentation
                                     var rows = webRepeater
                                     var rowModel = webResultsModel
                                     rep._webHeld = rep._webHeld.concat([{ "url_resolved": webItem.model.url, "url": webItem.model.rawUrl, "stationuuid": webItem.model.rbUuid }])
                                     root.addStationToList(webItem.model.name, webItem.model.url, webItem.model.favicon, true, webItem.model.rbUuid, webItem.model.codec, webItem.model.bitrate)
                                     rowModel.remove(wasIndex)
-                                    rep.webResultCap =
-                                        Math.max(rowModel.count, rep.webResultCap - 1)
                                     // Keyboard flow: the focused row just vanished — land on
                                     // the row that took its place, or the last one left.
                                     var land = rows.itemAt(Math.min(wasIndex, rowModel.count - 1))
@@ -1891,7 +1887,7 @@ PlasmaExtras.Representation {
                                         EqBars {
                                             anchors.verticalCenter: parent.verticalCenter
                                             visible: webItem.isPreviewing
-                                            animating: visible && root.expanded && !root.thrifty
+                                            animating: visible && root.faceShown && !root.thrifty
                                             bars: 3
                                             barWidth: 3
                                             minHeight: 4
@@ -1913,6 +1909,7 @@ PlasmaExtras.Representation {
 
                                 // ⭐ = add PERMANENTLY to my stations + favorites
                                 CircleButton {
+                                    id: webStar
                                     anchors.right: parent.right
                                     anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5
                                     anchors.verticalCenter: parent.verticalCenter
@@ -1930,19 +1927,17 @@ PlasmaExtras.Representation {
                                     onTapped: root.previewStation(webItem.model.name, webItem.model.url, webItem.model.favicon, webItem.model.rbUuid, webItem.model.rawUrl, webItem.model.codec, webItem.model.bitrate)
                                 }
 
-                                PlasmaCore.ToolTipArea {
-                                    anchors.fill: parent
-                                    mainText: webItem.isPreviewing
-                                              ? i18n("Click = stop preview")
-                                              : i18n("Click = preview · ⭐ = add to my stations")
+                                PlasmaComponents3.ToolTip {
+                                    visible: webHover.hovered && !webStar.pointed
+                                    text: webItem.isPreviewing ? i18n("Click = stop preview") : i18n("Click = preview · ⭐ = add to my stations")
                                 }
                             }
                         }
 
                         PlasmaComponents3.ToolButton {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            visible: fullRepresentation._webPage.more && !fullRepresentation.webSearching
-                                     && fullRepresentation.webResultCap < fullRepresentation.webResultCapMax
+                            visible: !fullRepresentation.webSearching
+                                     && SearchLogic.pageOpen(fullRepresentation._webPage, webResultsModel.count, fullRepresentation.webResultCapMax)
                             text: i18n("Show more results")
                             icon.name: "arrow-down"
                             onClicked: loadMoreWeb()
@@ -2103,36 +2098,25 @@ PlasmaExtras.Representation {
                         // still on its own; thrifty stills it on battery.
                         SequentialAnimation on scale {
                             loops: Animation.Infinite
-                            running: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
+                            running: fullRepresentation._streamActive && root.view === 1 && root.faceShown && !root.thrifty
                             NumberAnimation { from: 1.0; to: 1.011; duration: 2600; easing.type: Easing.InOutSine }
                             NumberAnimation { from: 1.011; to: 1.0; duration: 2600; easing.type: Easing.InOutSine }
                         }
 
-                        Image {
+                        // How the picture is read, capped and kept in shape is CoverImage's business.
+                        CoverImage {
                             id: artImage
                             anchors.fill: parent
                             anchors.margins: 1
                             source: fullRepresentation._bestArtUrl
-                            fillMode: Image.PreserveAspectCrop
-                            // Catalog-controlled favicon can be a pixel-flood
-                            // image — cap the decode. The cover art panel is
-                            // never larger than a few hundred px.
-                            sourceSize.width: 600
-                            sourceSize.height: 600
-                            asynchronous: true
                             visible: status === Image.Ready
-                            smooth: true
 
                             // A url that 404s would otherwise pin the vinyl
                             // placeholder even when the next chain link
                             // (station image, favicon) would have loaded fine.
                             onStatusChanged: {
                                 if (status === Image.Error && source.toString() !== "") {
-                                    var m = {}
-                                    for (var k in fullRepresentation._brokenArtUrls)
-                                        m[k] = true
-                                    m[source.toString()] = true
-                                    fullRepresentation._brokenArtUrls = m
+                                    fullRepresentation._brokenArtUrls = CoverLogic.marked(fullRepresentation._brokenArtUrls, source.toString())
                                     // A corrupt CACHED favicon: mark it in the
                                     // central map too, so _bestArtUrl gets one
                                     // more try at the REMOTE favicon instead of
@@ -2146,8 +2130,6 @@ PlasmaExtras.Representation {
                                         root.faviconCacheBroken(root.currentStationFavicon)
                                 }
                             }
-
-                            Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
                         }
 
                         // 2026: spinning vinyl when there's no cover art
@@ -2163,51 +2145,13 @@ PlasmaExtras.Representation {
                                 to: 360
                                 duration: 9000
                                 loops: Animation.Infinite
-                                running: vinyl.visible && fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
+                                running: vinyl.visible && fullRepresentation._streamActive && root.view === 1 && root.faceShown && !root.thrifty
                             }
 
-                            Canvas {
+                            VinylDisc {
                                 anchors.fill: parent
-                                readonly property color tintA: root.accent
-                                readonly property color tintB: root.accentTeal
-                                onTintAChanged: requestPaint()
-                                onTintBChanged: requestPaint()
-                                onPaint: {
-                                    var ctx = getContext("2d")
-                                    ctx.reset()
-                                    var c = width / 2
-                                    // Record
-                                    ctx.beginPath()
-                                    ctx.arc(c, c, c - 1, 0, Math.PI * 2)
-                                    ctx.fillStyle = "#151515"
-                                    ctx.fill()
-                                    // Grooves
-                                    ctx.strokeStyle = "rgba(255,255,255,0.07)"
-                                    ctx.lineWidth = 1
-                                    for (var r = c * 0.45; r < c * 0.94; r += c * 0.055) {
-                                        ctx.beginPath()
-                                        ctx.arc(c, c, r, 0, Math.PI * 2)
-                                        ctx.stroke()
-                                    }
-                                    // Light glint
-                                    var g = ctx.createLinearGradient(0, 0, width, height)
-                                    g.addColorStop(0, fullRepresentation.cssRgba(tintA, 0.14))
-                                    g.addColorStop(0.5, fullRepresentation.cssRgba(tintA, 0))
-                                    g.addColorStop(1, fullRepresentation.cssRgba(tintB, 0.10))
-                                    ctx.beginPath()
-                                    ctx.arc(c, c, c - 1, 0, Math.PI * 2)
-                                    ctx.fillStyle = g
-                                    ctx.fill()
-                                    // Center hole
-                                    ctx.beginPath()
-                                    ctx.arc(c, c, c * 0.3, 0, Math.PI * 2)
-                                    ctx.fillStyle = "#1f1f1f"
-                                    ctx.fill()
-                                    ctx.beginPath()
-                                    ctx.arc(c, c, c * 0.045, 0, Math.PI * 2)
-                                    ctx.fillStyle = "#0a0a0a"
-                                    ctx.fill()
-                                }
+                                tintA: root.accent
+                                tintB: root.accentTeal
                             }
 
                             Rectangle {
@@ -2296,13 +2240,26 @@ PlasmaExtras.Representation {
                             anchors.bottom: parent.bottom
                             anchors.margins: Kirigami.Units.smallSpacing * 1.5
                             visible: fullRepresentation._streamActive
-                            animating: visible && root.expanded && !root.thrifty
+                            animating: visible && root.faceShown && !root.thrifty
                             bars: 4
                             barWidth: 4
                             minHeight: 6
                             maxHeight: Kirigami.Units.gridUnit
                             barColor: artImage.status === Image.Ready ? "white" : root.accentBright
                         }
+                    }
+
+                    // The cover answers a click and carries the artist's links.
+                    CoverTouch {
+                        anchors.fill: parent
+                        face: fullRepresentation
+                        accent: root.accent
+                        art: artImage.status === Image.Ready ? artImage.source : ""
+                        natural: artImage.natural
+                        kind: fullRepresentation._bestArtUrl === root.albumArtUrl ? root.albumArtKind : ""
+                        corner: playingEq.visible ? playingEq.width + Kirigami.Units.smallSpacing * 3 : 0
+                        trackArtist: fullRepresentation._podcastPlaying ? "" : root.trackArtist
+                        station: root.currentStation
                     }
                 }
 
@@ -2350,7 +2307,7 @@ PlasmaExtras.Representation {
                                 color: Kirigami.Theme.negativeTextColor
                                 SequentialAnimation on opacity {
                                     loops: Animation.Infinite
-                                    running: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
+                                    running: fullRepresentation._streamActive && root.view === 1 && root.faceShown && !root.thrifty
                                     NumberAnimation { from: 1.0; to: 0.25; duration: 800; easing.type: Easing.InOutSine }
                                     NumberAnimation { from: 0.25; to: 1.0; duration: 800; easing.type: Easing.InOutSine }
                                 }
@@ -2367,49 +2324,19 @@ PlasmaExtras.Representation {
 
                     // The timeshift pill takes the LIVE pill's place while
                     // the listener is behind the broadcast (the buffer is a
-                    // file, so _localPlayback hides LIVE on its own). One
-                    // tap catches back up.
-                    Rectangle {
-                        id: tsPill
-                        visible: root.tsShifted || root._tsPaused
-                        implicitHeight: tsPillLabel.implicitHeight + Kirigami.Units.smallSpacing
-                        implicitWidth: tsPillLabel.implicitWidth + Kirigami.Units.largeSpacing
-                        radius: height / 2
-                        color: Qt.alpha(root.accent, 0.14)
-                        border.width: 1
-                        border.color: Qt.alpha(root.accent, 0.4)
-
-                        // Behind-live counts on wall time, so the label must
-                        // tick even while the player is paused and no
-                        // position events arrive to re-run the binding.
-                        property int tick: 0
-                        Timer {
-                            interval: 1000
-                            repeat: true
-                            running: tsPill.visible && root.expanded
-                            onTriggered: tsPill.tick++
-                        }
-
-                        PlasmaComponents3.Label {
-                            id: tsPillLabel
-                            anchors.centerIn: parent
-                            text: {
-                                void tsPill.tick;
-                                return root._tsPaused
-                                    ? i18n("Paused · %1 behind live", root.tsBehindText(playMusic.position))
-                                    : i18n("%1 behind live — tap to catch up", root.tsBehindText(playMusic.position));
-                            }
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            font.weight: Font.Bold
-                            color: root.accentText
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            Accessible.name: i18n("Back to live")
-                            onClicked: root.timeshiftBackToLive()
-                        }
+                    // file, so _localPlayback hides LIVE on its own), with
+                    // a step of thirty seconds on either side of it where
+                    // the buffer slides (ShiftPill.qml).
+                    ShiftPill {
+                        shifted: root.tsShifted
+                        parked: root._tsPaused
+                        stepReady: root.tsStepReady
+                        open: root.faceShown
+                        accent: root.accent
+                        accentText: root.accentText
+                        behindOf: function() { return root.tsBehindText(playMusic.position) }
+                        onLive: root.timeshiftBackToLive()
+                        onStep: (ms) => root.timeshiftStep(ms)
                     }
 
                     Rectangle {
@@ -2553,38 +2480,22 @@ PlasmaExtras.Representation {
                         Layout.alignment: Qt.AlignVCenter
                         implicitWidth: Kirigami.Units.gridUnit * 4.5
                         implicitHeight: implicitWidth
-                        // A cast preview leaves the LOCAL player idle while the
-                        // speaker sounds — the same rule the result rows and
-                        // previewStation's toggle already follow. isPlaying()
-                        // alone showed Play here and started a second station
-                        // OVER the audible one.
-                        iconName: (isPlaying() || root._casting)
-                                  ? ((root.tsPauseAvailable || root.tsShifted) ? "media-playback-pause"
-                                                                               : "media-playback-stop")
-                                  : "media-playback-start"
+                        // The face is what a press does (TransportLogic.face,
+                        // asked of the facts the press itself is answered
+                        // from): a Pause where something is set down for
+                        // later, a Stop on live radio and on a cast.
+                        iconName: root.bigFace === "pause" ? "media-playback-pause" : (root.bigFace === "stop" ? "media-playback-stop" : "media-playback-start")
                         iconScale: 0.45
                         primary: true
-                        glowPulse: fullRepresentation._streamActive && root.view === 1 && root.expanded && !root.thrifty
-                        enabledState: stationsModel.count > 0 || isPlaying() || root._casting
-                                      || root._tsPaused || root.tsShifted || root._lastAudition !== null
-                        tooltipText: (isPlaying() || root._casting)
-                                     ? ((root.tsPauseAvailable || root.tsShifted) ? i18n("Pause") : i18n("Stop"))
-                                     : i18n("Play")
-                        onClicked: {
-                            // While audible: pause into the timeshift buffer
-                            // when one is ready, stop otherwise (preview and
-                            // cast included). Silent: resume the parked
-                            // shift, or whatever was heard last.
-                            if (isPlaying() || root._casting) {
-                                if (!root.timeshiftPause()) stopWithFade()
-                            } else if (root._tsPaused) {
-                                root.timeshiftResume()
-                            } else if (root.tsShifted) {
-                                playMusic.play()
-                            } else {
-                                root.playLast()
-                            }
-                        }
+                        glowPulse: fullRepresentation._streamActive && root.view === 1 && root.faceShown && !root.thrifty
+                        enabledState: root.canPlay
+                        tooltipText: root.bigFace === "pause" ? i18n("Pause") : (root.bigFace === "stop" ? i18n("Stop") : i18n("Play"))
+                        // While audible: pause into the timeshift buffer
+                        // when one is ready, stop otherwise (preview and
+                        // cast included), and an episode or a file is kept
+                        // for the next press. Silent: resume the parked
+                        // shift, or whatever was heard last.
+                        onClicked: root.transport("PlayPause")
                     }
 
                     CircleButton {
@@ -2618,8 +2529,8 @@ PlasmaExtras.Representation {
                         // It sits after the skip pair rather than inside it so
                         // the three controls a listener already knows stay put.
                         visible: TransportLogic.stopOffered(isPlaying(), root._casting,
-                                                            root._wantsPlaying, root._tsPaused,
-                                                            root.tsShifted, root.tsPauseAvailable)
+                                                            root._wantsPlaying, root._tsPaused, root.tsShifted,
+                                                            root.bigFace === "pause", root._pausedFile !== null)
                         tooltipText: i18n("Stop")
                         onClicked: stopWithFade()
                     }
@@ -2693,10 +2604,7 @@ PlasmaExtras.Representation {
                         text: PodcastLogic.fmtRate(root.podcastRate)
                         font.weight: root.podcastRate !== 1.0 ? Font.Bold : Font.Normal
                         Accessible.name: i18n("Playback speed")
-                        PlasmaCore.ToolTipArea {
-                            anchors.fill: parent
-                            mainText: i18n("Playback speed — tap to change")
-                        }
+                        PlasmaComponents3.ToolTip { text: i18n("Playback speed — tap to change") }
                         onClicked: root.cyclePodcastRate()
                         contentItem: PlasmaComponents3.Label {
                             text: parent.text
@@ -2882,12 +2790,12 @@ PlasmaExtras.Representation {
                         // Not checkable: one-shot action button; checked only drives the
                         // "downloading" visual, it is not a user-togglable state.
                         checked: root.downloading
-                        // && expanded: the infinite pulse ring must not tick in a hidden popup
-                        glowPulse: root.downloading && root.expanded && !root.thrifty
+                        // && faceShown: the infinite pulse ring must not tick in a hidden popup
+                        glowPulse: root.downloading && root.faceShown && !root.thrifty
                         enabledState: !root.downloading && (root.trackTitle !== "" || (root.title !== Plasmoid.title && root.title !== ""))
                         tooltipText: root.downloading
                                      ? i18n("Downloading…")
-                                     : i18n("Download this track (for offline listening)")
+                                     : i18n("Find and download this track (for offline listening)")
                         onClicked: root.downloadCurrentTrack()
                     }
 
@@ -2906,9 +2814,9 @@ PlasmaExtras.Representation {
                         checked: root.recording
                         checkedColor: "#E0463C"
                         checkedIconColor: "#FFFFFF"
-                        // && expanded: recordings run for hours — the pulse ring must
+                        // && faceShown: recordings run for hours — the pulse ring must
                         // not keep plasmashell's animation timer alive popup-closed
-                        glowPulse: root.recording && root.expanded && !root.thrifty
+                        glowPulse: root.recording && root.faceShown && !root.thrifty
                         enabledState: root.recording ? !root._recScheduled : canRec
                         tooltipText: {
                             if (root.recording && root._recScheduled)
@@ -3113,7 +3021,7 @@ PlasmaExtras.Representation {
                     EqBars {
                         Layout.alignment: Qt.AlignVCenter
                         visible: root.downloading
-                        animating: visible && root.expanded && !root.thrifty
+                        animating: visible && root.faceShown && !root.thrifty
                         bars: 3
                         barWidth: 3
                         minHeight: 4
@@ -3154,7 +3062,7 @@ PlasmaExtras.Representation {
                     EqBars {
                         Layout.alignment: Qt.AlignVCenter
                         visible: root.recording
-                        animating: visible && root.expanded && !root.thrifty
+                        animating: visible && root.faceShown && !root.thrifty
                         bars: 3
                         barWidth: 3
                         minHeight: 4
@@ -3192,8 +3100,8 @@ PlasmaExtras.Representation {
 
                 Kirigami.Icon {
                     source: libraryPage.showLiked ? "love" : "view-history"
-                    width: Kirigami.Units.iconSizes.small
-                    height: width
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                     color: root.accent
                 }
                 PlasmaComponents3.Label {
@@ -3326,6 +3234,7 @@ PlasmaExtras.Representation {
                                     }
                                 }
                                 CircleButton {
+                                    id: histGet
                                     implicitWidth: Kirigami.Units.gridUnit * 1.7
                                     implicitHeight: implicitWidth
                                     iconName: "download"
@@ -3337,6 +3246,7 @@ PlasmaExtras.Representation {
                                 }
                                 // Un-like straight from the list (liked view only)
                                 CircleButton {
+                                    id: histDrop
                                     implicitWidth: Kirigami.Units.gridUnit * 1.7
                                     implicitHeight: implicitWidth
                                     visible: libraryPage.showLiked
@@ -3354,9 +3264,9 @@ PlasmaExtras.Representation {
                             onTapped: root.youtubeSearchFor((histItem.model.artist ? histItem.model.artist + " " : "") + histItem.model.trackName)
                         }
 
-                        PlasmaCore.ToolTipArea {
-                            anchors.fill: parent
-                            mainText: i18n("Click = search on YouTube · ⬇ = download")
+                        PlasmaComponents3.ToolTip {
+                            visible: histHover.hovered && !histGet.pointed && !histDrop.pointed
+                            text: i18n("Click = search on YouTube · ⬇ = download")
                         }
                     }
                 }
@@ -3416,8 +3326,8 @@ PlasmaExtras.Representation {
 
                 Kirigami.Icon {
                     source: "folder-music"
-                    width: Kirigami.Units.iconSizes.small
-                    height: width
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                     color: root.accent
                 }
                 PlasmaComponents3.Label {
@@ -3464,7 +3374,7 @@ PlasmaExtras.Representation {
                             const i = fileName.lastIndexOf(".")
                             return i > 0 ? fileName.substring(0, i) : fileName
                         }
-                        readonly property bool isThisPlaying: isPlaying() && playMusic.source.toString() === localUrl
+                        readonly property bool isThisPlaying: (isPlaying() || root._pausedFile !== null) && playMusic.source.toString() === localUrl
                         readonly property bool isVideo: fileName.endsWith(".mp4") || fileName.endsWith(".webm")
                         width: libraryView.width - libraryView.leftMargin - libraryView.rightMargin
                         height: Kirigami.Units.gridUnit * 3
@@ -3473,11 +3383,11 @@ PlasmaExtras.Representation {
                         // reachable only with a pointer (same pattern as web rows)
                         activeFocusOnTab: true
                         Accessible.role: Accessible.Button
-                        Accessible.name: fileItem.isThisPlaying ? i18n("Stop: %1", displayName) : i18n("Play: %1", displayName)
+                        Accessible.name: fileItem.isThisPlaying && isPlaying() ? i18n("Pause: %1", displayName) : i18n("Play: %1", displayName)
                         Accessible.onPressAction: root.playLocalFile(fileItem.localUrl, fileItem.displayName)
                         Keys.onPressed: (event) => {
                             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                root.playLocalFile(fileItem.localUrl, fileItem.displayName)
+                                if (!event.isAutoRepeat) root.playLocalFile(fileItem.localUrl, fileItem.displayName)
                                 event.accepted = true
                             }
                         }
@@ -3515,7 +3425,8 @@ PlasmaExtras.Representation {
                                     EqBars {
                                         anchors.centerIn: parent
                                         visible: fileItem.isThisPlaying
-                                        animating: visible && root.expanded && !root.thrifty
+                                        paused: root._pausedFile !== null
+                                        animating: visible && root.faceShown && !root.thrifty
                                         bars: 3
                                         barWidth: 3
                                         minHeight: 4
@@ -4177,7 +4088,7 @@ PlasmaExtras.Representation {
                         readonly property string epTitle: meta && meta.title ? meta.title : fileName
                         readonly property int resumeSec: meta && meta.key
                                                          ? root.podcastPositionSec(meta.key) : 0
-                        readonly property bool isThisPlaying: isPlaying()
+                        readonly property bool isThisPlaying: (isPlaying() || root._pausedFile !== null)
                                     && playMusic.source.toString() === fileUrl.toString()
 
                         width: podDownloadsView.width - podDownloadsView.leftMargin
@@ -4199,7 +4110,7 @@ PlasmaExtras.Representation {
                         Keys.onPressed: (event) => {
                             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
                                 || event.key === Qt.Key_Space) {
-                                podDlRow._activate()
+                                if (!event.isAutoRepeat) podDlRow._activate()
                                 event.accepted = true
                             }
                         }
@@ -4273,6 +4184,7 @@ PlasmaExtras.Representation {
                                     textFormat: Text.PlainText
                                     text: {
                                         var bits = []
+                                        if (podDlRow.isThisPlaying && root._pausedFile !== null) bits.push(i18n("Paused"))
                                         if (podDlRow.meta && podDlRow.meta.show) bits.push(podDlRow.meta.show)
                                         bits.push(PodcastLogic.fmtSize(podDlRow.fileSize))
                                         if (podDlRow.resumeSec > 0)
@@ -4361,6 +4273,10 @@ PlasmaExtras.Representation {
                         hoverEnabled: true
                         Accessible.name: title
                         Accessible.role: Accessible.Button
+                        // An item delegate takes no focus unless told to: Tab went from star to star.
+                        focusPolicy: Qt.TabFocus
+                        onClicked: root.loadPodcastFeed(showRow.feedUrl, showRow.title, showRow.art)
+                        Keys.onPressed: (event) => ViewLogic.pressRow(event, showRow)
 
                         background: Item {
                             anchors.fill: parent
@@ -4370,9 +4286,9 @@ PlasmaExtras.Representation {
                                 radius: Kirigami.Units.smallSpacing * 1.5
                                 color: showRow.hovered ? Qt.alpha(root.accent, 0.07)
                                                        : Qt.alpha(Kirigami.Theme.textColor, 0.045)
-                                border.width: 1
-                                border.color: showRow.hovered ? Qt.alpha(root.accent, 0.25)
-                                                              : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                                border.width: showRow.activeFocus ? 2 : 1
+                                border.color: showRow.activeFocus ? root.accent : showRow.hovered
+                                              ? Qt.alpha(root.accent, 0.25) : Qt.alpha(Kirigami.Theme.textColor, 0.06)
                             }
                         }
 
@@ -4477,10 +4393,6 @@ PlasmaExtras.Representation {
                                 }
                             }
                         }
-
-                        TapHandler {
-                            onTapped: root.loadPodcastFeed(showRow.feedUrl, showRow.title, showRow.art)
-                        }
                     }
 
                     // Empty states, honest per mode. Suppressed while a feed
@@ -4568,7 +4480,7 @@ PlasmaExtras.Representation {
                         required property double dateMs
                         required property double durationMs
 
-                        readonly property bool isThisPlaying: isPlaying()
+                        readonly property bool isThisPlaying: (isPlaying() || root._pausedFile !== null)
                                     && (playMusic.source.toString() === url
                                         || (root._podPlayingRawUrl !== "" && root._podPlayingRawUrl === url))
                         readonly property string sub: {
@@ -4587,6 +4499,12 @@ PlasmaExtras.Representation {
                         hoverEnabled: true
                         Accessible.name: title
                         Accessible.role: Accessible.Button
+                        // Reached by Tab and pressed by key, the way the show rows are.
+                        focusPolicy: Qt.TabFocus
+                        onClicked: root.playPodcastEpisode(epsRow.url, epsRow.title,
+                                       PodcastLogic.episodeKey(epsRow.guid, epsRow.url),
+                                       epsRow.show, epsRow.art, epsRow.feed)
+                        Keys.onPressed: (event) => ViewLogic.pressRow(event, epsRow)
 
                         background: Item {
                             anchors.fill: parent
@@ -4596,9 +4514,9 @@ PlasmaExtras.Representation {
                                 radius: Kirigami.Units.smallSpacing * 1.5
                                 color: epsRow.hovered ? Qt.alpha(root.accent, 0.07)
                                                       : Qt.alpha(Kirigami.Theme.textColor, 0.045)
-                                border.width: 1
-                                border.color: epsRow.hovered ? Qt.alpha(root.accent, 0.25)
-                                                             : Qt.alpha(Kirigami.Theme.textColor, 0.06)
+                                border.width: epsRow.activeFocus ? 2 : 1
+                                border.color: epsRow.activeFocus ? root.accent : epsRow.hovered
+                                              ? Qt.alpha(root.accent, 0.25) : Qt.alpha(Kirigami.Theme.textColor, 0.06)
                             }
                         }
 
@@ -4646,7 +4564,8 @@ PlasmaExtras.Representation {
                                 EqBars {
                                     anchors.centerIn: parent
                                     visible: epsRow.isThisPlaying
-                                    animating: visible && root.expanded && !root.thrifty
+                                    paused: root._pausedFile !== null
+                                    animating: visible && root.faceShown && !root.thrifty
                                     bars: 3
                                     barWidth: 3
                                     minHeight: 4
@@ -4689,12 +4608,6 @@ PlasmaExtras.Representation {
                                 tooltipText: i18n("Open the show")
                                 onClicked: root.loadPodcastFeed(epsRow.feed, epsRow.show, epsRow.art)
                             }
-                        }
-
-                        TapHandler {
-                            onTapped: root.playPodcastEpisode(epsRow.url, epsRow.title,
-                                          PodcastLogic.episodeKey(epsRow.guid, epsRow.url),
-                                          epsRow.show, epsRow.art, epsRow.feed)
                         }
                     }
 
@@ -4811,8 +4724,8 @@ PlasmaExtras.Representation {
                             spacing: Kirigami.Units.smallSpacing
                             Kirigami.Icon {
                                 source: "chronometer"
-                                width: Kirigami.Units.iconSizes.small
-                                height: width
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                                Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                                 color: root.accent
                             }
                             PlasmaComponents3.Label {
@@ -4880,8 +4793,8 @@ PlasmaExtras.Representation {
                         spacing: Kirigami.Units.smallSpacing
                         Kirigami.Icon {
                             source: "clock"
-                            width: Kirigami.Units.iconSizes.small
-                            height: width
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                             color: root.accent
                         }
                         PlasmaComponents3.Label {
@@ -5105,8 +5018,8 @@ PlasmaExtras.Representation {
                         spacing: Kirigami.Units.smallSpacing
                         Kirigami.Icon {
                             source: "media-record"
-                            width: Kirigami.Units.iconSizes.small
-                            height: width
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                             color: "#E0463C"
                         }
                         PlasmaComponents3.Label {
@@ -5413,24 +5326,16 @@ PlasmaExtras.Representation {
                 filterField.text = ""
                 event.accepted = true
             }
-        } else if (event.key === Qt.Key_Space && !_inputFocused()) {
+        } else if (event.key === Qt.Key_Space && !_inputFocused() && !event.isAutoRepeat) {
             // A true play/stop toggle: anything audible right now — a station,
             // a preview, a local file, a cast session — stops. Without the
             // stop branch, Space during a preview (lastPlay === -1) started
             // station 0 over it instead of stopping. Timeshift takes the
             // same roads here as the play button and the panel click.
-            if (isPlaying() || root._casting) {
-                if (!root.timeshiftPause()) stopWithFade()
-            } else if (root._tsPaused) {
-                root.timeshiftResume()
-            } else if (root.tsShifted) {
-                playMusic.play()
-            } else {
-                root.playLast()
-            }
+            root.transport("PlayPause")
             event.accepted = true
         } else if (event.key === Qt.Key_M && !_inputFocused() && root.view !== 0) {
-            root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
+            if (!event.isAutoRepeat) root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
             event.accepted = true
         } else if (root.view === 0 && !_inputFocused() && typeToSearch(event)) {
             // Open-and-type: any letter nobody above claimed lands in the search
@@ -5455,29 +5360,22 @@ PlasmaExtras.Representation {
             anchors.right: parent.right
             height: Kirigami.Units.gridUnit * 4.5
             anchors.leftMargin: Kirigami.Units.smallSpacing * 1.5
-            // The heading text stays clear of the pin's corner seat.
-            anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5
-                                 + (pinButton.visible ? pinButton.width : 0)
+            // The heading text stays clear of the corner's buttons.
+            anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5 + seatButtons.width
         }
 
-        // Pinned, the popup survives clicks elsewhere (the same pattern the
-        // folder-view popup uses); the state lives in a config key, so a
-        // pinned player is still pinned after a restart. Hidden on a desktop
-        // containment — an inline face has no popup to hold open.
-        PlasmaComponents3.ToolButton {
-            id: pinButton
+        // The pin, and the way to a window of its own and back (SeatButtons.qml).
+        SeatButtons {
+            id: seatButtons
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.topMargin: Kirigami.Units.smallSpacing
             anchors.rightMargin: Kirigami.Units.smallSpacing
-            icon.name: "window-pin"
-            checkable: true
-            checked: Plasmoid.configuration.pin
-            onToggled: Plasmoid.configuration.pin = checked
-            visible: !root.planar
-            focusPolicy: Qt.TabFocus
-            Accessible.name: i18n("Keep open")
-            PlasmaComponents3.ToolTip { text: i18n("Keep open") }
+            planar: root.planar
+            inWindow: playerWindow.seat === "window"
+            pinned: Plasmoid.configuration.pin
+            onPinToggled: (on) => Plasmoid.configuration.pin = on
+            onMoveAsked: playerWindow.detached = !playerWindow.detached
         }
 
         // The popup's map, finally on the surface: four labeled tabs.
@@ -5681,14 +5579,16 @@ PlasmaExtras.Representation {
                     if (root.downloading) {
                         return "⬇ " + i18n("Downloading…")
                     }
-                    if (root._casting) {
-                        return i18n("Casting to %1", root._castName)
+                    if (root._casting || (root._castFailedName !== "" && !isPlaying())) {
+                        return root._casting ? i18n("Casting to %1", root._castName)
+                             : root._castFailedRefused ? i18n("%1 cannot play this station", root._castFailedName)
+                             : i18n("Could not cast to %1", root._castFailedName)
                     }
-                    if (root._tsPaused)
+                    if (root._tsPaused || root._pausedFile !== null)
                         // Without this the paused footer read "Connecting…" —
                         // the loading-state branch below catches a stopped
                         // player — which looks like a hang, not a pause.
-                        return i18n("Paused — the station keeps recording")
+                        return root.tsBuffering ? i18n("Paused — still buffering live radio") : i18n("Paused")
                     if (ViewLogic.offlineWord(isConnected, fullRepresentation._localPlayback, fullRepresentation._streamActive))
                         return i18n("Check internet connection…")
                     else if (root.isError)
@@ -5701,11 +5601,8 @@ PlasmaExtras.Representation {
                     else if (fullRepresentation._streamActive) {
                         if (fullRepresentation._nowBitrate > 0)
                             return i18n("Bitrate: %1 kb/s", fullRepresentation._nowBitrate)
-                        else
-                            // A playing local file has no ICY title to wait
-                            // for — it is simply playing, never "connecting".
-                            return (root.title !== Plasmoid.title || fullRepresentation._localPlayback)
-                                   ? "♪ " + i18n("Playing") : i18n("Connecting…")
+                        else   // sound is the proof, not a title: _sounds
+                            return fullRepresentation._sounds ? "♪ " + i18n("Playing") : i18n("Connecting…")
                     } else if (playMusic.mediaStatus === MediaPlayer.LoadingMedia
                                || playMusic.mediaStatus === MediaPlayer.LoadedMedia)
                         return i18n("Connecting…")
@@ -5715,14 +5612,12 @@ PlasmaExtras.Representation {
                     else if (root._friendlyError !== "")
                         return root._friendlyError  // a dead preview's word, until the next play or stop
                     else
-                        return i18n("Choose station and enjoy…")
+                        return i18n("Choose a station to start listening")
                 }
             }
 
-            // Cast button — DLNA renderers (TVs, soundbars, network speakers)
-            // work with no extra packages; Google Cast devices additionally
-            // appear when pychromecast is installed. Hidden only when
-            // the bridge itself is unusable (no python3).
+            // Cast button — DLNA renderers (TVs, soundbars, network speakers) work with no extra packages;
+            // Google Cast devices additionally appear when pychromecast is installed.
             CircleButton {
                 id: castBtn
                 Layout.alignment: Qt.AlignVCenter
@@ -5739,8 +5634,7 @@ PlasmaExtras.Representation {
                 // one state where feedback matters most: while casting. The
                 // checked state already says "active", so the same
                 // video-display carries both.
-                iconName: (root._casting || root._castAvailable) ? "video-display"
-                          : "audio-volume-high"
+                iconName: (root._casting || root._castAvailable) ? "video-display" : "audio-volume-high"
                 iconScale: 0.55
                 checkable: true
                 checked: root._casting
@@ -5778,12 +5672,12 @@ PlasmaExtras.Representation {
                     // menu can stay "opened" inside a hidden popup (a click on
                     // the desktop hides the applet without closing the menu),
                     // and an unguarded heartbeat then spawned a bluetoothctl
-                    // pipeline every 5 s forever — the same !expanded pause
-                    // every other timer here honours. A desktop face never
-                    // closes, so a menu left open there slows the beat to
-                    // 15 s until the pointer comes back.
-                    running: castMenu.opened && root.expanded
-                    interval: root.planar && !root.faceHovered ? 15000 : 5000
+                    // pipeline every 5 s forever — the same !faceShown pause
+                    // every other timer here honours. A desktop face and a
+                    // window never close, so a menu left open there slows the
+                    // beat to 15 s until somebody is back at the face.
+                    running: castMenu.opened && root.faceShown
+                    interval: playerWindow.faceWatched ? 5000 : 15000
                     repeat: true
                     onTriggered: root.btList()
                 }
@@ -5919,35 +5813,42 @@ PlasmaExtras.Representation {
 
                         Kirigami.Separator { Layout.fillWidth: true; opacity: 0.4 }
 
-                        // Master volume — the one the per-speaker balances
-                        // all follow. It lived on a separate footer button;
-                        // the output hub is where every audio control
-                        // belongs, so it moved here (the panel icon's scroll
-                        // wheel still nudges it without opening anything).
+                        // Master volume, the one the per-speaker balances all follow (the panel
+                        // icon's wheel nudges it without opening anything), under its name: on
+                        // the default output it is the system's, and moves every application.
+                        PlasmaComponents3.Label {
+                            id: volumeCaption
+                            Layout.leftMargin: Kirigami.Units.smallSpacing
+                            readonly property string word: TransportLogic.volumeName(root.masterRoadOf(""), root._casting, root._castLocalPlay)
+                            text: word === "system" ? i18n("System volume") : (word === "device" ? i18n("Device volume") : i18n("On Air volume"))
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            opacity: 0.7
+                        }
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.smallSpacing
                             Layout.rightMargin: Kirigami.Units.smallSpacing
                             spacing: Kirigami.Units.smallSpacing
 
-                            // ONE knob per room: whenever playback hangs off
-                            // the default sink (sync on, or follow-default
-                            // routing) this row IS the system volume — the
-                            // same one the keyboard's volume keys turn, so
-                            // the knob and the slider finally mirror each
-                            // other. Pinned-device routing keeps the old
-                            // stream-volume semantics, where the system
-                            // default is somebody else's business.
-                            readonly property bool roomMode:
-                                root.sync._combineWantActive || root.sync._combineActive
-                                || (Plasmoid.configuration.audioOutputDevice || "") === ""
+                            // ONE knob per room: on the default sink (sync on, or follow-default
+                            // routing) this row IS the system volume, the one the keyboard's keys
+                            // turn. A pinned output and a device that plays alone keep the widget's
+                            // own volume; the reasons are with TransportLogic.volumeRoad.
+                            readonly property bool roomMode: root.masterRoadOf(masterVolumeSlider.dragRoad) === "sink"
+                            // One answer for both gestures: which knob, and what a device that plays along is told.
+                            function gesture(kind, level) {
+                                var to = TransportLogic.masterGesture(kind, roomMode ? "sink" : "player", root._casting, root._castLocalPlay,
+                                                                      level, playMusicOutput.volume, root.targetVolume(), root._ownMuted)
+                                if (to.sink >= 0) root.setSinkMaster(to.sink)
+                                if (to.sinkMute) root.toggleSinkMasterMute(to.castFollows)
+                                if (to.player >= 0) root.setUserVolume(to.player)
+                                if (to.cast >= 0) root._castSetVolume(to.cast)
+                            }
                             readonly property real shownVol:
                                 roomMode && root._sinkMasterPct >= 0
                                 ? Math.min(1, root._sinkMasterPct / 100.0)
                                 : playMusicOutput.volume
-                            readonly property bool shownMuted:
-                                roomMode ? (root._sinkMasterMuted || shownVol <= 0)
-                                         : playMusicOutput.volume <= 0
+                            readonly property bool shownMuted: (roomMode && root._sinkMasterMuted) || shownVol <= 0
 
                             CircleButton {
                                 implicitWidth: Kirigami.Units.gridUnit * 2
@@ -5963,10 +5864,7 @@ PlasmaExtras.Representation {
                                 // Absolute gesture (mute/unmute names its level)
                                 // — no step flag, so the auto-care park folds it
                                 // as spoken rather than as a delta.
-                                onClicked: {
-                                    if (parent.roomMode) root.toggleSinkMasterMute()
-                                    else root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume())
-                                }
+                                onClicked: parent.gesture("mute", 0)
                             }
                             PlasmaComponents3.Slider {
                                 id: masterVolumeSlider
@@ -5975,11 +5873,11 @@ PlasmaExtras.Representation {
                                 to: 1
                                 stepSize: 0.05
                                 value: parent.shownVol
-                                onMoved: {
-                                    if (parent.roomMode) root.setSinkMaster(value * 100)
-                                    else root.setUserVolume(value)
-                                }
-                                Accessible.name: i18n("Volume")
+                                // A drag keeps the knob it began on, also when a cast ends or begins under it.
+                                property string dragRoad: ""
+                                onPressedChanged: dragRoad = pressed ? (parent.roomMode ? "sink" : "player") : ""
+                                onMoved: parent.gesture("move", value)
+                                Accessible.name: volumeCaption.text
                             }
                             PlasmaComponents3.Label {
                                 text: Math.round(parent.shownVol * 100) + "%"
@@ -6014,31 +5912,18 @@ PlasmaExtras.Representation {
 
                         // Local output picker (Bluetooth speakers, HDMI,
                         // headphones…). Only shown when there is a choice.
-                        QQC2.ComboBox {
+                        // Which row shows over a list that changes under it
+                        // is OutputBox.qml's to keep right.
+                        OutputBox {
                             id: outputCombo
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
                             Layout.rightMargin: Kirigami.Units.smallSpacing
                             visible: mediaDevices.audioOutputs.length > 1
-                            model: {
-                                var names = [i18n("System default output")];
-                                var outs = mediaDevices.audioOutputs;
-                                for (var i = 0; i < outs.length; i++)
-                                    names.push(outs[i].description);
-                                return names;
-                            }
-                            currentIndex: {
-                                var wanted = Plasmoid.configuration.audioOutputDevice || "";
-                                if (wanted === "") return 0;
-                                var outs = mediaDevices.audioOutputs;
-                                for (var i = 0; i < outs.length; i++)
-                                    if (String(outs[i].id) === wanted) return i + 1;
-                                return 0;
-                            }
-                            onActivated: function(index) {
-                                var outs = mediaDevices.audioOutputs;
-                                root.setAudioOutputDevice(index === 0 ? "" : String(outs[index - 1].id));
-                            }
+                            firstRow: i18n("System default output")
+                            outs: mediaDevices.audioOutputs
+                            wanted: Plasmoid.configuration.audioOutputDevice || ""
+                            onChosen: (id) => root.setAudioOutputDevice(id)
                         }
 
                         // Every local output at once, in sync: a PipeWire
@@ -6128,7 +6013,7 @@ PlasmaExtras.Representation {
                             }
 
                             PlasmaComponents3.ToolTip {
-                                text: i18n("Listens now and then while music plays and puts the speakers back in step on its own. Nothing is audible and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you.")
+                                text: i18n("Listens now and then while music plays and puts the speakers back in step on its own. Most people hear nothing, and the music is never interrupted — if it ever cannot fix the drift on its own, it says so and leaves the measuring to you.")
                             }
                         }
 
@@ -6263,6 +6148,50 @@ PlasmaExtras.Representation {
                             }
                         }
 
+                        // The whole ride, both rounds: the quiet gap between
+                        // the calibration clicks and the check clicks reads
+                        // as "done" — this row stays up until it really is.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
+                            Layout.margins: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.smallSpacing
+                            visible: root.sync.calibPhase !== ""
+                            PlasmaComponents3.BusyIndicator {
+                                implicitWidth: Kirigami.Units.iconSizes.small
+                                implicitHeight: implicitWidth
+                            }
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: root.sync.calibPhase !== "clicks" ? i18n("Round 2 of 2 — quiet, checking the result…")
+                                      : Plasmoid.configuration.syncUltrasonic !== false ? i18n("Round 1 of 2 — measuring with a tone too high to hear…")
+                                      : i18n("Round 1 of 2 — clicks through every speaker…")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                font.weight: Font.DemiBold
+                                // The full sentence must be readable, not
+                                // clipped at the popup's edge — it wraps.
+                                wrapMode: Text.WordWrap
+                                // Red on purpose: this is the one line that
+                                // must catch the eye before someone decides
+                                // the quiet gap means "done" and walks off
+                                // mid-measurement. Theme red, both schemes.
+                                color: Kirigami.Theme.negativeTextColor
+                            }
+                            // The way OUT. A measurement the user did not
+                            // ask for this minute (the caretaker's verify)
+                            // used to play its clicks with no control in
+                            // sight — the row is visible whenever a run is
+                            // on, even if the sync box was unticked mid-run.
+                            PlasmaComponents3.Button {
+                                icon.name: "process-stop"
+                                text: i18n("Stop")
+                                onClicked: root.sync.calibrateCancel()
+                                PlasmaComponents3.ToolTip {
+                                    text: i18n("Stops the measurement, unmutes every speaker and gives the music back.")
+                                }
+                            }
+                        }
+
                         // A grey button with no word is a riddle: when the
                         // pair is not there, say WHY the room cannot be
                         // measured instead of leaving a dead control.
@@ -6301,7 +6230,7 @@ PlasmaExtras.Representation {
                             text: i18n("Keep sync tuned automatically")
 
                             PlasmaComponents3.ToolTip {
-                                text: i18n("Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only — never stored, never sent anywhere.")
+                                text: i18n("Plays a short tone too high to hear through each speaker every few minutes and re-checks the sync when they drift apart. Audio is processed on this computer only: a short recording is kept for the check and deleted after it, and nothing is sent anywhere.")
                             }
                         }
 
@@ -6424,50 +6353,6 @@ PlasmaExtras.Representation {
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.6
                                 wrapMode: Text.WordWrap
-                            }
-                        }
-
-                        // The whole ride, both rounds: the quiet gap between
-                        // the calibration clicks and the check clicks reads
-                        // as "done" — this row stays up until it really is.
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: Kirigami.Units.gridUnit * 1.5
-                            Layout.margins: Kirigami.Units.smallSpacing
-                            spacing: Kirigami.Units.smallSpacing
-                            visible: root.sync.calibPhase !== ""
-                            PlasmaComponents3.BusyIndicator {
-                                implicitWidth: Kirigami.Units.iconSizes.small
-                                implicitHeight: implicitWidth
-                            }
-                            PlasmaComponents3.Label {
-                                Layout.fillWidth: true
-                                text: root.sync.calibPhase === "clicks"
-                                      ? i18n("Round 1 of 2 — clicks through every speaker…")
-                                      : i18n("Round 2 of 2 — quiet, checking the result…")
-                                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                font.weight: Font.DemiBold
-                                // The full sentence must be readable, not
-                                // clipped at the popup's edge — it wraps.
-                                wrapMode: Text.WordWrap
-                                // Red on purpose: this is the one line that
-                                // must catch the eye before someone decides
-                                // the quiet gap means "done" and walks off
-                                // mid-measurement. Theme red, both schemes.
-                                color: Kirigami.Theme.negativeTextColor
-                            }
-                            // The way OUT. A measurement the user did not
-                            // ask for this minute (the caretaker's verify)
-                            // used to play its clicks with no control in
-                            // sight — the row is visible whenever a run is
-                            // on, even if the sync box was unticked mid-run.
-                            PlasmaComponents3.Button {
-                                icon.name: "process-stop"
-                                text: i18n("Stop")
-                                onClicked: root.sync.calibrateCancel()
-                                PlasmaComponents3.ToolTip {
-                                    text: i18n("Stops the measurement, unmutes every speaker and gives the music back.")
-                                }
                             }
                         }
 
@@ -6637,46 +6522,18 @@ PlasmaExtras.Representation {
                                 required property bool connected
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
+                                // The tick first, so Tab meets the speaker and then its Forget;
+                                // laid out from the right, Forget still stands at the far left.
+                                layoutDirection: Qt.RightToLeft
 
-                                // One hover for the WHOLE row, gaps included:
-                                // per-child hover made the trash blink while
-                                // the pointer crossed the seam to the tick.
+                                // One hover for the WHOLE row, gaps included: per-child hover made
+                                // the trash blink while the pointer crossed the seam to the tick.
                                 HoverHandler { id: btRowHover }
-
-                                // Forget lives at the FAR LEFT, a full row
-                                // away from the tick — nobody should have to
-                                // guess which of two neighbouring targets
-                                // their click will land on. Two taps, because
-                                // the road back is a fresh pairing.
-                                CircleButton {
-                                    id: btForgetBtn
-                                    property bool armed: false
-                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
-                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
-                                    Layout.alignment: Qt.AlignVCenter
-                                    iconName: armed ? "dialog-warning" : "user-trash"
-                                    iconScale: 0.5
-                                    baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
-                                    opacity: (btRowHover.hovered || armed) ? 0.75 : 0.0
-                                    visible: opacity > 0.0 && root._btConnectingMac === ""
-                                             && root._btPairingMac === ""
-                                    Behavior on opacity {
-                                        NumberAnimation { duration: Kirigami.Units.shortDuration }
-                                    }
-                                    tooltipText: armed
-                                                 ? i18n("Tap again to forget — pairing again is the only way back")
-                                                 : i18n("Forget this device (unpair)")
-                                    onClicked: {
-                                        if (!armed) { armed = true; btForgetDisarm.restart(); return }
-                                        armed = false
-                                        root.btForget(btRow.mac)
-                                    }
-                                    Timer { id: btForgetDisarm; interval: 3000; onTriggered: btForgetBtn.armed = false }
-                                }
 
                                 PlasmaComponents3.CheckDelegate {
                                     id: btRowDelegate
                                     Layout.fillWidth: true
+                                    focusPolicy: Qt.TabFocus
                                     // Connected is not the same as audible, and
                                     // the tick used to claim it was: a JBL that
                                     // links up without its A2DP profile answers
@@ -6717,6 +6574,34 @@ PlasmaExtras.Representation {
                                         if (wasConnected) root.btDisconnect(btRow.mac)
                                         else root.btConnect(btRow.mac, btRow.name)
                                     }
+                                }
+
+                                // Forget at the FAR LEFT, a full row away from the tick: nobody should guess
+                                // which of two neighbours a click lands on. Two taps, because the road back
+                                // is a fresh pairing, and the first is dropped when the button goes (Escape).
+                                CircleButton {
+                                    id: btForgetBtn
+                                    property bool armed: false
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
+                                    Layout.alignment: Qt.AlignVCenter
+                                    iconName: armed ? "dialog-warning" : "user-trash"
+                                    iconScale: 0.5
+                                    baseColor: armed ? Kirigami.Theme.negativeTextColor : "transparent"
+                                    opacity: (btRowHover.hovered || armed || activeFocus || btRowDelegate.activeFocus) ? 0.75 : 0.0
+                                    visible: (opacity > 0.0 || activeFocus || btRowDelegate.activeFocus) && root._btConnectingMac === ""
+                                             && root._btPairingMac === ""
+                                    onVisibleChanged: if (!visible) armed = false
+                                    Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+                                    tooltipText: armed
+                                                 ? i18n("Tap again to forget — pairing again is the only way back")
+                                                 : i18n("Forget this device (unpair)")
+                                    onClicked: {
+                                        if (!armed) { armed = visible; btForgetDisarm.restart(); return }
+                                        armed = false
+                                        root.btForget(btRow.mac)
+                                    }
+                                    Timer { id: btForgetDisarm; interval: 3000; onTriggered: btForgetBtn.armed = false }
                                 }
                             }
                         }
@@ -6788,10 +6673,8 @@ PlasmaExtras.Representation {
 
                         Repeater {
                             model: castDevicesModel
-                            // Per-role required properties, NOT `required
-                            // property var model`: a role named "model"
-                            // shadowed the delegate's model object and left
-                            // every row blank (2026.8).
+                            // Per-role required properties, NOT `required property var model`: a role named "model"
+                            // shadowed the delegate's model object and left every row blank (2026.8).
                             delegate: ColumnLayout {
                                 id: castRow
                                 required property string kind
@@ -6801,25 +6684,25 @@ PlasmaExtras.Representation {
                                 required property int port
                                 required property string deviceModel
                                 required property string location
-                                // Speaker groups made in the Google Home app
-                                // are one mDNS entry with this model name.
-                                // Google keeps the members sample-synced —
-                                // the only true whole-home sync we can offer.
+                                // Speaker groups made in the Google Home app are one mDNS entry with this model name.
+                                // Google keeps the members sample-synced — the only true whole-home sync we can offer.
                                 readonly property bool isGroup: deviceModel === "Google Cast Group"
                                 readonly property bool isTarget: root.castTargetIndex(uuid) >= 0
+                                // Ticked and asked, and it turned this station's address down. The tick stays, so the row has to
+                                // say it: a Ruark that refused sat beside a television that played with nothing to tell them apart.
+                                readonly property bool refused: root.castRefused(uuid)
                                 Layout.fillWidth: true
                                 spacing: 0
 
                                 PlasmaComponents3.CheckDelegate {
                                     Layout.fillWidth: true
                                     text: castRow.isGroup ? i18n("%1 (speaker group)", castRow.name) : castRow.name
-                                    // The icon answers "how is this connected?" —
-                                    // WiFi fan vs Bluetooth rune vs the group
-                                    // glyph — so the menu reads at a glance which
-                                    // radio a device is on (asked for explicitly:
-                                    // everything connectable from one place).
-                                    icon.name: castRow.isGroup ? "audio-speakers-symbolic" : "network-wireless"
+                                    // The icon answers "how is this connected?" — WiFi fan vs Bluetooth rune vs the group glyph —
+                                    // so the menu reads at a glance which radio a device is on (asked for explicitly: everything
+                                    // connectable from one place). A device that refused the station wears a warning in its place.
+                                    icon.name: castRow.refused ? "dialog-warning" : castRow.isGroup ? "audio-speakers-symbolic" : "network-wireless"
                                     checked: castRow.isTarget
+                                    PlasmaComponents3.ToolTip { text: castRow.refused ? i18n("Cannot play this station") : "" }
                                     onToggled: root.castToggleDevice({
                                         "kind": castRow.kind, "uuid": castRow.uuid, "name": castRow.name,
                                         "host": castRow.host, "port": castRow.port,

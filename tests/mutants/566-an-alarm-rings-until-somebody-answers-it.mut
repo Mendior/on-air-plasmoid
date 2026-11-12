@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An alarm nobody answered goes on counting as ringing after its half hour.
+
+history:
+  Somebody who has had the alarm's station on for half an hour is up, and
+  an empty flat has nobody in it to wake. With no end to the ringing, a
+  network that drops hours later and is not back within the knock's eight
+  seconds ends in the tone, at the alarm's volume, until somebody comes
+  home.
+
+target:
+  package/contents/ui/AlarmLogic.js
+
+find:
+      return nowMs - firedAtMs <= WAKE_WINDOW_MS;
+
+replace:
+      return nowMs - firedAtMs >= 0;
+
+expect:
+  Killed by tst_alarmlogic::test_an_alarm_rings_for_half_an_hour_from_its_fire.
+  Line-neutral.

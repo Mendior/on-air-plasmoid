@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An open window asks the sound server every two seconds whether or not anybody is at it.
+
+history:
+  Every tick of the level poll is a shell with two pactl, two grep, head
+  and tr. A window is on screen all day, minimised or not, so "on screen"
+  kept the poll at full rate beside other work: 1800 shells an hour. The
+  rate goes by somebody being at the face.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          interval: playerWindow.faceWatched ? 2000 : 30000
+
+replace:
+          interval: playerWindow.faceShown ? 2000 : 30000
+
+expect:
+  Killed by tests/test_invariants.py::test_the_level_is_asked_at_full_rate_only_while_somebody_is_at_the_face.
+  Line-neutral.

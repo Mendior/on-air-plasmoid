@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The ground under the line on the cover lets most of the picture through.
+
+history:
+  The line lies on a picture of any colour, a white sleeve among them.
+  Its own dark ground at 0.72 keeps white letters at 9.3 to 1 there. At 0.3
+  the same letters on a white sleeve read under 2 to 1. This mutant thins
+  the ground.
+
+target:
+  package/contents/ui/CoverNote.qml
+
+find:
+      color: Qt.rgba(0, 0, 0, 0.72)
+
+replace:
+      color: Qt.rgba(0, 0, 0, 0.3)
+
+expect:
+  Killed by tests/qml/tst_covernote.qml::test_the_words_read_on_any_picture.
+  Line-neutral.

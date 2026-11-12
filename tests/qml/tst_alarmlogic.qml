@@ -8,6 +8,7 @@ import QtQuick
 import QtTest
 
 import "../../package/contents/ui/AlarmLogic.js" as AL
+import "../../package/contents/ui/StandLogic.js" as SL
 
 TestCase {
     name: "AlarmLogic"
@@ -500,5 +501,122 @@ TestCase {
             { keepAwake: true, nextRun: 4 },
             { keepAwake: true, nextRun: 0 }   // malformed: never counts
         ]), 4)
+    }
+
+    // ── a station that falls silent while the alarm rings ────────────────
+
+    function test_the_numbers_the_tones_later_checks_are_built_on() {
+        compare(AL.WAKE_GRACE_MS, 8000)
+        compare(AL.WAKE_STARTED_MS, 5000)
+        compare(AL.WAKE_BACK_MS, 3000)
+        // A connection that is let through has to be one the stand watch can watch.
+        verify(AL.WAKE_BACK_MS >= SL.ARM_MS)
+        // 2.5 s to the first sound and the sound itself fit in the grace.
+        verify(2500 + AL.WAKE_BACK_MS < AL.WAKE_GRACE_MS)
+    }
+
+    function test_an_alarm_rings_for_half_an_hour_from_its_fire() {
+        var fired = ms(2026, 11, 12, 7, 0);
+        compare(AL.WAKE_WINDOW_MS, 1800000)
+        verify(AL.wakeRings(fired, fired))
+        verify(AL.wakeRings(fired, fired + 9000))
+        verify(AL.wakeRings(fired, fired + 1799999))
+        verify(AL.wakeRings(fired, fired + 1800000))
+        verify(!AL.wakeRings(fired, fired + 1800001))
+        verify(!AL.wakeRings(fired, fired + 3600000))
+        verify(AL.wakeRings(1, 2))
+    }
+
+    function test_a_clock_that_jumped_ends_the_ringing_and_cannot_lengthen_it() {
+        var fired = ms(2026, 11, 12, 7, 0);
+        // Set back behind the fire: an hour, a second, a millisecond.
+        verify(!AL.wakeRings(fired, fired - 3600000))
+        verify(!AL.wakeRings(fired, fired - 1000))
+        verify(!AL.wakeRings(fired, fired - 1))
+        verify(!AL.wakeRings(fired, 0))
+        verify(!AL.wakeRings(fired, -1))
+        // Set forward, or eight hours asleep.
+        verify(!AL.wakeRings(fired, fired + 28800000))
+        verify(!AL.wakeRings(fired, Number.MAX_VALUE))
+    }
+
+    function test_no_fire_and_no_clock_ring_nothing() {
+        var noFire = [0, -1, undefined, null, NaN, Infinity, "1794466800000", {}];
+        for (var i = 0; i < noFire.length; i++) verify(!AL.wakeRings(noFire[i], 1794466800000), "fired " + String(noFire[i]))
+        var noClock = [undefined, null, NaN, Infinity, "1794466800001", {}];
+        for (i = 0; i < noClock.length; i++) verify(!AL.wakeRings(1794466800000, noClock[i]), "now " + String(noClock[i]))
+        verify(!AL.wakeRings())
+    }
+
+    function test_a_knock_has_eight_seconds_before_the_check() {
+        compare(AL.wakeGraceLeftMs(100000, 100000), 8000)
+        compare(AL.wakeGraceLeftMs(100000, 102400), 5600)
+        compare(AL.wakeGraceLeftMs(100000, 107999), 1)
+        compare(AL.wakeGraceLeftMs(100000, 108000), 0)
+        compare(AL.wakeGraceLeftMs(100000, 3600000), 0)
+        compare(AL.wakeGraceLeftMs(1, 2), 7999)
+    }
+
+    function test_a_clock_set_back_does_not_lengthen_the_wait() {
+        compare(AL.wakeGraceLeftMs(100000, 99999), 8000)
+        compare(AL.wakeGraceLeftMs(100000, 0), 8000)
+        compare(AL.wakeGraceLeftMs(100000, -7200000), 8000)
+    }
+
+    function test_no_fall_is_no_wait() {
+        var noFall = [0, -1, undefined, null, NaN, Infinity, "100000", {}];
+        for (var i = 0; i < noFall.length; i++) compare(AL.wakeGraceLeftMs(noFall[i], 100000), 0, String(noFall[i]))
+        var noClock = [undefined, null, NaN, Infinity, "100001", {}];
+        for (i = 0; i < noClock.length; i++) compare(AL.wakeGraceLeftMs(100000, noClock[i]), 0, String(noClock[i]))
+        compare(AL.wakeGraceLeftMs(), 0)
+    }
+
+    function test_a_station_that_never_fell_sounds_once_it_has_started() {
+        // 2026-08-10 23:08:46: playing, Buffering, 24917 ms, and it could be heard.
+        verify(AL.wakeSounds(true, false, 24917, false))
+        verify(AL.wakeSounds(true, false, 5001, false))
+        verify(!AL.wakeSounds(true, false, 5000, false))
+        verify(!AL.wakeSounds(true, false, 800, false))
+        verify(AL.wakeSounds(true, true, 0, false))
+        verify(!AL.wakeSounds(false, true, 24917, false))
+        // No word about a fall is no fall.
+        verify(AL.wakeSounds(true, false, 24917))
+        verify(!AL.wakeSounds(true, false, 3000))
+    }
+
+    function test_after_a_fall_it_is_the_new_connection_that_has_to_sound() {
+        verify(AL.wakeSounds(true, false, 3000, true))
+        verify(AL.wakeSounds(true, false, 6750, true))
+        verify(AL.wakeSounds(true, true, 24917, true))
+        verify(!AL.wakeSounds(true, false, 2999, true))
+        verify(!AL.wakeSounds(true, false, 0, true))
+        // A burst fills the buffer at once, and the connection may hold its peace from there.
+        verify(!AL.wakeSounds(true, true, 1200, true))
+        verify(!AL.wakeSounds(true, true, 0, true))
+        verify(!AL.wakeSounds(false, false, 7968, true))
+        verify(!AL.wakeSounds(false, true, 7968, true))
+    }
+
+    function test_what_is_no_fact_does_not_sound() {
+        var notTrue = [undefined, null, 1, "true", {}];
+        for (var i = 0; i < notTrue.length; i++) {
+            verify(!AL.wakeSounds(notTrue[i], true, 24917, false), "playing " + String(notTrue[i]))
+            verify(!AL.wakeSounds(notTrue[i], true, 24917, true), "playing " + String(notTrue[i]))
+            // A status that is no plain true leaves it to the position.
+            verify(!AL.wakeSounds(true, notTrue[i], 800, false), "buffered " + String(notTrue[i]))
+            verify(AL.wakeSounds(true, notTrue[i], 5001, false), "buffered " + String(notTrue[i]))
+            // A fall that is no plain true is none.
+            verify(AL.wakeSounds(true, true, 0, notTrue[i]), "fell " + String(notTrue[i]))
+            verify(!AL.wakeSounds(true, false, 3000, notTrue[i]), "fell " + String(notTrue[i]))
+        }
+        var noPos = [undefined, null, NaN, Infinity, "24917", {}];
+        for (i = 0; i < noPos.length; i++) {
+            verify(!AL.wakeSounds(true, false, noPos[i], false), "position " + String(noPos[i]))
+            verify(!AL.wakeSounds(true, false, noPos[i], true), "position " + String(noPos[i]))
+            verify(!AL.wakeSounds(true, true, noPos[i], true), "position " + String(noPos[i]))
+        }
+        verify(!AL.wakeSounds())
+        verify(AL.wakeSounds(true, false, Number.MAX_VALUE, true))
+        verify(AL.wakeSounds(true, false, Number.MAX_VALUE, false))
     }
 }

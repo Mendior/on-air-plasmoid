@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The Last.fm entry of the cover's menu searches for whoever is on air at
+  the moment it is pressed, not for the artist the menu was opened for.
+
+history:
+  A song ends while the menu is open. The menu still says the name it was
+  opened with, and the listener presses the entry under that name. Bound
+  to the live title, the entry would lead to the artist of the next song,
+  or to nothing during an advert. The menu takes the artist when it opens
+  and both entries read that copy. This mutant reads the live one.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+                  onClicked: touch.follow(MusicLinks.lastfm(touch.heldArtist))
+
+replace:
+                  onClicked: touch.follow(MusicLinks.lastfm(touch.artist))
+
+expect:
+  Killed by tests/qml/tst_covertouch.qml::test_the_next_song_does_not_move_an_open_menu.
+  Line-neutral.

@@ -18,6 +18,7 @@
     "PW_DRIFTKILL": "kills a wedged drift probe; nothing to report",
     "PW_ORPHANS": "orphan sweep; absence of orphans is normal",
     "TS_SWEEP": "startup sweep of the buffer directory; the ack only logs what it cleared, and a sweep that never ran leaves the old state, not a broken one",
+    "TS_END": "signals the segment writer behind a pause a window old; its own answer says nothing, the writer's end comes by TS_RUN",
     "PW_HEARING": "ack lifts the deaf shelf and rearms the sweep when the SBC-XQ seat was taken; a failed or absent seat only logs — the exit code carries nothing the HEARING line does not",
     "REC_PROBE": "file watch for the REC counter; it only reads, and a no, a failed shell or an older recording's answer is dropped until the next tick asks again"
   },
@@ -77,6 +78,10 @@
     "REC_URL",
     "SINKSET",
     "SINKVOL",
+    "TS_GROW",
+    "TS_HAVE",
+    "TS_KIND",
+    "TS_LIST",
     "TS_RUN",
     "TS_SRV",
     "TS_STOP",

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The player's error does not reach the watch.
+
+history:
+  Measured 2026-11-12: a station that closes the connection is reported by
+  the player at once (-5), a second before the last sound. With the error
+  as a witness the stream is handed on five seconds after the position
+  stopped, and the sound was back 10 s after the close; without it the
+  wait is the full twenty.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+  function onErrorOccurred() { watch._erred(Date.now()); }
+
+replace:
+  function onErrorOccurred() { }
+
+expect:
+  Killed by tst_standwatch::test_the_players_own_error_signal_is_the_one_heard.
+  Line-neutral.

@@ -399,3 +399,106 @@ def test_a_missing_directory_is_nothing_to_sweep(tmp_path):
     out = _sweep(tmp_path / "never-made", int(time.time()))
     assert "__TS_SWEEP__ stopped=0 removed=0" in out
     assert not (tmp_path / "never-made").exists()
+
+
+# ------------------------------------------- the sliding buffer's folder
+#
+# Since 2026.44 an MP3 or AAC station's buffer is a folder of segments,
+# buffer-N.hls, beside the two small files its writer decides by. A crashed
+# session leaves all of it, and the files that were swept one by one do not
+# cover a folder.
+
+
+def _segment_folder(d: Path, n: int, age_s: float = 0.0) -> Path:
+    folder = d / ("buffer-%d.hls" % n)
+    folder.mkdir()
+    for name in ("seg-40.ts", "seg-41.ts", "seg-42.ts.tmp", "live.m3u8", "play-3.m3u8"):
+        _touch(folder / name, age_s=age_s)
+    if age_s:
+        t = time.time() - age_s
+        os.utime(folder, (t, t))
+    return folder
+
+
+def test_the_sweep_takes_a_crashed_sessions_segment_folder(tmp_path):
+    d = tmp_path / "onair-timeshift-1"
+    d.mkdir()
+    folder = _segment_folder(d, 21)
+    writer = subprocess.Popen(
+        _writer_argv(folder / "seg-%d.ts"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    try:
+        _catches_sigint(writer.pid)
+        _touch(d / "writer-21.pid", body="%d %d %d\n" % (writer.pid, os.getpid(), _dead_pid()))
+        for name in ("url-21.cfg", "head-21.bin", "kind-21.txt"):
+            _touch(d / name)
+        # A folder the sweep has no claim on, named almost like one it has.
+        (d / "buffer-21.keep").mkdir()
+        _touch(d / "buffer-21.keep" / "mine.txt")
+        out = _sweep(d, int(time.time()) - 60)
+        assert _dies(writer), "the crashed session's segment writer is still running"
+        assert {p.name for p in d.iterdir()} == {"buffer-21.keep"}, sorted(p.name for p in d.iterdir())
+        assert (d / "buffer-21.keep" / "mine.txt").exists()
+        assert "__TS_SWEEP__ stopped=1 removed=5" in out, out
+    finally:
+        if writer.poll() is None:
+            writer.kill()
+        writer.wait(timeout=5)
+
+
+def test_the_sweep_leaves_a_living_widgets_segment_folder(tmp_path):
+    d = tmp_path / "onair-timeshift-1"
+    d.mkdir()
+    folder = _segment_folder(d, 22, age_s=7200)
+    writer = subprocess.Popen(
+        _writer_argv(folder / "seg-%d.ts"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    try:
+        _catches_sigint(writer.pid)
+        _touch(d / "writer-22.pid", age_s=7200, body="%d %d %d\n" % (writer.pid, os.getpid(), os.getppid()))
+        _touch(d / "head-22.bin", age_s=7200)
+        _touch(d / "kind-22.txt", age_s=7200)
+        out = _sweep(d, int(time.time()) - 60)
+        assert not _dies(writer, 0.5), "the sweep stopped a segment writer whose host is alive"
+        assert {p.name for p in d.iterdir()} == {"buffer-22.hls", "writer-22.pid", "head-22.bin", "kind-22.txt"}
+        assert {p.name for p in folder.iterdir()} == {"seg-40.ts", "seg-41.ts", "seg-42.ts.tmp", "live.m3u8", "play-3.m3u8"}
+        assert "__TS_SWEEP__ stopped=0 removed=0" in out, out
+    finally:
+        if writer.poll() is None:
+            writer.kill()
+        writer.wait(timeout=5)
+
+
+def test_the_sweep_takes_an_old_folder_without_a_pid_file_and_keeps_this_sessions(tmp_path):
+    d = tmp_path / "onair-timeshift-1"
+    d.mkdir()
+    _segment_folder(d, 3, age_s=7200)
+    _touch(d / "head-3.bin", age_s=7200)
+    _touch(d / "kind-3.txt", age_s=7200)
+    # This session's arm, between its first files and its pid file.
+    fresh = _segment_folder(d, 11)
+    _touch(d / "head-11.bin")
+    _touch(d / "kind-11.txt")
+    out = _sweep(d, int(time.time()) - 60)
+    assert {p.name for p in d.iterdir()} == {"buffer-11.hls", "head-11.bin", "kind-11.txt"}
+    assert len(list(fresh.iterdir())) == 5
+    assert "__TS_SWEEP__ stopped=0 removed=3" in out, out
+
+
+def test_the_sweep_does_not_follow_a_link_out_of_the_directory(tmp_path):
+    music = tmp_path / "Music"
+    music.mkdir()
+    _touch(music / "song.flac", age_s=7200)
+    d = tmp_path / "onair-timeshift-1"
+    d.mkdir()
+    link = d / "buffer-4.hls"
+    link.symlink_to(music, target_is_directory=True)
+    old = time.time() - 7200
+    os.utime(link, (old, old), follow_symlinks=False)
+    # A plain folder that is nobody's buffer stays whatever its age.
+    (d / "notes").mkdir()
+    _touch(d / "notes" / "a.txt", age_s=7200)
+    os.utime(d / "notes", (old, old))
+    _sweep(d, int(time.time()) - 60)
+    assert (music / "song.flac").exists(), "the sweep emptied a folder it reached through a link"
+    assert (d / "notes" / "a.txt").exists()

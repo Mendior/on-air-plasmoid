@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A paused player's needle under one second counts as one nobody knows, and
+  the second the pause kept speaks for it.
+
+history:
+  An episode that streams, paused at 120 s and dragged to its start, came
+  back at 120 on Play. Not knowing is a fact about the player, that it lost
+  the source or has not loaded it; where it holds the file paused, zero is
+  the listener's own choice.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      if (playerPaused === true && seekWaits !== true && Number.isFinite(positionMs) && positionMs >= 0)
+
+replace:
+      if (playerPaused === true && seekWaits !== true && Number.isFinite(positionMs) && positionMs >= 1000)
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_needle_taken_to_the_start_under_a_pause_is_the_listeners_choice
+  and tests/qml/tst_transportroads.qml::test_a_paused_stream_dragged_to_its_start_comes_back_at_the_start.
+  Line-neutral.

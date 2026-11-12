@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The pending seek is made also when the engine has just given the list up.
+
+history:
+  The engine's check may end in the broadcast: by then the player holds
+  the station's address, and a seek made after it would be a seek in live
+  radio.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                      if (timeshift.sourceLoaded(playMusic.seekable, playMusic.duration)) playMusic.position = seekMs;
+
+replace:
+                      timeshift.sourceLoaded(playMusic.seekable, playMusic.duration); playMusic.position = seekMs;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_player_is_asked_about_a_list_before_it_is_sought.
+  Line-neutral.

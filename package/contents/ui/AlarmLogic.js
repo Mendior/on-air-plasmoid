@@ -219,6 +219,79 @@ function castSilencesWakeTone(casting, confirmed, localPlay) {
     return casting === true && confirmed === true && localPlay !== true;
 }
 
+// A station that falls silent while the alarm rings.
+//
+// The tone's check was passed once, 25 s after the fire, and a station that
+// had played five seconds by then was the heal road's from there on. Measured
+// 2026-11-12 on a bench station that held its connection and sent nothing
+// 8 s into the alarm: the heal road knocked 30, 82 and 165 s into the
+// silence and no tone came in the 188 s that were watched. With the
+// station's server gone 41 s into the alarm it was 155 s the same way. So
+// the check is passed again every time the heal road takes the ringing
+// alarm's station for dead, once the knock has had its time.
+//
+// That time. On the bench the first sound came 1.25 s after the request; a
+// station across a network is allowed 2.5 s, and WAKE_BACK_MS of sound then
+// stands at 5.5 s.
+var WAKE_GRACE_MS = 8000;
+// What a station that never fell has to have played: five seconds of media
+// is a stream that started (2026-08-10, a live stream ruled dead by its
+// status flag while it could be heard).
+var WAKE_STARTED_MS = 5000;
+// What a connection made after a fall has to have played before the station
+// counts as back. StandWatch can only watch a position it has seen 3 s past
+// where it began (StandLogic.ARM_MS); a connection let through short of that
+// could fall silent again with nobody looking.
+var WAKE_BACK_MS = 3000;
+
+// How long an alarm rings. The tone's work is to wake: somebody who has had
+// the alarm's station on for half an hour is up, and from there the widget
+// is a radio again, with the heal road and its waits as they always are.
+// With no end to it, a network that dropped an hour later in an empty flat
+// would ring until somebody came home.
+var WAKE_WINDOW_MS = 30 * 60 * 1000;
+
+// Does the alarm that fired at firedAtMs still ring at nowMs?
+// Contract: true only when both are numbers, firedAtMs is above 0 and nowMs
+// is at it or after it by no more than WAKE_WINDOW_MS. A clock set back
+// behind the fire or forward past the window ends the ringing; neither can
+// lengthen it.
+function wakeRings(firedAtMs, nowMs) {
+    if (!_finite(firedAtMs) || firedAtMs <= 0 || !_finite(nowMs)) return false;
+    if (nowMs < firedAtMs) return false;
+    return nowMs - firedAtMs <= WAKE_WINDOW_MS;
+}
+
+// How long the tone's check still has to wait for the knock.
+// Contract: 0 when fellAtMs is no number above 0 or nowMs is no number.
+// Otherwise WAKE_GRACE_MS less the time since fellAtMs, never below 0 and
+// never above WAKE_GRACE_MS: a clock set back does not lengthen the wait.
+function wakeGraceLeftMs(fellAtMs, nowMs) {
+    if (!_finite(fellAtMs) || fellAtMs <= 0 || !_finite(nowMs)) return 0;
+    return Math.max(0, Math.min(WAKE_GRACE_MS, fellAtMs + WAKE_GRACE_MS - nowMs));
+}
+
+// Is the alarm's station audibly alive?
+//   playing   the player is in PlayingState
+//   buffered  its status is BufferedMedia
+//   posMs     its position
+//   fell      the heal road has taken the station for dead since the check
+//             last passed
+// Contract: false unless playing is exactly true. With fell not exactly
+// true: true when buffered is exactly true or posMs is a number above
+// WAKE_STARTED_MS. With fell exactly true: true only when posMs is a number
+// of WAKE_BACK_MS or more, whatever the status says; the player was stopped
+// at the fall, so the position is the new connection's own. Never throws.
+function wakeSounds(playing, buffered, posMs, fell) {
+    if (playing !== true) return false;
+    if (fell === true) return _finite(posMs) && posMs >= WAKE_BACK_MS;
+    return buffered === true || (_finite(posMs) && posMs > WAKE_STARTED_MS);
+}
+
+function _finite(x) {
+    return typeof x === "number" && isFinite(x);
+}
+
 // What a podcast alarm wakes with, given the downloaded file picked for it
 // (PodcastLogic.newestForAlarm; "" when the show has nothing on disk).
 // Contract: "episode" for a file name with something in it, "chime" for

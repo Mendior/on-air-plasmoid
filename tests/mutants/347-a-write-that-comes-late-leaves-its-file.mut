@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A reading ended before its address was written down leaves the address
+  file behind.
+
+history:
+  The end's rm can run ahead of the write. StreamKind had exactly this
+  fault: a file holding a stream's address, with nobody left to remove it.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+                  if (sweep !== "") app.exec(sweep);
+
+replace:
+                  if (sweep === "") app.exec(sweep);
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_reading_ended_between_its_two_commands_leaves_no_file.
+  Line-neutral.

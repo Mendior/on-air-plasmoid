@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A file qmllint gave up on passes the lint again, because nothing asks
+  whether the name planted at its end was reported.
+
+history:
+  qmllint exits 0 and prints nothing about a file it stopped reading, which
+  is also what it does for a file with nothing wrong in it. The lint took
+  the one for the other twice: four files and 16 766 lines by 2026-09-20,
+  and main.qml, FullRepresentation.qml and SyncEngine.qml again by 2026.43,
+  where a wrong member name planted in each was reported 0 times. The pass
+  now ends a copy of every file with one more object that reads a name
+  nothing declares, and a file where that read is not reported fails.
+
+target:
+  scripts/qmllint_gate.py
+
+find:
+      if probe_line is not None and not seen:
+
+replace:
+      if probe_line is not None and not seen and False:
+
+expect:
+  Killed by tests/test_qmllint_gate.py::test_a_file_qmllint_gives_up_on_fails_by_name,
+  which lints a file whose only fault is a const inside a callback, and by
+  tests/test_qmllint_gate.py::test_the_verdict_on_one_file on a report made
+  by hand, where there is no Qt.

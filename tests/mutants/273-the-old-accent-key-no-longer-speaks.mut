@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A config from before the Accent list existed loses its system accent.
+
+history:
+  followSystemAccent was the only colour setting until the list of three
+  came, and a config written then holds a yes there under accentMode 0.
+  The player has read that as the system accent ever since; 2026.44 moved
+  the reading into ColorLogic.accentMode so the Appearance page shows the
+  same answer. Dropping the old key there would turn every such listener's
+  widget green at the next start.
+
+target:
+  package/contents/ui/ColorLogic.js
+
+find:
+      return followSystem === true ? 1 : 0;
+
+replace:
+      return 0;
+
+expect:
+  Killed by tests/qml/tst_colorlogic.qml::test_every_pair_of_the_two_keys_reads_as_one_mode
+  and tests/qml/tst_appearancepage.qml::test_the_list_shows_what_the_player_wears.
+  Line-neutral.

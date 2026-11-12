@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  With this computer and a device playing together, the "Play on" menu's
+  Volume slider moves this computer's master and tells the device nothing.
+
+history:
+  On the default output the row is the room's own knob, and for a pair that
+  was half of what plays: the television stood where it was while the
+  speakers on the desk went up and down, and with an output pinned the same
+  slider moved both. The answer for a move now carries the device's master
+  too, the widget's volume times the room's.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+              if (both) to.cast = castMaster("sink", to.sink, false, ownMuted, target);
+
+replace:
+              if (false) to.cast = castMaster("sink", to.sink, false, ownMuted, target);
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_the_slider_beside_a_device_moves_the_room_and_the_device
+  and tests/qml/tst_volumeroad.qml::test_together_on_the_default_sink_the_slider_moves_both.
+  Line-neutral.

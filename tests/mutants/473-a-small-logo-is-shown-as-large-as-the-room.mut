@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The larger view fills its room whatever the picture's own size.
+
+history:
+  A station's logo of 32 pixels, clicked larger, was drawn 600 wide. Of
+  51 logos cached on one desk 12 are 32 pixels or less. The larger view
+  stops at twice a picture's own pixels. This mutant takes the limit out.
+
+target:
+  package/contents/ui/CoverLogic.js
+
+find:
+      return Math.min(roomW / natW, roomH / natH, STRETCH / (_side(ratio) || 1));
+
+replace:
+      return Math.min(roomW / natW, roomH / natH);
+
+expect:
+  Killed by tests/qml/tst_coverlogic.qml::test_the_larger_picture_is_whole_and_at_most_twice_its_pixels.
+  Line-neutral.

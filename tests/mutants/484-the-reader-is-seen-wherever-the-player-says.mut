@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A tick notes the player's position as the place heard without asking whether it can be one.
+
+history:
+  At the end of a Matroska buffer the player puts its position at the
+  header's length while it still says it plays, and the end itself comes a
+  moment later. Noted as the place heard, that length is where the reopen
+  would go.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+  TimeshiftLogic.endPlaceMs(pos, _captured(now), _heardPosMs)
+
+replace:
+  Number(pos)
+
+expect:
+  Killed by tst_timeshiftengine::test_the_headers_length_is_not_a_place_the_reader_was_seen_at.
+  Line-neutral.

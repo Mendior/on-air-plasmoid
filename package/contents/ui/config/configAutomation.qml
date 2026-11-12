@@ -39,6 +39,11 @@ KCM.SimpleKCM {
             root._autoCareSynced = live
         }
     }
+    // "Set the delay by ear" in the output menu. The engine runs no check of
+    // its own while that is on, so the box below is greyed and says why. It
+    // is read live and has no cfg_ key here: the menu can flip it while this
+    // dialog is open, and Apply would write an opening snapshot back over it.
+    readonly property bool _byEar: plasmoid.configuration.syncManualOnly === true
     property alias cfg_timeshiftEnabled: tsEnabled.checked
     property alias cfg_timeshiftWindowMin: tsWindow.value
 
@@ -114,13 +119,34 @@ KCM.SimpleKCM {
             Kirigami.FormData.isSection: true
         }
 
+        // Greyed, not unticked: the tick is cfg_syncAutoCare itself, and the
+        // choice has to be there again when tuning by ear is switched off.
         QQC2.CheckBox {
             id: autoCare
             Kirigami.FormData.label: i18n("Auto-care:")
             text: i18n("Keep sync tuned automatically")
+            enabled: !root._byEar
+            Accessible.description: root._byEar ? byEarNote.text : ""
+        }
+        // The reason is the menu's switch by the name it has there.
+        RowLayout {
+            visible: root._byEar
+            spacing: Kirigami.Units.smallSpacing
+            Kirigami.Icon {
+                source: "dialog-information"
+                implicitWidth: Kirigami.Units.iconSizes.small
+                implicitHeight: Kirigami.Units.iconSizes.small
+            }
+            QQC2.Label {
+                id: byEarNote
+                text: i18n("Set the delay by ear (no microphone)")
+                font: Kirigami.Theme.smallFont
+                wrapMode: Text.WordWrap
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            }
         }
         QQC2.Label {
-            text: i18n("Listens with the microphone every few minutes while music is playing and quietly re-tunes the sync when the speakers have drifted apart. The check rides on a tone too high to hear — the music keeps playing and nothing audible happens. It runs only while a Bluetooth speaker is in the group, never during a recording or an alarm, and audio never leaves this computer.")
+            text: i18n("Listens with the microphone every few minutes while music is playing and quietly re-tunes the sync when the speakers have drifted apart. The check rides on a tone too high to hear — the music keeps playing and most people hear nothing. It runs only while a Bluetooth speaker is in the group, never during a recording or an alarm, and audio never leaves this computer.")
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             wrapMode: Text.WordWrap
@@ -180,7 +206,7 @@ KCM.SimpleKCM {
             text: i18n("Pause live radio")
         }
         QQC2.Label {
-            text: i18n("While a station plays, a rolling copy is kept on this computer. Pause parks the broadcast; play resumes exactly where you left off, behind live, and one tap on the pill catches back up. The copy is deleted when playback stops and never leaves this machine.")
+            text: i18n("While a station plays, a rolling copy of the broadcast is kept on this computer. Pause parks it; Play picks up within a few seconds of where you paused, behind live, and one tap on the pill catches back up. Stay paused longer than the buffer holds and buffering stops: what was kept plays out, then live radio returns. Stop, or a change of station, deletes the copy, and it never leaves this machine.")
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             wrapMode: Text.WordWrap

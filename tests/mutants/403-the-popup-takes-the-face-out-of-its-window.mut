@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The popup's seat pulls the face back while the window is meant to hold it.
+
+history:
+  There is one face and two seats, and each takes it only on its turn. A
+  popup seat that takes it whenever it can leaves the window up and empty,
+  and the popup showing a face and a placeholder at once.
+
+target:
+  package/contents/ui/PopupFace.qml
+
+find:
+          if (!face || away) return;
+
+replace:
+          if (!face) return;
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_sent_to_the_window_the_same_face_sits_there_and_the_window_is_up.

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The artist's name is put into the search address with encodeURI, which
+  leaves & = ? # + / standing, so a name can end the query, add a second
+  one or change the path it is searched under.
+
+history:
+  The links for the artist on air are a fixed host and path with the name
+  as one query value. The name comes out of a stream's title line, which
+  the station writes: "Earth, Wind & Fire" would search for "Earth, Wind",
+  "A+B" for "A B", and a title built for it could hand the site any other
+  parameter. MusicLinks escapes the name as a single value. This mutant
+  escapes it as if it were a whole address.
+
+target:
+  package/contents/ui/MusicLinks.js
+
+find:
+      return encodeURIComponent(who).replace(/[!'()*]/g, function(ch) {
+
+replace:
+      return encodeURI(who).replace(/[!'()*]/g, function(ch) {
+
+expect:
+  Killed by tests/qml/tst_musiclinks.qml::test_a_name_goes_into_the_address_as_one_value.
+  Line-neutral.

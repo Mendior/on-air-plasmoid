@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An episode a pause keeps is not held: Next and Previous from the desk go
+  to the list of stations.
+
+history:
+  A headset's Next over an episode paused in place put a radio station on,
+  because the branch asked whether the player was playing. An episode is
+  held while it plays and while a pause keeps it, and the four commands
+  that move a needle stay inside it.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      if (!plays && !keptEpisode && !(on && f.casting === true)) return "station";
+
+replace:
+      if (!plays && !(on && f.casting === true)) return "station";
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_an_episode_a_pause_keeps_in_the_player_is_skipped_inside
+  and tests/qml/tst_transportroads.qml::test_next_over_a_paused_episode_goes_on_inside_it_and_starts_no_station.
+  Line-neutral.

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A row that is the artist with another song is named the track.
+
+history:
+  The picker ranks "the artist whole with another song" lowest and still
+  takes it, and nothing downstream could tell it from the song: the lock
+  screen showed "Nüüd taas sajab lund" as the cover of "Päiksepoolsel
+  tänaval". artChoice names such a row a release. This mutant names it the
+  track again.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      return { "index": i, "kind": i >= 0 ? "release" : "" };
+
+replace:
+      return { "index": i, "kind": i >= 0 ? "track" : "" };
+
+expect:
+  Killed by tests/qml/tst_artkind.qml::test_the_artists_other_song_is_another_release_and_never_the_track.
+  Line-neutral.

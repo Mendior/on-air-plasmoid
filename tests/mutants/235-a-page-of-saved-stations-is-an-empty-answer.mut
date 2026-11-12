@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An answer that named only the listener's own stations counts as empty.
+
+history:
+  What an empty answer tries next was told by the web rows alone. Saved
+  stations an answer names are shown in the list and left out of the web
+  rows, so a genre page of fifty of them read as nothing found: the word
+  was shaved to its stem and asked again as a name ("techno" as "techn"),
+  or the country chip was dropped and the text run again everywhere. They
+  are counted as found.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      var found = n(s.count) + n(s.own);
+
+replace:
+      var found = n(s.count);
+
+expect:
+  Killed by tests/qml/tst_searchlogic.qml::test_saved_stations_an_answer_named_are_no_empty_answer
+  and tests/qml/tst_searchlogic.qml::test_a_thin_answer_counts_the_listeners_own_stations_too.
+  Line-neutral.

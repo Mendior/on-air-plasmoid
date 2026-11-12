@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An output menu left open in a window nobody is at runs its Bluetooth beat every five seconds.
+
+history:
+  The beat is a bluetoothctl pipeline. On a desktop face a menu left open
+  slows it to fifteen seconds until the pointer comes back; the window is
+  the other seat that never closes.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                      interval: playerWindow.faceWatched ? 5000 : 15000
+
+replace:
+                      interval: root.planar && !root.faceHovered ? 15000 : 5000
+
+expect:
+  Killed by tests/test_invariants.py::test_the_level_is_asked_at_full_rate_only_while_somebody_is_at_the_face.
+  Line-neutral.

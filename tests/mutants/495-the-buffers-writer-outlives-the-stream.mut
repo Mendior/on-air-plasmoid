@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A stream taken for dead leaves its buffer's writer running.
+
+history:
+  On the bench, a stall of forty seconds: the old writer gave up on its own
+  stalled connection while the start that followed was still waiting for
+  the station, the engine found nobody playing and took the arm down, and
+  the station came back with no buffer. A pause two minutes later was a
+  stop, and Play joined the broadcast twenty seconds further on.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+          engine.disarm();
+
+replace:
+          engine.shifted;
+
+expect:
+  Killed by tst_standwatch::test_a_position_that_stands_hands_the_stream_over_once.
+  Line-neutral.

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A player handed a new source keeps the count it had.
+
+history:
+  A new source is a new connection of the player's own; the helper's follows
+  ten seconds after that one, not on top of it.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+              loud._follow(true);
+              if (loud.mayAsk) settle.restart();
+
+replace:
+              loud._follow(true);
+              if (loud.mayAsk && !settle.running) settle.restart();
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_station_is_listened_to_once_it_has_sounded_for_a_while.
+  Line-neutral.

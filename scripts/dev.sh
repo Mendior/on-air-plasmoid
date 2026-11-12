@@ -34,24 +34,47 @@ QMLLINT="${QMLLINT:-/usr/lib/qt6/bin/qmllint}"
 # Qt6 qmltestrunner (qt6-declarative) — runs the QML logic tests in tests/qml.
 QMLTESTRUNNER="${QMLTESTRUNNER:-/usr/lib/qt6/bin/qmltestrunner}"
 # locale/ is excluded from both sync directions because the two trees carry
-# different catalog domains: a local install keeps the ones built for whichever
-# plugin id it was first installed under. The shipped .plasmoid is a separate
-# matter — "build" compiles all twelve catalogs into it below.
+# different catalog domains: a local install's catalogs are named after
+# whichever plugin id it was first installed under, so they cannot be copied.
+# `install` compiles them from po/ instead (install_locale below). The shipped
+# .plasmoid is a separate matter — "build" compiles its own catalogs.
 RSYNC_OPTS=(-a --delete --exclude '__pycache__' --exclude 'locale')
+
+# The install's catalogs, compiled from po/ under THIS install's plugin id.
+# The id is not the same on both machines: home still runs the old
+# org.kde.plasma.advancedradio tree, work only has io.github.mendior.onair,
+# and a catalog under the other name is one KDE never looks up.
+# They used to be compiled only by `locale-install`, which nobody ran: on
+# 2026-11-11 the panel showed that day's code with catalogs 23 messages short
+# (28 in twelve of the languages), "Paused" and "Back 30 seconds" in English
+# beside a translated "Stations", and doctor called the install a match.
+install_locale() {
+  local domain po lang dir
+  domain="plasma_applet_$(basename "$INSTALL_DIR")"
+  for po in "$REPO_DIR"/po/*.po; do
+    [ -e "$po" ] || continue
+    lang="$(basename "$po" .po)"
+    dir="$INSTALL_DIR/contents/locale/$lang/LC_MESSAGES"
+    mkdir -p "$dir"
+    msgfmt --check -o "$dir/$domain.mo" "$po"
+    [ "${1:-}" = quiet ] || echo "  install locale: $lang"
+  done
+}
 
 usage() {
   cat <<EOF
 Usage: scripts/dev.sh <command>
 
-  install   sync repo package/contents/ -> local install (metadata.json and locale untouched)
+  install   sync repo package/contents/ -> local install and compile po/ into its catalogs
+            (the install's metadata.json keeps its own plugin id)
   pull      sync local install -> repo package/contents/ (metadata.json and locale untouched)
-  lint      Qt6 qmllint (rc + message grep) + Python compile check + metadata.json
+  lint      Qt6 qmllint (every message, and proof it read each file) + Python compile check + metadata.json
             + po validation + regression grep rules + unit tests (QMLLINT=none skips qmllint)
   check     lint + offscreen plasmoidviewer runtime smoke test (run before every release)
   preflight reuse (SPDX) + codespell + yamllint + gitleaks + lychee (links, needs network)
             — slower and partly online, so it runs before a release, not every commit
   i18n      re-extract po/template.pot from the QML sources and msgmerge all po files
-  locale-install  compile po/ catalogs into the LOCAL install (old plugin id domain)
+  locale-install  only the catalog half of install: compile po/ into the LOCAL install
   build     build on-air-<Version>.plasmoid into the repo root (7z, compiles po/ -> locale/)
   mutants   break the widget on purpose, one shipped bug at a time, and demand
             the gate goes red (scripts/mutants.py; slow — one full check per mutant)
@@ -87,7 +110,8 @@ if moved:
     json.dump(inst, open(sys.argv[2], "w"), indent=4)
     print("  install " + ", ".join(moved) + " -> repo (id untouched)")
 PYEOF
-    echo "OK: package/contents -> $INSTALL_DIR/contents (metadata id and locale untouched)"
+    install_locale quiet
+    echo "OK: package/contents -> $INSTALL_DIR/contents (metadata id untouched, catalogs compiled from po/)"
     echo "To reload the QML: scripts/dev.sh restart"
     ;;
   pull)
@@ -105,17 +129,14 @@ PYEOF
     # QMLLINT=none skips the qmllint pass only — for CI runners without Qt6;
     # every other check below still runs there.
     if [ "$QMLLINT" != "none" ]; then
-      while IFS= read -r -d '' f; do
-        rc=0; raw="$("$QMLLINT" "$f" 2>&1)" || rc=$?
-        # Only message lines (qmllint also prints code excerpts, which may
-        # contain the word "error"); Qt6 also warns on clean code ([unqualified]
-        # etc.), but duplicates/syntax/errors must fail the lint; a nonzero exit
-        # always fails it.
-        out="$(printf '%s\n' "$raw" | grep -E '^(Warning|Error):' | grep -Ei 'duplicat|syntax|unavailable|error' || true)"
-        if [ "$rc" -ne 0 ] || [ -n "$out" ]; then
-          printf '== %s (rc=%s)\n%s\n' "$f" "$rc" "${out:-$raw}"; fail=1
-        fi
-      done < <(find "$PKG" -name '*.qml' -print0)
+      # The pass used to grep qmllint's text for a few words. On Qt 6.12 that
+      # text is only what follows the last loop of a file, and a const inside
+      # a callback makes qmllint drop the rest of the file while exiting 0:
+      # main.qml, FullRepresentation.qml and SyncEngine.qml went unread and
+      # this line stayed green. The script reads the JSON report, proves on a
+      # copy of each file that qmllint reached its end, and names every
+      # message that is not on its list.
+      python3 "$REPO_DIR/scripts/qmllint_gate.py" "$QMLLINT" "$PKG" || fail=1
     fi
     # compile() also catches compile-phase SyntaxErrors (e.g. 'return' outside
     # a function) that ast.parse misses, and writes no __pycache__ litter.
@@ -124,6 +145,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     python3 -c "import json; json.load(open('$PKG/metadata.json'))"
     bash -n "$PKG/contents/ui/start-mpris.sh"
     bash -n "$PKG/contents/ui/tsguard.sh"
+    bash -n "$PKG/contents/ui/tsslide.sh"
     # Python rules, pinned in ruff.toml. That file is the record: every rule
     # switched off there carries the reason it was triaged out on 2026-08-09,
     # one finding at a time, so nobody has to rediscover a decision somebody
@@ -408,25 +430,7 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     ;;
   locale-install)
     require_install_dir
-    # Compile the po catalogs into the LOCAL install so the panel widget is
-    # translated too. The published package gets its own catalogs at build
-    # time; the regular install/pull sync deliberately never touches locale/.
-    #
-    # The domain follows THIS MACHINE's install id, which is not the same on
-    # both: the home machine still runs the old org.kde.plasma.advancedradio
-    # tree, the work machine only has io.github.mendior.onair. This used to be
-    # hardcoded to the old id, so on the work machine it wrote catalogs under a
-    # domain KDE never looks up and the widget stayed English no matter how
-    # many times this ran.
-    domain="plasma_applet_$(basename "$INSTALL_DIR")"
-    for po in "$REPO_DIR"/po/*.po; do
-      [ -e "$po" ] || continue
-      lang="$(basename "$po" .po)"
-      dir="$INSTALL_DIR/contents/locale/$lang/LC_MESSAGES"
-      mkdir -p "$dir"
-      msgfmt --check -o "$dir/$domain.mo" "$po"
-      echo "  install locale: $lang"
-    done
+    install_locale
     echo "OK: reload with scripts/dev.sh restart (full effect after re-login)"
     ;;
   i18n)
@@ -590,6 +594,33 @@ for p in sys.argv[1:]: compile(open(p).read(), p, "exec")' "$PKG/contents/ui/rea
     else
       echo "install : ${skew} file(s) differ from package/contents — run: scripts/dev.sh install && scripts/dev.sh restart"
       doctor_rc=1
+    fi
+
+    # 2b. the install's catalogs against po/. The check above cannot see
+    # them (locale/ is not synced), and a panel in half-English beside an
+    # "install matches" line is what this is here to say out loud. Compiled
+    # to a pipe and compared, so that looking writes nothing.
+    if command -v msgfmt >/dev/null 2>&1; then
+      loc_domain="plasma_applet_$(basename "$INSTALL_DIR")"
+      loc_total=0; loc_off=0; loc_names=""
+      for loc_po in "$REPO_DIR"/po/*.po; do
+        [ -e "$loc_po" ] || continue
+        loc_total=$((loc_total + 1))
+        loc_lang="$(basename "$loc_po" .po)"
+        if ! { msgfmt -o - "$loc_po" 2>/dev/null || true; } \
+             | cmp -s - "$INSTALL_DIR/contents/locale/$loc_lang/LC_MESSAGES/$loc_domain.mo" 2>/dev/null; then
+          loc_off=$((loc_off + 1)); loc_names="${loc_names:+$loc_names }$loc_lang"
+        fi
+      done
+      if [ "$loc_off" -eq 0 ]; then
+        echo "locale  : $loc_total catalogs match po/"
+      else
+        echo "locale  : $loc_off of $loc_total catalogs differ from po/ ($loc_names) — run: scripts/dev.sh install"
+        doctor_rc=1
+      fi
+    else
+      echo "locale  : msgfmt is not here — cannot tell whether the panel's translations are current"
+      if [ "$doctor_rc" -eq 0 ]; then doctor_rc=2; fi
     fi
 
     # 3. install vs the running panel. ctime, never mtime: rsync -a preserves

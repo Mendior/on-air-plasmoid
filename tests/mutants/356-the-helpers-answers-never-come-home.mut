@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The exec handler no longer hands the loudness engine its commands'
+  answers.
+
+history:
+  The helper is started on the write's answer and the number is read off the
+  run's. Without the way home the address is written into a file and stays
+  there.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (loudness.handleExec(cmd, stdout)) return;
+
+replace:
+              if (false && loudness.handleExec(cmd, stdout)) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_the_loudness_engine_has_its_instance_its_answers_and_its_sweep.
+  Line-neutral.

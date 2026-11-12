@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The popup no longer learns the least width the face needs.
+
+history:
+  Plasma sizes the popup by the Layout hints of the item it was given, and
+  that item is the seat. The least width is measured from the tab bar;
+  without it the popup can be dragged narrower than the tabs, where My
+  Music and Podcasts wrapped in the middle of the word.
+
+target:
+  package/contents/ui/PopupFace.qml
+
+find:
+      Layout.minimumWidth: face ? face.Layout.minimumWidth : 0
+
+replace:
+      Layout.minimumWidth: 0
+
+expect:
+  Killed by tests/qml/tst_popupface.qml::test_the_popup_reads_the_faces_four_hints_off_the_seat.

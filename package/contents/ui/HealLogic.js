@@ -643,27 +643,27 @@ function proofWaitMs(firstDeadMs, nowMs) {
     return Math.max(1000, DEATH_PROOF_MS - dead);
 }
 
-// How many looks, five minutes apart, an address may go unanswered before
-// its silence counts.
+// How many looks in a row, five minutes apart, an address may go unanswered
+// before its silence counts.
 var PROOF_LOOKS = 3;
 
-// What the second look makes of the old address's answer. looks: how many
-// looks this move has had, this one included.
+// What the second look makes of the old address's answer. silent: how many
+// looks in a row, this one included, nobody answered at all.
 // Contract: "keep" when the address is a stream again; "move" when its
-// server says it is gone, or when nobody has answered there in PROOF_LOOKS
-// looks; "again" while it is not known.
+// server says it is gone, or when nobody has answered there on PROOF_LOOKS
+// looks running; "again" while it is not known.
 // Anything that was not a stream used to be a "move", a look that timed out
 // included, and a slow three seconds rewrote the listener's list. Only two
 // things are proof now. The server's own word: 403, 404 or 410. And silence
-// that lasts, status 0 on every look while the new address played on, which
-// is what a host that is gone for good looks like. A server that says
-// anything else is still there, and -1 is KinHunt's answer whose last hop
-// Qt does not name: on a Qt that never names it, a living address gives
-// nothing but those.
-function proofVerdict(status, contentType, looks) {
+// that lasts, status 0 on look after look while the new address played on,
+// which is what a host that is gone for good looks like. A server that says
+// anything else is still there, and the caller starts the count again. -1
+// is KinHunt's answer whose last hop Qt does not name: on a Qt that never
+// names it, a living address gives nothing but those.
+function proofVerdict(status, contentType, silent) {
     if (aliveAnswer(status, contentType)) return "keep";
     if (status === 403 || status === 404 || status === 410) return "move";
-    return status === 0 && looks >= PROOF_LOOKS ? "move" : "again";
+    return status === 0 && silent >= PROOF_LOOKS ? "move" : "again";
 }
 
 // Did the directory answer the question?

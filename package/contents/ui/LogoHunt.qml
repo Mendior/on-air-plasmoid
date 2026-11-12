@@ -67,7 +67,7 @@ QtObject {
         try {
             xhr = _request();
             xhr.open("GET", page);
-            xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.43)");
+            xhr.setRequestHeader("User-Agent", "Mozilla/5.0 (compatible; OnAir/2026.44)");
             xhr.setRequestHeader("Accept", "text/html,application/xhtml+xml,*/*");
         } catch (e) {
             finish("", "");
@@ -159,7 +159,7 @@ QtObject {
             xhr = _request();
             xhr.open("GET", url);
             xhr.responseType = "arraybuffer";
-            xhr.setRequestHeader("User-Agent", "OnAir/2026.43");
+            xhr.setRequestHeader("User-Agent", "OnAir/2026.44");
         } catch (e) {
             finish(null, false);
             return;

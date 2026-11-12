@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A device that takes a command and never answers is reported in the words
+  of whatever the socket raised, with nothing to tell it from a refusal.
+
+history:
+  The widget has to tell two things apart: a device that answered and
+  turned the address down, and a device that could not be talked to. On
+  2026-11-12 a Ruark that was sent an address it could not reach took the
+  command and went silent until the helper's wait ran out. That is a
+  timeout while SetAVTransportURI was asked, and the line says so in a
+  field of its own.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+      if isinstance(exc, Unreached):
+          return "%s reach=%s action=%s" % (FAIL, exc.how, exc.action)
+
+replace:
+      if isinstance(exc, Unreached):
+          return "%s %s" % (FAIL, exc)
+
+expect:
+  Killed by tests/test_cast_fault.py::test_a_device_that_takes_the_command_and_says_nothing_timed_out.

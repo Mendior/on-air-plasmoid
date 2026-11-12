@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The shared round asks for each member's level at the member's own slot
+  again, between the wait and the player.
+
+history:
+  The question is a blocking pactl, and the capture is read against the
+  slot the member was told to play in, so whatever the answer took was
+  added to that member's arrival and to nobody else's. On a synthetic
+  clock on 2026-11-11, with two speakers both 100 ms from the microphone
+  and 150 ms spent on the first one's query, the round read the second as
+  150 ms early; with the same 150 ms on both it read nothing, which is
+  how it hid. A query that ran into its own three-second timeout moved
+  every later member off the schedule as well: plays at 0.75, 5.39, 5.39
+  and 5.98 s where 0.6, 2.39, 4.18 and 5.98 were planned.
+  The earlier test of this function answers the query in no time at all,
+  and stayed green through all of it.
+
+target:
+  package/contents/ui/calibrate.py
+
+find:
+                           volumes[i], ultra_wav],
+
+replace:
+                           str(int(_ultra_volume_for(sink, trim))), ultra_wav],
+
+expect:
+  Killed by tests/test_calibrate.py::test_a_slow_level_query_on_one_speaker_is_not_read_as_that_speakers_lag.
+  Line-neutral.

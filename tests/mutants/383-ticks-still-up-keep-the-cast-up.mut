@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Unticking the one device that played leaves the widget casting to one that refused.
+
+history:
+  A television and a Ruark R5se were ticked; the television played, the
+  Ruark refused. Unticking the television left nobody playing and nobody
+  being asked, but the flag was only lowered when the last TICK went, and
+  the Ruark's was still up: "Casting to Ruark R5se" came back over a
+  silent room (2026-11-11). The flag follows the record of who carries the
+  stream. No sound is started here for it: the listener unticked a device,
+  and Play is theirs to press.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              if (!CastLogic.carried(_castSession)) _castEnd();   // a refused device stays ticked: the last that played can leave with ticks up
+
+replace:
+              if (targets.length === 0) _castEnd();   // a refused device stays ticked: the last that played can leave with ticks up
+
+expect:
+  Killed by tests/test_invariants.py::test_a_device_that_refused_the_stream_is_not_cast_to.
+  Line-neutral.

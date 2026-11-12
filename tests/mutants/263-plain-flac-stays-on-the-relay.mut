@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station known to send plain FLAC still starts through the relay,
+  because its address ends in .flac or the directory labels it FLAC.
+
+history:
+  An audition labelled FLAC and every address ending in .flac started
+  through the relay. Measured on 2026-11-11: the stations the directory
+  files as FLAC sent plain FLAC, which reached sound in 2.5 s straight off
+  the socket with its ICY titles, and in 5.5 s through the relay with none.
+  Only Ogg FLAC freezes without the relay, and only the stream's first
+  bytes say which of the two a station sends; once they have said plain
+  FLAC, the label and the ending no longer count.
+
+target:
+  package/contents/ui/KindLogic.js
+
+find:
+      if (known === "flac" || known === "other") return { relay: false, ask: false, pull: false };
+
+replace:
+      if (known === "other") return { relay: false, ask: false, pull: false };
+
+expect:
+  Killed by tests/qml/tst_kindlogic.qml::test_a_known_stream_starts_by_what_it_is.
+  Line-neutral.

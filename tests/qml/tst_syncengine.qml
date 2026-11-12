@@ -103,7 +103,8 @@ Item {
             function setAudioOutputDevice(id) { lastOutputDevice = id; }
             function btList() { btListed++; }
             function _btValidMac(mac) { return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac); }
-            function castTrimActive(id) { return false; }
+            property bool castLive: false
+            function castTrimActive(id) { return castLive; }
             function applyCastTrim(uuid) { castApplied.push(uuid); }
         }
     }
@@ -413,7 +414,7 @@ Item {
             verify(cmd.indexOf("channels=1 channel_map=front-left") !== -1);
             // The same click again is not a second swap: the built channel
             // now matches the wanted one.
-            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\n", "");
             var again = r.mock.execLog.length;
             r.e._settleQuietSwap("slider", {}, true);
@@ -490,6 +491,263 @@ Item {
             r.e._reloopGuardFire();
             verify(!r.e._combineReloopPending);     // …is taken, not dropped
             verify(r.mock.execLog.length > n);      // …and the rebuild went out
+        }
+
+        // ── two rebuilds of one enable, and whose answer is whose ─────────
+
+        function sent(r, tag) {
+            var out = [];
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(tag) === 0) out.push(r.mock.execLog[i]);
+            return out;
+        }
+        function lastSent(r, tag) {
+            var all = sent(r, tag);
+            return all.length ? all[all.length - 1] : "";
+        }
+        // Rebuild A hangs past its thirty seconds and B, queued behind it,
+        // goes out. Both shells are alive and both will answer.
+        function hungThenNext(r) {
+            r.e._combineRebuildLoopbacks();
+            var a = lastSent(r, ": PW_RELOOP");
+            r.e._combineReloopPending = true;
+            r.e._reloopGuardFire();
+            var b = lastSent(r, ": PW_RELOOP");
+            verify(a !== "" && b !== "" && a !== b);
+            verify(r.e._combineReloopBusy);
+            return { a: a, b: b };
+        }
+        function test_a_hung_rebuild_answering_last_is_not_adopted_next_to_its_successor() {
+            // Both answers carried the same enable generation, so the late
+            // one was taken for a second honest ack: four module ids for two
+            // speakers, and a map that knew only the last pair.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            var j = hungThenNext(r);
+            r.e.handleExec(j.b, "LB 201 " + wired + "\nLB 202 " + btSink + "\n", "");
+            var n = sent(r, ": PW_UNCOMBINE;").length;
+            r.e.handleExec(j.a, "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
+            compare(r.e._combineLoopbackIds.join(), "201,202");
+            compare(r.e._combineLoopbackSinkByModule["201"], wired);
+            compare(r.e._combineLoopbackSinkByModule["302"], undefined);
+            verify(!r.e._combineReloopBusy);
+            // The loopbacks the hung shell did load are taken down again,
+            // and only those.
+            compare(sent(r, ": PW_UNCOMBINE;").length, n + 1);
+            var un = lastSent(r, ": PW_UNCOMBINE;");
+            verify(un.indexOf("pactl unload-module 301 ") !== -1);
+            verify(un.indexOf("pactl unload-module 302 ") !== -1);
+            compare(un.indexOf("unload-module 20"), -1);
+        }
+        function test_a_hung_rebuild_answering_first_leaves_its_successors_lock_alone() {
+            // The other order: the late answer released the flag while B was
+            // still loading, and a third rebuild could start beside it.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            var j = hungThenNext(r);
+            r.e.handleExec(j.a, "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
+            verify(r.e._combineReloopBusy);
+            compare(r.e._combineLoopbackIds.length, 0);
+            verify(lastSent(r, ": PW_UNCOMBINE;").indexOf("pactl unload-module 301 ") !== -1);
+            // A third rebuild asked for now waits its turn behind B.
+            var n = sent(r, ": PW_RELOOP").length;
+            r.e._combineRebuildLoopbacks();
+            compare(sent(r, ": PW_RELOOP").length, n);
+            verify(r.e._combineReloopPending);
+            // B answers: its pair is adopted and the third goes out, retiring
+            // B's two modules and nobody else's.
+            r.e.handleExec(j.b, "LB 201 " + wired + "\nLB 202 " + btSink + "\n", "");
+            var c = lastSent(r, ": PW_RELOOP");
+            verify(c !== j.b);
+            verify(c.indexOf("pactl unload-module 201 ") !== -1);
+            verify(c.indexOf("pactl unload-module 202 ") !== -1);
+            compare(c.indexOf("unload-module 30"), -1);
+            r.e.handleExec(c, "LB 401 " + wired + "\nLB 402 " + btSink + "\n", "");
+            compare(r.e._combineLoopbackIds.join(), "401,402");
+            verify(!r.e._combineReloopBusy);
+            verify(!r.e._combineReloopPending);
+        }
+        function test_a_hung_rebuild_with_no_successor_is_still_adopted_when_it_answers() {
+            // Nothing was queued behind it, so its loopbacks are the only
+            // ones the room has: dropping them would be silence.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            r.e._combineRebuildLoopbacks();
+            var a = lastSent(r, ": PW_RELOOP");
+            r.e._reloopGuardFire();
+            var n = sent(r, ": PW_UNCOMBINE;").length;
+            r.e.handleExec(a, "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
+            compare(r.e._combineLoopbackIds.join(), "301,302");
+            compare(sent(r, ": PW_UNCOMBINE;").length, n);
+        }
+        function test_a_rebuild_asked_for_after_the_hang_owns_the_room_in_either_order() {
+            // No rebuild was waiting when the thirty seconds ran out; the
+            // next one came later, on its own. The hung shell is still not
+            // the newest word once that one is out.
+            for (var order = 0; order < 2; order++) {
+                var r = rig([dev(wired), dev(btSink)], {});
+                activate(r);
+                r.e._combineRebuildLoopbacks();
+                var a = lastSent(r, ": PW_RELOOP");
+                r.e._reloopGuardFire();
+                r.e._combineRebuildLoopbacks();
+                var b = lastSent(r, ": PW_RELOOP");
+                verify(a !== b);
+                var late = "LB 301 " + wired + "\nLB 302 " + btSink + "\n";
+                var live = "LB 201 " + wired + "\nLB 202 " + btSink + "\n";
+                if (order === 0) { r.e.handleExec(a, late, ""); verify(r.e._combineReloopBusy); }
+                r.e.handleExec(b, live, "");
+                if (order === 1) r.e.handleExec(a, late, "");
+                compare(r.e._combineLoopbackIds.join(), "201,202", "order " + order);
+                verify(!r.e._combineReloopBusy);
+            }
+        }
+        function test_a_superseded_rebuild_that_loaded_nothing_sends_no_unload() {
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            var j = hungThenNext(r);
+            var n = r.mock.execLog.length;
+            r.e.handleExec(j.a, "", "");
+            compare(r.mock.execLog.length, n);
+            verify(r.e._combineReloopBusy);
+        }
+        function test_a_superseded_swap_that_loaded_nothing_sends_no_unload() {
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.setDeviceChannel(wired, "L");
+            compare(r.e._settleQuietSwap("slider", {}, true), "swapped");
+            var s = lastSent(r, ": PW_LBSWAP");
+            r.e._combineReloopPending = true;
+            r.e._reloopGuardFire();
+            var n = r.mock.execLog.length;
+            r.e.handleExec(s, "LBSWAPFAIL " + wired + "\n", "");
+            compare(r.mock.execLog.length, n);
+            verify(r.e._combineReloopBusy);
+        }
+        function test_a_rebuild_answering_a_room_that_was_switched_off_takes_its_loopbacks_down() {
+            // The switch went off while the rebuild was loading. Its answer
+            // is still the newest job's, and what it loaded has no room to
+            // play in: unloaded, nothing adopted, nothing queued.
+            var answers = ["LB 301 " + wired + "\nLB 302 " + btSink + "\n", ""];
+            for (var i = 0; i < answers.length; i++) {
+                var r = rig([dev(wired), dev(btSink)], {});
+                activate(r);
+                r.e._combineRebuildLoopbacks();
+                var a = lastSent(r, ": PW_RELOOP");
+                r.e.combineOutputsDisable();
+                verify(!r.e._combineActive);
+                r.e._combineReloopPending = true;
+                var n = r.mock.execLog.length;
+                r.e.handleExec(a, answers[i], "");
+                compare(r.e._combineLoopbackIds.length, 0);
+                verify(!r.e._combineReloopPending);
+                if (i === 0) {
+                    compare(r.mock.execLog.length, n + 1);
+                    compare(r.mock.execLog[n], ": PW_UNCOMBINE; pactl unload-module 301 2>/dev/null;"
+                                               + " pactl unload-module 302 2>/dev/null; true");
+                } else {
+                    compare(r.mock.execLog.length, n, "an answer that loaded nothing sends no shell");
+                }
+            }
+        }
+        function test_a_swap_answering_a_room_that_was_switched_off_takes_its_loopback_down() {
+            var answers = ["LBSWAP 301 " + wired + " 101\n", "LBSWAPFAIL " + wired + "\n"];
+            for (var i = 0; i < answers.length; i++) {
+                var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+                activate(r);
+                r.e.setDeviceChannel(wired, "L");
+                compare(r.e._settleQuietSwap("slider", {}, true), "swapped");
+                var s = lastSent(r, ": PW_LBSWAP");
+                r.e.combineOutputsDisable();
+                verify(!r.e._combineActive);
+                r.e._combineReloopPending = true;
+                var n = r.mock.execLog.length;
+                r.e.handleExec(s, answers[i], "");
+                compare(r.e._combineLoopbackIds.indexOf("301"), -1);
+                verify(!r.e._combineReloopPending);
+                if (i === 0) {
+                    compare(r.mock.execLog.length, n + 1);
+                    compare(r.mock.execLog[n], ": PW_UNCOMBINE; pactl unload-module 301 2>/dev/null; true");
+                } else {
+                    compare(r.mock.execLog.length, n, "a swap that loaded nothing sends no shell");
+                }
+            }
+        }
+        function test_a_rebuild_answer_without_its_number_is_nobodys() {
+            // The job number is part of the address. An answer that lost it,
+            // or carries a word where it belongs, is not the live rebuild's.
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            r.e._combineRebuildLoopbacks();
+            var gen = r.e._combineLoadSeq;
+            var bad = [": PW_RELOOP " + gen + "; x", ": PW_RELOOP " + gen + " ; x",
+                       ": PW_RELOOP " + gen + " x; x", ": PW_RELOOP " + gen + " -1; x",
+                       ": PW_RELOOP; x"];
+            for (var i = 0; i < bad.length; i++) {
+                r.e.handleExec(bad[i], "LB 301 " + wired + "\n", "");
+                verify(r.e._combineReloopBusy, bad[i]);
+                compare(r.e._combineLoopbackIds.length, 0, bad[i]);
+            }
+        }
+        function test_fifty_rebuilds_in_a_row_each_leave_one_loopback_a_speaker() {
+            var r = rig([dev(wired), dev(btSink)], {});
+            activate(r);
+            var first = "";
+            for (var i = 0; i < 50; i++) {
+                r.e._combineRebuildLoopbacks();
+                var cmd = lastSent(r, ": PW_RELOOP");
+                if (i === 0) first = cmd;
+                r.e.handleExec(cmd, "LB " + (500 + 2 * i) + " " + wired
+                               + "\nLB " + (501 + 2 * i) + " " + btSink + "\n", "");
+                compare(r.e._combineLoopbackIds.length, 2);
+                verify(!r.e._combineReloopBusy);
+            }
+            compare(sent(r, ": PW_RELOOP").length, 50);
+            // The very first answer, played again after all that, is nobody's.
+            r.e.handleExec(first, "LB 900 " + wired + "\n", "");
+            compare(r.e._combineLoopbackIds.join(), "598,599");
+        }
+        function test_a_hung_swap_cannot_answer_for_the_rebuild_that_followed_it() {
+            // The settle swap shares the rebuild's lock and its thirty
+            // seconds, so it had the same hole.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.setDeviceChannel(wired, "L");
+            compare(r.e._settleQuietSwap("slider", {}, true), "swapped");
+            var s = lastSent(r, ": PW_LBSWAP");
+            r.e._combineReloopPending = true;
+            r.e._reloopGuardFire();
+            var b = lastSent(r, ": PW_RELOOP");
+            verify(b !== "");
+            r.e.handleExec(s, "LBSWAP 301 " + wired + " 101\n", "");
+            verify(r.e._combineReloopBusy);
+            compare(r.e._combineLoopbackIds.indexOf("301"), -1);
+            verify(lastSent(r, ": PW_UNCOMBINE;").indexOf("pactl unload-module 301 ") !== -1);
+            r.e.handleExec(b, "LB 201 " + wired + "\nLB 202 " + btSink + "\n", "");
+            compare(r.e._combineLoopbackIds.join(), "201,202");
+            verify(!r.e._combineReloopBusy);
+        }
+        function test_a_hung_swap_cannot_answer_for_the_swap_that_followed_it() {
+            // A swap leaves the module map standing, so a second swap can go
+            // out right after the first one's thirty seconds.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e.setDeviceChannel(wired, "L");
+            compare(r.e._settleQuietSwap("slider", {}, true), "swapped");
+            var s1 = lastSent(r, ": PW_LBSWAP");
+            r.e._reloopGuardFire();
+            r.e.setDeviceChannel(wired, "R");
+            compare(r.e._settleQuietSwap("slider", {}, true), "swapped");
+            var s2 = lastSent(r, ": PW_LBSWAP");
+            verify(s1 !== s2);
+            r.e.handleExec(s1, "LBSWAP 301 " + wired + " 101\n", "");
+            verify(r.e._combineReloopBusy);
+            compare(r.e._combineLoopbackIds.indexOf("301"), -1);
+            verify(lastSent(r, ": PW_UNCOMBINE;").indexOf("pactl unload-module 301 ") !== -1);
+            r.e.handleExec(s2, "LBSWAP 401 " + wired + " 101\n", "");
+            verify(!r.e._combineReloopBusy);
+            verify(r.e._combineLoopbackIds.indexOf("401") !== -1);
+            compare(r.e._combineLoopbackIds.indexOf("101"), -1);
         }
 
         // ── the PW_COMBINE ack ────────────────────────────────────────────
@@ -914,7 +1172,7 @@ Item {
             r.e._combineReloopBusy = true;     // the live generation is rebuilding
             r.e._combineLoadSeq = 5;           // ...and the ack below is from gen 1
             var before = r.mock.execLog.length;
-            r.e.handleExec(": PW_RELOOP 1; x", "LB 300 " + wired + "\n", "");
+            r.e.handleExec(": PW_RELOOP 1 " + r.e._reloopJob + "; x", "LB 300 " + wired + "\n", "");
             verify(r.e._combineReloopBusy);    // untouched
             verify(r.mock.execLog[before].indexOf("unload-module 300") !== -1);
         }
@@ -923,7 +1181,7 @@ Item {
             var r = rig([dev(wired), dev(btSink)]);
             activate(r);
             r.e._combineReloopBusy = true;
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 300 " + wired + "\nLB 301 " + btSink + "\n", "");
             verify(!r.e._combineReloopBusy);
             verify(r.e._combineLoopbackIds.indexOf("300") >= 0);
@@ -960,6 +1218,165 @@ Item {
             compare(r.e.trimOf(btMac), 1.0);   // the quietest is the reference
             compare(r.mock.notes.length, 1);
             compare(r.mock.notes[0].title, "Speakers calibrated");
+        }
+
+        function test_the_measurement_and_its_cancel_go_out_as_the_dry_run_reads_them() {
+            // tests/test_calibrate_cancel.py runs these commands under sh
+            // with stand-ins for pactl and python, and cancels at every
+            // stage of the preparation. Only the engine can say what it
+            // would hand the shell, so it says it here, on one line.
+            var r = rig([dev(wired), dev(btSink), dev(wired2)]);
+            activate(r);
+            // One balance below full, so the loopback that is raised for the
+            // measurement and lowered after it is in the commands too.
+            r.e.setDeviceTrim(wired, 0.5);
+            var from = r.mock.execLog.length;
+            r.e.calibrateSync();
+            r.e.calibrateCancel();
+            r.e.calibrateSync();
+            var cmds = { sinks: [wired, btSink, wired2], master: r.e._combineSinkName, run: "", kill: "", next: "" };
+            for (var i = from; i < r.mock.execLog.length; i++) {
+                var c = r.mock.execLog[i];
+                if (c.indexOf(": PW_CALIBKILL;") === 0) cmds.kill = c;
+                else if (c.indexOf(": PW_CALIB ") === 0) cmds[cmds.run === "" ? "run" : "next"] = c;
+            }
+            verify(cmds.run !== "" && cmds.kill !== "" && cmds.next !== "");
+            verify(cmds.run !== cmds.next);
+            // The check that follows a calibration is launched by the same
+            // hand and called off by the same button.
+            r.e.calibrateCancel();
+            r.e._verifyPending = true;
+            r.e._verifyArmTimers();
+            r.e._verifyLaunch();
+            cmds.check = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmds.check.indexOf(": PW_VERIFY ") === 0);
+            r.e.calibrateCancel();
+            cmds.checkKill = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(cmds.checkKill.indexOf(": PW_CALIBKILL;") === 0);
+            console.log("ONAIR_CALIB_DRYRUN " + JSON.stringify(cmds));
+        }
+
+        // What a command says its run is called, and what a cancel writes.
+        function between(text, head, tail) {
+            var a = text.indexOf(head);
+            var b = a < 0 ? -1 : text.indexOf(tail, a + head.length);
+            return b < 0 ? "" : text.substring(a + head.length, b);
+        }
+        function tokenAsked(cmd) {
+            return between(cmd, "2>/dev/null)\" = '", "' ]; };");
+        }
+        function tokenMarked(cmd) {
+            return between(cmd, "printf '%s' '", "' > \"$XDG_RUNTIME_DIR/onair_calib_7.off\";");
+        }
+        function test_a_cancel_marks_the_run_that_was_in_flight() {
+            // The mark is the only word a shell still asking the speakers
+            // for their levels can get: it has no pid to be found by. And it
+            // must name the run that was going, not the number the engine
+            // moves on to in the same breath.
+            var roads = [
+                function(r) { r.e.calibrateCancel() },
+                function(r) { r.e.combineOutputsDisable() },
+                function(r) { r.e._combineResurrect() }
+            ];
+            for (var i = 0; i < roads.length; i++) {
+                var r = rig([dev(wired), dev(btSink)]);
+                activate(r);
+                r.e._calibBornMs = 1731359000123;
+                r.e.calibrateSync();
+                var run = r.mock.execLog[r.mock.execLog.length - 1];
+                var seq = r.e._calibRunSeq;
+                compare(tokenAsked(run), seq + ".1731359000123", "road " + i);
+                var before = r.mock.execLog.length;
+                roads[i](r);
+                var kill = "";
+                for (var j = before; j < r.mock.execLog.length; j++)
+                    if (r.mock.execLog[j].indexOf(": PW_CALIBKILL;") === 0) kill = r.mock.execLog[j];
+                compare(tokenMarked(kill), seq + ".1731359000123", "road " + i);
+                verify(r.e._calibRunSeq > seq);
+                // Mark first, pid second.
+                verify(kill.indexOf("printf '%s'") < kill.indexOf("p=$(cat"), "road " + i);
+            }
+        }
+        function test_every_run_and_every_session_has_a_token_of_its_own() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            verify(r.e._calibBornMs > 1.7e12);      // the clock, not a constant
+            r.e._calibBornMs = 1000;
+            r.e.calibrateSync();
+            var first = tokenAsked(r.mock.execLog[r.mock.execLog.length - 1]);
+            r.e.calibrateCancel();
+            r.e.calibrateSync();
+            var second = tokenAsked(r.mock.execLog[r.mock.execLog.length - 1]);
+            verify(first !== "" && second !== "" && first !== second);
+            // A panel restarted a moment later counts its runs from one
+            // again. The mark the old panel left must not be this run's.
+            var r2 = rig([dev(wired), dev(btSink)]);
+            activate(r2);
+            r2.e._calibBornMs = 2000;
+            r2.e.calibrateSync();
+            var reborn = tokenAsked(r2.mock.execLog[r2.mock.execLog.length - 1]);
+            compare(first, "1.1000");
+            compare(reborn, "1.2000");
+        }
+        function test_the_check_after_a_calibration_asks_the_mark_before_it_starts() {
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e._calibBornMs = 1000;
+            r.e._verifyPending = true;
+            r.e._verifyArmTimers();
+            r.e._verifyLaunch();
+            var check = r.mock.execLog[r.mock.execLog.length - 1];
+            verify(check.indexOf(": PW_VERIFY ") === 0);
+            compare(tokenAsked(check), r.e._calibRunSeq + ".1000");
+            verify(check.indexOf(" if ! off; then ONAIR_LEASH_PID=$$ timeout ") !== -1);
+            verify(check.indexOf(" off && kill \"$cp\" 2>/dev/null; wait \"$cp\";") !== -1);
+            // The mark is defined before the first level is asked for.
+            verify(check.indexOf(" off() {") < check.indexOf("pactl get-sink-volume"));
+            r.e.calibrateCancel();
+            compare(tokenMarked(r.mock.execLog[r.mock.execLog.length - 1]), tokenAsked(check));
+        }
+        function test_the_drift_probe_is_launched_as_it_always_was() {
+            // It has its own pid file and its own kill, and nobody writes a
+            // mark for it: a launch that asked one would wait on a word that
+            // never comes, or worse, obey the calibration's.
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.e._calibBornMs = 1000;
+            r.mock.playing = true;
+            r.mock.anythingPlaying = true;
+            r.e._driftProbe();
+            var probe = "";
+            for (var i = 0; i < r.mock.execLog.length; i++)
+                if (r.mock.execLog[i].indexOf(": PW_DRIFT;") === 0) probe = r.mock.execLog[i];
+            verify(probe !== "");
+            compare(probe.indexOf(" off"), -1);
+            compare(probe.indexOf(": PW_DRIFT; ONAIR_LEASH_PID=$$ timeout "), 0);
+            verify(probe.indexOf("onair_drift_7.pid") !== -1);
+        }
+
+        function test_neither_measurement_starts_its_park_file_with_a_word_that_can_end_the_shell() {
+            // `: > file` exits a POSIX shell when the file cannot be opened,
+            // and it stood after the parks: a runtime folder that was gone
+            // left every speaker at the measuring level.
+            var r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.calibrateSync();
+            var cal = r.mock.execLog[r.mock.execLog.length - 1];
+            r.e.calibrateCancel();
+            r.e._verifyPending = true;
+            r.e._verifyArmTimers();
+            r.e._verifyLaunch();
+            var both = [cal, r.mock.execLog[r.mock.execLog.length - 1]];
+            verify(both[0].indexOf(": PW_CALIB ") === 0 && both[1].indexOf(": PW_VERIFY ") === 0);
+            var file = "\"$XDG_RUNTIME_DIR/onair_park_7.sh\"";
+            for (var i = 0; i < 2; i++) {
+                compare(both[i].indexOf(": > "), -1);
+                verify(both[i].indexOf("; [ -n \"$XDG_RUNTIME_DIR\" ] && true > " + file + " && pk=1;") !== -1);
+                // Every line written to the file waits for the file.
+                var lines = both[i].split(" >> " + file + ";").length - 1;
+                verify(lines >= 2);
+                compare(both[i].split(" [ -n \"$pk\" ] && printf ").length - 1, lines);
+            }
         }
 
         function test_calibrate_builds_the_full_measurement_shell() {
@@ -1867,7 +2284,7 @@ Item {
             r.e._combineRebuildLoopbacks();
             compare(r.e._combineModuleForKey(wired), "");   // map died with the flight
             r.e.setDeviceTrim(wired, 0.5);                  // dragged mid-rebuild
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + ";",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + ";",
                            "LB 201 " + wired + "\nLB 202 " + btSink + "\n", "");
             wait(400);                                      // the 250 ms apply debounce
             var last = r.mock.execLog[r.mock.execLog.length - 1];
@@ -1973,8 +2390,8 @@ Item {
             verify(!r.e.hasTrim("uuid-2"));
             r.e.adoptTrim("uuid-3", 3.7);       // clamped into the valid range
             verify(!r.e.hasTrim("uuid-3"));     // ...which lands on full level
-            r.e.adoptTrim("uuid-4", 0.001);
-            fuzzyCompare(r.e.trimOf("uuid-4"), 0.05, 0.001);
+            r.e.adoptTrim("uuid-4", 0.0001);    // below the smallest step a device is told
+            fuzzyCompare(r.e.trimOf("uuid-4"), 0.001, 0.0001);
         }
 
         // ── the join watchdog ─────────────────────────────────────────────
@@ -2602,7 +3019,7 @@ Item {
             r.e._combineRebuildLoopbacks();
             verify(r.e._driftSkipNext);
             compare(r.e._driftHistory.length, 0);
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             // The very next probe is spent, however loud it reads.
             r.e.handleExec(": PW_DRIFT;", p2, "");
@@ -2667,7 +3084,7 @@ Item {
             r.e._combineRebuildLoopbacks();
             verify(r.e._driftSkipNext);
             compare(r.e._driftHistory.length, 0);
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             // The very next probe is spent, however sensible it reads.
             r.e.handleExec(": PW_DRIFT;", p1, "");
@@ -2698,7 +3115,7 @@ Item {
             r.e._refLatShiftByMac = sh;
             // The recompensation rebuild deploys map + shift.
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             var p1 = "DRIFT_EAR " + wired + " 1434\nDRIFT_EAR " + btSink + " 1446\nDRIFT_EST 12\n";
             r.e.handleExec(": PW_DRIFT;", p1, "");    // spent: the rebuild armed the skip
@@ -2718,7 +3135,7 @@ Item {
             var sh = {}; sh[btMac] = 150;
             r.e._refLatShiftByMac = sh;
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             var p = "DRIFT_EAR " + wired + " 1400\nDRIFT_EAR " + btSink + " 1443\nDRIFT_EST 43\n";
             r.e.handleExec(": PW_DRIFT;", p, "");     // spent by the rebuild's skip
@@ -2792,13 +3209,13 @@ Item {
             var sh = {}; sh[btMac] = 150;
             r.e._refLatShiftByMac = sh;
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             compare(r.e._builtShiftByMac[btMac], 150);
             // The speaker drops off the list for one rebuild.
             r.mock.mediaDevs = { audioOutputs: [dev(wired)] };
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 303 " + wired + "\n", "");
             compare(r.e._builtShiftByMac[btMac], 150);
             // Back in range. The fold reads the retained deployed lag and
@@ -2899,7 +3316,7 @@ Item {
             var m1 = {}; m1[btMac] = 150;
             r.cfg.syncOffsetMap = JSON.stringify(m1);
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             verify(r.e._driftSkipNext);
             var p = "DRIFT_EAR " + wired + " 1434\nDRIFT_EAR " + btSink + " 1451\nDRIFT_EST 17\n";
@@ -2928,7 +3345,7 @@ Item {
             var m1 = {}; m1[btMac] = 150;
             r.cfg.syncOffsetMap = JSON.stringify(m1);
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             verify(r.e._driftProbeStale);
             // No answer ever arrives: the lost probe's leash runs out
@@ -3798,6 +4215,93 @@ Item {
             verify(!r2.e._settleTimerRunningForTest());
         }
 
+        function test_the_engine_writes_its_journal_for_the_reader_of_the_lines() {
+            // tests/test_sync_journal.py reads what the engine logs during
+            // this function, step by step. A QML test cannot see a
+            // console.log, and these lines are the whole point: which road
+            // moved the delay map, and how a settle round ended.
+            var m181 = {}; m181[btMac] = 181;
+            var m145 = {}; m145[btMac] = 145;
+            var unread = "DRIFT_UNSTEADY " + btSink + " " + wired + "\nDRIFT_NOSIG\n";
+            var r, i;
+
+            console.log("STEP hand");
+            r = settleRig(m181);
+            console.log("MAP " + r.cfg.syncOffsetMap);
+            r.e.setSyncOffset(161);
+            console.log("MAP " + r.cfg.syncOffsetMap);
+
+            console.log("STEP same");
+            r.e.setSyncOffset(161);
+
+            console.log("STEP notches");
+            for (i = 0; i < 3; i++) r.e.setSyncOffset(171 + 10 * i);
+            console.log("MAP " + r.cfg.syncOffsetMap);
+
+            console.log("STEP no bluetooth");
+            r = rig([dev(wired), dev(wired2)], { syncOffsetMap: JSON.stringify(m181) });
+            r.e.setSyncOffset(120);
+            compare(r.cfg.syncOffsetMs, 120);
+            compare(r.cfg.syncOffsetMap, JSON.stringify(m181));
+
+            console.log("STEP settle");
+            r = settleRig(m145);
+            var settle = [[1460, 1563], [1450, 1547], [1440, 1540]];
+            for (i = 0; i < 3; i++) {
+                r.e._settleTick();
+                r.e.handleExec(": PW_DRIFT;", settleEars(settle[i][0], settle[i][1]), "");
+            }
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 245);
+
+            console.log("STEP fold");
+            r = rig([dev(wired), dev(btSink)], { syncAutoCare: true, syncOffsetMap: JSON.stringify(m145) });
+            activate(r);
+            var late = [40, 38, 42];
+            for (i = 0; i < 3; i++)
+                r.e.handleExec(": PW_DRIFT;", "DRIFT_EAR " + wired + " 1400\nDRIFT_EAR " + btSink + " "
+                               + (1400 + late[i]) + "\nDRIFT_EST " + late[i] + "\n", "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 185);
+
+            console.log("STEP calibration");
+            r = rig([dev(wired), dev(btSink)]);
+            activate(r);
+            r.e.handleExec(": PW_CALIB " + r.e._calibRunSeq + " " + btMac + " ;",
+                           "CALIBVOL " + wired + " 55% 55%\nCALIBVOL " + btSink + " 55% 55%\nCALIB_OK 150\n", "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 150);
+
+            console.log("STEP verify");
+            var m213 = {}; m213[btMac] = 213;
+            r = rig([dev(wired), dev(btSink)], { syncOffsetMap: JSON.stringify(m213) });
+            activate(r);
+            r.e._calibVolumeBefore = 0.5;
+            r.e._verifyPending = true;
+            for (i = 0; i < 2; i++)
+                r.e.handleExec(": PW_VERIFY " + r.e._calibRunSeq + ";",
+                               "VERIFY_LAG " + wired + " 0\nVERIFY_LAG " + btSink + " 149\nVERIFY_OK 149\n", "");
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 362);
+
+            console.log("STEP unread");
+            r = settleRig(m145);
+            for (i = 0; i < 7; i++) {
+                var n = r.mock.execLog.length;
+                r.e._settleTick();
+                if (r.mock.execLog.length > n) r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1], unread, "");
+            }
+            compare(r.e._settleReadsLeft, 0);
+            compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);
+
+            console.log("STEP short");
+            r = settleRig(m145);
+            for (i = 0; i < 5; i++) {
+                r.e._settleTick();
+                r.e.handleExec(r.mock.execLog[r.mock.execLog.length - 1],
+                               i === 1 || i === 3 ? settleEars(1450, 1550) : unread, "");
+            }
+            compare(r.e._settleReadsLeft, 0);
+
+            console.log("STEP end");
+        }
+
         function test_three_flat_settle_readings_repair_the_room_whole() {
             // A restart-sized error (100 ms) — far past the periodic fold's
             // 60 ms leash — lands in ONE move, and the landing touches only
@@ -3831,7 +4335,7 @@ Item {
             verify(swapCmd.indexOf("\"$osi\" 0%") !== -1);                // faded out before the cut
             verify(swapCmd.indexOf("sleep 0.8") !== -1);                  // buffer fill at the new delay
             verify(r.e._combineReloopBusy);
-            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LBSWAP 205 " + wired + " 101\n", "");
             verify(!r.e._combineReloopBusy);
             verify(r.e._combineLoopbackIds.indexOf("205") !== -1);
@@ -3973,7 +4477,7 @@ Item {
             r.e._settleTick();
             r.e.handleExec(": PW_DRIFT;", settleEars(1440, 1540), "");
             var from = r.mock.execLog.length;
-            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LBSWAPFAIL " + wired + "\n", "");
             var rebuilt = false;
             for (var i = from; i < r.mock.execLog.length; i++)
@@ -4043,7 +4547,7 @@ Item {
             compare(JSON.parse(r.cfg.syncOffsetMap)[btMac], 145);   // fold declined
             // The rebuild lands the map and takes the fence down.
             r.e._combineRebuildLoopbacks();
-            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+            r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                            "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
             var fenced = false;
             for (var m in r.e._settleDeferredMacs) fenced = true;
@@ -4071,7 +4575,7 @@ Item {
             r.e._settleTick(); r.e.handleExec(": PW_DRIFT;", settleEars(1450, 1547), "");
             r.e._settleTick(); r.e.handleExec(": PW_DRIFT;", settleEars(1440, 1540), "");
             var from = r.mock.execLog.length;
-            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + "; x", "", "");
+            r.e.handleExec(": PW_LBSWAP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x", "", "");
             var rebuilt = false;
             for (var i = from; i < r.mock.execLog.length; i++)
                 if (r.mock.execLog[i].indexOf(": PW_RELOOP") === 0) rebuilt = true;
@@ -4100,7 +4604,7 @@ Item {
         function test_a_stale_settle_swap_ack_unloads_its_strays() {
             var r = settleRig();
             var from = r.mock.execLog.length;
-            r.e.handleExec(": PW_LBSWAP 9999; x", "LBSWAP 205 " + wired + " 101\n", "");
+            r.e.handleExec(": PW_LBSWAP 9999 " + r.e._reloopJob + "; x", "LBSWAP 205 " + wired + " 101\n", "");
             var swept = false;
             for (var i = from; i < r.mock.execLog.length; i++)
                 if (r.mock.execLog[i].indexOf(": PW_UNCOMBINE;") === 0
@@ -4162,7 +4666,7 @@ Item {
         activate(r);
         r.e._combineRebuildLoopbacks();
         var from = r.mock.execLog.length;
-        r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + "; x",
+        r.e.handleExec(": PW_RELOOP " + r.e._combineLoadSeq + " " + r.e._reloopJob + "; x",
                        "LB 301 " + wired + "\nLB 302 " + btSink + "\n", "");
         // The pending map is what the apply timer drains.
         compare(r.e._trimPendingLocal["301"], 100);
@@ -4421,6 +4925,60 @@ Item {
         verify(r.e._ultraDeaf[wired] === true);
     }
 
+    function test_the_check_says_fewer_than_two_for_none_and_for_one_and_not_for_two() {
+        // The sentence read "only one speaker can hear the inaudible tone",
+        // and it is said for none as well as for one. A speaker does not
+        // hear either: it reproduces the tone or it does not.
+        var want = ": fewer than two speakers can reproduce the test tone — nothing to compare";
+        var shelved = [[wired, btSink], [btSink], [wired], []];
+        for (var i = 0; i < shelved.length; i++) {
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.mock.playing = true;
+            r.mock.anythingPlaying = true;
+            var shelf = {};
+            for (var j = 0; j < shelved[i].length; j++) shelf[shelved[i][j]] = true;
+            r.e._ultraDeaf = shelf;
+            r.e.driftLastText = "";
+            r.mock.execLog = [];
+            r.e._driftProbe();
+            var said = r.e.driftLastText;
+            if (shelved[i].length > 0) {
+                compare(r.mock.execLog.length, 0, "nothing is played, case " + i);
+                compare(said.indexOf("Auto-check "), 0, said);
+                compare(said.substring(said.length - want.length), want, "case " + i);
+                // The time stands where it stood, between the two.
+                verify(/^Auto-check \d\d:\d\d: fewer /.test(said), said);
+            } else {
+                compare(said.indexOf("fewer than two"), -1, said);
+                compare(said.indexOf("nothing to compare"), -1, said);
+                compare(r.mock.execLog.length, 1);
+                compare(r.mock.execLog[0].indexOf(": PW_DRIFT;"), 0);
+            }
+        }
+    }
+
+    function test_an_unsteady_answer_is_read_the_same_with_one_name_or_with_all_of_them() {
+        // calibrate.py names every member that answered now. The engine
+        // only asks whether the line is there: the words shown are the same,
+        // and it is not counted as a silent room, however many names follow.
+        var names = [btSink, btSink + " " + wired];
+        for (var i = 0; i < names.length; i++) {
+            var r = rig([dev(wired), dev(btSink)], { syncAutoCare: true });
+            activate(r);
+            r.mock.playing = true;
+            r.mock.anythingPlaying = true;
+            for (var twice = 0; twice < 2; twice++) {
+                r.mock.execLog = [];
+                r.e.handleExec(": PW_DRIFT;", "DRIFT_UNSTEADY " + names[i] + "\nDRIFT_NOSIG\n", "");
+                verify(r.e.driftLastText.indexOf(": reading would not settle") !== -1, r.e.driftLastText);
+                compare(r.e._quietRoomStreak, 0);
+                compare(r.mock.execLog.length, 0, "nothing is kicked, case " + i);
+            }
+            compare(Object.keys(r.e._ultraDeaf).length, 0);
+        }
+    }
+
     function test_the_ears_window_survives_a_panel_restart() {
         // A hand on the fine-tune slider is the room's highest court, and a
         // panel restart is not the listener changing their mind. The window
@@ -4482,6 +5040,104 @@ Item {
         r.e.onOutputsChanged();
         compare(r.e._btJoinWatchMac, btMac);
         compare(r.mock.btLost, 0);
+    }
+
+    // A balance moved on a playing network device's own row is sent to it.
+    function test_a_balance_moved_on_a_playing_devices_row_reaches_the_device() {
+        var r = rig([dev(wired)]);
+        r.mock.castLive = true;
+        r.e.setDeviceTrim("tv-uuid", 0.5);
+        compare(r.e.trimOf("tv-uuid"), 0.5);
+        wait(400);                                      // the 250 ms apply debounce
+        compare(r.mock.castApplied.length, 1);
+        compare(r.mock.castApplied[0], "tv-uuid");
+    }
+
+    // A balance that is only read against another master is the same loudness
+    // under another number: the store takes it and the device is told nothing.
+    function test_a_balance_only_stored_tells_a_playing_device_nothing() {
+        var r = rig([dev(wired)]);
+        r.mock.castLive = true;
+        r.e.setDeviceTrim("tv-uuid", 0.2, true);
+        compare(r.e.trimOf("tv-uuid"), 0.2);
+        verify(r.e.hasTrim("tv-uuid"));
+        wait(400);
+        compare(r.mock.castApplied.length, 0);
+        // Anything but a plain true is the row: an answer nobody can read sends.
+        r.e.setDeviceTrim("tv-uuid", 0.3, "true");
+        r.e.setDeviceTrim("kitchen-uuid", 0.4, 1);
+        wait(400);
+        compare(r.mock.castApplied.length, 2);
+    }
+
+    function test_a_balance_only_stored_is_kept_for_the_next_start() {
+        var r = rig([dev(wired)]);
+        r.mock.castLive = true;
+        r.e.setDeviceTrim("tv-uuid", 0.2, true);
+        wait(1200);                                     // the 1 s write
+        compare(JSON.parse(r.cfg.deviceTrims)["tv-uuid"], 0.2);
+        // Full level stored is no entry, as from the row.
+        r.e.setDeviceTrim("tv-uuid", 1, true);
+        verify(!r.e.hasTrim("tv-uuid"));
+        wait(400);
+        compare(r.mock.castApplied.length, 0);
+    }
+
+    // A balance the widget worked out by itself may lie below the 5 % a row's slider starts at.
+    function test_a_stored_balance_below_five_per_cent_is_kept_and_read_as_it_is() {
+        var r = rig([dev(wired)]);
+        r.e.setDeviceTrim("tv-uuid", 0.01, true);
+        compare(r.e.trimOf("tv-uuid"), 0.01);
+        r.e.setDeviceTrim("tv-uuid", 0.014, true);
+        compare(r.e.trimOf("tv-uuid"), 0.014);
+        // Never below the thousandth a device can be told, and full level only at full level.
+        r.e.setDeviceTrim("tv-uuid", 0.0001, true);
+        compare(r.e.trimOf("tv-uuid"), 0.001);
+        r.e.setDeviceTrim("tv-uuid", 0.999, true);
+        verify(r.e.hasTrim("tv-uuid"));
+        compare(r.e.trimOf("tv-uuid"), 0.999);
+        r.e.setDeviceTrim("tv-uuid", 1, true);
+        verify(!r.e.hasTrim("tv-uuid"));
+    }
+
+    function test_a_rows_slider_keeps_its_five_per_cent_and_its_whole_per_cents() {
+        var r = rig([dev(wired)]);
+        r.e.setDeviceTrim("tv-uuid", 0.01);
+        compare(r.e.trimOf("tv-uuid"), 0.05);
+        r.e.setDeviceTrim(wired, 0.014);
+        compare(r.e.trimOf(wired), 0.05);
+        r.e.setDeviceTrim(wired, 0.337);
+        compare(r.e.trimOf(wired), 0.34);
+        r.e.setDeviceTrim(wired, 0.996);
+        verify(!r.e.hasTrim(wired));
+    }
+
+    function test_a_joining_device_far_below_the_master_keeps_its_small_share() {
+        var r = rig([dev(wired)]);
+        r.e.adoptTrim("tv-uuid", 0.02);
+        compare(r.e.trimOf("tv-uuid"), 0.02);
+        r.e.adoptTrim("kitchen-uuid", 0.0001);
+        compare(r.e.trimOf("kitchen-uuid"), 0.001);
+        r.e.adoptTrim("hall-uuid", 0.999);
+        compare(r.e.trimOf("hall-uuid"), 0.999);
+        r.e.adoptTrim("attic-uuid", 1);
+        verify(!r.e.hasTrim("attic-uuid"));
+        // One that has a balance is never measured over.
+        r.e.adoptTrim("tv-uuid", 0.5);
+        compare(r.e.trimOf("tv-uuid"), 0.02);
+    }
+
+    function test_what_the_store_cannot_read_is_full_level() {
+        var r = rig([dev(wired)], { deviceTrims: JSON.stringify({ "a": 0.0005, "b": 0, "c": -1, "d": "0.5", "e": 1.5, "f": 0.001, "g": 1 }) });
+        r.e._loadDeviceTrims();
+        compare(r.e.trimOf("a"), 1);
+        compare(r.e.trimOf("b"), 1);
+        compare(r.e.trimOf("c"), 1);
+        compare(r.e.trimOf("d"), 1);
+        compare(r.e.trimOf("e"), 1);
+        compare(r.e.trimOf("f"), 0.001);
+        compare(r.e.trimOf("g"), 1);
+        compare(r.e.trimOf("nobody"), 1);
     }
     }
 }

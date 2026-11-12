@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The cancel takes the run's token after the run counter has moved on, so
+  the mark names a run that does not exist yet.
+
+history:
+  The counter is bumped in the cancel itself, so that the cancelled run's
+  answer is recognised as stale when it finally comes. The token for the
+  mark has to be taken before that. Taken after, the mark stops nothing
+  that is running, and it sits there waiting for the next calibration:
+  the one the listener starts right after cancelling carries exactly that
+  number, reads the mark and quietly does nothing.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+          var gone = CalibLogic.token(_calibBornMs, _calibRunSeq);
+          _calibRunSeq++;
+
+replace:
+          _calibRunSeq++;
+          var gone = CalibLogic.token(_calibBornMs, _calibRunSeq);
+
+expect:
+  Killed by tst_syncengine::test_a_cancel_marks_the_run_that_was_in_flight.
+  Line-neutral.

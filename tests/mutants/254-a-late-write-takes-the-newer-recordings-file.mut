@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The line that clears away older address files takes the files with a later
+  start time in their name, not an earlier one.
+
+history:
+  Each recording's write first removes the address files of recordings
+  started before it, so that one left by a write landing after its own
+  cleanup does not stay. The line can itself run late, after the next
+  recording has written its file. Which files are older is therefore read
+  from the names: a late line must take nothing that was started after it.
+
+target:
+  package/contents/ui/RecLogic.js
+
+find:
+      return "for f in " + quotedPrefix + "*; do t=${f##*.}; [ \"$t\" -lt " + beforeMs
+
+replace:
+      return "for f in " + quotedPrefix + "*; do t=${f##*.}; [ \"$t\" -gt " + beforeMs
+
+expect:
+  Killed by tests/qml/tst_reclogic.qml::test_older_files_are_taken_by_the_time_in_their_name
+  and tests/test_recording_stop_race.py::test_a_late_write_of_the_recording_before_changes_no_station.
+  Line-neutral.

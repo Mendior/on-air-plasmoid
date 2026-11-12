@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The listener's own mute stands through anything that lifts the stream, so
+  it is back at the next zero the widget writes by itself.
+
+history:
+  A device is told zero for the listener's mute and for nothing else: not
+  for the zero a start, the end of a fade or a calibration writes. A start
+  after a mute brings this computer's sound back by itself, and the mute
+  ends there. Left standing, it reads as a mute again at the next
+  calibration, and a touch of the device's row or a click on the slider
+  then silences a television that nobody muted.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      return stood === true && !(typeof level === "number" && level > 0);
+
+replace:
+      return stood === true;
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_anything_that_lifts_the_stream_ends_the_mute
+  and tests/qml/tst_volumeroad.qml::test_a_mute_that_a_start_lifted_is_not_back_at_the_next_zero.
+  Line-neutral.

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A property or a function that its object does not have passes the lint,
+  as it did while the pass looked only for a handful of words.
+
+history:
+  The old pass failed on a nonzero exit and on messages that said
+  duplicate, syntax, unavailable or error. "Member … not found on type …"
+  says none of them: root.eiOleOlemasKanaar() in main.qml was found by
+  qmllint and the lint stayed green. Since 2026-11-12 every message fails
+  the lint unless it is an unqualified access or a var in a block, the two
+  kinds healthy code produces by the hundred, or a counted row accounts
+  for it; a config key is looked up in main.xml instead.
+
+target:
+  scripts/qmllint_gate.py
+
+find:
+          if category == "unqualified" and message == "Unqualified access":
+
+replace:
+          if category in ("unqualified", "missing-property"):
+
+expect:
+  Killed by tests/test_qmllint_gate.py::test_a_member_that_does_not_exist_is_reported_though_a_loop_follows
+  on a real qmllint, and by tests/test_qmllint_gate.py::test_the_verdict_on_one_file
+  and tests/test_qmllint_gate.py::test_a_config_key_is_checked_against_main_xml
+  on reports made by hand.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Stop looks at what plays, what is cast, ordered, parked or kept, and not
+  at a search result whose address stands while nothing of it sounds yet.
+
+history:
+  On the relay road a tried-out result's player starts only when the tap
+  is up, one to four seconds after the click. A Stop inside that window
+  answered "none", and the station came up and played: -9.9 dBFS on the
+  sink a second and a half after the press.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+                  || pausedFile === true || audition === true) ? "stop" : "none";
+
+replace:
+                  || pausedFile === true) ? "stop" : "none";
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_stop_and_pause_take_down_an_audition_that_is_on_its_way
+  and tests/qml/tst_transportroads.qml::test_stop_half_a_second_into_an_audition_is_silence.
+  Line-neutral.

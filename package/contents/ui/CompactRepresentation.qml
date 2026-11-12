@@ -27,7 +27,7 @@ MouseArea {
     // Held, not merely audible, so a reconnect does not take the text away
     // and bring it back (TransportLogic.held).
     readonly property bool _held: TransportLogic.held(isPlaying(), root._casting, root._wantsPlaying,
-                                                      root._tsPaused, root.tsShifted)
+                                                      root._tsPaused, root.tsShifted, root._pausedFile !== null)
     readonly property var _lines: PanelLogic.lines(root.trackArtist, root.trackTitle, root.currentStation)
     readonly property bool showTrackText: PanelLogic.shown(Plasmoid.configuration.panelShowTrack,
                                                            horizontalPanel, _held, _lines.top)
@@ -95,21 +95,11 @@ MouseArea {
 
     onClicked: (mouse) => {
         if (mouse.button === Qt.MiddleButton) {
-            if (Plasmoid.configuration.lastplay) {
-                if (isPlaying() || root._casting) {
-                    // Toggle semantics also while a preview/local file plays
-                    // (lastPlay is -1 then and refreshServer would no-op) and
-                    // while casting — stopWithFade stops cast devices too.
-                    // A ready timeshift buffer turns the toggle into a pause.
-                    if (!root.timeshiftPause()) stopWithFade();
-                } else if (root._tsPaused) {
-                    root.timeshiftResume();
-                } else if (root.tsShifted) {
-                    playMusic.play();
-                } else {
-                    root.playLast();
-                }
-            }
+            // Toggle semantics also while a preview/local file plays
+            // (lastPlay is -1 then and refreshServer would no-op) and
+            // while casting — stopWithFade stops cast devices too.
+            // A ready timeshift buffer turns the toggle into a pause.
+            if (Plasmoid.configuration.lastplay) root.transport("PlayPause");
         } else {
             root.expanded = !root.expanded;
         }
@@ -118,10 +108,10 @@ MouseArea {
         volumeTimer.restart();
         const delta = wheel.angleDelta.y || wheel.angleDelta.x;
         wheelDelta += delta;
-        // Not from the output's level alone: during the sleep timer's fade
-        // that is the fade's level, and the step is saved as the default.
-        const step = (notch) => root.setUserVolume(TransportLogic.wheelLevel(playMusicOutput.volume,
-            root._volumeBeforeSleepFade, root._pendingUserVolumePct, notch), true);
+        // What a notch counts from is main.qml's to say (wheelStep): not
+        // the output's level alone, which a sleep fade moves and which
+        // nobody hears while a device plays alone.
+        const step = (notch) => root.wheelStep(notch);
         while (wheelDelta >= 120) {
             wheelDelta -= 120;
             step(0.05);

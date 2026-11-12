@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The helper no longer tells an Ogg stream with FLAC inside from one with
+  Vorbis or Opus, so no station is ever sent to the relay on its answer.
+
+history:
+  An Ogg FLAC stream freezes 278 ms in when the player reads it off the
+  socket and has to start through the relay; Vorbis and Opus in the same
+  container do not. The directory files all three as OGG, so the first
+  packet of the first page is the only place that says which it is.
+
+target:
+  package/contents/ui/streamkind.py
+
+find:
+      if packet[:5] == b"\x7fFLAC" or packet[:4] == b"fLaC":
+
+replace:
+      if packet[:5] == b"\x7fFLAX" or packet[:4] == b"fLaX":
+
+expect:
+  Killed by tests/test_streamkind.py::test_the_three_kinds_and_everything_else.
+  Line-neutral.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A verdict does not lengthen the wait before the next one.
+
+history:
+  A position can stand for a reason opening the station again does not
+  cure. Measured with the sound server frozen and with the stream left
+  unlinked: it stood for a minute with no error. An output that takes sound
+  for a few seconds and stops again would have the station opened every
+  half minute for as long as it lasts; doubled, the wait reaches five
+  minutes at the fifth verdict.
+
+target:
+  package/contents/ui/StandLogic.js
+
+find:
+   * Math.pow(2, n));
+
+replace:
+   * Math.pow(1, n));
+
+expect:
+  Killed by tst_standlogic::test_the_wait_doubles_with_every_strike_up_to_five_minutes.
+  Line-neutral.

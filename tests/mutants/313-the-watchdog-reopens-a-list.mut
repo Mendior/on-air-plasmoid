@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The single file's horizon watchdog runs over a list too.
+
+history:
+  On a list the position stops at the length the list had when it was
+  opened while the sound goes on: that is how the player reports a list that
+  grows. The watchdog takes three seconds of a standing position for the
+  single file's frozen horizon and reopens, every three seconds.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (!shifted || slide || playing !== true) {
+
+replace:
+          if (!shifted || playing !== true) {
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_list_has_no_horizon_to_watch.

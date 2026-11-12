@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Closing the window leaves the face in a window that is gone.
+
+history:
+  The title bar's close button is the plainest way out of the window. If
+  the wish stays standing, the window is hidden with the face inside it,
+  the popup keeps showing its placeholder, and the config brings the
+  hidden window's state back after a restart.
+
+target:
+  package/contents/ui/PlayerWindow.qml
+
+find:
+      onClosing: detached = false
+
+replace:
+      onClosing: (close) => close.accepted = true
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_the_close_button_brings_the_face_back_to_the_popup.

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Every recording writes its address into the one file the widget has, instead
+  of a file of its own.
+
+history:
+  A command handed to the shell runs when the shell gets to it, and the number
+  an answer carries guards the answer only. Run in a chosen order on
+  2026-11-11 with the engine's own commands: the write of a recording called
+  off, run after the next recording's write, put its own address into the
+  shared file and New FM's capture asked for /old.mp3; its cleanup, run late,
+  deleted the file and the capture ended "__REC_EMPTY__ rc=183".
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+          _recUrlFile = _recUrlBase + "-" + _recToken;
+
+replace:
+          _recUrlFile = _recUrlBase;
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_each_recording_has_an_address_file_of_its_own
+  and tests/test_recording_stop_race.py::test_a_late_write_of_the_recording_before_changes_no_station.
+  Line-neutral.

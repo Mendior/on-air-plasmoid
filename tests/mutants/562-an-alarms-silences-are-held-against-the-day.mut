@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Verdicts given while an alarm rang double the waits of the listening after it.
+
+history:
+  Outside an alarm every verdict doubles the wait before the next, up to
+  five minutes, until ten minutes of sound forgive it. An alarm's verdicts
+  do not double and may be several; counted, the first silence of the station
+  the listener puts on after getting up would stand for 40 or 80 s before
+  anything was done about it.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+          if (!waking) _strikes++;
+
+replace:
+          _strikes++;
+
+expect:
+  Killed by tst_standwatch::test_what_an_alarm_went_through_is_not_held_against_the_listening_after_it.
+  Line-neutral.

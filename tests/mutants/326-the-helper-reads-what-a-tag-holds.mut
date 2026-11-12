@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The codec helper looks for frames inside an ID3 tag.
+
+history:
+  A tag can carry anything, a picture for one, and bytes in it can read
+  as frames of the other codec. The stream begins where the tag says it
+  ends.
+
+target:
+  package/contents/ui/streamkind.py
+
+find:
+          start = 10 + ((data[6] << 21) | (data[7] << 14) | (data[8] << 7) | data[9])
+
+replace:
+          start = 10
+
+expect:
+  Killed by tests/test_streamkind.py::test_what_a_tag_holds_is_not_the_stream.

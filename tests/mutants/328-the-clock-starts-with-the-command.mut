@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The writer's clock counts from the moment its command was sent, not from its stream's first bytes.
+
+history:
+  A writer armed while the station is silent waits for its first bytes,
+  and so does the player. Counted from the command, the clock is ahead of the
+  segments by that wait for as long as the buffer lives, which is the fault a
+  stall left behind, in the small.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+                  runMs = 0;
+                  _runAt = nowMs;
+                  if (liveBaseMs > 0) liveBaseMs = 0;
+
+replace:
+                  if (liveBaseMs > 0) liveBaseMs = 0;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_the_clock_starts_when_the_writer_has_its_stream.

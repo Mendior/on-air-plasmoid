@@ -1236,6 +1236,47 @@ def test_rounds_that_never_settle_say_unsteady_not_deaf(calib, monkeypatch, caps
     assert "DRIFT_DEAF" not in out
 
 
+def _said_about(calib, monkeypatch, capsys, members, rounds):
+    """What the drift check prints for a room that answers as `rounds` say.
+    The mute lookup is a stand-in too: the real one asks pactl."""
+    seq = [list(r) for r in rounds]
+    monkeypatch.setitem(calib, "_mute_states", lambda sinks: {})
+    monkeypatch.setitem(calib, "_shared_round",
+                        lambda m, w, mic, trim, slot_seconds=None: seq.pop(0))
+    assert calib["_drift_by_ultra"]("combined", [(m, 0) for m in members], "mic") is None
+    return capsys.readouterr().out.splitlines()
+
+
+def test_an_unsteady_room_names_every_member_that_answered_not_the_first(calib, monkeypatch, capsys):
+    """One name stood on the line, the first member to answer, and in the
+    journal it read as that speaker being the unsteady one: all evening
+    "DRIFT_UNSTEADY bluez_output..." beside a Bluetooth speaker nothing had
+    shown to be at fault. What would not hold still is the difference between
+    the members, so the line names all of them that were heard."""
+    wander = [[0.50, 0.62], [0.50, 0.72], [0.50, 0.82], [0.50, 0.92]]
+    assert _said_about(calib, monkeypatch, capsys, ["wired", "bt"], wander) == ["DRIFT_UNSTEADY wired bt"]
+    # Whichever of them answered first.
+    late = [[None, 0.62], [0.50, 0.72], [0.50, 0.82], [0.50, 0.92]]
+    assert _said_about(calib, monkeypatch, capsys, ["wired", "bt"], late) == ["DRIFT_UNSTEADY wired bt"]
+
+
+def test_an_unsteady_room_leaves_out_a_member_nobody_heard(calib, monkeypatch, capsys):
+    rounds = [[0.50, None, 0.62], [0.50, None, 0.72], [0.50, None, 0.82], [0.50, None, 0.92]]
+    said = _said_about(calib, monkeypatch, capsys, ["wired", "gone", "bt"], rounds)
+    assert said == ["DRIFT_DEAF gone", "DRIFT_UNSTEADY wired bt"]
+
+
+def test_an_unsteady_line_still_opens_the_way_the_engine_looks_for_it(calib, monkeypatch, capsys):
+    """The engine asks one thing of this line: that it begins with the word
+    and a space. A line without a name behind it would be read as a quiet
+    room, and two of those in a row suspend-cycle the Bluetooth speaker."""
+    many = ["s%d" % i for i in range(8)]
+    rounds = [[0.5 + 0.1 * r * i for i in range(8)] for r in range(4)]
+    said = _said_about(calib, monkeypatch, capsys, many, rounds)
+    assert said == ["DRIFT_UNSTEADY " + " ".join(many)]
+    assert said[0].startswith("DRIFT_UNSTEADY s0")
+
+
 def test_a_stalled_player_costs_its_slot_not_the_schedule(calib, monkeypatch):
     """A wedged sink used to hold a blocking paplay for its full 5 s timeout,
     pushing every later member ~3 s past its own slot while the extractor
@@ -1309,6 +1350,187 @@ def test_a_stalled_player_costs_its_slot_not_the_schedule(calib, monkeypatch):
     assert got == [None, None]
     # And every player is reaped, wedged or not.
     assert all(p.dead for p in procs)
+
+
+class _SyntheticRoom:
+    """_shared_round with nothing real under it: a clock that moves only when
+    somebody waits, a level query that takes as long as the test says, and a
+    capture built afterwards from when each player was REALLY started plus
+    its speaker's own latency. What the round then reads off that capture is
+    what it would have told the engine."""
+
+    def __init__(self, calib, monkeypatch, query_s, latency_s, levels=None):
+        self.calib = calib
+        self.query_s = query_s
+        self.latency_s = latency_s
+        self.levels = levels or {}
+        self.t = 1000.0
+        self.events = []          # ("query" | "record" | "play", sink or None, clock)
+        self.volumes = {}         # sink -> the --volume its player was given
+        monkeypatch.setitem(calib, "time", self)
+        monkeypatch.setitem(calib, "subprocess", self)
+        monkeypatch.setitem(calib, "read_mono", self._capture)
+
+    DEVNULL = -3
+    PIPE = -1
+
+    class TimeoutExpired(Exception):
+        pass
+
+    class _Proc:
+        def poll(self):
+            return 0
+
+        def kill(self):
+            pass
+
+        def terminate(self):
+            pass
+
+        def send_signal(self, sig):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+    def monotonic(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += max(0.0, s)
+
+    def Popen(self, argv, **kw):
+        if argv[0] == "paplay":
+            sink = argv[argv.index("--device") + 1]
+            self.events.append(("play", sink, self.t))
+            self.volumes[sink] = argv[argv.index("--volume") + 1]
+        else:
+            self.events.append(("record", None, self.t))
+        return self._Proc()
+
+    def run(self, argv, **kw):
+        class R:
+            stdout = ""
+            stderr = ""
+            returncode = 0
+
+        if argv[:2] == ["pactl", "get-sink-volume"]:
+            sink = argv[2]
+            self.events.append(("query", sink, self.t))
+            took = self.query_s.get(sink, 0.0)
+            if took is None:
+                raise self.TimeoutExpired()
+            self.t += took
+            R.stdout = "Volume: front-left: 36045 /  %s / -15.58 dB" % self.levels.get(sink, "55%")
+        return R()
+
+    def at(self, kind):
+        return [(sink, t) for k, sink, t in self.events if k == kind]
+
+    def _capture(self, _path):
+        rate = self.calib["RATE"]
+        began = self.at("record")[0][1]
+        landed = [t - began + self.latency_s[sink] for sink, t in self.at("play")]
+        seconds = max(landed, default=0.0) + 2.5
+        return _capture_with_stimuli(self.calib, rate, landed, [1.0] * len(landed), seconds), rate
+
+    def round(self, sinks, trim=0.1):
+        return self.calib["_shared_round"]([(s, 0) for s in sinks], "u.wav", "mic", trim)
+
+
+def _apart_ms(got):
+    assert None not in got, got
+    return (got[1] - got[0]) * 1000.0
+
+
+def test_the_synthetic_room_reads_two_equal_speakers_as_equal_and_a_late_one_as_late(calib, monkeypatch):
+    """What the next tests are read against. Two speakers 100 ms from the
+    microphone and nothing in the way: no difference. Give the second one
+    30 ms more and the round has to say 30, or it could not tell a slow query
+    from a slow speaker either."""
+    room = _SyntheticRoom(calib, monkeypatch, {}, {"a": 0.1, "b": 0.1})
+    assert abs(_apart_ms(room.round(["a", "b"]))) <= 2.0
+    late = _SyntheticRoom(calib, monkeypatch, {}, {"a": 0.1, "b": 0.13})
+    assert abs(_apart_ms(late.round(["a", "b"])) - 30.0) <= 2.0
+
+
+def test_a_slow_level_query_on_one_speaker_is_not_read_as_that_speakers_lag(calib, monkeypatch):
+    """Each member's level was asked for after the wait for its slot, with a
+    blocking pactl, and the capture was then read against the slot. Whatever
+    the query took went into that member's arrival: with two speakers both
+    100 ms from the microphone and 150 ms spent on the first one's query, the
+    round said the second was 150 ms EARLY."""
+    room = _SyntheticRoom(calib, monkeypatch, {"a": 0.15}, {"a": 0.1, "b": 0.1})
+    assert abs(_apart_ms(room.round(["a", "b"]))) <= 2.0
+    other = _SyntheticRoom(calib, monkeypatch, {"b": 0.15}, {"a": 0.1, "b": 0.1})
+    assert abs(_apart_ms(other.round(["a", "b"]))) <= 2.0
+
+
+def test_the_same_slow_query_on_both_speakers_changes_nothing(calib, monkeypatch):
+    """Equal delays always cancelled, which is why this hid: they have to go
+    on cancelling, and a real 30 ms between the speakers has to stay 30."""
+    room = _SyntheticRoom(calib, monkeypatch, {"a": 0.15, "b": 0.15}, {"a": 0.1, "b": 0.1})
+    assert abs(_apart_ms(room.round(["a", "b"]))) <= 2.0
+    late = _SyntheticRoom(calib, monkeypatch, {"a": 0.15, "b": 0.15}, {"a": 0.1, "b": 0.13})
+    assert abs(_apart_ms(late.round(["a", "b"])) - 30.0) <= 2.0
+
+
+def test_every_level_is_asked_for_before_the_capture_begins(calib, monkeypatch):
+    """Nothing that can block sits between the wait for a slot and the
+    player: the queries are over before the recorder is started."""
+    room = _SyntheticRoom(calib, monkeypatch, {"a": 0.15, "b": 0.02, "c": 0.4}, {"a": 0.1, "b": 0.1, "c": 0.1})
+    room.round(["a", "b", "c"])
+    began = room.at("record")[0][1]
+    assert [sink for sink, _t in room.at("query")] == ["a", "b", "c"]
+    assert all(t < began for _sink, t in room.at("query")), room.events
+
+
+def test_every_player_starts_on_its_slot_whatever_the_queries_took(calib, monkeypatch):
+    """A query that runs into pactl's own three-second timeout used to push
+    its member, and every member after it, off the schedule the capture is
+    read by."""
+    slow = {"a": 0.15, "b": 3.0, "c": 0.0, "d": None}
+    room = _SyntheticRoom(calib, monkeypatch, slow, dict.fromkeys("abcd", 0.1))
+    room.round(list("abcd"))
+    began = room.at("record")[0][1]
+    slot = calib["ULTRA_SLOT_SECONDS"]
+    want = [calib["PLAY_DELAY"] + i * slot for i in range(4)]
+    assert [round(t - began, 6) for _sink, t in room.at("play")] == [round(w, 6) for w in want]
+
+
+def test_each_player_still_gets_the_level_its_own_sink_asked_for(calib, monkeypatch):
+    levels = {"a": "55%", "b": "100%", "c": "20%"}
+    room = _SyntheticRoom(calib, monkeypatch, {"a": 0.15}, dict.fromkeys("abc", 0.1), levels)
+    # Not the default trim: the round was asked for a louder rung.
+    room.round(["c", "a", "b"], trim=0.3)
+    vol = calib["ultra_play_volume"]
+    assert room.volumes == {"a": str(vol(0.55, 0.3)), "b": str(vol(1.0, 0.3)), "c": str(vol(0.2, 0.3))}
+    assert vol(0.55, 0.3) != vol(0.55)
+    assert len({room.volumes[s] for s in "abc"}) == 3
+
+
+def test_a_level_that_cannot_be_read_still_plays_at_the_ceiling(calib, monkeypatch):
+    """As before: no answer, or an answer with no percentage in it, means the
+    loudest the stimulus is allowed, and the round goes on."""
+    room = _SyntheticRoom(calib, monkeypatch, {"a": None}, {"a": 0.1, "b": 0.1}, {"b": "muted"})
+    got = room.round(["a", "b"])
+    assert room.volumes == {"a": str(calib["ULTRA_PLAY_MAX"]), "b": str(calib["ULTRA_PLAY_MAX"])}
+    assert abs(_apart_ms(got)) <= 2.0
+
+
+def test_a_round_with_nobody_in_it_asks_and_plays_nothing(calib, monkeypatch):
+    room = _SyntheticRoom(calib, monkeypatch, {}, {})
+    assert room.round([]) == []
+    assert room.at("query") == [] and room.at("play") == []
+
+
+def test_eight_members_with_uneven_queries_all_land_together(calib, monkeypatch):
+    sinks = ["s%d" % i for i in range(8)]
+    slow = {s: 0.03 * i for i, s in enumerate(sinks)}
+    room = _SyntheticRoom(calib, monkeypatch, slow, dict.fromkeys(sinks, 0.1))
+    got = room.round(sinks)
+    assert None not in got, got
+    assert (max(got) - min(got)) * 1000.0 <= 2.0
 
 
 def test_a_member_short_of_rounds_is_not_deaf(calib, monkeypatch, capsys):

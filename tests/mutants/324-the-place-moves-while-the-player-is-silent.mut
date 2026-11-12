@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The listener's place in the buffer advances with the clock, whether or not the player sounds.
+
+history:
+  The pill is read off the place, and the list is grown and left by it.
+  A player that is still loading, or that stalled, has heard nothing: its
+  place stands.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (app.isPlaying()) placeMs += heard;
+
+replace:
+          placeMs += heard;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_the_place_moves_only_while_the_player_sounds.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The tag list is the one "Show more" pages only when the web list holds rows.
+
+history:
+  Whether the tag answer's list or the name answer's was paged was told by
+  the web rows the tag answer had put in. The listener's own stations are
+  left out of those, so under "jazz" a tag page of fifty saved stations put
+  none in and paging stayed with the name answer, an empty one: the genre's
+  fifty-first station could not be reached. The search now asks
+  SearchLogic.tagListPaged, which reads the two answers.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                      if (tagOk && SearchLogic.tagListPaged(lead !== null, fullRepresentation._webPage.more, tagRows, tagPage.more))
+
+replace:
+                      if (tagOk && webResultsModel.count > 0 && SearchLogic.tagListPaged(lead !== null, fullRepresentation._webPage.more, tagRows, tagPage.more))
+
+expect:
+  Killed by tests/test_invariants.py::test_the_list_show_more_pages_is_read_from_the_two_answers.
+  Line-neutral.

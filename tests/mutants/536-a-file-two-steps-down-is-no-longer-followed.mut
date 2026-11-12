@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Only the file that creates a component is asked what a name means, not
+  the file that created that one: `root` in a list row leads nowhere and
+  the row's reads are no longer looked up.
+
+history:
+  MediaListItem.qml and EpisodeListItem.qml are created by
+  FullRepresentation.qml, which main.qml creates; `root` in them is
+  main.qml's id, two files up. A check that stops following a name does not
+  fail, it finds less: the rows' 81 reads through `root` would drop to 0
+  with nothing printed. So the test holds a least number of reads for each
+  wire between two files, about half of what was there on 2026-11-12.
+
+target:
+  tests/test_cross_file_members.py
+
+find:
+                  todo.extend(self.makers[maker])
+
+replace:
+                  pass
+
+expect:
+  Killed by tests/test_cross_file_members.py::test_the_shipped_files_read_no_member_that_is_not_there
+  (the least number of reads for MediaListItem.qml and EpisodeListItem.qml)
+  and by tests/test_cross_file_members.py::test_a_misspelt_member_is_named_with_its_line_and_the_file_it_was_looked_for_in
+  for the name planted in MediaListItem.qml.

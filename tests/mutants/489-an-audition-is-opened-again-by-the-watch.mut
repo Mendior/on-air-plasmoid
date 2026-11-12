@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A search result being tried is watched like a saved station.
+
+history:
+  An audition is nobody's standing order, so nothing asks whether it is
+  still wanted: one left playing under a closed lid would be found dead in
+  the morning and put on again through the identity road.
+
+target:
+  package/contents/ui/StandLogic.js
+
+find:
+   && f.episode === false && f.audition === false;
+
+replace:
+   && f.episode === false;
+
+expect:
+  Killed by tst_standlogic::test_what_is_not_the_broadcast_is_not_watched.
+  Line-neutral.

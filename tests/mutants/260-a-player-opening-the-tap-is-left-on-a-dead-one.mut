@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A relay writer that dies at birth sends only an audibly playing room back
+  to the live stream, so a player still opening the tap is left on it.
+
+history:
+  Measured on the bench on 2026-11-11 with an MP3 stream the directory
+  called FLAC: the tap answered 0.26 s after the start, ffmpeg refused the
+  Ogg shell 0.09 s later, and the player, already sent to the tap and still
+  opening it, did not count as playing. An audition stayed silent for the
+  whole 25 s that were measured, and a saved station came back only with
+  the heal road's knock, 15 s after the press.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+                      if (backTo !== "" && !wasShifted && !app._tsPaused && (app.isPlaying() || onTap) && !app._orderLapsed())
+
+replace:
+                      if (backTo !== "" && !wasShifted && !app._tsPaused && app.isPlaying() && !app._orderLapsed())
+
+expect:
+  Killed by tests/qml/tst_timeshiftengine.qml::test_a_player_still_opening_the_tap_goes_live_when_the_writer_dies_at_birth.
+  Line-neutral.

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  UPnP 716 in answer to a play is read as any other failure, so the widget
+  says "Could not cast" of a device that works.
+
+history:
+  A Ruark R5se refused three station addresses with 716, "Resource not
+  found", and played a fourth through the same helper a few minutes later
+  (2026-11-12). "Could not cast to Ruark R5se. The device could not play
+  this station." read as a speaker that is broken or off, and the listener
+  had no way to know that the next station might just play. An answer that
+  is about the resource is told apart now, and the widget says the device
+  cannot play this station and that another may work.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+  var _REFUSALS = { "702": true, "703": true, "704": true, "714": true, "715": true, "716": true };
+
+replace:
+  var _REFUSALS = { "702": true, "703": true, "704": true, "714": true, "715": true };
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_what_an_answer_says.

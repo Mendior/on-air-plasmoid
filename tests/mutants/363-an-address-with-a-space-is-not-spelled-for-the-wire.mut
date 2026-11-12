@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The helpers hand a saved address to urllib as it stands.
+
+history:
+  urllib refuses a space and a letter outside ASCII, which the player spells
+  for the wire itself. Measured: for such a station no connection was made
+  at all, every day again.
+
+target:
+  package/contents/ui/streamkind.py
+
+find:
+      req = urllib.request.Request(spelled, headers={"User-Agent": _USER_AGENT})
+
+replace:
+      req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+
+expect:
+  Killed by tests/test_loudness.py::test_an_address_with_a_space_a_quote_and_a_token_is_heard
+  and tests/test_streamkind.py::test_the_script_reads_an_address_with_a_space_in_it.
+  Line-neutral.

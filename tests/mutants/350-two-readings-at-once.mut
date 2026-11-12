@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A second reading goes out while the first is in flight.
+
+history:
+  The engine keeps one reading's number and file. A second one takes their
+  place, the first helper's answer is dropped, and its station is connected
+  to again for nothing.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+              settle.restart();
+              return;
+          }
+          if (kind && kind.busy)
+
+replace:
+              settle.restart();
+          }
+          if (kind && kind.busy)
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_one_reading_at_a_time.
+  1 line(s) shorter.

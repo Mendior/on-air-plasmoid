@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A widget on the desktop shows the window button.
+
+history:
+  The desktop form shows the face inline, always in sight, and the window
+  cut six pixels off each side of it there. The button is not offered; a
+  face that is in a window all the same keeps the way back.
+
+target:
+  package/contents/ui/SeatButtons.qml
+
+find:
+          visible: seatButtons.inWindow || !seatButtons.planar
+
+replace:
+          visible: true
+
+expect:
+  Killed by tests/qml/tst_seatbuttons.qml::test_on_the_desktop_the_corner_is_empty_and_takes_no_room.

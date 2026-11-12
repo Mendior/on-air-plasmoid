@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A tip of the face is again a window placed by a position the window does not have.
+
+history:
+  PlasmaCore.ToolTipArea places its tip by the item's position inside its
+  window, read as a place on the screen. In the player's own window the
+  Stop button at (800, 686) got its tip at (162, 473). The face's tips are
+  drawn inside the window the face sits in.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                          PlasmaComponents3.ToolTip { text: i18n("Playback speed — tap to change") }
+
+replace:
+                          PlasmaCore.ToolTipArea { anchors.fill: parent; mainText: i18n("Playback speed — tap to change") }
+
+expect:
+  Killed by tests/test_invariants.py::test_the_faces_tooltips_are_drawn_in_the_window_the_face_is_in.
+  Line-neutral.

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The file the address is written into takes the session's default mode.
+
+history:
+  The address is kept off the command line because it can carry a token; a
+  file other users can read gives it away just the same.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+          write: ": LD_URL; umask 077; printf '%s' " + q(a.url)
+
+replace:
+          write: ": LD_URL; printf '%s' " + q(a.url)
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_the_address_goes_into_a_file_and_never_to_the_helper.
+  Line-neutral.

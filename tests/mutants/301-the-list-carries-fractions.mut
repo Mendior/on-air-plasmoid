@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A segment's length is written into the list with a decimal point.
+
+history:
+  FFmpeg reads "#EXTINF:" with atof(), and under a Finnish, Estonian or
+  German LC_NUMERIC "2.0" is read as 2 and "2.5" as 2 too: the reader's clock
+  then runs off the sound's. The widget writes its own list for that reason,
+  in whole seconds, and the writer cuts whole seconds.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+      for (n = from; n <= upto; n++) out.push("#EXTINF:" + SEG_SEC + ",\nseg-" + n + ".ts\n");
+
+replace:
+      for (n = from; n <= upto; n++) out.push("#EXTINF:" + SEG_SEC + ".0,\nseg-" + n + ".ts\n");
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_the_list_names_its_segments_in_whole_seconds_and_has_no_end.

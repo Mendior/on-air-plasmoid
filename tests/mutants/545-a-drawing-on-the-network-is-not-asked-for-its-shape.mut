@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A drawing that is not a local file yet is read without its shape.
+
+history:
+  A station's logo is on the network until the logo cache has it, and
+  for a station whose cache copy is broken it stays there. An SVG named so
+  was drawn squeezed into the square meanwhile. Its shape is read off a copy
+  of 16 pixels before the picture itself is asked for. This mutant never
+  asks for that copy.
+
+target:
+  package/contents/ui/CoverImage.qml
+
+find:
+          source: CoverLogic.namedSvg(cover._address) ? cover.source : ""
+
+replace:
+          source: CoverLogic.namedSvg("") ? cover.source : ""
+
+expect:
+  Killed by tests/test_cover_larger_fetch.py::test_a_drawing_from_the_network_is_asked_for_its_shape_once.
+  Line-neutral.

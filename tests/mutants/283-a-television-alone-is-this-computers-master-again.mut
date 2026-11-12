@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A device that plays alone is reached by the output menu's volume row only
+  when a local output is pinned.
+
+history:
+  Up to 2026.43 the "Play on" menu's Volume slider and its Mute asked how
+  the local sound is routed and nothing else. With the system default
+  selected and a television carrying the stream, this computer silent, both
+  turned this computer's master and the television heard nothing. Measured
+  2026-11-11 on the row's own lines around counting roads: local=1 cast=0,
+  and with an output pinned local=0 cast=1. 2026.44 makes the row the
+  widget's own volume whenever a device plays alone.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      if (casting === true && localAlong !== true) return "player";
+
+replace:
+      if (casting === true && localAlong !== true && followsDefault !== true) return "player";
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_device_playing_alone_is_what_the_row_turns
+  and tests/qml/tst_volumeroad.qml::test_a_television_playing_alone_is_what_the_row_turns.
+  Line-neutral.

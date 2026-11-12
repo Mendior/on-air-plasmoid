@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The heal's second look counts every look towards a silent address, also
+  the ones its server answered.
+
+history:
+  2026.43 moves a station when its old address has been silent on three
+  looks five minutes apart. The count was of looks, not of silences: a busy
+  503, then a 429, then one timeout made three, and so did two answers whose
+  place Qt does not name followed by one timeout. Found 2026-11-11, the day
+  2026.43 went out. The count is of unanswered looks in a row, and any answer
+  starts it again.
+
+target:
+  package/contents/ui/KinHunt.qml
+
+find:
+              move.silent = status === 0 ? (move.silent || 0) + 1 : 0;
+
+replace:
+              move.silent = (move.silent || 0) + 1;
+
+expect:
+  Killed by tests/qml/tst_kinhunt.qml::test_only_silence_in_a_row_counts_as_silence
+  and tests/qml/tst_kinhunt.qml::test_an_answer_between_two_silences_starts_the_count_again.
+  Line-neutral.

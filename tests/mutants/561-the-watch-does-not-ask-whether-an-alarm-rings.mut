@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stand watch treats a ringing alarm's station like any other.
+
+history:
+  Bench, 2026-11-12: an alarm's station held its connection and sent
+  nothing 8 s into the wake-up. The rule that makes an alarm's
+  third silence known as fast as its first is of no use if the watch never
+  asks whether an alarm rings: every verdict doubles the wait.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+          var waking = app._alarmRings(nowMs) === true;
+
+replace:
+          var waking = false;
+
+expect:
+  Killed by tst_standwatch::test_while_an_alarm_rings_every_silence_is_known_as_fast_as_the_first.
+  Line-neutral.

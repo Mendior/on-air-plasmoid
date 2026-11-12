@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  main.qml resumes the buffer without handing the engine a clock.
+
+history:
+  The engine measures how far the reader would be from the writer by the
+  caller's clock, like every other gesture. Given none it has only the park
+  to go by and opens there, which is the short pause's four reopens again.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (!timeshift.resumeGesture(Date.now())) {
+
+replace:
+          if (!timeshift.resumeGesture()) {
+
+expect:
+  Killed by test_invariants::test_a_resume_of_the_single_file_is_given_the_clock.
+  Line-neutral.

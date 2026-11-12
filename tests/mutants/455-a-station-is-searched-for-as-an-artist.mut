@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The artist links are offered for whatever stands in front of the dash,
+  the station's own name included.
+
+history:
+  A title line is not always a song. "Kiss FM - The Morning Show" parses
+  to the artist "Kiss FM", and a link that searches the artists of Last.fm
+  for a radio station leads to a stranger of the same name. The cover
+  lookup already asks TrackLogic.stationTalk before it believes such a
+  line, and MusicLinks.artist asks the same question before it offers a
+  link. This mutant believes every line.
+
+target:
+  package/contents/ui/MusicLinks.js
+
+find:
+      return who !== "" && TrackLogic.stationTalk(who, typeof station === "string" ? station : "") ? "" : who;
+
+replace:
+      return who;
+
+expect:
+  Killed by tests/qml/tst_musiclinks.qml::test_a_station_is_not_an_artist.
+  Line-neutral.

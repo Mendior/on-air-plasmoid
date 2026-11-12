@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Every picture is read with a box to be cropped to, which enlarges a
+  small raster while it is read.
+
+history:
+  Asked to crop or fit, Qt scales a picture to the source size as it
+  decodes it (Qt 6.12: a PNG of 32 by 32 came back 600 by 600). After that
+  nothing can tell a small logo from a cover, and the larger view cannot
+  stop at twice its pixels. Only a drawing is cropped to a box, one of its
+  own shape; a raster is read as it is. This mutant crops every picture
+  that has no box of its own to the whole source size.
+
+target:
+  package/contents/ui/CoverImage.qml
+
+find:
+          // With a box of the drawing's own shape, cropping to it scales the
+          // drawing to the box and cuts nothing.
+          fillMode: cover._box.width > 0 ? Image.PreserveAspectCrop : Image.Stretch
+
+replace:
+          // With a box of the drawing's own shape, cropping to it scales the
+          // drawing to the box and cuts nothing.
+          fillMode: cover._box.width > 0 ? Image.PreserveAspectCrop : Image.PreserveAspectCrop
+
+expect:
+  Killed by tests/test_cover_larger_fetch.py::test_the_larger_cover_is_the_picture_the_page_already_holds,
+  which runs first and finds the picture of 400 pixels read at 600, and behind it by
+  tests/qml/tst_coverimage.qml::test_a_raster_says_its_own_size_and_covers_the_frame.
+  Line-neutral.

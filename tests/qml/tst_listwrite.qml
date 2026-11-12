@@ -22,7 +22,8 @@ Item {
         property string source: ""
         property bool on: false
         property int stops: 0
-        function stop() { if (on) stops++; on = false }
+        property int stopCalls: 0
+        function stop() { stopCalls++; if (on) stops++; on = false }
     }
     QtObject { id: timeshift; property string bufPath: ""; property bool shifted: false }
     QtObject { id: cfg; property string servers: "[]" }
@@ -35,6 +36,7 @@ Item {
     property string _alarmToneUrl: "file:///usr/share/onair/chime.ogg"
     property bool _wantsPlaying: false
     property bool _reorderKeepPlaying: false
+    property var _pausedFile: null
     property int lastPlay: -1
     property var started: []
     property int sessionsEnded: 0
@@ -102,7 +104,7 @@ Item {
         var out = JSON.stringify(servers);
         var kept = TransportLogic.listWriteKeepsSound({ "audible": isPlaying(), "preview": root._previewUrl !== "",
             "source": playMusic.source.toString(), "episode": root._podPlayingKey !== "" ? root._podPlayingUrl : "",
-            "tone": root._alarmToneUrl.toString(), "bufferPath": timeshift.bufPath, "shifted": timeshift.shifted });
+            "tone": root._alarmToneUrl.toString(), "bufferPath": timeshift.bufPath, "shifted": timeshift.shifted, "paused": root._pausedFile !== null });
         if (out === cfg.servers) return false;
         if (kept) _reorderKeepPlaying = true;
         cfg.servers = out;
@@ -132,6 +134,8 @@ Item {
             root._podPlayingKey = ""
             root._podPlayingUrl = ""
             root._wantsPlaying = false
+            root._pausedFile = null
+            playMusic.stopCalls = 0
             root.lastPlay = -1
             root.started = []
             root.sessionsEnded = 0
@@ -223,6 +227,25 @@ Item {
             verify(!playMusic.on)
             compare(root.started.length, 0)
             verify(!root._reorderKeepPlaying)
+        }
+
+        function test_a_paused_file_stays_in_the_player_through_a_write() {
+            // It does not sound, but the player holds it at its second, and
+            // a stop under the pause would put the page's needle back at zero.
+            playMusic.source = song; root._pausedFile = ({ "local": true, "sec": 42 })
+            root.removeStation(b); settle()
+            root.addStation("http://d.example/live"); settle()
+            compare(playMusic.stopCalls, 0, "a list write stopped the player under a paused file")
+            compare(playMusic.source, song)
+            compare(root.started, [])
+            compare(root.sessionsEnded, 0)
+        }
+
+        function test_a_pause_whose_file_left_the_player_keeps_nothing_there() {
+            root._pausedFile = ({ "local": true, "sec": 42 })
+            root.removeStation(b); settle()
+            verify(playMusic.stopCalls >= 1)
+            compare(root.started, [])
         }
 
         function test_the_next_write_after_a_kept_one_stops_a_station_again() {

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Two frames in a row are enough for the helper to name a codec.
+
+history:
+  Any compressed audio holds eleven set bits in a row by chance, and two
+  such places a plausible frame apart are not rare in 4 KiB. A wrong "mp3"
+  sends FLAC into segments that cannot hold it. The third frame is what makes
+  a row.
+
+target:
+  package/contents/ui/streamkind.py
+
+find:
+              if third is not None and third[1] == first[1]:
+
+replace:
+              if third is not None or True:
+
+expect:
+  Killed by tests/test_streamkind.py::test_three_frames_in_a_row_are_what_it_takes.

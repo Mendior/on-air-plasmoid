@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station that has one reading is not read again for thirty days.
+
+history:
+  One reading is not a station: the same day one read -14.8 where the survey
+  had it at -21.1, and an advert in a reading's twenty seconds stood for the
+  programme for a month.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return e[3].length < KEEP || nowS - e[1] > STALE_S;
+
+replace:
+      return nowS - e[1] > STALE_S;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_one_more_reading_a_day_until_there_are_five.
+  Line-neutral.

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A delay set by hand is written to the map without a word in the journal.
+
+history:
+  The delay map has four writers, and this was the only one of them that
+  said nothing. On 2026-11-11 the map went from 181 to 161 ninety seconds
+  after a panel restart. The journal showed a correction landing and the
+  next probe working with 161, and no line between them to say who had
+  asked for it; the room then read 21, 27 and 20 ms out for ten minutes
+  before the settle put it back. The hand was found by ruling out the
+  three writers that do speak. Two notches of the wheel over the slider
+  are enough to do it.
+
+target:
+  package/contents/ui/SyncJournal.js
+
+find:
+      if (_same(was, now)) return "";
+
+replace:
+      return "";
+
+expect:
+  Killed by tests/test_sync_journal.py::test_a_delay_set_by_hand_leaves_one_line_with_the_map_before_and_after.
+  Line-neutral.

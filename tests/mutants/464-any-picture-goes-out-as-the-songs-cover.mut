@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The address for places that show no label is whatever picture there is.
+
+history:
+  MPRIS and a cast device were handed the lookup's picture as it came.
+  Measured on 2026-11-12: mpris:artUrl was the sleeve of another single
+  while "Päiksepoolsel tänaval" played. trackArtUrl is empty unless the
+  picture is the song's own cover. This mutant makes it the picture again.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+      readonly property string trackArtUrl: albumArtKind === "track" ? albumArtUrl : ""
+
+replace:
+      readonly property string trackArtUrl: albumArtUrl
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_another_single_of_the_artist_is_another_release_and_never_the_songs_cover.
+  Line-neutral.

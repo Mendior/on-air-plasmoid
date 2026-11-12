@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A wall clock that lands before the alarm's fire leaves the alarm ringing.
+
+history:
+  The half hour is counted on the wall clock, which a time sync or a
+  changed zone can move. Set back behind the fire, the difference is
+  negative and passes any upper bound: the alarm would ring for as long as
+  the clock took to catch up, hours for a zone change.
+
+target:
+  package/contents/ui/AlarmLogic.js
+
+find:
+      if (nowMs < firedAtMs) return false;
+
+replace:
+      if (nowMs < 0) return false;
+
+expect:
+  Killed by tst_alarmlogic::test_a_clock_that_jumped_ends_the_ringing_and_cannot_lengthen_it.
+  Line-neutral.

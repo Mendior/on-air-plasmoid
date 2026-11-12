@@ -99,8 +99,9 @@ sweep() {
             fi
             kill -INT "$w" 2>/dev/null && stopped=$((stopped + 1))
         fi
-        for x in "$f" "$dir/url-$n.cfg" "$dir"/buffer-"$n".* "$dir"/serve-"$n".*; do
-            [ -e "$x" ] && rm -f -- "$x" && removed=$((removed + 1))
+        for x in "$f" "$dir/url-$n.cfg" "$dir"/buffer-"$n".* "$dir"/serve-"$n".* \
+            "$dir/head-$n.bin" "$dir/kind-$n.txt"; do
+            [ -e "$x" ] && take "$x" && removed=$((removed + 1))
         done
     done
     # What is left without a pid file: writers that already ended (the guard
@@ -113,11 +114,22 @@ sweep() {
         n=${n#*-}
         n=${n%%.*}
         case "$living" in *" $n "*) continue ;; esac
-        rm -f -- "$f" && removed=$((removed + 1))
-    done < <(find "$dir" -maxdepth 1 -type f \
-        \( -name 'buffer-*' -o -name 'url-*.cfg' -o -name 'serve-*' -o -name 'writer-*.pid' \) \
+        take "$f" && removed=$((removed + 1))
+    done < <(find "$dir" -maxdepth 1 \( -type f \( -name 'buffer-*' -o -name 'url-*.cfg' -o -name 'serve-*' -o -name 'writer-*.pid' \
+        -o -name 'head-*.bin' -o -name 'kind-*.txt' \) -o -type d -name 'buffer-*.hls' \) \
         ! -newermt "@$since" -print0 2>/dev/null)
     echo "__TS_SWEEP__ stopped=$stopped removed=$removed"
+}
+
+# Removes one leftover. A sliding buffer keeps its segments in a folder of
+# its own (buffer-N.hls), which goes with everything in it; nothing else is
+# ever removed as a folder, and a link is removed as the link it is.
+take() {
+    if [ -d "$1" ] && [ ! -L "$1" ]; then
+        [[ $1 =~ /buffer-[0-9]+\.hls$ ]] && rm -rf -- "$1"
+    else
+        rm -f -- "$1"
+    fi
 }
 
 case "${1:-}" in

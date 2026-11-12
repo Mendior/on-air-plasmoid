@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  One const returns to a callback on the General settings page and qmllint
+  stops reading that page, without a word and with exit 0.
+
+history:
+  qmllint compiles a function that sits inside another one a second time,
+  and a const or let in it fails that second time; the object it is in and
+  every object after it are dropped (measured on 6.12.0, 2026-11-12).
+  Fifty-one such declarations were turned into var on 2026-09-20. By
+  2026.43 twelve had grown back and by 2026-11-12 seventeen, in
+  FullRepresentation.qml, configGeneral.qml and configSearch.qml; the first
+  and the last were unread from their first object on, this page from
+  part-way down. This is one of the seventeen, put back.
+
+target:
+  package/contents/ui/config/configGeneral.qml
+
+find:
+                          var flat = {};
+
+replace:
+                          const flat = {};
+
+expect:
+  Killed by the lint's qmllint pass itself, scripts/qmllint_gate.py:
+  "qmllint does not analyse ui/config/configGeneral.qml". No test stands
+  behind this one on purpose: it is the shipped file going unread, and the
+  pass is what has to notice. That the pass can notice at all is what
+  tests/test_qmllint_gate.py::test_a_file_qmllint_gives_up_on_fails_by_name
+  holds.

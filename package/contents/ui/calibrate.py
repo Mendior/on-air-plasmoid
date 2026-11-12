@@ -2135,6 +2135,15 @@ def _shared_round(members, ultra_wav, mic, trim, slot_seconds=ULTRA_SLOT_SECONDS
     """
     plays = [PLAY_DELAY + i * slot_seconds for i in range(len(members))]
     total = PLAY_DELAY + len(members) * slot_seconds + 0.4
+    # Every level is asked for before the capture begins. The question is a
+    # blocking pactl, and it used to be put between the wait for a member's
+    # slot and its player, while the capture is read against the slot: what
+    # the answer took was added to that speaker's arrival. On a synthetic
+    # clock, two speakers both 100 ms from the microphone and 150 ms spent on
+    # the first one's query read as the second being 150 ms early. A query
+    # that ran into its own 3 s timeout also moved every later member off
+    # the schedule, the very thing the unwaited player below is there for.
+    volumes = [str(int(_ultra_volume_for(sink, trim))) for sink, _lag in members]
     rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     try:
         rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
@@ -2156,7 +2165,7 @@ def _shared_round(members, ultra_wav, mic, trim, slot_seconds=ULTRA_SLOT_SECONDS
                 try:
                     pps.append(subprocess.Popen(
                         ["paplay", "--device", sink, "--volume",
-                         str(int(_ultra_volume_for(sink, trim))), ultra_wav],
+                         volumes[i], ultra_wav],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
                 except OSError:
                     # A player that cannot even start costs this member its
@@ -2307,8 +2316,14 @@ def _drift_by_ultra(combined, members, mic):
             # That is a room the check cannot read today, not a chain that
             # cannot carry the band — and the distinction matters, because the
             # caller shelves a DEAF member for the life of the group.
+            # Every member that answered is named, in the order they were
+            # played. One name used to stand here, the first to answer, and
+            # in the journal it read as that speaker being the unsteady one;
+            # what would not hold still is the difference between them. The
+            # engine asks only whether the line is there, word and space.
             if len(heard_ever) >= 2:
-                print("DRIFT_UNSTEADY %s" % members[min(heard_ever)][0])
+                print("DRIFT_UNSTEADY %s"
+                      % " ".join(members[k][0] for k in sorted(heard_ever)))
             return None
 
         landings, spread = verdict

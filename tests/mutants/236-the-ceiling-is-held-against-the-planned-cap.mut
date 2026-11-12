@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  "Show more" stops when the next page's planned thirty rows would reach the
+  300, whatever the page before it really brought.
+
+history:
+  The button and the request held the 300-row ceiling against the cap
+  planned for the page. With 270 rows up the cap went to 300, the page gave
+  49 duplicates and one new station, and at 271 rows the button was gone and
+  a click asked nothing, the directory still holding more. The ceiling is
+  held against the rows on screen.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      return !!page && page.more === true && typeof shown === "number" && shown < ceiling;
+
+replace:
+      return !!page && page.more === true && typeof shown === "number" && shown + 30 <= ceiling;
+
+expect:
+  Killed by tests/qml/tst_searchlogic.qml::test_the_ceiling_is_held_against_the_rows_on_screen.
+  Line-neutral.

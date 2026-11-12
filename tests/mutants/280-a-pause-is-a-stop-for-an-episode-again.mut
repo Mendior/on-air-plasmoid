@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The media key's Pause stops an episode or a My Music file as it stops a
+  station, and keeps nothing of it.
+
+history:
+  Up to 2026.43 a pause was a stop for anything without a timeshift buffer.
+  The stop threw the episode away, and the next Play, which names nothing,
+  put the first station of the list on. Measured 2026-11-11 on main.qml's own
+  functions around a counting player: Pause left the source and the episode
+  key empty, and two presses of the widget's button ended in "radio:0".
+  2026.44 answers "keep" for a file that plays here: it pauses where it
+  stands, and Play goes on from there.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+          if (here) return ownFile === true ? "keep" : "pause";
+
+replace:
+          if (here) return "pause";
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_pause_keeps_the_episode_or_the_file_that_plays
+  and tests/qml/tst_transportroads.qml::test_play_after_the_pause_goes_on_in_place.
+  Line-neutral.

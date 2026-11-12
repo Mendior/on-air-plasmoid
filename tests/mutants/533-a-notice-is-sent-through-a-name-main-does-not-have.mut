@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The sync engine reports a finished calibration through app.notifyy, a
+  function main.qml does not have.
+
+history:
+  SyncEngine.qml reaches the widget through `app`, a `property var` that
+  main.qml binds to its root, and FullRepresentation.qml reaches it through
+  main.qml's id. qmllint knows the type behind neither name: a member that
+  does not exist, planted behind `root.` in FullRepresentation.qml and
+  behind `app.` in SyncEngine.qml on 2026-11-12, got no message of its own
+  in the JSON report and the lint stayed green. In a
+  binding such a read is undefined without a word; in a handler the call
+  throws the first time its branch runs, here when a calibration has
+  succeeded. tests/test_cross_file_members.py follows the names by the code
+  that wires the files together: 1559 reads on the day it was written.
+
+target:
+  package/contents/ui/SyncEngine.qml
+
+find:
+  app.notify(i18n("Speakers calibrated"), calText, "audio-input-microphone");
+
+replace:
+  app.notifyy(i18n("Speakers calibrated"), calText, "audio-input-microphone");
+
+expect:
+  Killed by tests/test_cross_file_members.py::test_the_shipped_files_read_no_member_that_is_not_there,
+  which names the line, the name and ui/main.qml.

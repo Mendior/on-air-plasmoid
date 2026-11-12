@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The oldest reading is not dropped when a sixth arrives.
+
+history:
+  An entry of six readings is not one the map reads back, so the station
+  would stand there with nothing kept of it and be read again at its next
+  play.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+  .concat([heard]).slice(-KEEP)], cap);
+
+replace:
+  .concat([heard])], cap);
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_five_readings_are_kept_and_a_sixth_takes_the_oldest_ones_place.
+  Line-neutral.

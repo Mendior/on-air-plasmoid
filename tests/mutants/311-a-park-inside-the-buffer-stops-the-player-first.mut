@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A pause inside a list stops the player and then clears its source.
+
+history:
+  Measured on Qt 6.12 with FFmpeg 9: stop() on a list whose reader has
+  run out of segments returns, and then the event loop stands until the list
+  grows. With the source cleared first the player lets go in 4 to 13 ms,
+  however its reader stands.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              else { root._tsPaused = true; alarmEngine.standDown(); playMusic.source = ""; playMusic.stop(); }
+
+replace:
+              else { root._tsPaused = true; alarmEngine.standDown(); playMusic.stop(); playMusic.source = ""; }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_pause_inside_the_sliding_buffer_lets_the_player_go_source_first.
+  Line-neutral.

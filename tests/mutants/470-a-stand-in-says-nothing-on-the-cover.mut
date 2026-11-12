@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The line on the cover that names a stand-in is given no words.
+
+history:
+  A sleeve that reads "Nüüd taas sajab lund" stood under "Päiksepoolsel
+  tänaval" with nothing to say it was another record. The cover carries
+  "From another release" or "Artist picture" on its lower edge now. This
+  mutant leaves the line on the cover empty.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+          text: touch.note
+          room: touch.width - Kirigami.Units.smallSpacing * 3 - touch.corner
+
+replace:
+          text: ""
+          room: touch.width - Kirigami.Units.smallSpacing * 3 - touch.corner
+
+expect:
+  Killed by tests/qml/tst_covertouch.qml::test_a_stand_in_says_what_it_is.
+  Line-neutral.

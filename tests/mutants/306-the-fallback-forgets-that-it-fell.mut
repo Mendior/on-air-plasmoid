@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  After a list failed, the next arm tries the sliding buffer again.
+
+history:
+  Whether this player can search a list is found out once. A machine
+  where it cannot would otherwise pay the gap of a failed open on every pause
+  of the session.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          slideOff = true;
+          var live = streamUrl;
+
+replace:
+          slideOff = false;
+          var live = streamUrl;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_player_that_cannot_search_a_list_is_found_out_once.

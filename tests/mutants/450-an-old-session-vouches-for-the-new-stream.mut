@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any media session on the receiver counts as the stream having been taken,
+  so a television busy with something else reads as casting.
+
+history:
+  The verdict read pychromecast's session event, and any session sets it.
+  A television in the middle of a YouTube programme was sent a station on
+  2026-11-11: the helper said OK after 420 ms and YouTube played on, with
+  the footer reading "Casting to" over it. The status names what a session
+  holds, and the receiver hands the address back as it was given, so the
+  helper asks for a session that holds the stream it sent. This mutant
+  takes the content out of the question again.
+
+target:
+  package/contents/ui/cast.py
+
+find:
+      return (bool(url)
+              and getattr(status, "media_session_id", None) is not None
+              and getattr(status, "content_id", None) == url)
+
+replace:
+      return (bool(url)
+              and getattr(status, "media_session_id", None) is not None)
+
+expect:
+  Killed by tests/test_cast_play.py::test_a_device_busy_with_something_else_is_not_casting.

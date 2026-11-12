@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The map of readings grows without end.
+
+history:
+  It lives in the widget's config. A bounded map lets the oldest reading go;
+  an unbounded one is written out whole at every answer.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return _text(rest.slice(Math.max(0, rest.length - top)));
+
+replace:
+      return _text(rest);
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_the_map_stops_at_its_cap_and_lets_the_oldest_go.
+  Line-neutral.

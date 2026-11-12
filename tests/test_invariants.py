@@ -284,11 +284,14 @@ def test_a_stream_the_rescue_relayed_once_arms_the_relay_at_start():
     codec test, so the second start goes straight through the relay.
     """
     src = (UI / "main.qml").read_text(encoding="utf-8")
-    assert "root._relayProven[src] = true;" in src, (
+    assert "streamKind.rescued(src, root._currentOrigUrl);" in src, (
         "the rescue no longer records the stream it relayed - every "
         "start replays the six frozen seconds")
-    assert "tsOgg || root._relayProven[tsUrl] === true" in src, (
+    assert "tsOgg || streamKind.proven(tsUrl)" in src, (
         "the arm road no longer consults the rescue's session record")
+    kind = (UI / "StreamKind.qml").read_text(encoding="utf-8")
+    assert "_proven[spelled[i]] = true;" in _function_body(kind, "rescued")
+    assert "_proven[url] === true" in _function_body(kind, "proven")
 
 
 def test_the_url_file_ack_asks_for_the_title_at_once():
@@ -309,10 +312,12 @@ def test_the_url_file_ack_asks_for_the_title_at_once():
 
 
 def test_the_popup_volume_poll_is_not_slowed_on_battery():
-    """This poll runs ONLY while the face is watched: with a popup that
-    means `running: root.expanded`; on a desktop containment, where
-    expanded is pinned true for the applet's life, the pointer stands in
-    and the unattended face coasts at thirty seconds instead.
+    """This poll runs while the face is watched: with a popup that means
+    expanded; on a desktop containment, where expanded is pinned true for
+    the applet's life, the pointer stands in and the unattended face coasts
+    at thirty seconds instead. Since 2026.44 it also runs, at the unattended
+    rate, while a device follows the reading
+    (test_the_rooms_reading_is_kept_fresh_while_a_device_follows_it).
 
     Stretching it on BATTERY bought nothing worth having: the seconds saved
     are seconds the user spends looking straight at the slider it feeds, and
@@ -1516,9 +1521,11 @@ def test_the_wake_tone_accepts_flowed_audio_as_life():
     order the fire path arms.
     """
     src = (UI / "AlarmEngine.qml").read_text(encoding="utf-8")
-    i = src.index("_alarmFallbackArmed = false;")
-    window = src[i:i + 2500]
-    assert "playMusicRef.position" in window and "BufferedMedia" in window, (
+    check = re.sub(r"\s+", " ", _code_only(_function_body(src, "_fallbackTrigger")))
+    # The verdict itself is AlarmLogic.wakeSounds (tst_alarmlogic pins the
+    # measured case); what is held here is that the check hands it both.
+    assert ("AlarmLogic.wakeSounds(app.isPlaying(), app.playMusicRef.mediaStatus === MediaPlayer.BufferedMedia, "
+            "app.playMusicRef.position, fell)") in check, (
         "the wake-tone stand-down lost its flowed-audio evidence — a "
         "status-only gate calls a playing live stream dead (measured: "
         "25 s of audio at BufferingMedia) and the chime replaces it")
@@ -1721,16 +1728,24 @@ def test_the_frozen_horizon_has_a_watchdog():
     EndOfMedia alone, so without this watchdog the engine's whole
     reopen-or-return machinery is dead code and a resumed pause goes
     silent forever with the widget still showing "playing".
+
+    Since 2026.44 the watchdog is the engine's own, where its rule can be
+    called by a test (tst_timeshiftengine.qml); main.qml keeps no second one,
+    or a frozen horizon would be reopened twice.
     """
-    src = (UI / "main.qml").read_text(encoding="utf-8")
+    src = (UI / "TimeshiftEngine.qml").read_text(encoding="utf-8")
     assert "id: tsHorizonWatch" in src, "the horizon watchdog is gone"
     i = src.index("id: tsHorizonWatch")
-    body = src[i:i + 2000]
-    assert "timeshift.playerEndOfMedia(" in body, (
-        "the watchdog no longer hands the frozen horizon to the engine")
-    assert "timeshift.shifted" in body, (
+    body = src[i:i + 400]
+    assert "engine._horizonTick(" in body, (
+        "the watchdog's timer no longer asks the engine's rule")
+    assert "engine.shifted" in body, (
         "the watchdog stopped gating on the shifted state — it would fire "
         "over ordinary live playback")
+    assert "playerEndOfMedia(" in _function_body(src, "_horizonTick"), (
+        "the watchdog no longer hands the frozen horizon to the engine")
+    assert "tsHorizonWatch" not in (UI / "main.qml").read_text(encoding="utf-8"), (
+        "main.qml grew a horizon watchdog of its own again beside the engine's")
 
 
 def test_the_colour_choice_stays_a_measured_set():
@@ -1828,17 +1843,21 @@ def test_the_panel_wheel_does_not_save_a_level_the_sleep_fade_made():
     radio came on at 35 % in the morning. The arithmetic is
     TransportLogic.wheelLevel, under tst_transportlogic; what is held here is
     that the panel asks it, with the fade's start level and the pending
-    gesture, and has no sum of its own left."""
+    gesture, and has no sum of its own left. Since 2026.44 it is also told
+    whether a device plays alone, and the listener's own level to count
+    from there (test_one_level_is_the_listeners_own_for_every_device)."""
     src = _code_only((UI / "CompactRepresentation.qml").read_text(encoding="utf-8"))
     wheel = src[src.index("onWheel:"):src.index("onEntered:")]
     flat = re.sub(r"\s+", " ", wheel)
-    assert ("root.setUserVolume(TransportLogic.wheelLevel(playMusicOutput.volume, "
-            "root._volumeBeforeSleepFade, root._pendingUserVolumePct, notch), true)") in flat, (
-        "the panel's wheel steps from the level the output shows, fade or not")
-    assert flat.count("setUserVolume(") == 1 and "step(0.05)" in flat and "step(-0.05)" in flat
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert "const step = (notch) => root.wheelStep(notch);" in flat, "the panel's wheel has a step of its own"
+    assert ("{ setUserVolume(TransportLogic.wheelLevel(playMusicOutput.volume, _volumeBeforeSleepFade, "
+            "_pendingUserVolumePct, notch, _casting && !_castLocalPlay, targetVolume()), true); }"
+            ) in re.sub(r"\s+", " ", _function_body(main, "wheelStep")), (
+        "the panel's wheel steps from the level the output shows, fade or not, heard or not")
+    assert "setUserVolume(" not in flat and "step(0.05)" in flat and "step(-0.05)" in flat
     assert not re.search(r"playMusicOutput\.volume\s*[+-]\s*0", wheel), (
         "a wheel step is added to the shown level outside wheelLevel")
-    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
     assert "property real _volumeBeforeSleepFade: -1" in main
     assert "property int _pendingUserVolumePct: -1" in main
 
@@ -1974,14 +1993,15 @@ def test_a_pause_is_a_pause_whoever_leaves_the_room():
         assert road not in eng, "SyncEngine.qml can start sound through %s" % road
 
     # Every resume of a park is a person's gesture: the station they clicked,
-    # or Play / PlayPause over MPRIS. Nothing else in main.qml may call it.
+    # or a Play / PlayPause through transport(), where the media keys and the
+    # widget's own button arrive. Nothing else in main.qml may call it.
     src = (UI / "main.qml").read_text(encoding="utf-8")
     inside = sum(_code_only(_function_body(src, fn)).count("timeshiftResume(")
-                 for fn in ("refreshServer", "_mprisDispatch"))
+                 for fn in ("refreshServer", "transport"))
     total = main.count("timeshiftResume(") - main.count("function timeshiftResume(")
     assert total == inside, (
         "%d call(s) to timeshiftResume() sit outside the two roads a person "
-        "drives (refreshServer, _mprisDispatch)" % (total - inside))
+        "drives (refreshServer, transport)" % (total - inside))
 
 
 def test_a_park_that_cannot_resume_always_finds_a_way_back_to_sound():
@@ -2616,7 +2636,7 @@ def test_the_first_search_is_read_again_when_the_country_list_arrives():
     assert "[f]" not in look, "a country map is indexed by hand again"
     body = _function_body(code, "_ensureCountryList")
     key = body.index("SearchLogic.readingKey(root.searchFilter, fullRepresentation.webSearchMode, _countryCodeOf)")
-    was = body.index("const was = key()")
+    was = body.index("var was = key()")
     put = body.index("fullRepresentation._countryMapApiFolded =")
     again = body.index("if (!webSearchDebounce.running && key() !== was) runWebSearch(root.searchFilter)")
     assert key < was < put < again, "the reading is not compared across the list's arrival"
@@ -2823,7 +2843,7 @@ def test_opening_the_popup_asks_for_the_title_once():
     keeps the single reader and the no-titles pin, and it hands the rule the
     desktop form, the poll's timer and the player's state."""
     code = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
-    handler = code[code.index("onExpandedChanged:"):]
+    handler = code[code.index("onFaceShownChanged:"):]
     handler = handler[:handler.index("function _pushHistory")]
     assert ("} else if (RetryLogic.titleOnOpen(planar, infoTimer.running, "
             "isPlaying() && !isError && !_qtMetaWorks)) "
@@ -3079,17 +3099,23 @@ def test_the_settings_list_asks_in_one_spelling_and_lists_a_station_once():
 def test_a_later_page_that_failed_is_asked_again_without_a_scroll():
     """Page two of the settings list failed once at the end of the list and
     never came: the only trigger was the list moving, and a list at its end
-    does not move. Both failure roads of loadMore now go through _pageFailed,
-    which waits (SearchLogic.pageRetryDelay, held by tst_searchlogic) and asks
-    the next mirror; a good page clears the count and a new search stops a
-    retry that belongs to the old list."""
+    does not move. Every answer that is no list (SearchLogic.directoryRows,
+    held by tst_searchlogic: another status, a page, JSON that is no array)
+    goes through _pageFailed, which waits (SearchLogic.pageRetryDelay) and
+    asks the next mirror; a good page clears the count and a new search stops
+    a retry that belongs to the old list."""
     code = _code_only((UI / "config" / "configSearch.qml").read_text(encoding="utf-8"))
     more = _function_body(code, "loadMore")
-    assert more.count("_pageFailed()") == 2, (
+    rows = "var servers = SearchLogic.directoryRows(xhr.status, xhr.responseText)"
+    assert rows in more and "JSON.parse(" not in more, "loadMore judges the answer itself again"
+    assert more.count("_pageFailed()") == 1, (
         "a failed page goes back to waiting for a scroll that may never come")
     assert more.count("stat = 1") == 1, (
         "a failure road only re-opens the scroll trigger again (stat = 1)")
     assert "_pageFailures = 0" in more, "a good page leaves the failure count standing"
+    # The cursor and the count move only over a page that was a list: a body
+    # of "null" used to move both before it threw.
+    assert more.index("_pageFailed()") < more.index("offset = nextOffset") < more.index("_pageFailures = 0")
     failed = _function_body(code, "_pageFailed")
     for needle in ("SearchLogic.pageRetryDelay(_pageFailures)", "if (wait < 0)",
                    "currentUrl = SearchLogic.rehost(currentUrl, server)", "pageRetryTimer.restart()"):
@@ -3102,7 +3128,11 @@ def test_a_later_page_that_failed_is_asked_again_without_a_scroll():
 
 _TEXT_ELEMENT = re.compile(
     r"(?<![\w.])(?:\w+\.)?(?:Label|Heading|Text|TextEdit|TextInput)\s*\{")
+
+
 _RAW_ACCENT = re.compile(r"\broot\.accent(?:Bright|Teal)?\b")
+
+
 _NEXT_MEMBER = re.compile(
     r"^(?:[A-Za-z_][\w.]*\s*:(?!:)|[A-Z][\w.]*\s*\{|\}"
     r"|(?:readonly\s+|required\s+|default\s+)?property\b|function\b|signal\b|Behavior\b)")
@@ -3251,10 +3281,10 @@ def test_a_genre_word_is_asked_of_the_tags_and_only_its_namesakes_lead():
         "a genre word is asked of the station names alone again")
     assert "_webAppendResults(xhr, lead || own)" in body, "the name answer is no longer filtered to its leads"
     tag = body[body.index("_webAppendResults(xhr2)"):]
-    at = tag.index("var tagIn = webResultsModel.count > beforeTag")
-    page = tag.index("if (tagIn) _webMark(0, tagQs + tail)")
-    back = tag.index("if (lead && _webAppendResults(xhr) && !tagIn) _webMark(0)")
-    assert at < page < back, "the tag list's position is read after the name rows came back in"
+    at = tag.index("var tagPage = SearchLogic.pageAfter(tagQs + tail, 0, tagRows, ")
+    back = tag.index("if (lead && _webAppendResults(xhr)) _webMark(0)")
+    page = tag.index("_webMark(0, tagQs + tail, tagPage)")
+    assert at < back < page, "the tag list's position is read after the name rows came back in"
 
 
 def test_the_word_pass_asks_for_the_listeners_own_word():
@@ -3652,15 +3682,18 @@ def test_a_bare_play_is_answered_in_one_place_that_knows_about_auditions():
     for name, code in codes.items():
         assert not row_zero.search(code), (
             "%s answers a bare Play with row 0 again, past any audition" % name)
+    # The five roads meet in transport() since 2026.44, so playLast has one
+    # caller, and the widget's three roads are held to that door at the end
+    # of this file.
     calls = {name: code.count("playLast(") - code.count("function playLast(")
              for name, code in codes.items()}
-    assert {k: v for k, v in calls.items() if v} == {
-        "main.qml": 2, "FullRepresentation.qml": 2, "CompactRepresentation.qml": 1}, (
-        "playLast is called from somewhere other than the five roads a person drives: %r" % calls)
-    dispatch = _code_only(_function_body(main_src, "_mprisDispatch"))
-    assert dispatch.count("playLast();") == 2, "MPRIS Play or PlayPause lost the shared answer"
+    assert {k: v for k, v in calls.items() if v} == {"main.qml": 1}, (
+        "playLast is called from somewhere other than transport(), the door a person's Play comes through: %r" % calls)
+    door = _code_only(_function_body(main_src, "transport"))
+    assert door.count('else if (act === "bare") playLast();') == 1, "a Play that names nothing lost the shared answer"
     body = _code_only(_function_body(main_src, "playLast"))
-    assert "TransportLogic.bareplay(root._lastAudition !== null, lastPlay, stationsModel.count)" in body
+    assert ("TransportLogic.bareplay(root._lastAudition !== null, lastPlay, stationsModel.count, "
+            "root._pausedFile !== null)") in body
     assert "previewStation(a.name, a.url, a.favicon, a.uuid, a.rawUrl, a.codec, a.bitrate);" in body, (
         "the audition comes back without its codec or bitrate, and an Ogg one wedges on the relay decision")
 
@@ -3692,7 +3725,7 @@ def test_only_an_audition_is_remembered_and_every_other_start_forgets_it():
 def test_the_footer_says_reconnecting_while_the_ladder_waits():
     """Between two knocks of the retry ladder the player sits idle, so the
     footer fell through to its idle sentence: on the bench (2026-09-23) a
-    station at a dead address read "Choose station and enjoy…" under its own
+    station at a dead address read "Choose a station to start listening" under its own
     name for the whole 30 s before knock #1, which looks like a widget that
     gave up. RetryLogic.betweenKnocks decides, under tst_retrylogic; this pins
     where the footer asks it. The louder states keep their words first:
@@ -3700,7 +3733,7 @@ def test_the_footer_says_reconnecting_while_the_ladder_waits():
     code = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
     at = code.index("id: subtext")
     text = code[code.index("text: {", at):]
-    idle = text.index('return i18n("Choose station and enjoy…")')
+    idle = text.index('return i18n("Choose a station to start listening")')
     text = text[:idle + 50]
     asks = "else if (RetryLogic.betweenKnocks(root._wantsPlaying, root._healRetryAttempts))"
     assert asks in text, "the footer never asks whether the ladder is waiting for its next knock"
@@ -3782,9 +3815,11 @@ def _owner_span(src: str, pos: int) -> str:
 # One door per road each automatic owner can take: handleExec both goes live
 # after a writer died at birth and re-arms after one that lived. Counted,
 # because a second door in the same owner hid a missing first one.
+
+
 _DOORS = {
     "_playStation": 1, "_healAdvance": 1, "stallTimer": 1, "bitrateFallbackTimer": 1,
-    "relayPlaybackFell": 1, "handleExec": 2,
+    "relayPlaybackFell": 1, "handleExec": 2, "_slideFell": 1,
 }
 
 
@@ -3801,11 +3836,13 @@ def _sound_calls(src: str, pattern: str) -> list[tuple[str, int, int]]:
 
 # Every place in main.qml that can start sound, by the function or timer that
 # owns it. "asks" means the owner consults _orderLapsed() before the call.
+
+
 _MAIN_SOUND = {
     "startWithFade": "the sink itself",
     "tsPlayBuffer": "the local capture, played on for a shifted listen",
     "tsPlayRelay": "the engine's UP ack; its re-arms ask before arming",
-    "_mprisDispatch": "a person's media key",
+    "transport": "a person's media key, or the widget's own button, Space or middle click",
     "playLocalFile": "a person's file",
     "tsPlayLive": "a person's Back to live; the engine's fallback asks first",
     "timeshiftResume": "a person's resume",
@@ -3820,19 +3857,26 @@ _MAIN_SOUND = {
 
 # The doors themselves, word for word: a door that is present but can never
 # refuse ("&& false", "automated === false") passed a count and a presence check.
+
+
 _DOOR_LINES = {
     "_tryHealStation": "if (_orderLapsed()) return;",
     "_healAdvance": "if (_orderLapsed()) return;",
     "_playStation": "if (automated === true && (!root._wantsPlaying || _orderLapsed())) return;",
-    "stallTimer": "if (root._tsPaused || _orderLapsed()) return;",
+    "stallTimer": "if (root._tsPaused || root._pausedFile !== null || _orderLapsed()) return;",
     "bitrateFallbackTimer": 'if (!fallbackUrl || root._tsPaused || _orderLapsed()) { fallbackUrl = ""; return; }',
 }
+
+
 _ENGINE_DOOR_LINES = {
     "relayPlaybackFell": "if (app._orderLapsed()) return true;",
-    "handleExec": "app.isPlaying() && !app._orderLapsed())",
+    "handleExec": "!app._tsPaused && (app.isPlaying() || onTap) && !app._orderLapsed())",
+    "_slideFell": 'if (live !== "" && !app._orderLapsed()) app.tsPlayLive(live);',
 }
 
 # Who hands _playStation a station, and how the order is dated on that road.
+
+
 _PLAY_STATION = {
     "refreshServer": "a person's press is dated; the ladder's replay says automated",
     "previewStation": "a preview is nobody's standing order",
@@ -3845,6 +3889,9 @@ _ENGINE_SOUND = {
     "backToLive": "a person's Live, or a shifted listen reaching the live edge",
     "playerEndOfMedia": "a shifted listen; the park before it dropped the order",
     "handleExec": "asks",
+    # 2026.44: a list of the sliding buffer failed under a listener, or on a
+    # person's Play or step; the broadcast takes over and the single file.
+    "_slideFell": "asks",
 }
 
 
@@ -4003,7 +4050,7 @@ def test_every_station_row_enters_a_model_through_normalize():
             assert call.startswith("DoorLogic.normalize("), "%s: %s" % (name, call)
     for name in ("config/configGeneral.qml", "config/configSearch.qml"):
         src = _code_only((UI / name).read_text(encoding="utf-8"))
-        norms = re.findall(r"const norm = \(o\) => \{\n\s*const plain = ([^\n]*)", src)
+        norms = re.findall(r"const norm = \(o\) => \{\n\s*var plain = ([^\n]*)", src)
         assert norms, "%s has no merge norm" % name
         for plain in norms:
             assert plain.startswith("DoorLogic.normalize("), "%s: %s" % (name, plain)
@@ -4101,7 +4148,8 @@ def test_the_star_and_the_trash_keep_a_file_playing_and_nothing_else():
                  '"source": playMusic.source.toString()',
                  '"episode": root._podPlayingKey !== "" ? root._podPlayingUrl : ""',
                  '"tone": root._alarmToneUrl.toString()',
-                 '"bufferPath": timeshift.bufPath', '"shifted": timeshift.shifted'):
+                 '"bufferPath": timeshift.bufPath', '"shifted": timeshift.shifted',
+                 '"paused": root._pausedFile !== null'):
         assert fact in write, "the rule is no longer told %s" % fact
     bail = write.index("if (out === Plasmoid.configuration.servers) return false;")
     arm = write.index("if (kept) _reorderKeepPlaying = true;")
@@ -4231,7 +4279,10 @@ def test_an_audition_through_the_relay_is_still_the_audition():
     src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
     assert "playMusic.source.toString() === root._healPendingUrl" not in src
     assert src.count("_icyStreamTarget(playMusic.source) === root._healPendingUrl") == 3
-    assert "_icyStreamTarget(src) === root._healPendingUrl" in src
+    # The connect watchdog and the stall timer asked it each in their own
+    # words; both hand a dead stream to _streamDied now, which asks it once.
+    assert "_icyStreamTarget(playMusic.source) === root._healPendingUrl" in _function_body(src, "_streamDied")
+    assert "=== root._healPendingUrl" not in src.replace("_icyStreamTarget(playMusic.source) === root._healPendingUrl", "")
 
 
 def test_an_automated_play_whose_order_went_meanwhile_does_not_start():
@@ -4282,7 +4333,7 @@ def test_a_dead_previews_honest_word_stays_readable():
     fr = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
     at = fr.index("id: subtext")
     text = fr[fr.index("text: {", at):]
-    idle = text.index('return i18n("Choose station and enjoy…")')
+    idle = text.index('return i18n("Choose a station to start listening")')
     word = text.index('else if (root._friendlyError !== "")\n                        return root._friendlyError')
     assert text.index('i18n("Reconnecting…")') < word < idle, "the word does not sit just above the idle sentence"
     i = fr.index("id: subtext")
@@ -4369,6 +4420,8 @@ def test_a_candidate_is_not_started_after_the_switches_were_turned_off():
     assert ask in body, "a candidate starts without asking whether healing is still wanted"
     assert body.index(ask) < body.index("root._healPendingUrl = playUrl;")
     assert body.count("startWithFade(") == 1, "a second place starts candidates, past the check"
+
+
 def test_show_more_goes_by_the_directorys_page_and_not_by_the_rows_left():
     """A full page of fifty that held twenty-five saved stations left
     twenty-five rows under a cap of thirty, and the button, which showed only
@@ -4386,7 +4439,7 @@ def test_show_more_goes_by_the_directorys_page_and_not_by_the_rows_left():
     mark = _code_only(_function_body(src, "_webMark"))
     took = mark.index("if (qs) fullRepresentation._webLastQs = qs")
     assert took < mark.index(
-        "fullRepresentation._webPage = SearchLogic.pageAfter(fullRepresentation._webLastQs, from, "
+        "fullRepresentation._webPage = page || SearchLogic.pageAfter(fullRepresentation._webLastQs, from, "
         "fullRepresentation._webLastParsed, fullRepresentation._webLastConsumed)")
     more = _code_only(_function_body(src, "loadMoreWeb"))
     assert "const from = fullRepresentation._webPage.at" in more
@@ -4400,9 +4453,8 @@ def test_show_more_goes_by_the_directorys_page_and_not_by_the_rows_left():
             "webResultsModel.count + 30)") in failed, "rows the dedup dropped come off the next click's thirty"
     at = code.index('text: i18n("Show more results")')
     button = code[code.rindex("PlasmaComponents3.ToolButton {", 0, at):at]
-    assert "visible: fullRepresentation._webPage.more && !fullRepresentation.webSearching" in button
-    assert "fullRepresentation.webResultCap < fullRepresentation.webResultCapMax" in button
-    assert "webResultsModel.count" not in button, "the button waits for the rows to fill the cap again"
+    assert "fullRepresentation._webPage" in button and "!fullRepresentation.webSearching" in button
+    assert "webResultsModel.count >=" not in button, "the button waits for the rows to fill the cap again"
     foot = code[code.index("footer: Column {"):code.index("id: webRepeater")]
     assert "|| fullRepresentation._webPage.more" in foot, (
         "a first page of nothing but saved stations hides the button with the footer")
@@ -4473,3 +4525,2105 @@ def test_a_saved_station_the_directory_found_stays_on_the_list():
                      '"url": webItem.model.rawUrl, "stationuuid": webItem.model.rbUuid }])')
     assert star.index("var rep = fullRepresentation") < own < star.index(".remove("), (
         "the starred row is named after its delegate is gone, or not at all")
+
+
+def test_the_settings_search_counts_an_answer_that_is_no_list_as_a_failed_try():
+    """The first page of the settings search parsed the body and set its retry
+    counter back to 0 before it looked at what it had parsed. A 200 with
+    "null" in it threw one line later, counted one, and asked again, without
+    end; an error object read as "nothing found". The answer is judged by
+    SearchLogic.directoryRows first, and the counter goes back only for a
+    list. The retry waits a turn and is dropped if somebody searched
+    meanwhile: a request started inside another request's handler is the same
+    crash an abort from in there is."""
+    code = _code_only((UI / "config" / "configSearch.qml").read_text(encoding="utf-8"))
+    body = _function_body(code, "_doGetStations")
+    rows = "var servers = SearchLogic.directoryRows(xhr.status, xhr.responseText)"
+    assert rows in body and "JSON.parse(" not in body, "the first page judges the answer itself again"
+    assert body.index(rows) < body.index("if (servers === null) {") < body.index("_retryCount = 0"), (
+        "the retry counter is set back before the answer is known to be a list")
+    assert body.count("_retryCount++") == 1 and body.count("_doGetStations(by, val)") == 1
+    retry = body[body.index("Qt.callLater(function() {"):body.index("_doGetStations(by, val)")]
+    assert "if (asked !== _asked) return" in retry, "a retry can land in a search made after it"
+    assert body.index("_asked++") < body.index("busy.running = true")
+
+
+def test_the_list_show_more_pages_is_read_from_the_two_answers():
+    """Under "jazz" the fifty stations of the tag answer were all saved ones.
+    The web list leaves those out, so it did not grow, and that was how the
+    search told whether the tag list was the one to page: paging stayed with
+    the name answer, an empty one, and the genre's fifty-first station could
+    not be reached. Two tagged rows, the other way round, took the paging from
+    a name list that went on and ended it. SearchLogic.tagListPaged reads the
+    two answers (tst_searchlogic holds it); this pins that the search asks it
+    with the tag answer's own numbers, taken before the name rows the lead
+    filter held back are walked again, and with the name list's verdict taken
+    after that walk; and that the listener's own stations count as found, so a
+    page of them is not shaved to a stem or asked again without its country."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    run = _code_only(_function_body(src, "runWebSearch"))
+    assert "beforeTag" not in run and "tagIn" not in run, (
+        "the paged list is told by the web rows that came in again")
+    tag = run[run.index("root._rbFetch(tagQs + tail, 4000, function(xhr2) {"):]
+    walked = tag.index("var tagOk = _webAppendResults(xhr2), tagRows = fullRepresentation._webLastParsed")
+    place = tag.index("var tagPage = SearchLogic.pageAfter(tagQs + tail, 0, tagRows, "
+                      "fullRepresentation._webLastConsumed)")
+    back = tag.index("if (lead && _webAppendResults(xhr)) _webMark(0)")
+    pick = tag.index("if (tagOk && SearchLogic.tagListPaged(lead !== null, fullRepresentation._webPage.more, "
+                     "tagRows, tagPage.more))")
+    assert walked < place < back < pick, (
+        "the tag answer's place is read off the name rows' walk, or the names' verdict before it")
+    assert "_webMark(0, tagQs + tail, tagPage)" in tag[pick:pick + 220]
+    mark = _code_only(_function_body(src, "_webMark"))
+    assert "fullRepresentation._webPage = page || SearchLogic.pageAfter(" in mark
+    finish = _code_only(_function_body(src, "_webFinish"))
+    assert ("count: webResultsModel.count, own: fullRepresentation._webHeld.length, gotAnswer: gotAnswer,"
+            in finish), "a page of saved stations reads as an empty answer"
+
+
+def test_the_ceiling_counts_the_rows_on_screen_and_not_the_cap_planned_for_them():
+    """With 270 rows up, "Show more" planned a cap of 300, the page gave 49
+    duplicates and one new station, and at 271 rows the button was gone and a
+    click asked nothing: both held the 300 against the planned cap, with the
+    directory still holding more. SearchLogic.pageOpen holds it against the
+    rows that are shown (tst_searchlogic); this pins that the button and the
+    request ask it with the row count, that the cap still ends at the ceiling
+    so a page cannot carry the list past it, and that the star, whose row
+    leaves the count, has no cap of its own to keep in step any more."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    code = _code_only(src)
+    asks = ("SearchLogic.pageOpen(fullRepresentation._webPage, webResultsModel.count, "
+            "fullRepresentation.webResultCapMax)")
+    more = _code_only(_function_body(src, "loadMoreWeb"))
+    assert more.index("if (!" + asks + ") return") < more.index("root._rbFetch("), (
+        "a click asks the directory with the list at its ceiling, or with no page behind it")
+    assert "webResultCap >= " not in more, "the request is refused by the planned cap again"
+    assert ("fullRepresentation.webResultCap = Math.min(fullRepresentation.webResultCapMax, "
+            "webResultsModel.count + 30)") in more, "a page can carry the list past its ceiling"
+    at = code.index('text: i18n("Show more results")')
+    button = code[code.rindex("PlasmaComponents3.ToolButton {", 0, at):at]
+    assert asks in button and "!fullRepresentation.webSearching" in button
+    assert "webResultCap " not in button, "the button is held against the planned cap again"
+    assert "webResultCap" not in _function_body(src, "starThisRow"), (
+        "the star keeps a cap in step that nothing reads between two pages")
+
+
+def _delegate_of(code, ident, kind="PlasmaComponents3.ItemDelegate"):
+    """The delegate that carries `id: <ident>`, braces and all."""
+    at = code.index("id: %s\n" % ident)
+    start = code.rindex("delegate: %s {" % kind, 0, at)
+    i = code.index("{", start)
+    return code[i:_balanced_end(code, i) + 1]
+
+
+def test_a_podcast_row_is_reached_and_pressed_from_the_keyboard():
+    """A show on the podcast page and an episode the search found are item
+    delegates with the button role, and an item delegate takes no focus by
+    itself (focusPolicy 0, measured on PlasmaComponents3.ItemDelegate): Tab
+    went from one row's star to the next row's star, and a row given the
+    focus anyway did nothing on Return, Enter or Space, because it acted on
+    a TapHandler alone. A screen reader's press ended in the delegate's
+    clicked(), which nobody heard. Each row now takes the Tab focus and has
+    one way to act, its own clicked(): the pointer and the screen reader end
+    there by themselves and ViewLogic.pressRow sends the three keys there
+    (tst_viewrules, and tst_rowkeys with real key presses on both rows). A
+    TapHandler beside it would open the show a second time on every click."""
+    code = _no_comments((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    acts = {
+        "showRow": "onClicked: root.loadPodcastFeed(showRow.feedUrl, showRow.title, showRow.art)",
+        "epsRow": "onClicked: root.playPodcastEpisode(epsRow.url, epsRow.title,",
+    }
+    for ident, act in acts.items():
+        row = _delegate_of(code, ident)
+        assert "focusPolicy: Qt.TabFocus" in row, "Tab steps over %s again" % ident
+        assert row.count(act) == 1, "%s does not act on its own click" % ident
+        assert "Keys.onPressed: (event) => ViewLogic.pressRow(event, %s)" % ident in row, (
+            "Return, Enter and Space do nothing on %s" % ident)
+        assert "TapHandler" not in row and "Accessible.onPressAction" not in row, (
+            "%s has a second way to act: a click or a screen reader's press acts twice" % ident)
+        assert "border.width: %s.activeFocus ? 2 : 1" % ident in row, (
+            "%s takes the focus and shows nothing for it" % ident)
+
+
+def test_a_paired_speaker_and_its_forget_are_reached_with_tab():
+    """The output menu's Forget button was shown under the pointer and at no
+    other time, and a button that is not shown is no Tab stop. The speaker's
+    tick beside it is a check delegate, which takes no focus by itself
+    (focusPolicy 0, measured), so Tab went past the whole Bluetooth row:
+    a paired speaker could be neither connected nor forgotten from the
+    keyboard. The tick takes the Tab focus now and Forget is shown while the
+    tick or the button itself has it. The tick is declared first, because
+    Tab walks in that order and a button shown by its speaker's focus has
+    to come after the speaker; the row is laid out from the right so Forget
+    keeps its place at the far left. It is there the moment the tick or the
+    button has the focus and not one frame of the fade later: a quick second
+    Tab ran past it, and one that landed found it hidden for that frame, where
+    a press does nothing. The two taps stay, and the first one is taken back when the
+    button goes: Escape closed the menu on a standing question, and a press
+    inside the next three seconds forgot the speaker. tst_btforget walks a
+    copy of the row with real keys."""
+    code = _no_comments((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    row = _delegate_of(code, "btRow", "RowLayout")
+    tick = row.index("PlasmaComponents3.CheckDelegate {")
+    forget = row.index("CircleButton {")
+    assert tick < forget, "Forget is declared before the speaker: Tab meets it while it is hidden"
+    assert "layoutDirection: Qt.RightToLeft" in row[:tick], (
+        "declared second and laid out from the left, Forget stands beside the tick's right edge")
+    assert "focusPolicy: Qt.TabFocus" in row[tick:forget], "Tab steps over a paired speaker again"
+    btn = row[forget:]
+    assert ("opacity: (btRowHover.hovered || armed || activeFocus || btRowDelegate.activeFocus)"
+            " ? 0.75 : 0.0") in btn, "Forget is shown under the pointer only"
+    assert ('visible: (opacity > 0.0 || activeFocus || btRowDelegate.activeFocus)'
+            ' && root._btConnectingMac === ""') in btn, (
+        "Forget waits for its fade before Tab can land on it, or goes while it has the focus")
+    assert "onVisibleChanged: if (!visible) armed = false" in btn, (
+        "a first tap outlives the button it was made on")
+    ask = "if (!armed) { armed = visible; btForgetDisarm.restart(); return }"
+    assert ask in btn and btn.index(ask) < btn.index("root.btForget(btRow.mac)"), (
+        "one tap forgets, or a button nobody can see takes the first one")
+
+
+def test_the_player_and_the_appearance_page_read_the_accent_the_same_way():
+    """A config can hold two keys for the widget's colours: accentMode, and
+    followSystemAccent from before the Accent list existed. The player read
+    both and the Appearance page showed accentMode alone, so a config with
+    accentMode 0 and the old key on wore the system accent under a list
+    that said "On Air green". Both ask ColorLogic.accentMode now
+    (tst_colorlogic has every pair; tst_appearancepage drives the page).
+    The page writes the two keys in one place and nowhere else: a choice
+    that left the old yes standing would be outvoted by it at the next
+    start, and a list that wrote on opening would turn Apply on by itself."""
+    main = _no_comments((UI / "main.qml").read_text(encoding="utf-8"))
+    assert re.search(r"readonly property int _accentMode: ColorLogic\.accentMode\("
+                     r"Plasmoid\.configuration\.accentMode,\s*"
+                     r"Plasmoid\.configuration\.followSystemAccent\)", main), (
+        "the player reads the two accent keys its own way again")
+    page = _no_comments((UI / "config" / "configAppearance.qml").read_text(encoding="utf-8"))
+    assert ("readonly property int _accent: "
+            "ColorLogic.accentMode(cfg_accentMode, cfg_followSystemAccent)") in page, (
+        "the page shows the accent by a reading of its own")
+    assert "currentIndex: root._accent\n" in page, "the Accent list shows the stored number as it is"
+    assert "checked: root._accent === 1\n" in page, "the old box shows the old key as it is"
+    assert "property alias cfg_followSystemAccent" not in page, (
+        "the old key is a control's own state again, and the two controls can disagree")
+    choose = _function_body(page, "_chooseAccent")
+    assert "cfg_accentMode = mode" in choose and "cfg_followSystemAccent = (mode === 1)" in choose
+    assert len(re.findall(r"cfg_accentMode\s*=[^=]", page)) == 1, "the mode is written outside _chooseAccent"
+    assert len(re.findall(r"cfg_followSystemAccent\s*=[^=]", page)) == 1, (
+        "the old key is written outside _chooseAccent")
+    assert page.count("root._chooseAccent(") == 2, "a control does not write its choice through _chooseAccent"
+
+
+def test_the_transport_words_go_through_one_door_and_a_pause_keeps_its_file():
+    """An episode plays, the headset says Pause, and later Play: the first
+    station of the list came on. A pause was a stop for anything without a
+    timeshift buffer, the stop threw the episode away, and a Play that names
+    nothing fell back to row 0. The widget's own button did the same on its
+    second press, from its own copy of the same branches.
+
+    What each word does is TransportLogic.mediaKey, and what a pause keeps is
+    TransportLogic.filePause (tst_transportlogic). tst_transportroads walks
+    the roads from a pause around a counting player, with a copy of the lines
+    below; this holds main.qml and the widget's roads to that copy.
+
+    The player pauses where it stands, so the page goes on showing the file,
+    and what was kept is one property. The pause writes it; Play, a stop and
+    the handoff every other start goes through drop it, so it cannot outlive
+    a choice made after it, and a widget that starts fresh holds none."""
+    main_src = (UI / "main.qml").read_text(encoding="utf-8")
+    main = _code_only(main_src)
+
+    def flat(text):
+        return re.sub(r"\s+", " ", text)
+
+    dispatch = _function_body(main, "_mprisDispatch")
+    words = 'if (cmd === "Stop" || cmd === "Pause" || cmd === "PlayPause" || cmd === "Play") {'
+    assert flat(dispatch[dispatch.index(words) + len(words):]).startswith(" transport(cmd); }"), (
+        "a media key's word is answered somewhere other than transport()")
+    for own in ("stopWithFade(", "timeshiftPause(", "timeshiftResume(", "playMusic.play(", "playLast("):
+        assert own not in dispatch, "the MPRIS dispatch answers a transport word itself: %s" % own
+
+    # What plays, and the facts the words are answered from: one array, read
+    # by the transport and by the face of its button.
+    told = flat(main[main.index("readonly property var _nowPlays: ({"):main.index("readonly property var _keyFacts:")])
+    for fact in ('"audible": isPlaying()', '"preview": _previewUrl !== ""',
+                 '"source": playMusic.source.toString()',
+                 '"episode": _podPlayingKey !== "" ? _podPlayingUrl : ""',
+                 '"tone": _alarmToneUrl.toString()', '"bufferPath": timeshift.bufPath',
+                 '"shifted": timeshift.shifted', '"casting": _casting',
+                 '"stopping": fadeOutAnimation.running', '"raw": _podPlayingRawUrl',
+                 '"title": currentStation', '"key": _podPlayingKey', '"show": _podPlayingShow',
+                 '"art": _podPlayingArt', '"feed": _currentEpisodeFeed'):
+        assert fact in told, "the pause is no longer told %s" % fact
+    assert "playMusic.position" not in told, (
+        "what plays is bound to the needle, and the face of the button is worked out again with every tick")
+    assert ("readonly property var _keyFacts: [isPlaying(), _casting, _wantsPlaying, _tsPaused, timeshift.shifted, "
+            "TransportLogic.ownFile(_nowPlays), _pausedFile !== null, "
+            "TransportLogic.inPlace(_pausedFile, playMusic.playbackState === MediaPlayer.PausedState), "
+            "_previewComing]") in flat(main), (
+        "the transport's facts are not mediaKey's nine, in its order: an audition on its way is what Stop looks at "
+        "while nothing of it is audible yet")
+
+    door = flat(_function_body(main, "transport"))
+    lines = ("var act = TransportLogic.keyFor(cmd, _keyFacts);",
+             'if (act === "pause" && timeshiftPause()) return;',
+             'if (act === "stop" || act === "pause") stopWithFade();',
+             'else if (act === "keep") {',
+             "_stampPodPosition(); _flushPodPositions(); alarmEngine.standDown(); _volumeOverridePct = -1; _abortSleepFade();",
+             'root._pausedFile = TransportLogic.filePause(Object.assign({ "positionMs": playMusic.position, '
+             '"seekSec": _podPendingSeekUrl === playMusic.source.toString() ? _podPendingSeekSec : -1 }, _nowPlays));',
+             "playMusic.pause();",
+             '} else if (act === "resume") timeshiftResume();',
+             'else if (act === "unpause") { root._pausedFile = null; playMusic.play(); }',
+             'else if (act === "bare") playLast();')
+    at = [door.index(line) for line in lines]
+    assert at == sorted(at), (
+        "transport() does its answers in another order: the bookmark is stamped while the file still plays, "
+        "and the file is kept before the pause, whose edge arrives at once")
+    assert door.count("stopWithFade(") == 1 and door.count("playMusic.pause(") == 1 and door.count("playMusic.play(") == 1
+
+    # The widget's three roads: the Playing tab's button, Space, the panel's
+    # middle click. None of them keeps branches of its own.
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    panel = _code_only((UI / "CompactRepresentation.qml").read_text(encoding="utf-8"))
+    assert full.count('root.transport("PlayPause")') == 2 and 'onClicked: root.transport("PlayPause")' in full
+    assert panel.count('if (Plasmoid.configuration.lastplay) root.transport("PlayPause");') == 1
+    for path in sorted(UI.rglob("*.qml")):
+        code = _code_only(path.read_text(encoding="utf-8"))
+        own = main if path.name == "main.qml" else code
+        if path.name != "main.qml":
+            for road in ("timeshiftPause(", "timeshiftResume(", "playLast(", "playMusic.pause("):
+                assert road not in code, "%s goes round transport() through %s" % (path.name, road)
+        writes = len(re.findall(r"_pausedFile\s*=[^=]", own))
+        assert writes == (7 if path.name == "main.qml" else 0), (
+            "%s writes the kept file %d time(s)" % (path.name, writes))
+    assert main.count("timeshiftPause(") - main.count("function timeshiftPause(") == 1, (
+        "the pause is asked for outside transport()")
+    assert main.count("playMusic.pause(") == 2, (
+        "the player is paused somewhere besides the buffer's reader and the kept file")
+    # A word reaches the transport from the desk, and from a tap on the row
+    # of what is on. No timer and no recovery road sends one.
+    senders = {_owner_of(main, m.start())[0] for m in re.finditer(r"(?<!function )\btransport\(", main)}
+    # And from a step of the sliding buffer pressed on the broadcast, which is a pause and a play
+    # (test_a_step_is_a_pause_and_a_play_through_the_one_door).
+    assert senders == {"_mprisDispatch", "playPodcastEpisode", "playLocalFile", "timeshiftStep"}, sorted(senders)
+    tap = 'if (TransportLogic.rowTap(%s, isPlaying(), _pausedFile !== null, root._alarmFiring)) { transport("PlayPause"); return; }'
+    episode_tap = _function_body(main, "playPodcastEpisode")
+    assert ('var isThisOn = playMusic.source.toString() === raw || (_podPlayingRawUrl !== "" && _podPlayingRawUrl === raw);'
+            in episode_tap and tap % "isThisOn" in episode_tap), "an episode's row no longer asks whether its tap is the toggle"
+    file_tap = _function_body(main, "playLocalFile")
+    assert tap % "playMusic.source.toString() === urlStr" in file_tap, "a file's row no longer asks whether its tap is the toggle"
+    for body, name in ((episode_tap, "playPodcastEpisode"), (file_tap, "playLocalFile")):
+        assert "stopWithFade(" not in body, "%s stops what its row was tapped on, past the transport" % name
+    assert file_tap.index("TransportLogic.rowTap(") < file_tap.index("_podHandoff();"), (
+        "the handoff drops the kept file before the row's tap could be read as its resume")
+
+    # The kept file: born empty, never read from the configuration, dropped by
+    # Play, by a stop and by every other start, and the desk is told when it changes.
+    assert "property var _pausedFile: null\n" in main
+    assert "on_PausedFileChanged: _mprisQueueWrite()" in main, (
+        "a Stop over a paused file changes nothing that plays, so the desk would go on reading Paused")
+    for fn in ("stopWithFade", "_podHandoff"):
+        assert "_pausedFile = null;" in _function_body(main, fn), "%s keeps a paused file" % fn
+    # "Every other start" is the handoff's promise, so the handoff has to be
+    # on every road that begins something new: a station or a search result
+    # (_playStation, before its resolve can fail), a file or an episode
+    # (playLocalFile), and each start the wake-up makes by itself.
+    for fn in ("_playStation", "playLocalFile"):
+        body = _function_body(main, fn)
+        assert body.index("_podHandoff();") < body.index("startWithFade("), (
+            "%s starts something without the handoff that ends a pause" % fn)
+    alarm = _code_only((UI / "AlarmEngine.qml").read_text(encoding="utf-8"))
+    rings = [m.start() for m in re.finditer(r"app\.startWithFade\(", alarm)]
+    assert rings, "the wake-up no longer starts anything itself; this check has nothing to hold"
+    for at in rings:
+        name, opened = _owner_of(alarm, at)
+        assert "app._podHandoff();" in alarm[opened:at], (
+            "the wake-up's %s starts sound without the handoff, and a paused episode would outlive the alarm" % name)
+
+    # The kept file is started again only by a bare Play, when it streams or
+    # the player no longer holds it. It is let go of first: the start would
+    # read it as its own row tapped, and send Play round again.
+    play = _function_body(main, "playLast")
+    play = re.sub(r"\s+", " ", play)
+    held = play.index("var held = root._pausedFile, sec = TransportLogic.needle(held.sec, "
+                      "playMusic.playbackState === MediaPlayer.PausedState, playMusic.position, "
+                      "_podPendingSeekUrl === playMusic.source.toString());")
+    episode = "if (held.episode) playPodcastEpisode(held.url, held.title, held.key, held.show, held.art, held.feed);"
+    seek = "if (sec >= 0) { _podPendingSeekUrl = playMusic.source.toString(); _podPendingSeekSec = sec; }"
+    assert play.index('if (pick.what === "paused") {') < held < play.index("root._pausedFile = null;") \
+        < play.index(episode) < play.index("else playLocalFile(held.url, held.title);") < play.index(seek) \
+        < play.index('} else if (pick.what === "audition") {'), (
+        "the kept file is not let go of before its own start, or its second is set before the start")
+
+    state = _function_body(main, "_mprisWriteState")
+    assert ("var status = TransportLogic.playbackStatus(isPlaying(), _casting, _tsPaused, timeshift.shifted, "
+            "_pausedFile !== null);") in state
+    assert "status: status," in state and 'canPause: status !== "Stopped",' in state, (
+        "the desk's status or its CanPause is worked out apart from TransportLogic.playbackStatus")
+    assert 'station: root.currentStation || (_pausedFile !== null ? _pausedFile.title : ""),' in state, (
+        "a paused file has no name on the desk")
+
+
+def test_the_desk_is_told_what_play_can_do_by_the_rule_play_follows():
+    """CanPlay was "the list has a row", a rule written apart from the action.
+    With no station saved, a search result that was playing was announced as
+    unplayable, and after its stop the desk's Play stayed dark while the
+    widget's own button brought it back (measured 2026-11-11 on main.qml's
+    state writer: status Playing, canPlay false).
+
+    The rule is TransportLogic.canPlay, which asks bareplay, the function a
+    Play that names nothing obeys (tst_transportlogic). Held here: there is
+    one capability, a property of main.qml; it is handed the very facts
+    playLast hands bareplay; the desk and the Playing tab's button both read
+    it; and the desk is written to when it changes, since a list that gets
+    its first station while nothing plays moves nothing else."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    can = re.search(r"readonly property bool canPlay: TransportLogic\.canPlay\(([^\n]*)\)\n", main)
+    assert can, "main.qml has no canPlay that TransportLogic decides"
+    asked = [a.strip() for a in can.group(1).split(",")]
+    assert asked[:4] == ["isPlaying()", "_casting", "_tsPaused", "timeshift.shifted"], asked
+    bare = re.search(r"TransportLogic\.bareplay\(([^\n]*)\);", _function_body(main, "playLast"))
+    assert bare and asked[4:] == [a.strip().replace("root.", "") for a in bare.group(1).split(",")], (
+        "the capability is asked about other facts than the Play it speaks for: %s" % asked[4:])
+    assert "onCanPlayChanged: _mprisQueueWrite()" in main, "the desk is not told when Play starts or stops being possible"
+    state = _function_body(main, "_mprisWriteState")
+    assert "canPlay: root.canPlay," in state and "stationsModel.count > 0" not in state, (
+        "the desk's CanPlay is worked out apart from the Play it announces")
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    assert "enabledState: root.canPlay\n" in full, "the Playing tab's button has a rule of its own for when Play can be pressed"
+    uses = sum(_code_only(p.read_text(encoding="utf-8")).count("TransportLogic.canPlay(")
+               for p in sorted(UI.rglob("*.qml")))
+    assert uses == 1, "the capability is worked out in %d places" % uses
+
+
+def test_the_output_menus_volume_row_turns_what_is_heard():
+    """The system default output selected, a television carrying the stream
+    and this computer silent: the "Play on" menu's Volume slider and its Mute
+    turned this computer's master, because the row asked only how the local
+    sound is routed (measured 2026-11-11 on the row's own lines: local=1
+    cast=0, and with an output pinned local=0 cast=1). And with the two
+    playing together the row on the default sink moved this computer and
+    left the television where it stood, while pinned it moved both.
+
+    Which knob the row is, what a gesture on it sends where, and the master a
+    device follows are TransportLogic's volumeRoad, masterGesture and
+    castMaster, and a device's level is deviceLevel(master, its balance)
+    (tst_transportlogic). tst_volumeroad drives a copy of the row and of
+    main.qml's volume roads around devices that only write down what they
+    are sent. Held here: the row asks those and sends nothing else; a drag
+    holds the road it began on; every level a device is sent comes out of
+    the one formula; a device that is only ticked is never sent a level; the
+    devices follow what the mute answered, not what the icon showed, and are
+    not moved by the poll; and a mute does not take the place of a level
+    that was still waiting to be saved."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text)
+
+    full = flat(_code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8")))
+    assert 'readonly property bool roomMode: root.masterRoadOf(masterVolumeSlider.dragRoad) === "sink" ' in full, (
+        "the volume row decides for itself which output it turns")
+    answer = ('function gesture(kind, level) { var to = TransportLogic.masterGesture(kind, roomMode ? "sink" : "player", '
+              "root._casting, root._castLocalPlay, level, playMusicOutput.volume, root.targetVolume(), root._ownMuted) "
+              "if (to.sink >= 0) root.setSinkMaster(to.sink) "
+              "if (to.sinkMute) root.toggleSinkMasterMute(to.castFollows) "
+              "if (to.player >= 0) root.setUserVolume(to.player) "
+              "if (to.cast >= 0) root._castSetVolume(to.cast) }")
+    assert answer in full, "the row's gestures are not what TransportLogic.masterGesture answered, sent as it answered them"
+    assert 'onClicked: parent.gesture("mute", 0) ' in full, "the row's mute goes round the row's one answer"
+    assert "readonly property bool shownMuted: (roomMode && root._sinkMasterMuted) || shownVol <= 0 " in full, (
+        "the speaker button shows the room's mute on the widget's own knob, or forgets it on the room's")
+    held = 'property string dragRoad: "" onPressedChanged: dragRoad = pressed ? (parent.roomMode ? "sink" : "player") : "" '
+    assert held + 'onMoved: parent.gesture("move", value) ' in full, (
+        "the slider does not hold the road its drag began on, or moves past the row's answer")
+    for path in sorted(UI.rglob("*.qml")):
+        if path.name == "main.qml":
+            continue
+        code = _code_only(path.read_text(encoding="utf-8"))
+        rooms = code.count("setSinkMaster(") + code.count("toggleSinkMasterMute(")
+        assert rooms == (2 if path.name == "FullRepresentation.qml" else 0), (
+            "%s reaches this computer's master on %d road(s) past the volume row" % (path.name, rooms))
+        told = code.count("_castSetVolume(")
+        assert told == (1 if path.name in ("FullRepresentation.qml", "AlarmEngine.qml") else 0), (
+            "%s sets a device's level on %d road(s)" % (path.name, told))
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert ("function masterRoadOf(dragRoad) { return TransportLogic.volumeRoad(_casting, _castLocalPlay, "
+            "sync._combineWantActive || sync._combineActive, "
+            '(Plasmoid.configuration.audioOutputDevice || "") === "", dragRoad); }') in flat(main)
+    assert ('function castMaster() { return TransportLogic.castMaster(masterRoadOf(""), _sinkMasterPct, _sinkMasterMuted, '
+            "_ownMuted, targetVolume()); }") in flat(main)
+    user = _function_body(main, "setUserVolume")
+    keep = ("if (TransportLogic.muteDisplaces(_pendingUserVolumePct, vol)) "
+            "Plasmoid.configuration.defaultVolume = _pendingUserVolumePct;")
+    assert user.index(keep) < user.index("_pendingUserVolumePct = Math.round(vol * 100);"), (
+        "the waiting level is saved after the mute already took its place")
+    assert "if (_casting) _castSetVolume(castMaster());" in user, (
+        "a device that is ticked but not playing is sent a level, or a playing one a level past the one master")
+
+    # Every level a device is sent goes out of one function: the debounced master, and its own row.
+    tell = _function_body(main, "_castTell")
+    assert "var level = TransportLogic.deviceLevel(master, sync.trimOf(dev.uuid)).toFixed(3);" in tell
+    assert main.count("TransportLogic.deviceLevel(") == 1 and "* sync.trimOf(" not in main and "* root.sync.trimOf(" not in main, (
+        "a device's level is worked out somewhere besides TransportLogic.deviceLevel")
+    assert main.count('"CAST_VOL"') == 2 and tell.count('_castExec("CAST_VOL", [') == 2, (
+        "a device is sent a level past _castTell, which is where its balance is applied")
+    out = _function_body(main, "_castFlush")
+    assert "_castTargets.forEach(function (dev) { _castTell(dev, _pendingCastVolumePct / 100); });" in out
+    assert out.index("_castTell(") < out.index("_pendingCastVolumePct = -1;")
+    assert "onTriggered: root._castFlush()\n" in main[main.index("id: castVolumeTimer"):][:120]
+    assert "if (ti >= 0) _castTell(_castTargets[ti], castMaster());" in _function_body(main, "applyCastTrim"), (
+        "the device's own row sends it a level past the master: moved under a mute, it wakes the device")
+    assert ('var master = TransportLogic.castMaster(root.masterRoadOf(""), root._sinkMasterPct, false, false, '
+            "root.targetVolume()); var ratio = parseFloat(adVol[1]) / Math.max(0.05, master);") in flat(main), (
+        "a joining device's balance is measured against another master than the one it will follow, or a muted one")
+
+    # The mute: pactl decides, and only the click's own answer is passed on to the devices.
+    mute = _function_body(main, "toggleSinkMasterMute")
+    assert '${m:-no}" + (tellDevices === true ? " devices" : "") + "\\"; true # "' in mute
+    poll = main[main.index("id: sinkMasterPoll"):main.index("function setSinkMaster(")]
+    assert "devices" not in poll, "the poll of this computer's master tells the devices to move"
+    answer = main[main.index('if (cmd.indexOf(": SINKVOL;") === 0) {'):]
+    answer = answer[:answer.index("return;")]
+    assert "match(/SINKVOL (-?\\d+) (yes|no)( devices)?/);" in answer
+    assert answer.index('root._sinkMasterMuted = svM[2] === "yes";') \
+        < answer.index("if (svM[3] && root._casting) root._castSetVolume(root.castMaster());"), (
+        "the devices are told before the mute's answer is known, or one that stopped playing is told too")
+    assert main.count("_castSetVolume(") - main.count("function _castSetVolume(") == 2, (
+        "a device's master is set on a road besides the widget's own volume and the mute's answer")
+
+
+def test_the_big_button_shows_what_its_press_does_and_a_pause_stays_on_the_page():
+    """Since 2026.44 a press on the big button keeps an episode's place, and
+    the button still read Stop there: it asked only about the timeshift
+    buffer. And a paused episode left the Playing page looking idle, with
+    nothing on it that could let go of the pause.
+
+    The face is TransportLogic.face, asked of the facts transport() itself is
+    answered from, so the two cannot disagree (tst_transportlogic walks every
+    state). Held here: the button takes its glyph and its name from that one
+    property; the Stop beside it follows the face; the footer says Paused;
+    and the three roads that go on with an episode by themselves stand down
+    over a pause, as does the edge that wipes the header."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+
+    def flat(text):
+        return re.sub(r"\s+", " ", text)
+
+    assert "readonly property string bigFace: TransportLogic.face(_keyFacts, tsPauseAvailable)\n" in main, (
+        "the face is asked of other facts than the press")
+    assert ('iconName: root.bigFace === "pause" ? "media-playback-pause" '
+            ': (root.bigFace === "stop" ? "media-playback-stop" : "media-playback-start")\n') in full
+    assert ('tooltipText: root.bigFace === "pause" ? i18n("Pause") '
+            ': (root.bigFace === "stop" ? i18n("Stop") : i18n("Play"))\n') in full
+    assert "Accessible.name: tooltipText" in (UI / "CircleButton.qml").read_text(encoding="utf-8"), (
+        "the round button is no longer named by its tooltip, so the face has no name for a screen reader")
+    assert "tsPauseAvailable" not in full, "the Playing page asks the timeshift buffer what its button is, past the face"
+    assert ("visible: TransportLogic.stopOffered(isPlaying(), root._casting, root._wantsPlaying, root._tsPaused, "
+            'root.tsShifted, root.bigFace === "pause", root._pausedFile !== null)') in flat(full), (
+        "the Stop beside the button does not follow the button's face, or lets go of no paused file")
+
+    foot = full[full.index("if (root._tsPaused || root._pausedFile !== null)"):]
+    assert 'return root.tsBuffering ? i18n("Paused — still buffering live radio") : i18n("Paused")' in foot[:600]
+    assert foot.index('i18n("Paused")') < foot.index('i18n("Connecting…")'), (
+        "the footer reads Connecting over a paused file: the loading branch catches a player that is not playing")
+
+    # Nothing goes on by itself over a pause. The queue's head and the show's
+    # next episode start from two handlers, and the stall retry from its timer.
+    assert main.count("_podPlayUpNextHead()") - main.count("function _podPlayUpNextHead()") == 2
+    assert "if (root._pausedFile === null && root._podPlayUpNextHead()) return;" in main
+    assert "if (root._pausedFile === null && Plasmoid.configuration.podcastContinuous !== false && deadFeed) {" in main
+    assert "if (!fadeOutAnimation.running && root._pausedFile === null && !root._podPlayUpNextHead()" in main
+    stall = main[main.index("id: stallTimer"):]
+    assert stall.index("if (root._tsPaused || root._pausedFile !== null || _orderLapsed()) return;") < stall.index("playMusic.play()")
+    edge = main[main.index("onPlayingChanged:"):]
+    assert "if (!isPlaying() && root._pausedFile === null) {" in edge[:edge.index("_mprisQueueWrite()")], (
+        "the pause wipes a file's own title off the header, and nothing writes it back")
+
+
+def test_a_row_and_the_panel_go_on_naming_what_is_paused():
+    """A paused episode's row looked like any other row, and the panel's text
+    and its tooltip dropped the file the moment it stopped sounding, as if
+    nothing were held. What is on, playing or paused, keeps its row's mark;
+    the bars a row wears turn into the pause sign (tst_eqbars), and the row
+    without bars says Paused in words; the panel's opt-in text stays and its
+    tooltip says Paused."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    panel = _code_only((UI / "CompactRepresentation.qml").read_text(encoding="utf-8"))
+    row = _code_only((UI / "EpisodeListItem.qml").read_text(encoding="utf-8"))
+    bars = _code_only((UI / "EqBars.qml").read_text(encoding="utf-8"))
+
+    assert full.count("readonly property bool isThisPlaying: (isPlaying() || root._pausedFile !== null)") == 3
+    assert "&& root.onOrKept\n" in row[row.index("readonly property bool isThisPlaying:"):][:400]
+    assert ("readonly property bool onOrKept: playMusic.playbackState === MediaPlayer.PlayingState "
+            "|| _casting || _pausedFile !== null\n") in main
+    assert full.count("paused: root._pausedFile !== null\n") == 2 and row.count("paused: root._pausedFile !== null\n") == 1
+    assert 'if (podDlRow.isThisPlaying && root._pausedFile !== null) bits.push(i18n("Paused"))' in full, (
+        "the Downloaded row has no bars, and nothing else there says its episode is paused")
+    assert ('Accessible.name: fileItem.isThisPlaying && isPlaying() ? i18n("Pause: %1", displayName) '
+            ': i18n("Play: %1", displayName)') in full
+    for part in ("property bool paused: false", "readonly property bool _moving: animating && !paused",
+                 "function restOf(index) { return paused ? (index < 2 ? maxHeight * 0.7 : 0) : minHeight }",
+                 "running: eqRoot._moving", "if (!eqRoot._moving) return eqRoot.restOf(barSlot.index);"):
+        assert part in bars, "the bars lost their pause sign: %s" % part
+
+    assert ("TransportLogic.held(isPlaying(), root._casting, root._wantsPlaying, root._tsPaused, root.tsShifted, "
+            "root._pausedFile !== null)") in re.sub(r"\s+", " ", panel)
+    assert main.count("if (!onOrKept) return ") == 2
+    assert 'var line = _pausedFile !== null ? i18n("Paused") : currentStation;' in main
+
+
+def test_a_key_held_down_is_one_press():
+    """A held key repeats some 25 times a second. Space on the Playing page
+    and Enter or Space on a file's or an episode's row each toggle the
+    transport, so a key held for a second played and paused a dozen times;
+    before a pause could keep a file, the same hold stopped and restarted it."""
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    row = _code_only((UI / "EpisodeListItem.qml").read_text(encoding="utf-8"))
+    assert "event.key === Qt.Key_Space && !_inputFocused() && !event.isAutoRepeat) {" in full
+    assert "if (!event.isAutoRepeat) root.playLocalFile(fileItem.localUrl, fileItem.displayName)" in full
+    assert "if (!event.isAutoRepeat) podDlRow._activate()" in full
+    assert "if (!event.isAutoRepeat) epItem.primaryAction()" in row
+
+
+def test_a_tick_on_this_computer_leaves_a_playing_device_where_it_stands():
+    """On the default sink a device alone follows the widget's own volume, and
+    beside this computer that volume times the room's master. Ticking or
+    unticking "This computer" beside a device that plays swaps the one master
+    for the other, and a balance read against the old one moves the device
+    at the first gesture after it: with the room at 50 % under a widget at
+    80 %, a television standing at 0.200 with a balance of 0.5 is sent
+    0.75 x 0.5 = 0.375 by one wheel step down after the untick.
+
+    The balance is read against the new master at the tick
+    (TransportLogic.rebalance, tst_transportlogic) and stored, and the device
+    is told nothing (tst_syncengine asks the engine itself; tst_volumeroad
+    walks a copy of the tick). Held here: the tick asks which knob the row
+    was before it changes anything, re-reads the balance only when the knob
+    changed (it never does for a device that is ticked and idle: volumeRoad
+    asks the box only beside a cast), and stores without sending; the rows
+    of the menu go on sending."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    tick = _function_body(main, "castToggleLocal")
+    tick = re.sub(r"\s+", " ", tick)
+    line = ('if (masterRoadOf("") !== was) _castTargets.forEach(function (d) { sync.setDeviceTrim(d.uuid, '
+            "TransportLogic.rebalance(sync.trimOf(d.uuid), was, _sinkMasterPct, targetVolume()), true); });")
+    assert tick.index('var was = masterRoadOf("");') < tick.index("if (_castLocalPlay) {"), (
+        "the tick asks which knob the row was after it already changed it")
+    assert tick.index("_castJoinLocal = false;") < tick.index(line), (
+        "a device's balance is not read against its new master at the tick, or before this computer joined")
+    assert main.count("TransportLogic.rebalance(") == 1, "a balance is read against another master on a second road"
+
+    engine = _code_only((UI / "SyncEngine.qml").read_text(encoding="utf-8"))
+    store = _function_body(engine, "setDeviceTrim")
+    assert "function setDeviceTrim(id, factor, stored) {" in engine
+    assert "if (stored !== true && app.castTrimActive(id)) {" in store, (
+        "a balance that is only stored is sent to the device: a tick under a mute silences a television that plays")
+    quiet = re.compile(r"setDeviceTrim\([^\n]*, true\)")
+    for path in sorted(UI.rglob("*.qml")):
+        found = len(quiet.findall(_code_only(path.read_text(encoding="utf-8"))))
+        assert found == (1 if path.name == "main.qml" else 0), (
+            "%s stores a balance without sending it on %d road(s)" % (path.name, found))
+
+
+def test_a_device_is_muted_by_the_listener_and_never_by_a_zero_the_widget_passes_through():
+    """The master a device follows read a stream at zero as a mute, and the
+    widget writes zero by itself: for the length of a calibration
+    (SyncEngine parks the stream), for the first 10 to 20 ms of a start with
+    the fade (measured with the start's own lines on a stand-in output, with
+    fades of 250, 1000 and 3000 ms; the fade is restarted in the same call,
+    it does not wait for the stream), and when the sleep timer's fade has
+    run out. A click on the slider, a touch of the device's row or an
+    unmute's answer in such a moment sent the device 0, and nothing brought
+    it back before the next gesture (tst_volumeroad, on a copy: [tv 0.000]
+    where [tv 0.400] is due).
+
+    The mute is a fact of its own now, TransportLogic.ownMute
+    (tst_transportlogic): a gesture at zero makes it, any other gesture ends
+    it, and so does anything that lifts the stream, because a start brings
+    this computer's sound back by itself. Held here: the gestures' one door
+    and the output's own change are its only two writers, and castMaster is
+    given the fact and is not shown the stream."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert "property bool _ownMuted: false\n" in main
+    user = _function_body(main, "setUserVolume")
+    made = "_ownMuted = TransportLogic.ownMute(_ownMuted, true, vol);"
+    assert user.index("playMusicOutput.volume = vol;") < user.index(made) < user.index("if (_casting) _castSetVolume(castMaster());"), (
+        "a gesture's mute is decided before its level is written, or after the devices were told")
+    assert ("onVolumeChanged: { _mprisQueueWrite(); root._ownMuted = TransportLogic.ownMute(root._ownMuted, false, volume) }\n"
+            in main[main.index("id: playMusicOutput"):][:900]), (
+        "a start no longer ends the listener's mute: left up, it is back at the next zero the widget writes")
+    for path in sorted(UI.rglob("*.qml")):
+        writes = len(re.findall(r"_ownMuted\s*=[^=]", _code_only(path.read_text(encoding="utf-8"))))
+        assert writes == (2 if path.name == "main.qml" else 0), (
+            "%s writes the listener's mute on %d road(s)" % (path.name, writes))
+    assert "playMusicOutput.volume" not in _function_body(main, "castMaster"), (
+        "the master a device follows is read off the stream again: a start's zero is taken for a mute")
+
+
+def test_the_rooms_reading_is_kept_fresh_while_a_device_follows_it():
+    """Beside this computer on the room's knob a device follows the widget's
+    volume times the room's master, and the room's master is what the widget
+    last READ: the poll ran only while the face was watched. With the popup
+    closed, the panel's wheel, the M key and an MPRIS volume worked from a
+    reading as old as the popup's last visit, and a mute of the room that
+    something else had lifted since was still believed.
+
+    The poll now also runs while a device follows the reading
+    (TransportLogic.roomFollowed, tst_transportlogic), and at the unwatched
+    rate when nobody looks: a tick is a shell with two pactl, two grep, head
+    and tr, 6.5 ms of CPU measured, and every two seconds for as long as a
+    pair plays is the shape of issue #2. The poll still never moves a device
+    (test_the_output_menus_volume_row_turns_what_is_heard)."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    poll = main[main.index("id: sinkMasterPoll"):main.index("function setSinkMaster(")]
+    assert "interval: playerWindow.faceWatched ? 2000 : 30000\n" in poll, (
+        "the reading is polled every two seconds while nobody looks: 1800 shells an hour for as long as a pair plays")
+    assert 'running: root.faceShown || TransportLogic.roomFollowed(root._casting, root.masterRoadOf(""))\n' in poll, (
+        "the reading a device follows goes stale while the popup is closed")
+
+
+def test_a_start_goes_by_what_the_stream_is_and_asks_beside_itself():
+    """The start chose the relay by the address's ending and, for an audition,
+    by the directory's label, and both mislead (KindLogic.js has the numbers):
+    plain FLAC and Opus lost seconds and titles to a relay they do not need,
+    and a saved Ogg FLAC station at a bare address stood silent for the
+    rescue's six seconds. StreamKind decides now, under tst_streamkind. This
+    pins the road into it: every start tells it, with "" for one the relay has
+    no part in so that a question still out ends there; the plain start is on
+    its way before the question can go out; the answer is what arms the relay
+    in an Ogg shell; and neither the ending nor the label is read here."""
+    body = _code_only(_function_body((UI / "main.qml").read_text(encoding="utf-8"), "startWithFade"))
+    ask = 'var tsOgg = streamKind.start(tsLocal ? tsUrl : "", station.name || "", root._previewCodec);'
+    assert ask in body, "the start no longer asks StreamKind"
+    arm = 'timeshift.armRelay(tsUrl, station.name || "", Date.now(), tsOgg)'
+    assert body.index("playMusic.play();") < body.index(ask) < body.index(arm), (
+        "the question goes out before the plain start, or after the relay was chosen")
+    assert "if (tsLocal && (tsOgg || streamKind.proven(tsUrl))) {" in body
+    for old in ("streamFormat(tsUrl)", "tsSaid", "station.codec", "_previewCodec.indexOf", "relayExtension"):
+        assert old not in body, "the start reads the address or the label again: %s" % old
+    assert 'if (tsLocal && !tsOgg && tsUrl.indexOf("http") === 0' in body, (
+        "the rescue no longer stands by for every stream not known to be Ogg FLAC")
+    src = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert ("StreamKind { id: streamKind; app: root; cfg: Plasmoid.configuration; "
+            "engine: timeshift; player: playMusic }") in src
+    route = "if (streamKind.handleExec(cmd, stdout)) return;"
+    assert src.count(route) == 1, "the helper's answer has no way home, or two"
+    rescue = src[src.index("id: relayRescue"):]
+    rescue = rescue[:rescue.index("id: stallTimer")]
+    learn = "streamKind.rescued(src, root._currentOrigUrl);"
+    assert learn in rescue and rescue.index(learn) < rescue.index("timeshift.armRelay(src,"), (
+        "the rescue no longer tells StreamKind which address needed it")
+
+
+def test_what_stream_kind_may_move_is_asked_about_first():
+    """StreamKind is the one place outside main.qml and the timeshift engine
+    that can send a playing station somewhere, and it does so on the helper's
+    answer: a plain start to the relay when the stream is Ogg FLAC, and a
+    start that took the relay on a guess back to the plain one when it is
+    plain FLAC or no Ogg at all. Like every automatic road it may move only
+    the order that asked, never over a stop, a park or a night; the way back
+    is taken only while the player is not playing, and the check and the
+    start sit in one function with nothing between them that waits."""
+    src = _code_only((UI / "StreamKind.qml").read_text(encoding="utf-8"))
+    assert src.count("engine.armRelay(") == 1, "StreamKind arms the relay from more than one place"
+    move = _function_body(src, "_toRelay")
+    assert move.index("if (!_alive()) return;") < move.index("engine.armRelay(_url, _name, Date.now(), true);")
+    assert src.count("app.startWithFade(") == 1, "StreamKind starts playback from more than one place"
+    back = _function_body(src, "_toPlain")
+    guess = "if (!_pull || !(engine.relay && engine.active && engine.streamUrl === _url)) return;"
+    quiet = "if (app.isPlaying() || !_alive()) return;"
+    assert back.index(guess) < back.index(quiet) < back.index("engine.disarm();") < back.index("app.startWithFade("), (
+        "the way back to the plain start is taken unasked, or with the relay still armed")
+    # The one clock in there holds a question back; nothing waits between an
+    # answer and what it moves.
+    assert src.count("later.restart();") == 1 and "later.restart();" in _function_body(src, "_wait")
+    for part in ("handleExec", "_toRelay", "_toPlain", "_alive"):
+        for wait in ("Qt.callLater", "later.", "setTimeout"):
+            assert wait not in _function_body(src, part), "%s waits before it moves: %s" % (part, wait)
+    alive = _function_body(src, "_alive")
+    for door in ("if (app._tsPaused) return false;",
+                 "app._previewUrl !== _audition",
+                 "app._wantsPlaying !== true",
+                 "if (String(app._icyStreamTarget(player.source)) !== _url) return false;",
+                 "return !app._orderLapsed();"):
+        assert door in alive, "StreamKind's door lost %r" % door
+    assert alive.rindex("return") == alive.index("return !app._orderLapsed();"), (
+        "the lapse is asked before the order is known to be the one that asked")
+    answer = _function_body(src, "handleExec")
+    assert "if (_seq < 0 || KindLogic.seqOf(mine) !== _seq) return true;" in answer, (
+        "an answer is taken without asking whose question it was")
+    assert answer.index("_seq = -1;") < answer.index("_toRelay();") < answer.index("_toPlain();")
+    for sound in ("playMusic", "tsPlayLive", "tsPlayRelay", "executable", ".play()"):
+        assert sound not in src, "StreamKind reaches for %s" % sound
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    entry = re.search(r'<entry name="streamKinds" type="String">.*?</entry>', xml, flags=re.S)
+    assert entry and "<default>{}</default>" in entry.group(0), "the remembered kinds have no config entry"
+
+
+def test_an_address_written_for_a_question_does_not_outlive_it():
+    """StreamKind writes a stream's address into a file and runs the helper,
+    which removes the file, on the write's acknowledgement. A question ended
+    between the two left the file behind (measured with a real shell: there
+    after the late write, gone after the sweep). The sweep's command and its
+    cases are under tst_kindlogic and tst_streamkind; held here is that the
+    late write is swept by its own number before anything else is asked of
+    it, and that the widget's last command takes whatever is still left."""
+    src = (UI / "StreamKind.qml").read_text(encoding="utf-8")
+    answer = _function_body(src, "handleExec")
+    late = answer[answer.index('": SK_URL;"'):answer.index('if (_run === "") return true;')]
+    assert "var wrote = KindLogic.seqOf(mine);" in late
+    assert "if (_seq < 0 || wrote !== _seq) {" in late
+    assert 'KindLogic.buildSweep(base + ".kind" + wrote, wrote)' in late, (
+        "a late write is swept by a number other than its own")
+    assert "_seq + " not in late and '".kind" + _seq' not in late
+    assert 'if (mine.indexOf(": SK_RM;") === 0) return true;' in answer
+    ask = _function_body(src, "_ask")
+    assert 'urlPath: base + ".kind" + seq' in ask, "the question's file is no longer named by its number"
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    icy = r"""_icyUrlFile.replace(/'/g, "'\\''")"""
+    last = 'executable.exec("rm -f \'" + ' + icy + """ + "' '" + """ + icy + """ + "'.kind*\""""
+    assert last in main, "the widget's last command leaves a question's address file behind"
+
+
+def test_a_relayed_streams_titles_are_asked_for_on_one_road_at_a_time():
+    """A relayed Ogg stream's titles are read from its buffer file. A plain
+    FLAC station that ended up in an Ogg shell has none there and sends its
+    titles in ICY, so after three empty reads running the poll goes to the ICY
+    reader instead (TimeshiftLogic.titleRoad, the engine's titlesInBuffer and
+    titleAnswer, under their tests). This pins the two places main.qml hands
+    that decision over: which reader a poll starts, and every answer passing
+    the engine before it can pin the station as one with no titles."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    poll = _code_only(_function_body(src, "getStreamInfo"))
+    assert "if (timeshift.titlesInBuffer(u)) {" in poll
+    assert "timeshift.relayOggFamily" not in poll, "the poll picks its reader past the engine"
+    code = _code_only(src)
+    seen = 'if (timeshift.titleAnswer(cmd.indexOf("--oggbuf") !== -1, formattedText, queryUrl)) return;'
+    assert code.count(seen) == 1
+    at = code.index(seen)
+    assert code.rindex("if (!isPlaying()) {", 0, at) > code.rindex('if (cmd.indexOf("reader.py") < 0) return;', 0, at)
+    assert at < code.index('if (formattedText === "__NO_ICY__") {', at) < at + 400, (
+        "ICY's no is acted on before the engine has seen it")
+
+
+def test_m_held_down_is_one_mute():
+    """M on the Playing page toggles the mute, and a held key repeats some 25
+    times a second: a hold muted, unmuted and muted again, and where it ended
+    was the luck of the count (tst_heldkey, on a copy: 26 toggles for a
+    second's hold). One press is one toggle. The repeats are swallowed, not
+    passed on: the press was the mute's, and what sits above the popup has
+    no more claim on its repeats than on the press. On the stations page M
+    stays a letter of the search, and a text field keeps it, as before."""
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    branch = full[full.index("} else if (event.key === Qt.Key_M && !_inputFocused() && root.view !== 0) {"):]
+    branch = re.sub(r"\s+", " ", branch[:branch.index("} else if (root.view === 0")])
+    assert ("{ if (!event.isAutoRepeat) root.setUserVolume(playMusicOutput.volume > 0 ? 0 : root.targetVolume()) "
+            "event.accepted = true }") in branch + "}", "a held M toggles the mute with every repeat, or lets its repeats through"
+
+
+def test_next_previous_and_seek_from_the_desk_stay_inside_an_episode_that_is_held():
+    """Next, Previous, Seek and SetPosition asked "an episode's key stands and
+    the player plays". An episode paused in place is not playing, so a
+    headset's Next put a radio station on over it, and Seek and SetPosition
+    did nothing while CanSeek was published as true (on main.qml's own
+    functions around a counting player: Pause, Next gave "radio:0").
+
+    Where the four go is TransportLogic.skipRoad, and where the needle lands
+    deskNeedle (tst_transportlogic). tst_transportroads walks them through
+    the WHOLE dispatcher, and its copy is held here to main.qml's text word
+    for word, every branch of it, so a road added to one of the two fails
+    here. Held as well: the desk is told it may go next, go back and seek
+    from the same answer the dispatch acts on, and the second a pause keeps
+    follows a needle that was moved under it."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    copy = _code_only((TESTS / "qml" / "tst_transportroads.qml").read_text(encoding="utf-8"))
+    for fn in ("_mprisDispatch", "podcastSkip", "transport", "playLast"):
+        assert flat(_function_body(main, fn)) == flat(_function_body(copy, fn)), (
+            "tst_transportroads walks another %s than main.qml has" % fn)
+
+    asked = ("TransportLogic.skipRoad(_nowPlays, _pausedFile, playMusic.playbackState === MediaPlayer.PausedState, "
+             "playMusic.seekable);")
+    dispatch = flat(_function_body(main, "_mprisDispatch"))
+    state = flat(_function_body(main, "_mprisWriteState"))
+    assert "var road = " + asked in dispatch and "var road = " + asked in state, (
+        "the dispatch and what the desk is told are answered from different facts")
+    assert main.count("TransportLogic.skipRoad(") == 2
+    moved = ('var to = road === "skip" ? TransportLogic.deskNeedle(cmd, playMusic.position, playMusic.duration) : -1; '
+             "if (to >= 0) { playMusic.position = to; "
+             "if (_pausedFile !== null) _pausedFile = TransportLogic.keptAt(_pausedFile, to); _mprisQueueWrite(); }")
+    assert moved in dispatch, "a needle moved from the desk leaves the kept second behind, or the desk is not told"
+    assert ('} else if (road === "station" && (cmd === "Next" || cmd === "Previous")) { '
+            "var k = TransportLogic.stationStep(cmd, lastPlay, stationsModel.count); "
+            "if (k >= 0) { lastPlay = k; refreshServer(k); }") in dispatch, (
+        "Next or Previous reaches a station on a road that does not ask whether an episode is held")
+    assert dispatch.count("refreshServer(") == 1 and "isPlaying()" not in dispatch, (
+        "the dispatch asks the player whether it plays, past the one answer")
+    for told in ('canGoNext: road === "skip" || (road === "station" && stationsModel.count > 1),',
+                 'canGoPrevious: road === "skip" || (road === "station" && stationsModel.count > 1),',
+                 'canSeek: road === "skip"'):
+        assert told in state, "the desk is told %s apart from what the dispatch does" % told.split(":")[0]
+    assert ("if (_pausedFile !== null) _pausedFile = TransportLogic.keptAt(_pausedFile, playMusic.position);"
+            in _function_body(main, "podcastSkip")), "the popup's skip buttons leave the kept second behind the needle"
+
+
+def test_one_level_is_the_listeners_own_for_every_device():
+    """What a device is told is worked out from the listener's own level, and
+    that was targetVolume(), which read the SAVED level. The save waits a
+    second after a gesture. Pair, room 60 %, widget 80 %, balance 0.5: the
+    wheel takes the widget to 20 % and the device to 0.060; inside that
+    second the room's slider goes to 50 % and the device is sent 0.200, the
+    product of the 80 (tst_volumeroad, on a copy; 0.050 is due). The
+    device's own row and an unmute inside the second went the same way.
+
+    And after the wake-up alarm on a device that plays alone, the panel's
+    wheel counted its notch from the widget's output, which the alarm does
+    not touch there: one notch down took the device from 0.200 to 0.375.
+
+    targetVolume() is the one source now, answered by TransportLogic.ownLevel
+    (tst_transportlogic): a gesture counts before it is saved, a mute is no
+    level, the alarm's level stands, and the stream is never asked. Held
+    here: targetVolume is that call; everything that works out a device's
+    level reads it; and the wheel is given it where a device plays alone."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text)
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    full = flat(_code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8")))
+    assert flat(_function_body(main, "targetVolume")).strip() == (
+        "{ return TransportLogic.ownLevel(_pendingUserVolumePct, _volumeOverridePct, "
+        "Plasmoid.configuration.defaultVolume); }"), (
+        "the listener's level is worked out past TransportLogic.ownLevel, or from the stream")
+    assert main.count("TransportLogic.ownLevel(") == 1
+    # The readers: the master's wrapper, the row's answer, a joining device's measure, the tick's re-read.
+    assert "_ownMuted, targetVolume()); }" in flat(_function_body(main, "castMaster"))
+    assert "playMusicOutput.volume, root.targetVolume(), root._ownMuted)" in full
+    assert "root._sinkMasterPct, false, false, root.targetVolume());" in flat(main)
+    assert "was, _sinkMasterPct, targetVolume()), true);" in flat(_function_body(main, "castToggleLocal"))
+    for fn in ("castMaster", "applyCastTrim", "_castTell", "castToggleLocal"):
+        body = _function_body(main, fn)
+        assert "defaultVolume" not in body and "playMusicOutput.volume" not in body, (
+            "%s works a device's level out of the saved level or the stream, past the listener's own" % fn)
+    assert "if (_casting) _castSetVolume(castMaster());" in _function_body(main, "setUserVolume")
+
+
+def test_a_balance_the_widget_works_out_may_lie_below_the_sliders_five_per_cent():
+    """A device's balance was held to 0.05..1 in five places, because 5 % is
+    where the row's slider starts. Room 10 %, widget 80 %, balance 0.1: the
+    device stands at 0.008; "This computer" is unticked, the exact balance
+    against the widget alone is 0.01, the store made it 0.05, and one notch
+    DOWN sent the device 0.038. And a balance under 0.05, had one been
+    stored, was read back as full level.
+
+    The range of what is stored is 0.001..1 now, and every place that holds
+    it agrees: TransportLogic.deviceLevel and rebalance, the engine's
+    trimOf, and its two automatic writers, the tick's store-only write and
+    the adoption, which take what TransportLogic.balanceBelow cut for them
+    and round nothing. The row's slider keeps its own 5 % and its whole per
+    cents, for network devices and local sync outputs alike."""
+    lib = (UI / "TransportLogic.js").read_text(encoding="utf-8")
+    assert lib.count('(typeof balance === "number" && balance >= 0.001 && balance <= 1) ? balance : 1;') == 2, (
+        "deviceLevel and rebalance read another range than the store holds")
+    assert "return balanceBelow(b * was / now);" in lib and "0.05" not in lib[lib.index("function rebalance("):][:700]
+    assert "return Math.max(0.001, Math.min(1, Math.floor(exact * 1e6 + 1e-3) / 1e6));" in lib, (
+        "a balance the widget works out is rounded up, or held above what was worked out")
+
+    engine = _code_only((UI / "SyncEngine.qml").read_text(encoding="utf-8"))
+    assert 'return (typeof t === "number" && t >= 0.001 && t <= 1) ? t : 1.0;' in _function_body(engine, "trimOf")
+    row = _function_body(engine, "setDeviceTrim")
+    for line in ("var f = Math.max(stored === true ? 0.001 : 0.05, Math.min(1, factor));",
+                 "if (f >= (stored === true ? 1 : 0.995)) delete m[id];",
+                 "else m[id] = stored === true ? f : Math.round(f * 100) / 100;"):
+        assert line in row, "the row's slider lost its 5 % or its whole per cents, or a stored balance is rounded: %s" % line
+    adopt = _function_body(engine, "adoptTrim")
+    assert "var f = Math.max(0.001, Math.min(1, factor));" in adopt and "if (f >= 1) return;" in adopt
+    assert "Math.round(" not in adopt, "a joining device's share is rounded again, up as often as down"
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert "if (isFinite(ratio)) sync.adoptTrim(adM[1], TransportLogic.balanceBelow(ratio));" in main
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    for key in ("balanceRow.trimKey", "castRow.uuid"):
+        at = full.index("onMoved: root.sync.setDeviceTrim(%s, value / 100)" % key)
+        assert "from: 5\n" in full[at - 400:at], "the balance slider of %s starts somewhere else than at 5 %%" % key
+    assert len(re.findall(r"setDeviceTrim\([^\n]*, true\)", full)) == 0
+
+
+def test_a_tick_on_this_computer_does_not_reinterpret_a_level_that_still_waits():
+    """What a device is told waits 400 ms, and it waits as a MASTER: the
+    balance is multiplied in when it goes out. A tick of "This computer"
+    inside that window reads the balance against another master, and the
+    timer then multiplied the old master by the new balance. Pair, room
+    50 %, balance 0.5: the wheel takes the widget to 40 %, the device is due
+    0.100, the box is unticked inside the window, and it was sent
+    0.20 x 0.25 = 0.050 (tst_volumeroad, on a copy); ticked the other way it
+    was sent 0.200.
+
+    The tick sends what waits before it changes anything: a level already
+    asked for goes out as it was asked, whoever asked, the alarm's level
+    past the room's master and a mute's zero included, and nothing has to
+    turn a waiting master into another one. Held here: the timer and the
+    tick send through the one function, and the tick does so first."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    tick = _function_body(main, "castToggleLocal")
+    assert tick.index("_castFlush();") < tick.index('var was = masterRoadOf("");') < tick.index("if (_castLocalPlay) {"), (
+        "the tick changes the balance while a level still waits to be multiplied by it")
+    assert main.count("_castFlush()") - main.count("function _castFlush()") == 2, (
+        "what waits for the devices is sent on a road besides the timer and the tick")
+    assert main.count("_pendingCastVolumePct = -1;") == 1 and main.count("_pendingCastVolumePct / 100") == 1
+
+
+def test_an_audition_counts_as_coming_until_it_sounds_or_its_ladder_has_spoken():
+    """Stop has to see a search result that is on its way to sound, and the
+    fact it was given for that was "the result's address stands". The retry
+    ladder's last word leaves the address standing, for the row's mark and
+    the Playing page's star, and nothing clears it afterwards. A result that
+    was dead for good went on counting as coming: on TransportLogic's own
+    answers the face was Stop, Play "none" and PlayPause "stop" over a
+    widget with nothing on and nothing coming, where an idle widget says
+    Play, "bare", "bare".
+
+    The end is marked by the last word itself, the one sentence the ladder
+    sets and a start or a stop clears: TransportLogic.auditionComing
+    (tst_transportlogic; tst_transportroads walks the roads through
+    transport()). The address is not cleared, so everything else that reads
+    it after a failure does what it did. Held here: the ninth fact is that
+    answer; the ladder's last word is the only thing that ever sets the
+    sentence, so no other message can end an audition that is still coming;
+    and a new result's click takes the last one's sentence down before
+    anything of the new one is on its way."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert ("readonly property bool _previewComing: TransportLogic.auditionComing(_previewUrl, _friendlyError)\n"
+            in main), "an audition is on its way for as long as its address stands, dead or not"
+    assert main.count("_previewComing") == 2 and main.count("TransportLogic.auditionComing(") == 1
+
+    said = [m.start() for m in re.finditer(r"_friendlyError\s*=[^=]", main)]
+    spoken = [at for at in said if not main[at:].startswith('_friendlyError = "";')]
+    assert len(spoken) == 1 and _owner_of(main, spoken[0])[0] == "_previewRescueAudition", (
+        "something besides the audition's last word sets the sentence that ends an audition")
+    owners = sorted(_owner_of(main, at)[0] for at in said if at not in spoken)
+    assert owners == ["previewStation", "startWithFade", "stopWithFade"], owners
+
+    click = _function_body(main, "previewStation")
+    assert click.index("stopWithFade();") < click.index('root._friendlyError = "";') < click.index("root._previewUrl = url;") \
+        < click.index("_playStation("), "the last result's word stands over the next one while it arms"
+    word = _function_body(main, "_previewRescueAudition")
+    assert "_previewUrl = " not in word, (
+        "the last word takes the address with it: the row's dead mark and the Playing page's star read it afterwards")
+
+
+def test_the_panels_right_click_menu_is_four_entries_on_the_widgets_own_roads():
+    """The panel icon's right-click menu has the big button's press, the next
+    station, mute and the sleep timer. What an entry shows is
+    TransportLogic.panelAction (tst_transportlogic) and what a click does is
+    PanelAction.qml against a stand-in (tst_panelaction). Neither test loads
+    main.qml, so held here is the list itself, that an entry only calls the
+    roads the same controls take elsewhere, and that every name it reads off
+    the widget is one the widget has: a renamed property would leave an
+    entry silently dead, which no test of the stand-in can see."""
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    flat = re.sub(r"\s+", " ", _code_only(main))
+    assert ('Plasmoid.contextualActions: [ PanelAction { kind: "key"; app: root }, '
+            'PanelAction { kind: "next"; app: root; stations: stationsModel.count }, '
+            'PanelAction { kind: "mute"; app: root }, PanelAction { kind: "sleep"; app: root } ]') in flat, (
+        "the panel's menu is not the four entries, in their order")
+    entry = _code_only((UI / "PanelAction.qml").read_text(encoding="utf-8"))
+    assert "TransportLogic.panelAction(kind, app ? {" in entry
+    for road in ('app.transport("PlayPause")', 'app._mprisDispatch("Next")', "app.setUserVolume(0)",
+                 "app.setUserVolume(app.targetVolume())", "app.startSleepTimer(sleepSeconds)", "app.cancelSleepTimer()"):
+        assert road in entry, "the menu no longer takes the road %s" % road
+    for past in ("playMusic", "refreshServer", "stopWithFade", "executable", "Plasmoid.configuration"):
+        assert past not in entry, "a menu entry reaches for %s past the roads the controls take" % past
+    read = set(re.findall(r"\bapp\.(\w+)", entry))
+    assert read == {"bigFace", "canPlay", "_podPlayingKey", "_ownMuted", "sleepRemainingSec", "_casting", "isPlaying",
+                    "transport", "_mprisDispatch", "setUserVolume", "targetVolume", "startSleepTimer", "cancelSleepTimer"}, read
+    for name in sorted(read):
+        has = re.search(r"^    (?:readonly )?property [\w<>]+ %s\b|^    function %s\(" % (name, name), main, flags=re.M)
+        assert has, "main.qml has no %s for the menu to read" % name
+
+
+def test_the_output_menus_volume_row_says_what_it_turns():
+    """On the default output the row is the system's volume and moves every
+    application's sound; it used to say "Volume" and nothing else. Which of
+    the three names applies is TransportLogic.volumeName, under its tests.
+    Held here: the caption asks that function with the row's own facts, each
+    name has its words, and the slider is announced by the same name, so a
+    screen reader's user is told what a sighted one reads."""
+    src = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    code = _code_only(src)
+    assert ("readonly property string word: TransportLogic.volumeName(root.masterRoadOf(\"\"), "
+            "root._casting, root._castLocalPlay)") in code, "the caption names the row from other facts than the row's"
+    assert ('text: word === "system" ? i18n("System volume") : (word === "device" ? i18n("Device volume") '
+            ': i18n("On Air volume"))') in code
+    row = code[code.index("id: masterVolumeSlider"):]
+    row = row[:row.index("PlasmaComponents3.Label")]
+    assert "Accessible.name: volumeCaption.text" in row, "the slider is announced by another name than the one shown"
+    assert code.index("id: volumeCaption") < code.index("id: masterVolumeSlider"), "the name stands under the row it names"
+
+
+
+def test_the_stations_factor_sits_in_one_place_and_in_no_number_a_listener_sees():
+    """Stations differ by up to 13 dB, and a loud one is turned down by a
+    factor (LoudLogic.js has the measurement). Some thirty places read and
+    write the player's volume as the listener's own level: the slider, the
+    wheel, M, MPRIS, the saved default, three fades, the calibration's mute, a
+    device's master. Had the factor gone into any of them it would have shown
+    in a slider, been saved as somebody's default or been sent to a
+    television. So the name they all use is the listener's level and nothing
+    else, and the output itself is bound to that level times the factor, in
+    one line that nobody writes. Held here: the one line, that the real
+    output has no other reader or writer, and that the factor is read
+    nowhere else in the widget."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    bound = "audioOutput: AudioOutput { id: playMusicSink; volume: playMusicOutput.volume * loudness.gain }\n"
+    assert bound in main, "the output no longer plays the listener's level times the station's factor"
+    assert main.count("AudioOutput {") == 1, "the player has a second output, or one the factor is not on"
+    assert main.count("playMusicSink") == 2, "something beside the level's own device alias reaches the real output"
+    level = main[main.index("    QtObject {\n        id: playMusicOutput\n"):]
+    level = level[:level.index("\n    }\n")]
+    for line in ("property alias device: playMusicSink.device\n", "property real volume: 1\n",
+                 "Component.onCompleted: volume = root.targetVolume()\n"):
+        assert line in level, "the listener's level lost %r" % line.strip()
+    assert "loudness" not in level and "gain" not in level, "the factor is in the listener's own level"
+    assert main.count("loudness.gain") == 1, "the factor is read a second time in main.qml"
+    for path in sorted(UI.rglob("*.qml")):
+        code = _code_only(path.read_text(encoding="utf-8"))
+        if path.name == "main.qml":
+            assert sorted(set(re.findall(r"\bloudness\.(\w+)", code))) == ["gain", "handleExec"], (
+                "main.qml asks the loudness engine for more than its factor and its exec answers")
+        elif path.name != "Loudness.qml":
+            assert "playMusicSink" not in code, "%s reaches the real output" % path.name
+            assert not re.search(r"\bloudness\.\w", code), "%s reads the station's factor" % path.name
+    assert "            volume: playMusicOutput.volume,\n" in _function_body(main, "_mprisWriteState"), (
+        "the desk is told another level than the listener's own")
+
+
+def test_the_loudness_engine_has_its_instance_its_answers_and_its_sweep():
+    """Loudness.qml asks a helper how loud a station is, in two commands,
+    and ends a reading by removing its file. Its rules are under
+    tst_loudlogic and its behaviour under tst_loudness, both against
+    stand-ins; held here is that main.qml gives it the real neighbours, that
+    a command's answer reaches it once, and that the widget's last command
+    removes whatever file a reading still had: a helper holds on to that
+    file, so with the file gone no helper outlives the widget either."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert ("Loudness { id: loudness; app: root; cfg: Plasmoid.configuration; kind: streamKind; "
+            "engine: timeshift; player: playMusic }") in main
+    route = "if (loudness.handleExec(cmd, stdout)) return;"
+    assert main.count(route) == 1, "the helper's answer has no way home, or two"
+    assert main.index("if (streamKind.handleExec(cmd, stdout)) return;") < main.index(route)
+    last = _function_body(main[main.index("Component.onDestruction:"):].replace("Component.onDestruction:", "function last()", 1), "last")
+    sweep = '+ " " + PodcastLogic.shQuote(_icyUrlFile) + ".loud* \'"'
+    assert sweep in last, "the widget's last command leaves a reading's file, and with it its helper, behind"
+    for fact in ("exec", "nextSeq", "_icyUrlFile", "_currentOrigUrl", "_previewUrl", "_podPlayingKey", "_podStarting",
+                 "_volumeOverridePct", "_wantsPlaying", "_tsPaused", "_healPendingUrl", "_healBackupFor", "recording",
+                 "_casting", "_castLocalPlay", "isPlaying", "_icyStreamTarget"):
+        has = re.search(r"^    (?:readonly )?property [\w<>]+ %s\b|^    function %s\(" % (fact, fact), main, flags=re.M)
+        assert has, "main.qml has no %s for the loudness engine to read" % fact
+    src = _code_only((UI / "Loudness.qml").read_text(encoding="utf-8"))
+    read = set(re.findall(r"\bapp\.(\w+)", src))
+    assert read == {"exec", "nextSeq", "_icyUrlFile", "_currentOrigUrl", "_previewUrl", "_podPlayingKey", "_podStarting",
+                    "_volumeOverridePct", "_wantsPlaying", "_tsPaused", "_healPendingUrl", "_healBackupFor", "recording",
+                    "_casting", "_castLocalPlay", "isPlaying", "_icyStreamTarget"}, read
+    assert "casting: app._casting, local: app._castLocalPlay," in src, (
+        "the factor no longer stands aside while a device plays along")
+    assert "readonly property bool busy: _seq >= 0 || _waitUrl !== \"\"\n" in (UI / "StreamKind.qml").read_text(encoding="utf-8")
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    switch = re.search(r'<entry name="evenLoudness" type="Bool">.*?</entry>', xml, flags=re.S)
+    assert switch and "<default>false</default>" in switch.group(0), "evening out is on unasked, or has no entry"
+    kept = re.search(r'<entry name="stationLoudness" type="String">.*?</entry>', xml, flags=re.S)
+    assert kept and "<default>{}</default>" in kept.group(0), "the readings have no config entry"
+
+
+def test_the_loudness_engine_moves_no_sound_and_writes_no_command_of_its_own():
+    """The engine's one output is a number. It starts nothing, stops
+    nothing and sets no volume: a reading that arrives late, or for a station
+    the listener has left, must not be able to do more than change that
+    number, and the number is eased while the player plays. Every command it
+    runs is built by LoudLogic, where the quoting is PodcastLogic.shQuote's
+    and under tests; and an answer is taken only for the reading in flight,
+    so one that was ended cannot write a number down or stamp a station as
+    silent."""
+    src = _code_only((UI / "Loudness.qml").read_text(encoding="utf-8"))
+    for reach in ("playMusic", ".volume", "executable", ".play()", "player.stop", "startWithFade", "setUserVolume", "targetVolume"):
+        assert reach not in src, "the loudness engine reaches for %s" % reach
+    assert set(re.findall(r"\bplayer\.(\w+)", src)) == {"source"}, "the engine asks more of the player than its source"
+    assert len(re.findall(r"(?<![\w.])cutNow\s*=[^=]", src)) == 1, "the cut is set outside _follow"
+    follow = _function_body(src, "_follow")
+    assert "cutNow = wanted;" in follow and 'property: "cutNow"' in src
+    assert "    readonly property real gain: LoudLogic.factor(cutNow)\n" in src, (
+        "the factor is no longer made of the eased cut alone")
+    assert follow.index("if (atOnce || !app || !app.isPlaying()) {") < follow.index("ease.restart();"), (
+        "the factor is eased under a silent player, or set in one step under a playing one")
+    assert "function onSourceChanged() {\n            loud._follow(true);" in src, "a new source no longer has its factor at once"
+    assert "onWantedChanged: _follow(false)\n" in src
+    for raw in ("rm -f", "printf", "python3", "umask", "replace(/'/g", "shQuote"):
+        assert raw not in src, "the loudness engine writes shell of its own: %s" % raw
+    sent = re.findall(r"app\.exec\(([^)]*)\)", src)
+    assert sorted(sent) == ["cmd", "cmds.write", "run", "sweep"], sent
+    logic = (UI / "LoudLogic.js").read_text(encoding="utf-8")
+    assert "replace(/'/g" not in logic and logic.count("PodcastLogic.shQuote") == 2, (
+        "LoudLogic quotes for the shell by hand")
+    answer = _function_body(src, "handleExec")
+    guard = "if (_seq < 0 || KindLogic.seqOf(mine) !== _seq) return true;"
+    assert answer.index(guard) < answer.index("_remember(_key, LoudLogic.answerOf(stdout));"), (
+        "an answer is written down without asking whose reading it was")
+    late = answer[answer.index('": LD_URL;"'):answer.index('if (_run === "") return true;')]
+    assert "if (_seq < 0 || wrote !== _seq) {" in late
+    assert 'LoudLogic.buildEnd(base + ".loud" + wrote, wrote)' in late, "a late write is swept by a number other than its own"
+    assert "_seq + " not in late and "_path" not in late
+    assert 'path = base + ".loud" + seq;' in _function_body(src, "_ask"), "a reading's file is no longer named by its number"
+    begin = _function_body(src, "_begin")
+    assert begin.index("if (!mayAsk) return;") < begin.index("if (_seq >= 0) {") < begin.index("if (kind && kind.busy)") \
+        < begin.index("LoudLogic.due(") < begin.index("_ask("), "a station is asked about out of turn"
+    assert src.count("_ask(") == 2 and src.count("_end()") == 4, "a reading starts or ends on a road nobody listed"
+
+
+def test_the_words_about_loudness_say_the_numbers_the_rules_use():
+    """The option's sentence and the config entry's label name twenty
+    seconds, -18 LUFS, 15 dB and five readings. Those are LoudLogic's
+    constants, which rest on a measurement; a constant changed without its
+    words would have the settings page promise one thing and the widget do
+    another. The sentence said "once" while a station was read once; it is
+    read on several days now, and at most once a day is what stays true."""
+    logic = (UI / "LoudLogic.js").read_text(encoding="utf-8")
+
+    def number(name):
+        found = re.search(r"^var %s = (-?\d+);" % name, logic, flags=re.M)
+        assert found, "LoudLogic.js names no %s" % name
+        return found.group(1)
+
+    def said(pattern, text, what):
+        found = re.search(pattern, text)
+        assert found, "%s has no words" % what
+        return found.group(1)
+
+    page = (UI / "config" / "configAppearance.qml").read_text(encoding="utf-8")
+    assert "property alias cfg_evenLoudness: evenLoudnessCheck.checked\n" in page
+    audio = page[page.index('Kirigami.FormData.label: i18n("Audio")'):page.index('Kirigami.FormData.label: i18n("Visuals")')]
+    box = audio[audio.index("id: evenLoudnessCheck"):audio.index("id: autoBitrateCheck")]
+    assert 'text: i18n("Even out loudness between stations")' in box
+    words = said(r'QQC2\.Label \{\s*text: i18n\("([^"]+)"\)', box, "the option")
+    assert "for %s seconds" % number("LISTEN_S") in words and "on this computer" in words, words
+    assert "at most once a day" in words and "listened to once" not in words, words
+    assert number("RETRY_S") == "86400", "a day is no longer what lies between two readings"
+    assert words.count(".") == 1 and words.endswith("."), "the option is explained in more than one sentence"
+    xml = (ROOT / "package" / "contents" / "config" / "main.xml").read_text(encoding="utf-8")
+    label = said(r'<entry name="evenLoudness" type="Bool">\s*<label>([^<]+)</label>', xml, "the option's entry")
+    for part in ("louder than %s LUFS" % number("TARGET_LUFS"), "by %s dB at most" % number("MAX_CUT_DB"),
+                 "for %s seconds" % number("LISTEN_S"), "none is turned up", "at most once a day",
+                 "until %s readings are kept" % number("KEEP")):
+        assert part in label, "the entry's label no longer says %r" % part
+    kept = said(r'<entry name="stationLoudness" type="String">\s*<label>([^<]+)</label>', xml, "the readings' entry")
+    assert "At most %s addresses" % number("CAP") in kept and "up to %s readings" % number("KEEP") in kept
+
+
+# ───────────────────────── the sliding buffer (2026.44) ─────────────────────
+#
+# An MP3 or AAC station's pause buffer is a folder of two-second segments and
+# the player is handed a list of them. Measured on Qt 6.12 with FFmpeg 9: a
+# player stopped on a list whose reader has run out of segments returns from
+# stop() and then holds the whole widget until the list grows; with the
+# source cleared first it lets go in 4 to 13 ms. What main.qml owes that
+# road cannot be called by a test, so it is pinned here as text.
+
+
+def test_a_device_that_refused_the_stream_is_not_cast_to():
+    """"Casting" was raised when the play command went out and nothing took
+    it down: a Ruark R5se that refused two stations (UPnP 716, 2026-11-11)
+    left "Casting to Ruark R5se" over a silent room for more than four
+    minutes. Who was asked and who answered is CastLogic (tst_castlogic);
+    tst_castroads walks main.qml's own cast functions through the refusals,
+    and its copy is held here to main.qml's text word for word. Held as
+    well, because the copy cannot see them: every play answer goes to
+    _castAnswer, every play command is recorded as an attempt, the flag is
+    raised and lowered in one place each, an unticked device leaves the
+    record, and the footer names the refusal while nothing sounds here.
+
+    Two more roads, met the same evening. With a television playing and
+    the Ruark refused, unticking the television left the flag up over an
+    empty record and "Casting to Ruark R5se" came back: the flag follows
+    the record now, also when ticks are still up. And the refusal's name
+    outlived the attempt it was about: a file from My Music played and
+    paused afterwards read "Could not cast to Ruark R5se" where it should
+    read "Paused". The name is not kept when the station sounds here, and
+    the player being handed something else, or starting, takes it down (it
+    is only ever kept over silence, so the handler need not ask which way
+    the player moved)."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    copy = _code_only((TESTS / "qml" / "tst_castroads.qml").read_text(encoding="utf-8"))
+    for fn in ("_castEnd", "_castPlayOn", "_castPlay", "_castAnswer", "castToggleDevice", "castDisconnect", "castRefused"):
+        assert flat(_function_body(main, fn)) == flat(_function_body(copy, fn)), (
+            "tst_castroads walks another %s than main.qml has" % fn)
+
+    assert main.count('if (cmd.indexOf(": CAST_PLAY;") === 0) { root._castAnswer(cmd, stdout); return; }') == 1, (
+        "a play command's answer is read past _castAnswer")
+    assert main.count("_castAnswer(") == 2, "_castAnswer is called from somewhere the record does not know"
+
+    asked = flat(_function_body(main, "_castPlayOn"))
+    assert main.count('_castExec("CAST_PLAY"') == 2 and asked.count('_castExec("CAST_PLAY"') == 2, (
+        "a play command goes out past _castPlayOn, so its answer would find nobody waiting")
+    assert asked.endswith('_castSession = CastLogic.tried(_castSession, dev.uuid, _execSeq); _castFailedName = ""; }'), (
+        "a device is asked to play without the attempt being recorded")
+
+    assert len(re.findall(r"\b_casting = false\b", main)) == 1 and "_casting = false;" in _function_body(main, "_castEnd"), (
+        "the casting flag is lowered past _castEnd, which also ends the record")
+    assert len(re.findall(r"\b_casting = true\b", main)) == 1 and "_casting = true;" in _function_body(main, "_castPlay")
+
+    toggle = flat(_function_body(main, "castToggleDevice"))
+    assert '_castSession = CastLogic.left(_castSession, dev.uuid); _castFailedName = "";' in toggle, (
+        "an unticked device stays in the record and its late answer is believed")
+    assert toggle.index("CastLogic.left(") < toggle.index("if (!CastLogic.carried(_castSession)) _castEnd();") < toggle.index(
+        "if (targets.length === 0) {"), "the flag is asked about the ticks, not about who still carries the stream"
+
+    heard = 'root._castFailedName = "";'
+    for handler, end in (("onSourceChanged: {", "onErrorOccurred:"), ("onPlayingChanged: {", "_mprisQueueWrite()")):
+        edge = main[main.index(handler):]
+        assert heard in edge[:edge.index(end)], "the player's %s leaves a device's old refusal standing" % handler[:-3]
+        assert "%s %s }" % (handler, heard) in copy, "tst_castroads no longer says what main.qml's player says in %s" % handler[:-3]
+
+    face = flat(_code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8")))
+    word = ('if (root._casting || (root._castFailedName !== "" && !isPlaying())) { return root._casting '
+            '? i18n("Casting to %1", root._castName) '
+            ': root._castFailedRefused ? i18n("%1 cannot play this station", root._castFailedName) '
+            ': i18n("Could not cast to %1", root._castFailedName) }')
+    assert word in face, "the footer does not say that the device refused, or says it of one that could not be reached"
+    assert word in flat(copy), "tst_castroads reads another footer than the popup shows"
+
+
+def _flat(text: str) -> str:
+    return re.sub(r"\s+", " ", text)
+
+
+def test_a_pause_inside_the_sliding_buffer_lets_the_player_go_source_first():
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(src, "timeshiftPause")
+    assert "if (!timeshift.parkInPlace()) playMusic.pause();" in body, (
+        "a pause inside the buffer no longer asks the engine whether it is on a list")
+    assert ('else { root._tsPaused = true; alarmEngine.standDown(); playMusic.source = ""; playMusic.stop(); }'
+            in body), (
+        "the park inside a list no longer clears the source before the stop: stopped "
+        "first, a reader that has run dry holds the widget until the list grows")
+    assert body.index("timeshift.parkInPlace()") < body.index("if (_casting || _podPlayingKey"), (
+        "the shifted branch is no longer the first answer of the pause")
+    # A new open and a new start leave a list the same way round they always
+    # did, in one turn of the loop, which the reader survives (6 to 150 ms).
+    for owner in ("tsPlayBuffer", "startWithFade"):
+        assert 'playMusic.stop(); playMusic.source = "";' in _flat(_function_body(src, owner)), (
+            "%s no longer clears the source right after the stop" % owner)
+
+
+def test_the_player_is_asked_about_a_list_before_it_is_sought():
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    line = "if (timeshift.sourceLoaded(playMusic.seekable, playMusic.duration)) playMusic.position = seekMs;"
+    assert src.count(line) == 1, "the pending seek no longer goes through the engine's one check"
+    assert "playMusic.position = root._tsPendingSeekMs" not in src, (
+        "a pending seek is made without asking whether this player can search a list")
+    # The raw text here: _code_only cuts a line at the "//" of "file://".
+    fell = ('if (playMusic.source.toString() === "file://" + timeshift.bufPath '
+            "&& timeshift.listPlaybackFell(Date.now())) return;")
+    assert src.count(fell) == 1, "a player error on a list no longer goes to the engine"
+    at = src.index("onErrorOccurred: {")
+    handler = src[at:at + 6000]
+    assert handler.index("if (fadeOutAnimation.running) return;") < handler.index(fell) < handler.index("healTimer.restart()"), (
+        "the list's error is no longer taken after Stop's fade and before the heal ladder")
+
+
+def test_how_far_behind_is_read_off_the_engine():
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert ("function tsBehindText(posMs) { return timeshift.behindText(_tsPaused ? timeshift.shiftPosMs : posMs, Date.now()); }"
+            in src), "the pill no longer reads the engine's clock"
+    assert "behindLiveMs" not in src, "main.qml does the single file's sum itself again"
+    assert "function tsKnownKind(url) { return streamKind.known(url); }" in src, (
+        "the engine can no longer ask what StreamKind learnt of an address")
+    assert "var pos = timeshift.pauseGesture(Date.now(), playMusic.position);" in _function_body(src, "timeshiftPause"), (
+        "a pause no longer tells the engine where the player is: the park would be "
+        "the writer's clock, which ran 4.2 s ahead of the sound on the bench")
+    assert "timeshift.noteLivePlayback(Date.now());" in _function_body(src, "startWithFade"), (
+        "a start that keeps its buffer no longer dates the player's new beginning")
+    eng = (UI / "TimeshiftEngine.qml").read_text(encoding="utf-8")
+    # goneMs: the broadcast goes on after a capture has ended, and the pill
+    # reads the distance to it, not to the end of what was kept.
+    assert ("if (slide) return SlideLogic.clockText(SlideLogic.behindMs(runMs + goneMs - liveLagMs, shifted ? placeMs : shiftPosMs));"
+            in _function_body(eng, "behindText"))
+
+
+def test_the_sleep_timer_ends_a_park_in_the_sliding_buffer():
+    """The single file's writer ends by its window's cap. The segment writer
+    has none: a park left over a night would be cut and deleted until Stop."""
+    src = (UI / "main.qml").read_text(encoding="utf-8")
+    assert ("if (isPlaying() || _casting || _wantsPlaying || (root._tsPaused && timeshift.slide)) stopWithFade();"
+            in src), "the sleep timer's end leaves a park in the sliding buffer recording"
+
+
+def test_the_engine_leaves_a_list_by_its_own_clock_and_stops_through_the_folders_own_command():
+    eng = (UI / "TimeshiftEngine.qml").read_text(encoding="utf-8")
+    beat = _function_body(eng, "_beat")
+    assert "if (SlideLogic.mustLeave((listLast + 1) * SlideLogic.SEG_MS, placeMs)) {" in beat, (
+        "the engine no longer leaves a list before its reader runs dry")
+    assert beat.index("SlideLogic.mustLeave(") < beat.index("backToLive("), "leaving a list is no longer a return to live"
+    assert "if (app.isPlaying()) placeMs += heard;" in beat, "the place moves while the player is silent"
+    assert "if (writerUp) runMs += ran;" in beat, "the writer's clock runs on after the writer ended"
+    for other in ("Date.now()", "player.position", "playMusicRef"):
+        assert other not in _code_only(beat), "the beat reads %s instead of the clock it is handed" % other
+    stop = _function_body(eng, "disarm")
+    assert stop.index("SlideLogic.buildStop(") < stop.index("TimeshiftLogic.buildStopCommand("), (
+        "a cutting arm is no longer stopped by the command that takes its lists first")
+    assert "var looks = !isRelay && !slideOff && _slideDead[url] !== true" in _function_body(eng, "armCommon"), (
+        "the fallback is no longer remembered for the session, or for the station whose writer ended")
+    fell = _function_body(eng, "_slideFell")
+    assert fell.index("slideOff = true;") < fell.index("disarm()") < fell.index("app.tsPlayLive(live)"), (
+        "the fallback no longer gives the road up before it plays the broadcast")
+    at = eng.index("id: tsHorizonWatch")
+    assert "running: engine.shifted && !engine.slide" in eng[at:at + 200], (
+        "the single file's watchdog runs over a list, whose position stands still by design")
+
+
+def test_a_step_is_a_pause_and_a_play_through_the_one_door():
+    """Thirty seconds back from the broadcast is a park and a resume with the
+    park moved in between. Both go through transport(), so that a step takes
+    down and puts up exactly what a pause and a play do: the recovery timers,
+    the standing order, the wake-up. A step that parked on its own would be a
+    second pause to keep in step with the first."""
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    body = _function_body(main, "timeshiftStep")
+    guard = "if (live && (ms > 0 || !tsPauseAvailable || !isPlaying())) return;"
+    assert guard in body, (
+        "a step from the broadcast is taken where the pause would be a stop, or forward, where there is nothing ahead")
+    order = [body.index(guard), body.index('if (live) transport("Pause");'),
+             body.index("timeshift.stepGesture(ms, Date.now())"), body.index('transport("Play")')]
+    assert order == sorted(order), "the step no longer parks, moves the park and plays, in that order"
+    assert 'if (timeshift.stepGesture(ms, Date.now()) && live) transport("Play");' in body, (
+        "a step the engine refused is played anyway, or a step inside the buffer is played twice")
+    for road in ("timeshiftPause(", "timeshiftResume(", "playMusic.", "startWithFade(", "tsPlayLive(", "tsPlayBuffer("):
+        assert road not in body, "the step goes round transport() through %s" % road
+    assert main.count("timeshiftStep(") == 1, "something in main.qml steps on its own: a timer, a key, the desk"
+    callers = []
+    for path in sorted(UI.rglob("*.qml")):
+        if path.name != "main.qml":
+            callers += [(path.name, line.strip()) for line in path.read_text(encoding="utf-8").split("\n")
+                        if "timeshiftStep(" in line]
+    assert callers == [("FullRepresentation.qml", "onStep: (ms) => root.timeshiftStep(ms)")], callers
+
+
+def test_the_steps_are_offered_where_a_sliding_buffer_can_take_them():
+    main = _flat((UI / "main.qml").read_text(encoding="utf-8"))
+    assert ('readonly property bool tsStepReady: timeshift.steppable && !_casting && _podPlayingKey === "" '
+            "&& (tsPauseAvailable || timeshift.shifted || _tsPaused)") in main, (
+        "the steps are offered over a cast, an episode or a buffer no open can land in")
+    full = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    assert full.count("ShiftPill {") == 1 and "tsPill" not in full, "the Playing page has two pills, or the old one"
+    at = full.index("ShiftPill {")
+    pill = full[at:at + 700]
+    for line in ("shifted: root.tsShifted", "parked: root._tsPaused", "stepReady: root.tsStepReady",
+                 "behindOf: function() { return root.tsBehindText(playMusic.position) }",
+                 "onLive: root.timeshiftBackToLive()", "onStep: (ms) => root.timeshiftStep(ms)"):
+        assert line in pill, "the pill is no longer told %r" % line
+    # Whether the page is on screen is told by whatever the page itself goes
+    # by; only that the pill is told is held here, not in which words.
+    assert re.search(r"\n\s+open: root\.\w+\n", pill), "the pill is no longer told whether its page is shown"
+
+
+def test_the_face_asks_whether_it_is_on_screen_in_one_place():
+    """The face priced its animations and timers by root.expanded, which is
+    Plasma's popup and nothing else, in 21 places over four files. In a
+    window of its own it would have stood still, and kept running in a
+    popup that only holds a placeholder. They all read root.faceShown, and
+    the one rule behind it is WindowLogic.faceShown (tst_windowlogic), fed
+    by the window house with the popup's state; the panel icon still writes
+    expanded, because the popup is what a click on it opens."""
+    for path in sorted(UI.rglob("*.qml")):
+        if path.name in ("main.qml", "CompactRepresentation.qml"):
+            continue
+        assert "root.expanded" not in path.read_text(encoding="utf-8"), (
+            "%s asks Plasma's popup whether the face is on screen" % path.name)
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert "    readonly property bool faceShown: playerWindow.faceShown\n" in main, (
+        "main.qml answers for itself whether the face is on screen")
+    assert re.findall(r".*\bexpanded\b.*", main) == [
+        "        popupOpen: root.expanded; planar: root.planar; cfg: Plasmoid.configuration; hovered: root.faceHovered"], (
+        "main.qml reads the popup's state somewhere besides the line that hands it to the window house")
+    house = (UI / "PlayerWindow.qml").read_text(encoding="utf-8")
+    assert "    readonly property bool faceShown: WindowLogic.faceShown(popupOpen, visible)\n" in house, (
+        "the house no longer asks the tested rule, or asks it about something other than its own visibility")
+    assert "root.faceShown" in (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+
+
+def test_the_popup_is_given_a_seat_and_the_house_builds_one_face():
+    """Plasma parents, sizes and focuses whatever main.qml names as the full
+    representation. That item is the seat (PopupFace.qml), so the face is
+    free to sit in the window instead. The face is built by the window house
+    (PlayerWindow.qml), which lives as long as the applet; tst_playerwindow
+    holds how the two seats take it in turn. Two faces would be two search
+    fields, two sets of probes and two key handlers on one player, and two
+    houses two windows, so main.qml names one of each and nobody else any."""
+    main = _no_comments((UI / "main.qml").read_text(encoding="utf-8"))
+    assert main.count("fullRepresentation:") == 1 and "    fullRepresentation: PopupFace { house: playerWindow }\n" in main, (
+        "Plasma's popup is handed something other than the seat, or the seat no house")
+    assert len(re.findall(r"\bFullRepresentation \{", main)) == 1, "main.qml builds no face, or more than one"
+    assert len(re.findall(r"\bPlayerWindow \{", main)) == 1 and "        id: playerWindow\n" in main
+    assert "        face: FullRepresentation { anchors.fill: parent; focus: true }\n" in main, (
+        "the face no longer fills its seat, or no longer takes the keyboard the seat hands it")
+    for path in sorted(UI.rglob("*.qml")):
+        if path.name == "main.qml":
+            continue
+        code = _no_comments(path.read_text(encoding="utf-8"))
+        assert not re.search(r"\b(PlayerWindow|FullRepresentation|PopupFace) \{", code), (
+            "%s builds a face, a seat or a window house of its own" % path.name)
+
+
+def test_the_headers_corner_moves_the_face_and_keeps_the_pin():
+    """FullRepresentation.qml cannot be driven in a test. The corner's two
+    buttons are SeatButtons.qml, under tst_seatbuttons; this pins what the
+    face tells them and what their two signals do. The window button flips
+    the house's wish, which is the one thing that moves the face; the pin
+    writes the config key main.qml's hideOnWindowDeactivate reads."""
+    full = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    assert full.count("SeatButtons {") == 1 and "pinButton" not in full
+    at = full.index("SeatButtons {")
+    corner = full[at:full.index("}", at)]
+    for line in ("planar: root.planar", 'inWindow: playerWindow.seat === "window"', "pinned: Plasmoid.configuration.pin",
+                 "onPinToggled: (on) => Plasmoid.configuration.pin = on",
+                 "onMoveAsked: playerWindow.detached = !playerWindow.detached"):
+        assert line in corner, "the corner is no longer told %r" % line
+    assert "anchors.rightMargin: Kirigami.Units.smallSpacing * 1.5 + seatButtons.width\n" in full, (
+        "the heading runs under the corner's buttons")
+    assert full.count("playerWindow.detached") == 2, "something else in the face moves it between its seats"
+    assert "    hideOnWindowDeactivate: !Plasmoid.configuration.pin\n" in (UI / "main.qml").read_text(encoding="utf-8")
+
+
+def test_the_windows_three_keys_start_as_no_window_and_no_size():
+    """The house keeps three config keys (tst_playerwindow drives it with a
+    stand-in config): whether the face was in the window, and the window's
+    width and height. The names it reads have to be the names the schema
+    declares, or the wish and the size are forgotten at every restart with
+    nothing to say why. A fresh install starts in the popup, and 0 is the
+    size nobody has chosen yet (WindowLogic.sizeFor falls back to the
+    face's own wish)."""
+    xml = (UI.parent / "config" / "main.xml").read_text(encoding="utf-8")
+    house = _code_only((UI / "PlayerWindow.qml").read_text(encoding="utf-8"))
+    for key, kind, default in (("detached", "bool", "false"), ("windowWidth", "Int", "0"), ("windowHeight", "Int", "0")):
+        head = '<entry name="%s" type="%s">' % (key, kind)
+        assert xml.count(head) == 1, "the schema has no %s, or two" % key
+        entry = xml[xml.index(head):]
+        assert "<default>%s</default>" % default in entry[:entry.index("</entry>")], (
+            "a fresh install starts with %s set" % key)
+        assert "cfg.%s" % key in house, "the house no longer reads or writes %s" % key
+    assert set(re.findall(r"\bcfg\.(\w+)", house)) == {"detached", "windowWidth", "windowHeight"}, (
+        "the house touches a config key this test does not know")
+
+
+def test_the_faces_tooltips_are_drawn_in_the_window_the_face_is_in():
+    """PlasmaCore.ToolTipArea shows its tip as a window of its own and places
+    it by the item's position inside its window, read as a place on the
+    screen. That is right in Plasma's popup; in the player's own window the
+    Stop button at (800, 686) got its tip at (162, 473). Every tip of the
+    face is a PlasmaComponents3.ToolTip now, drawn inside whichever window
+    the face sits in (the round button's is under tst_buttontip). The panel
+    icon keeps its ToolTipArea: it never leaves the panel.
+
+    A row's own tip stands back while the pointer is on one of the row's
+    buttons, or the two tips would lie on top of each other; the old kind
+    showed one at a time by itself."""
+    users = sorted(path.name for path in UI.rglob("*.qml")
+                   if "ToolTipArea {" in _no_comments(path.read_text(encoding="utf-8")))
+    assert users == ["CompactRepresentation.qml"], "a ToolTipArea in the face: %s" % users
+    full = _flat((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    for tip in ("PlasmaComponents3.ToolTip { visible: webHover.hovered && !webStar.pointed text: webItem.isPreviewing",
+                "PlasmaComponents3.ToolTip { visible: histHover.hovered && !histGet.pointed && !histDrop.pointed text: i18n(",
+                'PlasmaComponents3.ToolTip { text: i18n("Playback speed — tap to change") }',
+                'PlasmaComponents3.ToolTip { text: i18n("Results are limited to %1 — tap to search everywhere again", '
+                "fullRepresentation.webScopeName) }"):
+        assert tip in full, "the face lost a tip, or a row's tip no longer stands back for its buttons: %r" % tip[:60]
+    for ident in ("id: webStar", "id: histGet", "id: histDrop"):
+        assert full.count(ident) == 1, ident
+
+
+def test_a_pause_a_window_old_ends_the_capture_and_the_footer_says_what_is_true():
+    """2026.44: a parked station's writer used to run until Stop. It ends when
+    the pause is about to leave the window, what was cut stays, and the
+    footer stops saying that live radio is being buffered."""
+    eng = (UI / "TimeshiftEngine.qml").read_text(encoding="utf-8")
+    beat = _function_body(eng, "_beat")
+    ends = ('if (slide && writerUp && !shifted && _stage === "" '
+            "&& SlideLogic.parkEndsCapture(shiftPosMs, runMs, keepMs)) _endCapture();")
+    assert ends in beat, "a parked place is pushed out of the window again, or a listener inside the buffer loses its writer"
+    assert "else if (slideFrozen) goneMs += ran;" in beat, "the pill of a buffer that no longer grows stands still"
+    assert beat.index("if (writerUp) runMs += ran;") < beat.index(ends) < beat.index("if (!slide || !shifted) return;"), (
+        "the park is looked at before the clock has moved, or only for a listener inside the buffer")
+    end = _function_body(eng, "_endCapture")
+    order = [end.index("SlideLogic.buildEnd("), end.index("writerUp = false;"), end.index("slideFrozen = true;")]
+    assert order == sorted(order), "the capture's end no longer signals the writer and keeps the folder for the park"
+    for gone in ("disarm(", "buildStop(", "reset("):
+        assert gone not in end, "the capture's end takes the buffer away (%s): Play would have nothing to come back to" % gone
+    assert "keepMs = SlideLogic.listSize(windowMin) * SlideLogic.SEG_MS;" in _function_body(eng, "armCommon"), (
+        "the engine no longer knows how much its folder keeps")
+    main = (UI / "main.qml").read_text(encoding="utf-8")
+    assert "readonly property bool tsBuffering: _tsPaused && timeshift.writerUp" in main
+    full = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    assert full.count('i18n("Paused — still buffering live radio")') == 1 and "keeps recording" not in full, (
+        "the footer calls the buffer a recording, which is the word for files the listener keeps")
+
+
+def test_the_picture_a_device_is_sent_is_chosen_in_one_place():
+    """A station's start sent station.favicon, the list icon. One station's
+    was measured on 2026-11-11: a JPEG of 32 by 32 pixels, 1010 bytes,
+    stretched over a television. The other road, _castArt, gave up when its
+    first candidate was no http(s) address instead of trying the next.
+
+    Which picture goes out is CastLogic.picture (tst_castlogic). What
+    main.qml owes it is that every stream sent to a device asks it, and is
+    handed only what belongs to that stream: the episode's cover while the
+    episode is the source, and at a station's start the cover on screen only
+    when the station starting is the one already on. A switch to another
+    station finds the previous station's track still up there.
+    """
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    art = flat(_function_body(main, "_castArt"))
+    assert "&& playMusic.source.toString() === _podPlayingUrl;" in art, (
+        "an episode's cover is cast without asking whether the episode is what plays")
+    assert art.endswith('return CastLogic.picture(isPod ? _podPlayingArt : "", trackArtUrl, currentStationFavicon); }'), (
+        "_castArt chooses the picture itself again")
+
+    start = flat(_function_body(main, "startWithFade"))
+    assert ('_castPlay(castUrl, station.name || "", CastLogic.picture("", station.name === root.currentStation '
+            '? root.trackArtUrl : "", station.favicon));') in start, (
+        "a station's start sends its devices a picture CastLogic.picture did not choose, "
+        "or a cover that belongs to the station before it")
+
+    sent = re.findall(r"\b_castPlay(?:On)?\((?!dev, url, name, art\) \{|url, name, art\) \{)[^;]*;", flat(main))
+    assert len(sent) == 4, "a stream is sent to a device from a place this test does not know: %r" % sent
+    own = "_castPlayOn(_castTargets[i], url, name, art);"
+    assert sorted(s for s in sent if s != own) == sorted(s for s in sent if "_castArt()" in s or "CastLogic.picture(" in s), (
+        "a stream goes to a device with a picture nobody chose")
+    assert main.count("CastLogic.picture(") == 2 and main.count("_castArt()") == 3
+
+
+def test_the_cover_answers_a_click_without_asking_the_network():
+    """The cover on the Playing page shows itself larger on a click and
+    carries the links for the artist on air. What it does is CoverTouch
+    (tst_covertouch) and MusicLinks (tst_musiclinks); what the page owes
+    them is pinned here.
+
+    The larger picture is a second Image, and Qt hands two Images one
+    decoded picture only when address, size and fill mode all agree.
+    Measured against a counting server: PreserveAspectFit beside a cover
+    read with PreserveAspectCrop fetched the picture twice
+    (test_cover_larger_fetch runs that measurement; these lines say what
+    it hangs on). Neither Image names a fill mode now: asked to crop or
+    fit, Qt enlarges a small picture to the source size while it reads it
+    (measured in Qt 6.12: a PNG of 32 by 32 came back as 600 by 600), and
+    the larger view could not keep a 32-pixel logo from being drawn at 600.
+    Read as it is, the picture says its own size, which the page hands on.
+    A link is opened by the listener's click and
+    in one place, and neither file asks the network for anything itself. An
+    episode's title line names a show, not an artist, so a podcast gets no
+    links.
+    """
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    face = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    touch = _code_only((UI / "CoverTouch.qml").read_text(encoding="utf-8"))
+    links = _code_only((UI / "MusicLinks.js").read_text(encoding="utf-8"))
+
+    assert ('CoverTouch { anchors.fill: parent face: fullRepresentation accent: root.accent '
+            'art: artImage.status === Image.Ready ? artImage.source : "" '
+            'natural: artImage.natural '
+            'kind: fullRepresentation._bestArtUrl === root.albumArtUrl ? root.albumArtKind : "" '
+            'corner: playingEq.visible ? playingEq.width + Kirigami.Units.smallSpacing * 3 : 0 '
+            'trackArtist: fullRepresentation._podcastPlaying ? "" : root.trackArtist '
+            'station: root.currentStation }') in flat(face), (
+        "the cover is no longer handed the picture the page shows, its size and what it is of, "
+        "or an episode's show is offered as an artist")
+    assert face.count("CoverTouch {") == 1
+
+    # Both are CoverImage with the page's address and nothing that changes how it is asked for.
+    cover = face[face.index("id: artImage"):]
+    cover = flat(cover[:cover.index("onStatusChanged")])
+    larger = touch[touch.index("id: largerImage"):]
+    larger = flat(larger[:larger.index("}")])
+    assert flat(face).count("CoverImage { id: artImage anchors.fill: parent anchors.margins: 1 "
+                            "source: fullRepresentation._bestArtUrl visible: status === Image.Ready") == 1, (
+        "the page's cover is no longer the shared cover picture")
+    assert flat(touch).count("CoverImage { id: largerImage ") == 1 and larger.endswith(
+            'height: touch.natural.height * by source: touch.larger ? touch.art : ""'), (
+        "the larger view no longer shows the cover's own picture")
+    for own in ("sourceSize", "fillMode", "asynchronous"):
+        assert own not in cover and own not in larger, (
+            "the cover or its larger view sets %s itself: asked for differently, the picture is fetched twice" % own)
+    picture = _code_only((UI / "CoverImage.qml").read_text(encoding="utf-8"))
+    assert "fillMode: cover._box.width > 0 ? Image.PreserveAspectCrop : Image.Stretch\n" in picture, (
+        "a raster is read with a fitting mode again, which enlarges a small picture as it is read")
+    assert "sourceSize: cover._box.width > 0 ? Qt.size(cover._box.width, cover._box.height) : Qt.size(600, 600)\n" in picture, (
+        "the picture is no longer read inside the source size")
+    # The one read whose size follows the picture's shape: 16 pixels on the short side, and Qt refuses a long side over 65535.
+    assert picture.count("sourceSize:") == 2 and "id: sketch visible: false" in flat(picture) and (
+        "fillMode: Image.PreserveAspectCrop sourceSize: Qt.size(16, 16) asynchronous: true }") in flat(picture), (
+        "the copy a drawing's shape is read off is no longer a small one")
+    # A picture that fails to load is remembered, so the next candidate gets its turn (CoverLogic.marked, tst_coverlogic).
+    failed = face[face.index("id: artImage"):]
+    failed = flat(failed[:failed.index("id: vinyl")])
+    assert ('if (status === Image.Error && source.toString() !== "") { fullRepresentation._brokenArtUrls = '
+            'CoverLogic.marked(fullRepresentation._brokenArtUrls, source.toString())') in failed, (
+        "a cover that failed to load is no longer set aside for the next candidate")
+    assert 'source: touch.larger ? touch.art : ""' in larger, "the larger cover shows something other than the cover's picture"
+
+    assert touch.count("Qt.openUrlExternally(") == 1 and (
+        "property var open: function(address) { Qt.openUrlExternally(address) }") in touch, (
+        "an address is opened past the one door the tests can stand in")
+    assert flat(touch).count("touch.open(") == 1 and "if (address !== \"\") touch.open(address)" in touch
+    for name, src in (("CoverTouch.qml", touch), ("MusicLinks.js", links), ("CoverImage.qml", picture)):
+        assert "XMLHttpRequest" not in src and "executable" not in src, "%s asks for something by itself" % name
+    # Read from the file as it is: stripped of comments, an address loses everything from its two slashes on.
+    assert re.findall(r'"(https?://[^"]*)"', (UI / "MusicLinks.js").read_text(encoding="utf-8")) == [
+        "https://www.last.fm/search/artists?q=", "https://www.discogs.com/search/?type=artist&q="], (
+        "MusicLinks builds an address this test does not know")
+
+
+def test_the_level_is_asked_at_full_rate_only_while_somebody_is_at_the_face():
+    """Every tick of the level poll is a shell asking the sound server. A
+    popup pays for it only while it is open, and a desktop face only under
+    the pointer; the player's own window was on screen and so "watched" all
+    day, minimised or not: 1800 shells an hour beside other work. What
+    counts as somebody being there is WindowLogic.watched (tst_windowlogic),
+    asked by the window house (tst_playerwindow); main.qml cannot be driven
+    in a test, so this pins that the poll, the output menu's Bluetooth beat
+    and the catch-up on arrival all go by that one answer."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    poll = main[main.index("id: sinkMasterPoll"):main.index("function setSinkMaster(")]
+    assert "interval: playerWindow.faceWatched ? 2000 : 30000\n" in poll, (
+        "the level poll's rate goes by something other than somebody being at the face")
+    assert "onFaceHoveredChanged" not in main and main.count("sinkMasterPoll.restart()") == 1, (
+        "the poll is re-armed from somewhere besides the arrival")
+    assert "        onArrived: if (sinkMasterPoll.running) sinkMasterPoll.restart()\n" in main, (
+        "somebody arriving at a window or a desktop face waits up to half a minute for the slider to catch up")
+    assert "hovered: root.faceHovered\n" in main, "the house is not told where the pointer is"
+    house = (UI / "PlayerWindow.qml").read_text(encoding="utf-8")
+    assert "    readonly property bool faceWatched: WindowLogic.watched(seat, planar, popupOpen, hovered, active)\n" in house, (
+        "the house answers past the tested rule, or about another window's keyboard")
+    assert "    onFaceWatchedChanged: if (faceWatched && WindowLogic.standing(seat, planar)) arrived()\n" in house
+    full = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    assert "running: castMenu.opened && root.faceShown\n" in full
+    assert "interval: playerWindow.faceWatched ? 5000 : 15000\n" in full, (
+        "an output menu left open in a window nobody is at asks about Bluetooth every five seconds")
+    assert "root.faceHovered" not in full.replace("root.faceHovered = ", ""), (
+        "the face reads the pointer by itself where the house's answer was meant")
+
+
+def test_the_output_box_is_the_tested_one_and_only_a_pick_moves_the_sound():
+    """With a Bluetooth and a USB speaker connected, the group of all
+    outputs was switched off and on again: sound and config came back to
+    the group and the box went on reading "System default output" for more
+    than a minute. A ComboBox puts itself on its first row whenever its
+    model is replaced, and the face worked the row out in a binding that
+    sometimes ran before that. The box is OutputBox.qml now (the row's rule
+    in OutputLogic.js, both under tests with a list that changes); this pins
+    what the face hands it and that the one road from the box to the sound
+    is the listener's pick."""
+    full = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    assert full.count("OutputBox {") == 1, "the face has no output box, or two"
+    code = _no_comments(full)
+    for m in re.finditer(r"\bComboBox \{", code):
+        block = code[m.start():_balanced_end(code, m.end() - 1)]
+        assert "audioOutputs" not in block and "audioOutputDevice" not in block, (
+            "a ComboBox in the face is wired to the output list by hand again")
+    at = full.index("OutputBox {")
+    box = full[at:full.index("}", at)]
+    for line in ("visible: mediaDevices.audioOutputs.length > 1", 'firstRow: i18n("System default output")',
+                 "outs: mediaDevices.audioOutputs", 'wanted: Plasmoid.configuration.audioOutputDevice || ""',
+                 "onChosen: (id) => root.setAudioOutputDevice(id)"):
+        assert line in box, "the output box is no longer told %r" % line
+    assert full.count("setAudioOutputDevice(") == 1, "something besides the listener's pick sets the output from the face"
+    own = _code_only((UI / "OutputBox.qml").read_text(encoding="utf-8"))
+    assert own.count("chosen(") == 2 and "onActivated: (index) => chosen(OutputLogic.idAt(outs, index))" in own, (
+        "the box reports a choice the listener did not make")
+    assert "onModelChanged: currentIndex = Qt.binding(function() { return row })" in own, (
+        "the row is no longer asked again after the list has been replaced")
+
+
+def test_the_way_out_of_a_measurement_stands_where_its_button_stood():
+    """A calibration started in a smaller window left its Stop button out of
+    sight. The row that carries it stood below the caretaker's lines and the
+    two microphone switches, some 165 lines of the face further down: the
+    button that started the run went away and the one that ends it was
+    behind the scroll. The row takes the button's own place now. Its first
+    line also names the sound the run makes: it read "clicks through every
+    speaker" while the sweep nobody hears was playing."""
+    code = _no_comments((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    assert code.count('visible: root.sync.calibPhase !== ""') == 1, "the measurement's row is gone, or there are two"
+    button = code.index('text: i18n("Calibrate with the microphone")')
+    row = code.index('visible: root.sync.calibPhase !== ""')
+    stop = code.index("onClicked: root.sync.calibrateCancel()")
+    below = code.index("visible: root.sync._combineWantActive", button)
+    assert button < row < stop < below, "the row with Stop no longer stands right under the button that starts a measurement"
+    said = code[row:stop]
+    assert ': Plasmoid.configuration.syncUltrasonic !== false ? i18n("Round 1 of 2 — measuring with a tone too high to hear…")' in said, (
+        "the first round is not named after the sweep when the sweep is what plays")
+    assert ': i18n("Round 1 of 2 — clicks through every speaker…")' in said, "the first round with clicks lost its line"
+    assert 'root.sync.calibPhase !== "clicks" ? i18n("Round 2 of 2 — quiet, checking the result…")' in said, (
+        "the second round lost its line")
+
+
+def test_a_failed_cast_says_which_kind_it_was_and_names_only_who_carries_the_stream():
+    """The Ruark that refused three stations played a fourth (2026-11-12):
+    716 is its word on an address, and "Could not cast to …" over it read as
+    if the speaker were broken or off. And with a television playing beside
+    it the footer said "Casting to 2 devices", because the name was counted
+    from the ticks.
+
+    What an answer means is CastLogic.verdict, and who is named is
+    CastLogic.carriers (tst_castlogic); tst_castroads walks the words
+    through main.qml's own _castAnswer. Held here, because that copy cannot
+    see them: the name is made from the record and not from the ticks, in
+    the copy as in main.qml; every place that says "Casting to" uses that
+    name; the answer is read by verdict and by nothing else; the refusal's
+    flag is written where its name is; and the one line the answer leaves
+    in the journal is made of the fields the helper named, never of the
+    helper's words or of the command, which holds the stream's address."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = flat(_code_only((UI / "main.qml").read_text(encoding="utf-8")))
+    copy = flat(_code_only((TESTS / "qml" / "tst_castroads.qml").read_text(encoding="utf-8")))
+    face = flat(_code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8")))
+
+    name = ('readonly property string _castName: { var on = CastLogic.carriers(_castSession, _castTargets); '
+            'return on.length === 1 ? on[0].name : (on.length > 1 ? i18np("%1 device", "%1 devices", on.length) : ""); }')
+    assert name in main, "the devices are named from the ticks, so one that refused is counted as cast to"
+    assert name in copy, "tst_castroads names the devices another way than main.qml does"
+    assert main.count("CastLogic.carriers(") == 1
+    assert main.count('i18n("Casting to %1", _castName)') == 1 and main.count('"Casting to %1') == 1, (
+        "the panel's hint names devices past the one name")
+    assert face.count('i18n("Casting to %1", root._castName)') == 1 \
+        and face.count('i18n("Casting to %1 — click to choose or stop", root._castName)') == 1 \
+        and face.count('"Casting to %1') == 2, "the popup names devices past the one name"
+
+    answer = flat(_function_body(main, "_castAnswer"))
+    assert answer.startswith("{ var castWhy = CastLogic.verdict(stdout);") and main.count("CastLogic.verdict(") == 1, (
+        "a play command's answer is read past CastLogic.verdict")
+    for sentinel in ("__CAST_OK__", "__CAST_FAIL__", "__NO_PYCHROMECAST__"):
+        assert sentinel not in answer, "_castAnswer reads %s by itself" % sentinel
+    assert answer.count("console.") == 1 and 'console.warn("[ARP] cast: " + castWhy.log);' in answer, (
+        "the journal gets more of a failed cast than the fields the helper named")
+    words = ('notify(castNo ? i18n("%1 cannot play this station", castName) : i18n("Could not cast to %1", castName), '
+             'castNo ? i18n("The device refused this station\'s address. Another station may work.") '
+             ': i18n("The device could not play this station."), "dialog-error");')
+    assert words in answer, "a refusal and a device out of reach are told in the same words"
+    assert 'var castNo = castWhy.kind === "refused", castName = castWho || i18n("the device");' in answer
+    kept = 'root._castFailedName = root.isPlaying() ? "" : castWho; root._castFailedRefused = castNo; root._castEnd();'
+    assert kept in answer and main.count("_castFailedRefused = ") == 1, (
+        "the footer's name and the kind of its failure are written apart, so one can outlive the other")
+
+
+def test_a_level_is_sent_only_to_a_device_that_plays():
+    """Every ticked device was sent the widget's level: the slider, the
+    mute, the alarm's level, the room's mute. A device that refused the
+    stream stays ticked, and it may be playing something of its own. A
+    Ruark in that place, beside a television that played, went from 10 to
+    6 during a test whose commands never named it (2026-11-12).
+
+    Who may be sent a level is CastLogic.plays, and what a device still
+    being asked is owed is CastLogic.owing and answered's owed
+    (tst_castlogic). tst_castroads and tst_volumeroad walk copies of
+    main.qml's level roads. Held here: the question is asked in _castTell,
+    ahead of both commands, and every level goes out through _castTell;
+    what waits is recorded as owed after it was sent to those that play; a
+    device that takes the stream is sent what it is owed in place of
+    adopting the loudness it had, since the level asked for is the one that
+    was wanted; and the copies are main.qml's lines."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    tell = flat(_function_body(main, "_castTell"))
+    gate = "if (!CastLogic.plays(_castSession, dev.uuid)) return;"
+    assert tell.startswith("{ " + gate) and main.count("CastLogic.plays(") == 1, (
+        "a device is sent a level without being asked whether it plays the stream")
+    assert tell.count('_castExec("CAST_VOL", [') == 2 and main.count('"CAST_VOL"') == 2, "a level goes out past _castTell"
+    assert main.count("_castTell(") - main.count("function _castTell(") == 3, (
+        "a device is told a level on a road besides the timer's, its own row's and its answer's")
+
+    flush = flat(_function_body(main, "_castFlush"))
+    assert flush.endswith("_castTargets.forEach(function (dev) { _castTell(dev, _pendingCastVolumePct / 100); }); "
+                          "_castSession = CastLogic.owing(_castSession, _pendingCastVolumePct); _pendingCastVolumePct = -1; }"), (
+        "a level asked for while a device is still being asked is dropped: an alarm's level never reaches a slow device")
+    assert main.count("CastLogic.owing(") == 1
+
+    answer = flat(_function_body(main, "_castAnswer"))
+    assert ("if (castIdx >= 0 && castAns.owed >= 0) root._castTell(root._castTargets[castIdx], castAns.owed / 100); "
+            "else if (castIdx >= 0) root._castAdoptTrim(root._castTargets[castIdx]); return; }") in answer, (
+        "a device that took the stream is not sent what it is owed, or adopts its old loudness over it")
+
+    roads = _code_only((TESTS / "qml" / "tst_castroads.qml").read_text(encoding="utf-8"))
+    for fn in ("_castTell", "_castFlush", "_castSetVolume", "applyCastTrim"):
+        assert flat(_function_body(main, fn)) == flat(_function_body(roads, fn)), (
+            "tst_castroads walks another %s than main.qml has" % fn)
+    row = _code_only((TESTS / "qml" / "tst_volumeroad.qml").read_text(encoding="utf-8"))
+    for fn in ("_castTell", "_castFlush", "applyCastTrim", "castTrimActive"):
+        assert flat(_function_body(main, fn)) == flat(_function_body(row, fn)), (
+            "tst_volumeroad walks another %s than main.qml has" % fn)
+
+
+def test_a_device_that_refused_says_so_on_its_own_row():
+    """A device that refuses stays ticked, so the next station is offered to
+    it again. The tick is then all its row shows, and a Ruark that had
+    refused sat in the output menu beside a television that played with
+    nothing to tell the two apart (2026-11-12). The record keeps who
+    refused (CastLogic, tst_castlogic) until the device is asked again or
+    unticked, and tst_castroads walks that through main.qml's own
+    functions. Held here: the end of a cast keeps the marks and only "This
+    computer" drops them all; the answer hands its kind to the record; and
+    the row reads the mark for its icon and its hint while the tick goes on
+    following the selection alone."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = flat(_code_only((UI / "main.qml").read_text(encoding="utf-8")))
+    assert "function castRefused(uuid) { return CastLogic.refusedBy(_castSession, uuid); }" in main
+    assert main.count("CastLogic.refusedBy(") == 1
+    assert ('function _castEnd() { _casting = false; _castCurrentUrl = ""; '
+            "_castSession = CastLogic.ended(_castSession); }") in main, "the end of a cast forgets who refused"
+    assert main.count("CastLogic.ended(") == 1
+    assert main.count("CastLogic.fresh()") == 2 and '_castEnd(); _castSession = CastLogic.fresh(); _castFailedName = "";' in flat(
+        _function_body(main, "castDisconnect")), "a mark outlives \"This computer\", and the next tick finds it"
+    assert ('CastLogic.answered(root._castSession, castUuid, CastLogic.seqOf(cmd), castWhy.kind === "ok", castWhy.kind);'
+            in flat(_function_body(main, "_castAnswer"))), "the record is not told what kind of answer it was"
+
+    face = flat(_code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8")))
+    row = face[face.index("id: castRow"):]
+    row = row[:row.index("id: castBalanceSlider")]
+    assert "readonly property bool refused: root.castRefused(uuid) " in row
+    assert ('icon.name: castRow.refused ? "dialog-warning" : castRow.isGroup ? "audio-speakers-symbolic" : "network-wireless" '
+            "checked: castRow.isTarget ") in row, "the row of a device that refused looks like any other, or its tick follows the refusal"
+    assert 'PlasmaComponents3.ToolTip { text: castRow.refused ? i18n("Cannot play this station") : "" }' in row, (
+        "the warning on the row has no words, or has them on a device that did not refuse")
+    assert face.count("castRefused(") == 1 and row.count("castRow.refused") == 2
+
+
+def test_a_stream_that_stands_is_handed_to_the_road_every_other_death_takes():
+    """Measured 2026-11-12 on Qt 6.12 with FFmpeg 9: a station that closed the
+    connection, and one that held it and sent nothing, left the player in
+    PlayingState with the position at 29976 ms for as long as it was watched
+    (170 s). The error the player reports arms the heal, and the heal turns
+    back at its door because the player says it plays; no EndOfMedia comes.
+
+    When a standing position is a dead stream is StandLogic.js
+    (tst_standlogic), and StandWatch.qml looks every five seconds while a
+    live stream plays (tst_standwatch). tst_standroads walks main.qml's own
+    _streamDied beside the real watch, and its copy is held here to
+    main.qml's text word for word. Held as well: the connect watchdog and
+    the stall timer take the same function instead of a routing of their
+    own, the watch is built with the widget, the engine and the player, it
+    asks whether the order lapsed before it hands anything over, and it has
+    no way to start sound by itself."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    copy = _code_only((TESTS / "qml" / "tst_standroads.qml").read_text(encoding="utf-8"))
+    assert flat(_function_body(main, "_streamDied")) == flat(_function_body(copy, "_streamDied")), (
+        "tst_standroads walks another _streamDied than main.qml has")
+
+    stall = main[main.index("id: stallTimer"):main.index("id: connectWatchdog")]
+    connect = main[main.index("id: connectWatchdog"):main.index("id: errorTimer")]
+    for name, block in (("the stall timer", stall), ("the connect watchdog", connect)):
+        assert block.count("_streamDied();") == 1, "%s no longer hands a dead stream to _streamDied" % name
+        for own in ("healTimer.restart()", "_healAdvance()", "_previewRetryByIdentity()"):
+            assert own not in block, "%s routes a dead stream by itself again (%s)" % (name, own)
+    assert main.count("_streamDied()") == 3, "a road hands a stream to _streamDied that nobody decided about"
+
+    assert main.count("StandWatch {") == 1, "main.qml has no watch over a standing position, or two"
+    assert "    StandWatch { id: standWatch; app: root; engine: timeshift; player: playMusic }\n" in main, (
+        "the watch is not handed the widget, the engine and the player")
+
+    watch = _code_only((UI / "StandWatch.qml").read_text(encoding="utf-8"))
+    assert "        running: watch.watching\n" in watch and "        interval: StandLogic.TICK_MS\n" in watch, (
+        "the watch's timer runs by another word than the tested one")
+    assert "        if (seen.stoodMs <= 0 || app._orderLapsed()) return false;\n" in watch, (
+        "a stream is handed over without asking whether its order lapsed")
+    assert watch.count("app._streamDied()") == 1 and watch.index("app._orderLapsed()") < watch.index("app._streamDied()")
+    for sound in (".play()", "startWithFade(", "armRelay(", "tsPlayLive(", "refreshServer("):
+        assert sound not in watch, "the watch starts sound by itself (%s)" % sound
+
+
+def test_space_after_a_click_on_the_cover_is_still_the_pages():
+    """Seen on the panel on 2026-11-12: a click on the cover's menu button
+    and one more to shut it, and the next Space opened the menu again, the
+    one after it a link in the browser. The listener had pressed it to pause.
+    CoverTouch gave the focus to its own button whenever its menu or the
+    larger view shut. It returns the focus to where it was now, or to its
+    face (tst_covertouch drives both with real clicks and keys).
+
+    The page cannot be driven in a test. What it owes is pinned here: the
+    face it hands CoverTouch is the item whose key handler turns Space into
+    play and pause, and CoverTouch names neither of its buttons as the place
+    the focus goes to.
+    """
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    face = _code_only((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    touch = _code_only((UI / "CoverTouch.qml").read_text(encoding="utf-8"))
+    assert "CoverTouch { anchors.fill: parent face: fullRepresentation " in flat(face)
+    assert "PlasmaExtras.Representation {\n    id: fullRepresentation\n" in face, (
+        "fullRepresentation is no longer the page's root, where its key handler sits")
+    keys = face[face.index("\n    Keys.onPressed: (event) => {"):]
+    keys = flat(keys[:keys.index("\n    }\n")])
+    assert ('} else if (event.key === Qt.Key_Space && !_inputFocused() && !event.isAutoRepeat) { '
+            'root.transport("PlayPause") event.accepted = true }') in keys, (
+        "the face no longer turns Space into play and pause, so handing it the focus proves nothing")
+    for button in ("linksButton", "coverButton"):
+        assert "%s.forceActiveFocus" % button not in touch, (
+            "CoverTouch puts the focus on %s by itself again: a click with the mouse would leave Space there" % button)
+    assert "onLinksOpenChanged: if (!linksOpen) _handBack(linksPanel)" in touch
+    # The larger view's limit counts the screen's pixels, and the page tells it nothing: the ratio is the screen's own.
+    assert "property real ratio: Screen.devicePixelRatio\n" in touch and "ratio:" not in face[face.index("CoverTouch {"):][:900], (
+        "the cover no longer takes the screen's pixel ratio from the screen")
+    assert "onLargerChanged: if (!larger) _handBack(largerView)" in touch
+
+
+def test_the_cover_and_what_it_is_of_are_written_in_one_place():
+    """The picture beside a song is the song's cover, a picture of the artist
+    or the sleeve of another record, and what may be done with it hangs on
+    which. That only holds while the address and the kind are never written
+    apart. ArtworkEngine._artShow writes both (tst_artworkengine drives it);
+    this pins that nobody else does. main.qml used to write the address
+    through an alias in four places; it reads through read-only aliases now
+    and asks the engine to clear a cover or to show a local file's own.
+    """
+    engine = _code_only((UI / "ArtworkEngine.qml").read_text(encoding="utf-8"))
+    show = _function_body(engine, "_artShow")
+    for name in ("albumArtUrl", "albumArtKind", "_albumArtKey"):
+        written = re.compile(r"\b%s\s*=(?!=)" % name)
+        assert written.search(show), "_artShow no longer writes %s" % name
+        assert len(written.findall(engine)) == len(written.findall(show)), (
+            "the engine writes %s outside _artShow, where the other two do not follow" % name)
+    for qml in sorted(UI.glob("*.qml")):
+        if qml.name == "ArtworkEngine.qml":
+            continue
+        code = _code_only(qml.read_text(encoding="utf-8"))
+        assert not re.search(r"\balbumArt(?:Url|Kind)\s*=(?!=)", code), (
+            "%s writes the cover past the engine" % qml.name)
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    for alias in ("albumArtUrl", "albumArtKind"):
+        assert "readonly property alias %s: artworkEngine.%s\n" % (alias, alias) in main, (
+            "main.qml can write %s again" % alias)
+    assert main.count("artworkEngine.artLocal(") == 1, (
+        "a local file's sidecar cover is no longer handed to the engine as that file's own")
+
+
+def test_only_the_songs_own_cover_leaves_the_playing_page():
+    """A picture of the artist, or the sleeve of another record of theirs,
+    stands in on the Playing page with a line that says what it is. The lock
+    screen, the media controls and a television have no such line. Measured
+    on 2026-11-12: MPRIS carried the sleeve of "Nüüd taas sajab lund" as the
+    cover of "Päiksepoolsel tänaval", and a cast would have sent it on.
+
+    The engine keeps trackArtUrl empty for such a picture (tst_artworkengine).
+    main.qml cannot be driven in a test, so this pins that it hands on that
+    address and never the other: its one mention of albumArtUrl is the alias
+    the Playing page reads, and the MPRIS state is written again when the
+    address that goes out changes.
+    """
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert main.count("albumArtUrl") == 2 and (
+        "readonly property alias albumArtUrl: artworkEngine.albumArtUrl\n") in main, (
+        "main.qml hands the picture on somewhere without asking what it is of")
+    assert "readonly property alias trackArtUrl: artworkEngine.trackArtUrl\n" in main
+    state = flat(_function_body(main, "_mprisWriteState"))
+    assert 'art: root.trackArtUrl || root.imageurl || root.faviconSrc(root.currentStationFavicon) || "",' in state, (
+        "MPRIS is handed a picture that may not be the song's cover")
+    assert re.search(r"^\s*onTrackArtUrlChanged: _mprisQueueWrite\(\)\s*$", main, re.M), (
+        "the MPRIS state is no longer written again when the cover that goes out changes")
+    assert "onAlbumArtUrlChanged" not in main and "onAlbumArtKindChanged" not in main
+    assert main.count("trackArtUrl") == 5, (
+        "the song's cover goes somewhere this test does not know: the five are the alias, "
+        "which names it twice, MPRIS and the two cast roads")
+
+
+def test_a_resume_of_the_single_file_is_given_the_clock():
+    """The single file's reader is opened twelve seconds behind its writer,
+    the distance the sliding buffer opens at. Measured 2026-11-12: after a
+    pause of four seconds it was 7.8 s behind, met the file's unfinished end
+    four times in 21 s and was reopened each time with about a second heard
+    twice. Where the file is opened is TimeshiftLogic.openPlaceMs
+    (tst_timeshiftlogic), and the engine asks it on a resume and on a reopen
+    (tst_timeshiftengine). It can only measure that distance with a clock:
+    given none it opens at the park, as it always did. So the one call
+    main.qml makes is held to handing the clock over."""
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    assert main.count("timeshift.resumeGesture(") == 1, "a second road resumes the buffer, and nobody decided what clock it has"
+    assert "        if (!timeshift.resumeGesture(Date.now())) {\n" in main, (
+        "the resume is given no clock: a short pause is opened at the park again, seven seconds behind the writer")
+
+
+def test_the_footer_says_playing_for_sound_and_not_for_a_title():
+    """A station played back from its buffer after a pause read
+    "Connecting…" in the footer for all of 44 seconds of music, with the big
+    button on Pause and the pill counting 0:12 behind (a real panel,
+    2026-11-12). The footer took a title or a bitrate for the sign that sound
+    had begun, and a buffer has neither; a live station without titles read
+    the same. The word comes from ViewLogic.streamSounds now, which also
+    takes a position that has left zero. The face reads the position in one
+    property of its own, so the footer's long text is not worked out again
+    at every tick of the player."""
+    code = _no_comments((UI / "FullRepresentation.qml").read_text(encoding="utf-8"))
+    assert ("readonly property bool _sounds: "
+            "ViewLogic.streamSounds(root.title !== Plasmoid.title, _localPlayback, playMusic.position)") in code, (
+        "the face no longer asks ViewLogic whether the stream sounds, or hands it something else")
+    assert 'return fullRepresentation._sounds ? "♪ " + i18n("Playing") : i18n("Connecting…")' in code, (
+        "the footer's word over a stream with no bitrate is not decided by the sound any more")
+    assert "root.title !== Plasmoid.title || fullRepresentation._localPlayback" not in code, (
+        "a title decides the footer's word again")
+    foot = code[code.index('i18n("Paused — still buffering live radio")'):code.index('i18n("Choose a station to start listening")')]
+    assert "playMusic.position" not in foot, "the footer's text reads the player's position itself and is redone at every tick"
+
+
+def test_an_alarm_whose_station_falls_silent_has_its_tone_asked_about_again():
+    """Measured 2026-11-12 on the bench: an alarm's station held its
+    connection and sent nothing 8 s in. The tone's one check, 25 s after the
+    fire, read playing=true position=7968 and stood down; the heal road
+    knocked 30, 82 and 165 s into the silence, and in the 188 s that were
+    watched no tone came. With the station's server gone 41 s into the alarm
+    it was 155 s the same way.
+
+    The rules are AlarmLogic.js (wakeRings, wakeGraceLeftMs, wakeSounds) and
+    StandLogic.limitMs under their own tests; what the engine and the watch
+    do with them is tst_alarmengine and tst_standwatch. main.qml cannot be
+    run in a test, so tst_standroads walks the head of its _tryHealStation,
+    down to the line that tells the alarm, beside the real watch and the
+    real engine. Held here to main.qml's text: that head, the one line that
+    hands the watch's question to the engine, and that nothing else in
+    main.qml tells the alarm about a fall."""
+    def flat(text):
+        return re.sub(r"\s+", " ", text).strip()
+
+    main = _code_only((UI / "main.qml").read_text(encoding="utf-8"))
+    copy = _code_only((TESTS / "qml" / "tst_standroads.qml").read_text(encoding="utf-8"))
+    told = "alarmEngine.stationFell(Date.now());"
+    head = flat(_function_body(copy, "_tryHealStation"))
+    assert head.endswith(told + ' log.push("knock"); }'), (
+        "tst_standroads' head of _tryHealStation no longer ends at the line that tells the alarm")
+    head = head[:head.index(told) + len(told)]
+    assert flat(_function_body(main, "_tryHealStation")).startswith(head), (
+        "tst_standroads walks another head of _tryHealStation than main.qml has: "
+        "the alarm is told at another place, or not at all")
+    assert main.count("alarmEngine.stationFell(") == 1, "the alarm is told about a fall from a place nobody decided about"
+
+    asks = "function _alarmRings(nowMs) { return alarmEngine.rings(nowMs); }"
+    assert asks in flat(main) and asks in flat(copy), (
+        "the watch's question does not reach the alarm engine, or tst_standroads asks it another way")

@@ -67,6 +67,9 @@ KCM.ScrollViewKCM {
     // load, promising a clear with nothing to clear.
     property bool isNoSearch: true
     property int _retryCount: 0
+    // Counts every request for a first page; a retry that waited a turn runs
+    // only if this has not moved meanwhile.
+    property int _asked: 0
     property int _maxRetries: 3
     property var _activeXhr: null
     property var _activeLoadMoreXhr: null
@@ -192,7 +195,7 @@ KCM.ScrollViewKCM {
     }
 
     function setHeaders(xhr) {
-        xhr.setRequestHeader("User-Agent", "OnAir/2026.43")
+        xhr.setRequestHeader("User-Agent", "OnAir/2026.44")
     }
 
     function getStations(by, val) {
@@ -206,10 +209,11 @@ KCM.ScrollViewKCM {
     }
 
     function _doGetStations(by, val) {
+        _asked++
         busy.running = true
         busy.visible = true
         gettext.visible = true
-        gettext.text = i18n("Get list of stations\nPlease wait…")
+        gettext.text = i18n("Loading stations…")
         view.enabled = false
 
         if (!server || server === "")
@@ -248,45 +252,24 @@ KCM.ScrollViewKCM {
             if (_activeXhr !== xhr)
                 return // superseded by a newer search
             _activeXhr = null
-            if (xhr.status === 200) {
-                // A 200 with a non-JSON body (captive portal, HTML error page)
-                // must fall into the retry chain — an unguarded JSON.parse throw
-                // would leave the page on "Please wait…" forever.
-                try {
-                    var servers = JSON.parse(xhr.responseText)
-                    // Reset the retry counter only AFTER a successful parse.
-                    _retryCount = 0
-                    currentUrl = base
-                    searchModel.clear()
-                    _seen = ({})
-                    for (var i = 0; i < servers.length; i++)
-                        _appendRow(servers[i])
-                    busy.running = false
-                    busy.visible = false
-                    gettext.visible = servers.length === 0
-                    gettext.text = servers.length === 0
-                        ? i18n("Nothing found\nTry changing your query")
-                        : i18n("Get list of stations\nPlease wait…")
-                    view.enabled = true
-                    stat = 1
-                } catch (e) {
-                    _retryCount++
-                    if (_retryCount < _maxRetries) {
-                        getServer()
-                        _doGetStations(by, val)
-                    } else {
-                        busy.running = false
-                        busy.visible = false
-                        gettext.visible = true
-                        gettext.text = i18n("Error: Could not connect to API servers")
-                        view.enabled = true
-                    }
-                }
-            } else {
+            // A 200 whose body is no list (a captive portal's page, "null",
+            // an error object) is a failed try like any other status. Parsed
+            // first and counted after, "null" set the counter back to 0 and
+            // then threw on .length: the page asked again without end, and
+            // an error object read as an empty result.
+            var servers = SearchLogic.directoryRows(xhr.status, xhr.responseText)
+            if (servers === null) {
                 _retryCount++
                 if (_retryCount < _maxRetries) {
-                    getServer()
-                    _doGetStations(by, val)
+                    // A turn later, and only if nobody has searched since: a
+                    // request started inside another's handler takes the
+                    // shell down the way an abort from in there does.
+                    var asked = _asked
+                    Qt.callLater(function() {
+                        if (asked !== _asked) return
+                        getServer()
+                        _doGetStations(by, val)
+                    })
                 } else {
                     busy.running = false
                     busy.visible = false
@@ -294,7 +277,22 @@ KCM.ScrollViewKCM {
                     gettext.text = i18n("Error: Could not connect to API servers")
                     view.enabled = true
                 }
+                return
             }
+            _retryCount = 0
+            currentUrl = base
+            searchModel.clear()
+            _seen = ({})
+            for (var i = 0; i < servers.length; i++)
+                _appendRow(servers[i])
+            busy.running = false
+            busy.visible = false
+            gettext.visible = servers.length === 0
+            gettext.text = servers.length === 0
+                ? i18n("Nothing found\nTry changing your query")
+                : i18n("Loading stations…")
+            view.enabled = true
+            stat = 1
         }
         guard = _armXhrTimeout(xhr, _httpTimeout)
         xhr.send()
@@ -326,22 +324,20 @@ KCM.ScrollViewKCM {
             if (_activeLoadMoreXhr !== xhr)
                 return // superseded
             _activeLoadMoreXhr = null
-            if (xhr.status === 200) {
-                try {
-                    var servers = JSON.parse(xhr.responseText)
-                    // The cursor moves only after a successful parse.
-                    offset = nextOffset
-                    _pageFailures = 0
-                    if (servers.length > 0) {
-                        for (var srv of servers)
-                            _appendRow(srv)
-                        stat = 1
-                    }
-                } catch (e) {
-                    _pageFailed()
-                }
-            } else {
+            var servers = SearchLogic.directoryRows(xhr.status, xhr.responseText)
+            if (servers === null) {
                 _pageFailed()
+                return
+            }
+            // The cursor moves only over a page that was a list. A body of
+            // "null" used to move it and clear the failure count before it
+            // threw, so that page was skipped and asked for without end.
+            offset = nextOffset
+            _pageFailures = 0
+            if (servers.length > 0) {
+                for (var srv of servers)
+                    _appendRow(srv)
+                stat = 1
             }
         }
         guard = _armXhrTimeout(xhr, _httpTimeout)
@@ -436,7 +432,7 @@ KCM.ScrollViewKCM {
                     // a model row drags wrapper internals along with the
                     // roles) and the wrapper's objectName is not an edit.
                     const norm = (o) => {
-                        const plain = DoorLogic.normalize(JSON.parse(JSON.stringify(o)))
+                        var plain = DoorLogic.normalize(JSON.parse(JSON.stringify(o)))
                         delete plain.objectName
                         // Both sides get the shape the model rows were given
                         // on load. A station stored before codecs were saved
@@ -447,12 +443,12 @@ KCM.ScrollViewKCM {
                         if (plain.codec === undefined) plain.codec = ""
                         if (plain.bitrate === undefined) plain.bitrate = 0
                         if (plain.uuid === undefined) plain.uuid = ""
-                        const keys = []
-                        for (const k in plain)
+                        var keys = []
+                        for (var k in plain)
                             if (plain[k] !== undefined) keys.push(k)
                         keys.sort()
-                        const flat = {}
-                        for (const k of keys) flat[k] = plain[k]
+                        var flat = {}
+                        for (var k of keys) flat[k] = plain[k]
                         return JSON.stringify(flat)
                     }
                     const merged = ReorderLogic.mergeExternal(base, ReorderLogic.savedRows(stationsModel), ext, norm)
@@ -475,7 +471,7 @@ KCM.ScrollViewKCM {
     Kirigami.Dialog {
         id: searchDrawer
 
-        title: i18n("Search Station")
+        title: i18n("Search stations")
         padding: Kirigami.Units.largeSpacing
         standardButtons: Kirigami.Dialog.NoButton
 
@@ -690,7 +686,7 @@ KCM.ScrollViewKCM {
                             if (!message.visible) {
                                 message.positive = true
                                 message.text = dupAt < 0
-                                    ? i18n("Station is added. Click 'Apply' to save changes.")
+                                    ? i18n("Station added. Click Apply to save your changes.")
                                     : i18n("Station is already in the list.")
                                 message.visible = true
                                 closetimer.restart()
@@ -766,7 +762,7 @@ KCM.ScrollViewKCM {
 
             QQC2.Label {
                 id: gettext
-                text: i18n("Get list of stations\nPlease wait…")
+                text: i18n("Loading stations…")
                 visible: false
                 enabled: true
                 horizontalAlignment: Text.AlignHCenter

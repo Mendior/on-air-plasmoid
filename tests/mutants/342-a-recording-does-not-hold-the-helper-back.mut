@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station is listened to while it is being recorded.
+
+history:
+  A recording is a connection of its own and the one the listener asked for.
+  The reading can wait for the next play; the recording cannot be taken
+  again.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      if (f.paused !== false || f.healing !== false || f.recording !== false) return false;
+
+replace:
+      if (f.paused !== false || f.healing !== false) return false;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_a_stream_from_another_address_an_alarm_and_a_recording_wait.
+  Line-neutral.

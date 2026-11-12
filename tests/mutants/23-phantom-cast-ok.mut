@@ -10,22 +10,20 @@ history:
   pychromecast's block_until_active returns quietly when its timeout runs
   out; the OK sentinel used to follow it unconditionally, and the widget's
   cast state, volume routing and sleep timer all believed a phantom. From
-  2026-09-06 the helper waits once more for a slow receiver and then reports
-  the truth — reading the session event block_until_active itself waits on,
-  after the first guard asked mc.is_active, which answers a different
-  question (the media namespace is up long before any session exists).
-  This mutant reports OK regardless again.
+  2026-09-06 the helper waits for a slow receiver and then says the truth.
+  What it reads for that has moved twice: mc.is_active first, which answers
+  a different question (the media namespace is up long before any session
+  exists), then the session event, and now the status itself (see 450).
+  This mutant says OK regardless again.
 
 target:
   package/contents/ui/cast.py
 
 find:
-          if not _media_session_open(mc):
-              _out("%s no media session after %.0fs" % (FAIL, 2 * CONNECT_TIMEOUT))
+          if not _wait_taken(mc, url, 2 * CONNECT_TIMEOUT):
 
 replace:
           if False:
-              _out("%s no media session after %.0fs" % (FAIL, 2 * CONNECT_TIMEOUT))
 
 expect:
   Killed by tests/test_cast_play.py::test_a_receiver_that_never_opens_a_session_is_a_fail.

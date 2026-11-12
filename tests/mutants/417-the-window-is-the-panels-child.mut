@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The player's window is a child of the panel's window.
+
+history:
+  A Window declared inside an item is transient for that item's window,
+  which for a panel widget is the panel: it would stay above it and leave
+  with it. The window is nobody's child.
+
+target:
+  package/contents/ui/PlayerWindow.qml
+
+find:
+      transientParent: null
+
+replace:
+      flags: Qt.Window
+
+expect:
+  Killed by tests/qml/tst_playerwindow.qml::test_the_window_is_nobodys_child_and_carries_the_players_name.

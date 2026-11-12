@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any device the record is asked about may be sent a level: one that
+  refused the stream and one still being asked among them.
+
+history:
+  Every ticked device was sent the widget's level, with every move of the
+  slider and every mute. A device that refuses the stream stays ticked,
+  and it has a life of its own: a Ruark that had refused stood beside a
+  television that played, and its level went from 10 to 6 during a test
+  whose commands never named it (2026-11-12). It may have been playing
+  its own radio. A level goes only to a device that answered it plays.
+
+target:
+  package/contents/ui/CastLogic.js
+
+find:
+      return typeof uuid === "string" && _copy(session).on[uuid] === true;
+
+replace:
+      return typeof uuid === "string";
+
+expect:
+  Killed by tests/qml/tst_castlogic.qml::test_only_a_device_that_plays_is_sent_a_level.

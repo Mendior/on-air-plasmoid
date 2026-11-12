@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A member counts as there when some file of the package declares it, not
+  the file the name leads to.
+
+history:
+  The names repeat across files: SyncEngine.qml, TimeshiftEngine.qml and
+  four more have a root called `engine`, most engines have `app` and `cfg`,
+  and a property such as `lag` exists on the sync engine and not on
+  main.qml. `root.lag` written in the popup is `undefined`, and a check
+  that asks "is it declared anywhere" calls it fine. What makes the check
+  worth having is that it asks the one file the wiring points at.
+
+target:
+  tests/test_cross_file_members.py
+
+find:
+          if member in f.members or member in inherited:
+
+replace:
+          if any(member in g.members for g in self.files.values()) or member in inherited:
+
+expect:
+  Killed by tests/test_cross_file_members.py::test_a_member_has_to_be_at_the_root_of_the_file_the_name_leads_to,
+  whose `root.lag` and `app.lag` are declared, in the other file.

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A reading is written down for a station that was removed while the helper
+  listened.
+
+history:
+  Only the saved list's addresses go into the config.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          if (!LoudLogic.isSaved(cfg.servers, key)) return;
+
+replace:
+          if (LoudLogic.isSaved(cfg.servers, key) === null) return;
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_a_reading_is_kept_for_a_saved_station_only.
+  Line-neutral.

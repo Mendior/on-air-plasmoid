@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The helper is handed the stream's address as an argument.
+
+history:
+  An argv is readable by every user on the machine for as long as the
+  process lives, here for twenty seconds, and an address can carry a
+  listener's token.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+  python3 -B " + q(a.scriptPath) + " " + q(a.urlPath) + " " + LISTEN_S
+
+replace:
+  python3 -B " + q(a.scriptPath) + " " + q(a.url) + " " + LISTEN_S
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_the_address_goes_into_a_file_and_never_to_the_helper.
+  Line-neutral.

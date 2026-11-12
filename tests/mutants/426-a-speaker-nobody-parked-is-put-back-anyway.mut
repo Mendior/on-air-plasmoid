@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The way back from a calibration sets every speaker's level again,
+  whether this run had parked it or not.
+
+history:
+  That was right for as long as every run parked every speaker. A run
+  that is called off while it is still asking for levels parks some of
+  them or none, and the level it puts back is "what I read, or the park
+  if I read nothing". For a speaker it never got to, that is 55 %: a
+  cancel pressed in the first second would leave the speakers it had not
+  reached at the measuring level, with no run left to undo it. Each
+  speaker is put back under the flag its own park set.
+
+target:
+  package/contents/ui/CalibLogic.js
+
+find:
+          restore += " [ -n \"$k" + si + "\" ] && pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-" + park + "%};";
+
+replace:
+          restore += " pactl set-sink-volume \"$s" + si + "\" ${v" + si + ":-" + park + "%};";
+
+expect:
+  Killed by tests/test_calibrate_cancel.py::test_cancel_during_the_first_query_parks_nothing_and_starts_nothing.
+  Line-neutral.

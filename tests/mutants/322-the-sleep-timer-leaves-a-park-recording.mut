@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The sleep timer's end no longer stops a station parked in the sliding buffer.
+
+history:
+  The single file's writer ends at its window's cap, so a park left over
+  a night stopped recording by itself. The segment writer has no cap: it
+  would cut and delete segments until somebody pressed Stop.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                  if (isPlaying() || _casting || _wantsPlaying || (root._tsPaused && timeshift.slide)) stopWithFade();
+
+replace:
+                  if (isPlaying() || _casting || _wantsPlaying) stopWithFade();
+
+expect:
+  Killed by tests/test_invariants.py::test_the_sleep_timer_ends_a_park_in_the_sliding_buffer.
+  Line-neutral.

@@ -127,6 +127,9 @@ def run_gate(tree: Path, quick: bool, active: str = "") -> tuple[bool, str]:
             cwd=tree,
             capture_output=True,
             text=True,
+            # qmltestrunner writes the two sides of a failed compare in
+            # Latin-1, so a title such as "Päiksepoolsel" is not UTF-8 here.
+            errors="replace",
             timeout=900,
             env=env,
             check=False,  # a non-zero exit IS the expected outcome here

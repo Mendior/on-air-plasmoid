@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Removing the helper's file no longer ends it.
+
+history:
+  That is how the widget ends a reading at Stop and at its own teardown,
+  without a pid to mistake for somebody else's.
+
+target:
+  package/contents/ui/loudness.py
+
+find:
+              or not os.path.exists(leash)
+
+replace:
+              or os.path.isdir(leash)
+
+expect:
+  Killed by tests/test_loudness.py::test_the_helper_stops_when_its_file_is_removed.
+  Line-neutral.

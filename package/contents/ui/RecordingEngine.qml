@@ -72,7 +72,26 @@ Item {
     // a shell on the machine could read a per-listener token out of
     // /proc/<pid>/cmdline the whole time. curl fetches from the file and
     // pipes the bytes to ffmpeg, which never learns the address.
-    readonly property string _recUrlFile: app._mprisRunDir + "/arp-rec-url-" + app._mprisId
+    //
+    // Each recording has a file of its own, this beginning and then its
+    // token. With one file for all of them, a command already handed to the
+    // shell could reach the next recording's address: run in a chosen order,
+    // the late write of a recording called off put its own address there
+    // and the next capture recorded the station just left under the new
+    // station's name, and its late cleanup deleted the file and the capture
+    // ended empty. The number an answer carries guards the answer only.
+    readonly property string _recUrlBase: app._mprisRunDir + "/arp-rec-url-" + app._mprisId
+    // The current recording's file, and after it the last one's. Before the
+    // first it is the bare beginning, the name older versions wrote under:
+    // main.qml removes this path when the widget goes, and it must never be
+    // an empty one.
+    property string _recUrlFile: _recUrlBase
+    // When this engine came up. A file whose name carries an earlier start
+    // time is a session's before this one, and the first cleanup takes it.
+    property double _recBornMs: Date.now()
+    // The start time the last recording's token carries; the next one's
+    // comes after it.
+    property double _recLastMs: 0
     // The recording waiting for its config file to land (the write is its
     // own short command — putting it in the same string as the recording
     // would park the URL on THAT shell's argv for the whole session).
@@ -256,7 +275,9 @@ Item {
         recOnDisk = false;
         recCapturedSec = 0;
         _recGen++;
-        _recToken = _recGen + "." + d.getTime();
+        _recLastMs = RecLogic.startStamp(d.getTime(), _recBornMs, _recLastMs);
+        _recToken = _recGen + "." + _recLastMs;
+        _recUrlFile = _recUrlBase + "-" + _recToken;
         _recProbeInFlight = false;
         _recDurationSec = Math.max(60, Math.floor(durationSec));
         _recUrl = url;
@@ -383,7 +404,15 @@ Item {
         var recCfgLine = 'url = "' + url.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
         // The write says which recording it is for, as the disk probe does,
         // so its answer can be told from an earlier recording's.
-        app.exec(": REC_URL " + _recGen + "; umask 077; printf '%s' "
+        //
+        // It first takes the files of recordings started before this one.
+        // None of them is needed any more: a recording starts only when the
+        // one before has ended or was called off. One can be left when a
+        // write lands after its own cleanup, or when a capture shell is
+        // killed outright, and it holds an address.
+        app.exec(": REC_URL " + _recGen + "; umask 077; "
+            + RecLogic.olderFilesLine(PodcastLogic.shQuote(_recUrlBase + "-"), _recLastMs)
+            + "printf '%s' "
             + PodcastLogic.shQuote(recCfgLine)
             + " > " + PodcastLogic.shQuote(_recUrlFile)
             + " && echo __REC_URL_OK__ || echo __REC_URL_FAIL__; true # " + app.nextSeq());
@@ -580,6 +609,7 @@ Item {
             // < 60 s left: not worth an ffmpeg spawn; the entry ages into the
             // missed branch above unless a recording already completed.
         }
+        _recArmStart();
     }
 
     Timer {
@@ -588,6 +618,26 @@ Item {
         repeat: true
         running: recSchedules.length > 0
         onTriggered: _recScheduleTick()
+    }
+
+    // A start does not wait for the regular look to come round: one that
+    // falls inside the coming period gets this timer, set to the moment
+    // (RecLogic.startsWithin; 18:30 used to begin at 18:30:09.8). Set anew
+    // by every look and by every change of the list, so a clock that was
+    // moved, a zone change and a sleep are caught by the look as before.
+    // _recStartWaitMs is what the timer was last set to, -1 for not at all.
+    property int _recStartWaitMs: -1
+    function _recArmStart() {
+        _recStartWaitMs = RecLogic.startsWithin(recSchedules, Date.now(), recScheduleTimer.interval);
+        if (_recStartWaitMs < 0) { recStartTimer.stop(); return; }
+        recStartTimer.interval = _recStartWaitMs;
+        recStartTimer.restart();
+    }
+    onRecSchedulesChanged: _recArmStart()
+    Timer {
+        id: recStartTimer
+        repeat: false
+        onTriggered: engine._recScheduleTick()
     }
 
     Timer {
@@ -656,7 +706,14 @@ Item {
         var safePid = _recPidFile.replace(/'/g, "'\\''");
         app.exec(": REC_CLEAN; p=$(cat '" + safePid + "' 2>/dev/null);"
             + " if [ -n \"$p\" ] && ps -o cmd= -p \"$p\" 2>/dev/null | grep -q 'ffmpeg.*pipe:0'; then"
-            + " kill -INT \"$p\" 2>/dev/null; fi; rm -f '" + safePid + "' "
+            + " kill -INT \"$p\" 2>/dev/null; fi; "
+            // Address files a session before this one left behind, a crash
+            // among them, and the one name older versions wrote under. A
+            // recording of this session is never older than the session,
+            // so this line can run as late as it likes.
+            + RecLogic.olderFilesLine(PodcastLogic.shQuote(_recUrlBase + "-"), _recBornMs)
+            + "rm -f " + PodcastLogic.shQuote(_recUrlBase) + "; "
+            + "rm -f '" + safePid + "' "
             + PodcastLogic.shQuote(_recStopFile) + "; true");
     }
 

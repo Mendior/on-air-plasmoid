@@ -55,7 +55,7 @@ PlasmaComponents3.ItemDelegate {
         readonly property bool isThisPlaying: (root._podPlayingRawUrl !== ""
                                            && (root._podPlayingRawUrl === epItem.localUrl
                                                || root._podPlayingRawUrl === epItem.url))
-                                          && (isPlaying() || root._casting)
+                                          && root.onOrKept
     readonly property bool isDownloading: root._podDownloadKey === epItem.epKey
     // The maps are mutated in place; the rev ticks are their change signals.
     readonly property int resumeSec: { root._podPosRev; return root.podcastPositionSec(epKey) }
@@ -105,7 +105,7 @@ PlasmaComponents3.ItemDelegate {
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
             || event.key === Qt.Key_Space) {
-            epItem.primaryAction()
+            if (!event.isAutoRepeat) epItem.primaryAction()
             event.accepted = true
         }
     }
@@ -204,7 +204,8 @@ PlasmaComponents3.ItemDelegate {
             EqBars {
                 anchors.centerIn: parent
                 visible: epItem.isThisPlaying
-                animating: visible && root.expanded && !root.thrifty
+                paused: root._pausedFile !== null
+                animating: visible && root.faceShown && !root.thrifty
                 bars: 3
                 barWidth: 3
                 minHeight: 4

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A button over the cover that disappears while it has the focus keeps it.
+
+history:
+  Someone walks to the cover's button with Tab and the next picture is a
+  small logo: the button goes. It kept the focus, unseen, and took the next
+  Space without doing anything with it. A button that goes hands the focus
+  to the face. This mutant lets it keep it.
+
+target:
+  package/contents/ui/CoverTouch.qml
+
+find:
+          if (!button.visible && button.activeFocus) _toFace(button)
+
+replace:
+          if (!button.visible && !button.activeFocus) _toFace(button)
+
+expect:
+  Killed by tests/qml/tst_covertouch.qml::test_a_button_that_goes_while_it_holds_the_keyboard_lets_it_go.
+  Line-neutral.

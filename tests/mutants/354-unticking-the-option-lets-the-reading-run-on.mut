@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A reading in flight runs to its end after the option is unticked.
+
+history:
+  With the option off the widget makes no connection on its behalf, the one
+  already out included.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+      on_OnChanged: if (!_on) _end()
+
+replace:
+      on_OnChanged: if (!_on) settle.stop()
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_unticking_the_option_ends_the_reading.
+  Line-neutral.

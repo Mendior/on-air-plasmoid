@@ -1,5 +1,142 @@
 # Changelog
 
+## 2026.44
+
+- **Pause live radio, and step back thirty seconds.** With "Pause live
+  radio" on (Automation page), an MP3 or AAC station is now kept as a buffer
+  that slides along with the broadcast: the last minutes, up to the length
+  you set, are always there. Play continues where you paused. Two new
+  buttons beside the "behind live" pill step thirty seconds back and
+  forward, and the step back works straight from live radio, so a sentence
+  you missed is one press away. A pause that lasts longer than the buffer
+  holds ends the buffering: Play still starts where you paused, plays what
+  was kept and then returns to live, and a radio that was paused and
+  forgotten no longer goes on downloading. A stream that stops sending for
+  half a minute gets a fresh buffer when it comes back, instead of a place
+  that has drifted. FLAC and Ogg stations keep the pause they had, and a
+  short pause on one of them no longer ends in a jump back to live a few
+  seconds after Play.
+
+- **The player in a window of its own.** A button in the popup's header
+  moves the player into an ordinary window that you can move, resize and
+  leave open beside your work. The popup then says where the player went
+  and offers to bring it back; closing the window does the same. It is the
+  same player, not a second one: the list stays where you scrolled it, an
+  open menu stays open and the music does not skip. The window remembers
+  its size and comes back after a restart if it was open. Where it stands on
+  the screen, and whether it stays above other windows, is up to your window
+  manager: on Wayland a widget can set neither.
+
+- **Stations at the same loudness.** A new option under Appearance, in the
+  Audio section: "Even out loudness between stations". It is off unless you
+  turn it on. With it on, the widget listens to a saved station for twenty
+  seconds, at most once a day, and turns down the ones that are louder than
+  the rest, by 15 dB at most; nothing is turned up. A change while you are
+  listening takes eight seconds, and the volume slider stays where you put
+  it. A cast device that plays along is left alone.
+
+- **One volume for this computer and a cast device.** When a television or
+  a speaker plays together with this computer, the volume slider and Mute
+  move both, and the device's own row sets the balance between them.
+  Ticking or unticking "This computer" no longer changes the device's level,
+  and leaving a quiet room no longer turns a device up. The volume row in
+  the output menu now says what it turns: System volume, On Air volume or
+  Device volume.
+
+- **A right-click menu on the panel icon.** Play, Pause or Stop, whichever
+  the big button would do, then Next station, Mute and "Sleep in 30
+  minutes".
+
+- **Episodes and files pause.** The big button pauses a podcast episode or
+  a file from My Music instead of stopping it. The page keeps showing what
+  is paused, Play continues it, and Next and Previous on a keyboard or a
+  headset step inside the paused episode instead of starting the radio. An
+  episode dragged back to its start begins at the start.
+
+- **FLAC stations start without the long silence.** The widget now reads
+  what a stream is from its first bytes instead of from the look of its
+  address. An Ogg FLAC station at a bare address used to begin with about
+  six seconds of nothing; it starts in under half a second now, and a
+  station the directory mislabels as FLAC or Ogg plays instead of staying
+  silent.
+
+- **A station that stops sending comes back by itself.** When a stream
+  went quiet in the middle of a song, because the server closed the
+  connection or simply sent nothing more, the widget could go on showing
+  Playing over silence until you pressed Stop and Play. It now notices
+  that the stream stands still and connects again: about ten seconds
+  after a closed connection, about half a minute into one that hangs.
+  An alarm is held to more than that: if its station falls silent in the
+  first half hour and does not come back, the fallback tone rings
+  instead of the silence going on.
+
+- **Casting says what is true.** A device that refuses the stream is no
+  longer shown as "Casting to …" over a silent room: the footer says it
+  could not be cast to and the big button offers Play. Unticking the one
+  device that played ends the cast even while another, refused one is still
+  ticked. A television that was busy with something else is no longer taken
+  for one that started the station: the widget now checks that the device
+  really holds the stream it was sent. A device that turns down one
+  station's address while it plays others, as some network radios do with
+  HTTPS streams, is said to be unable to play this station, with a mark on
+  its row in the output menu, instead of "Could not cast". With two
+  devices ticked the footer names the ones that play, and the volume
+  slider and Mute no longer reach a ticked device that is not playing the
+  stream. And a device is sent the album cover when the station already
+  playing has one, instead of the station's small list icon.
+
+- **Scheduled recordings start on the minute.** A scheduled recording could
+  begin up to half a minute late and came out that much shorter. It starts
+  at its own time now.
+
+- **Speaker sync.** Cancel pressed right after a calibration was started
+  now cancels it; it used to miss a calibration that was still reading the
+  speakers' volumes, which then ran anyway. A rebuild of the speaker group
+  that answered late can no longer leave a speaker with two delays at once.
+  The automatic check no longer mistakes a slow answer from the sound
+  server for a speaker's delay. If the session's temporary folder is
+  missing, the speakers still get their volume back after a measurement.
+  And the output box shows the output in use again after the speaker group
+  was switched off and on; it used to read "System default output". While
+  a calibration runs, its Stop button stands where the Calibrate button
+  was instead of further down the menu, and the first round is named
+  after the sound it really plays.
+
+- **The cover, larger, and links for the artist.** A click on the cover
+  shows it at the size of the player; another click or Esc closes it. A
+  small menu in the cover's corner searches for the artist on Last.fm or on
+  Discogs in your browser, as asked for on the KDE Store. Nothing is looked
+  up until you click. Switching online cover lookup off now also ends a
+  lookup that was under way. A picture that is not the cover of the song
+  on air says so: when no catalogue has the song, the artist's picture or
+  the sleeve of another of their records is still shown, now with a small
+  label, and the lock screen and a cast device get the station's logo
+  instead. Every catalogue is asked for the song itself before such a
+  picture is taken. A small station logo is no longer blown up into a
+  blur by the larger view, which stops at twice a picture's own pixels as
+  the screen counts them, and covers from iTunes are fetched at 600
+  pixels, so they stay sharp on a high-resolution screen.
+
+- **Languages.** A number of devices now takes each language's own plural
+  form; Polish, Ukrainian and Finnish read wrongly before. A few texts said
+  more than is true and were corrected: the automatic sync check is not
+  inaudible to everyone, and it keeps a short recording for the length of a
+  check before deleting it.
+
+- **Smaller fixes.** A key held down is one press, so M no longer flickers
+  between mute and sound. The footer no longer reads "Connecting…" over a
+  station that is playing but sends no titles, or over one played back
+  from its buffer. Stop is silence also while a search result is
+  still on its way to sound. "Show more" runs on to the 300th result and
+  goes on into a genre whose first page was all stations you already have.
+  A station is moved to another address for silence only when the silence
+  was unbroken. The settings search no longer asks again and again for an
+  answer that is no list. A paired Bluetooth speaker and its Forget button
+  can be reached with Tab, and a podcast show or a found episode opens from
+  the keyboard. A recording started right after one was called off records
+  its own station. Play on a keyboard is offered whenever it can do
+  something, also with no station saved.
+
 ## 2026.43
 
 - **The panel can show what is playing.** A new option under Appearance,

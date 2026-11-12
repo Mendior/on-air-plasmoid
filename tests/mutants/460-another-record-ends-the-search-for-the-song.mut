@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any picture a song search brings ends the lookup, the way the first
+  picture found used to.
+
+history:
+  A Deezer row that was the artist with another song was taken like the
+  song itself and nothing after it was asked. On 2026-11-12 "Alen Veziko -
+  Päiksepoolsel tänaval" wore the sleeve of his single "Nüüd taas sajab
+  lund", and a catalogue that had the song would never have been reached.
+  Only the song's own cover ends the chain now; anything else waits until
+  the last song search has answered. This mutant lets it end the chain.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+                  if (kind === "track" || (kind !== "" && kind === brings)) {
+
+replace:
+                  if (kind !== "") {
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_another_record_at_the_first_request_does_not_keep_the_song_from_being_found.
+  Line-neutral.

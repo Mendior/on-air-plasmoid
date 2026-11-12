@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station the heal road takes for dead while its alarm rings is not reported to the alarm.
+
+history:
+  Bench, 2026-11-12: an alarm's station held its connection and sent
+  nothing 8 s into the wake-up. The tone's one check, 25 s after
+  the fire, had passed on playing=true position=7968, and nothing asked
+  again: 188 s of silence with the heal road knocking three times. With the
+  server gone 41 s into the alarm it was 155 s.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          alarmEngine.stationFell(Date.now());
+
+replace:
+          alarmEngine.rings(Date.now());
+
+expect:
+  Killed by test_invariants::test_an_alarm_whose_station_falls_silent_has_its_tone_asked_about_again.
+  Line-neutral.

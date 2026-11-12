@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Whether a reopen gained anything is asked of the position the player gave.
+
+history:
+  A reopen that lands on the same unfinished end has gained nothing, and the
+  buffer is left for the broadcast. Judged by the header's length every end
+  looks five minutes past the last reopen, and a writer that stands would
+  have the file reopened without end.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          var stalled = _lastReopenPosMs >= 0 && place - _lastReopenPosMs < 500;
+
+replace:
+          var stalled = _lastReopenPosMs >= 0 && posMs - _lastReopenPosMs < 500;
+
+expect:
+  Killed by tst_timeshiftengine::test_a_reopen_that_gains_nothing_on_such_a_file_gives_up.
+  Line-neutral.

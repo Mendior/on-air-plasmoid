@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An address stays in the map after its station left the list.
+
+history:
+  An address can carry a listener's token. Removed from the list, it is not
+  to be found in the config a month later.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return _text(_entries(text).filter(function(e) { return held[e[0]] === true; }));
+
+replace:
+      return _text(_entries(text).filter(function(e) { return held[e[0]] !== false; }));
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_only_addresses_still_saved_stay_in_the_map.
+  Line-neutral.

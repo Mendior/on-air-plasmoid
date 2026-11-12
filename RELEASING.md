@@ -25,12 +25,14 @@ test. Fix the cause, not the check.
   must match the new version (the lint gate fails the release if forgotten).
 - If UI strings changed: `scripts/dev.sh i18n` and commit the updated
   `po/` catalogs.
-- `packaging/aur/PKGBUILD` → `pkgver`, then `updpkgsums` in that directory.
-  This one is corrected by nothing else: the lint gate holds the User-Agent
-  strings to metadata.json and the package filename is derived from it, so a
-  bump fixes every other version site by itself. The PKGBUILD sat five
-  releases behind before anyone noticed. Its checksum pins the tag tarball,
-  so it has to come AFTER the tag exists — the last step, not the first.
+- `packaging/aur/PKGBUILD` → `pkgver`, then `updpkgsums` in that directory
+  (it leaves the tarball behind: delete it). Its checksum pins the tag
+  tarball, so it has to come AFTER the tag exists — the last step, not the
+  first, and it rides in the next commit. Nothing else in a bump touches
+  this file: it sat five releases behind once and four the next time.
+  `tests/test_packaging.py` now fails the gate once it is two releases
+  behind the changelog; one behind is its normal state between a tag and
+  the commit after it.
 
 ## 3. Real-session test
 

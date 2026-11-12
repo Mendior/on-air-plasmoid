@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The pipe to ffmpeg has a buffer of this side's own.
+
+history:
+  ffmpeg leaves when it has its seconds, and a station never ends: what the
+  buffer still held could not be written out, and every reading of a real
+  station ended in a traceback on stderr.
+
+target:
+  package/contents/ui/loudness.py
+
+find:
+              bufsize=0,
+
+replace:
+              bufsize=-1,
+
+expect:
+  Killed by tests/test_loudness.py::test_a_stream_that_goes_on_past_the_reading_is_left_without_a_word.
+  Line-neutral.

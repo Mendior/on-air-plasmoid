@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The capture ends only once the parked place is a whole window old.
+
+history:
+  By then the place is gone: the folder's oldest segment is ahead of the
+  clock's reckoning by the station's first burst, an open keeps two segments
+  clear of it, and the writer closes one more as it stops. Thirty seconds
+  before, the place is still inside.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+      return runMs - parkMs >= keepMs - PARK_END_MS;
+
+replace:
+      return runMs - parkMs >= keepMs;
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_a_park_that_reaches_the_edge_of_what_is_kept_ends_the_capture.

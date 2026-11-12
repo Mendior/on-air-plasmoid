@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The window opens at a remembered size the screen cannot show.
+
+history:
+  A config can be edited by hand and a screen swapped for a smaller one. A
+  window taller than its screen has its lower edge, and the transport with
+  it, where nobody can reach, so the remembered size stops at the screen.
+
+target:
+  package/contents/ui/WindowLogic.js
+
+find:
+      return Math.round(Math.min(most, Math.max(least, want)));
+
+replace:
+      return Math.round(Math.max(least, want));
+
+expect:
+  Killed by tests/qml/tst_windowlogic.qml::test_the_size_stops_at_what_the_face_needs_and_at_the_screen.

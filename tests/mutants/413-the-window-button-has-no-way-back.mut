@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The header's window button sends the face to the window and never home.
+
+history:
+  The same button stands in both seats and flips the wish. In the window
+  it is the one control inside the face that brings it back to the panel.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+              onMoveAsked: playerWindow.detached = !playerWindow.detached
+
+replace:
+              onMoveAsked: playerWindow.detached = true
+
+expect:
+  Killed by tests/test_invariants.py::test_the_headers_corner_moves_the_face_and_keeps_the_pin.
+  Line-neutral.

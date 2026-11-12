@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A widget on the desktop puts its face in a window because an old config key says so.
+
+history:
+  The desktop form shows the face inline and is offered no window: there
+  the window cut six pixels off each side of the face. The key can still
+  be set from the widget's days in a panel, and it must not be obeyed.
+
+target:
+  package/contents/ui/WindowLogic.js
+
+find:
+      return detached === true && planar !== true ? "window" : "popup";
+
+replace:
+      return detached === true ? "window" : "popup";
+
+expect:
+  Killed by tests/qml/tst_windowlogic.qml::test_a_desktop_widget_keeps_its_face_whatever_the_config_says.

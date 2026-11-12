@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The first "I:" in ffmpeg's log is printed as the reading.
+
+history:
+  With the frame log on, every tenth of a second carries the running figure.
+  Five seconds in it was up to 6.3 dB off the station's loudness.
+
+target:
+  package/contents/ui/loudness.py
+
+find:
+  _SUMMARY = re.compile(r"Summary:\s+Integrated loudness:\s+I:\s+(-?\d+(?:\.\d+)?) LUFS")
+
+replace:
+  _SUMMARY = re.compile(r"I:\s+(-?\d+(?:\.\d+)?) LUFS")
+
+expect:
+  Killed by tests/test_loudness.py::test_a_frames_line_is_not_the_answer.
+  Line-neutral.

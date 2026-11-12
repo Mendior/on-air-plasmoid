@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Deezer's picture of the artist comes back as the track's cover.
+
+history:
+  For "Star Sisters - Waterloo" no catalogue had the song, and Deezer's
+  picture of the artist is the sleeve of an album without it. It stood on
+  the panel like the song's cover (seen 2026-11-12). The reader names it a
+  picture of the artist. This mutant names it the track.
+
+target:
+  package/contents/ui/SearchLogic.js
+
+find:
+      var face = artDeezerReal(first.picture_big) || artDeezerReal(first.picture_medium);
+      return face ? { "url": face, "kind": "artist" } : null;
+
+replace:
+      var face = artDeezerReal(first.picture_big) || artDeezerReal(first.picture_medium);
+      return face ? { "url": face, "kind": "track" } : null;
+
+expect:
+  Killed by tests/qml/tst_artkind.qml::test_deezers_artist_answer_is_a_picture_of_the_artist.
+  Line-neutral.

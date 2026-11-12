@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The unsteady line names one member again: the first that answered.
+
+history:
+  The check cannot tell which speaker would not hold still. It reads the
+  difference between them, and that is what would not settle. The name on
+  the line was whichever member came first in the list and had been heard
+  at all. On 2026-11-11 that put "DRIFT_UNSTEADY bluez_output..." into the
+  journal forty-one times, and it read as the Bluetooth speaker being at
+  fault, which nothing had shown. A room on paper where the wired member
+  is the one that answers late prints the Bluetooth one's name just the
+  same.
+
+target:
+  package/contents/ui/calibrate.py
+
+find:
+                        % " ".join(members[k][0] for k in sorted(heard_ever)))
+
+replace:
+                        % members[min(heard_ever)][0])
+
+expect:
+  Killed by tests/test_calibrate.py::test_an_unsteady_room_names_every_member_that_answered_not_the_first.
+  Line-neutral.

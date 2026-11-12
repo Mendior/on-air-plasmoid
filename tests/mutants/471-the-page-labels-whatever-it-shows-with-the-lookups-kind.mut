@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The page hands the cover the lookup's kind even when the picture it
+  shows is not the lookup's.
+
+history:
+  The Playing page shows the first of four pictures that loads: an
+  episode's cover, the lookup's picture, the stream's own image, the
+  station's logo. The line belongs to the lookup's picture only. When that
+  one fails to load and the logo stands in, "Artist picture" would sit on
+  the station's logo. This mutant passes the kind on regardless.
+
+target:
+  package/contents/ui/FullRepresentation.qml
+
+find:
+                          kind: fullRepresentation._bestArtUrl === root.albumArtUrl ? root.albumArtKind : ""
+
+replace:
+                          kind: root.albumArtKind
+
+expect:
+  Killed by tests/test_invariants.py::test_the_cover_answers_a_click_without_asking_the_network.
+  Line-neutral.

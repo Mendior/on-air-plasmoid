@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station's start hands the cover that is on screen to the cast device
+  without asking whether it belongs to the station that is starting.
+
+history:
+  The start used to send the station's list icon and nothing else (32 by
+  32 pixels on one station, measured 2026-11-11, stretched over a
+  television). It now asks CastLogic.picture, so a cover that is known
+  wins over the icon. At a switch to another station the cover on screen
+  is still the previous station's track, and a device keeps the picture it
+  was sent for as long as the station plays, so the cover goes in only
+  when the station starting is the one already on. This mutant sends it
+  along with any station.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                            CastLogic.picture("", station.name === root.currentStation ? root.trackArtUrl : "", station.favicon));
+
+replace:
+                            CastLogic.picture("", root.trackArtUrl, station.favicon));
+
+expect:
+  Killed by tests/test_invariants.py::test_the_picture_a_device_is_sent_is_chosen_in_one_place.
+  Line-neutral.

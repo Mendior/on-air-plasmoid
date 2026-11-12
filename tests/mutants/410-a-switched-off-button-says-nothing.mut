@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A round button that cannot be pressed shows no tooltip.
+
+history:
+  The tip is often the only place that says why a button is switched off.
+  The press area does not hover while the button is disabled, so the tip
+  has a hover of its own.
+
+target:
+  package/contents/ui/CircleButton.qml
+
+find:
+          visible: tipHover.hovered && text.length > 0
+
+replace:
+          visible: pressArea.containsMouse && text.length > 0
+
+expect:
+  Killed by tests/qml/tst_buttontip.qml::test_a_button_that_is_switched_off_still_shows_its_tip.

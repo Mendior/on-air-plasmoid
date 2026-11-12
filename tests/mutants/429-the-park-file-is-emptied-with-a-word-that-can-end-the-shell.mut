@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The park file is emptied with `: > file` again, the usual shell idiom.
+
+history:
+  `:` is a special builtin, and a POSIX shell exits on the spot when the
+  redirection of one of those fails. The line stands after the speakers
+  have been parked. Driven on 2026-11-11 with the engine's own command and
+  a runtime folder that was not there: the shell ended at it with all
+  three speakers at 55 %, nothing measured, nothing put back, and no park
+  file to replay either. The same with a folder that was fine and
+  something else sitting where the file goes. The file is the insurance
+  for the way back; it was the one line that could cost the way back.
+  Seen with bash running as sh. POSIX asks the same of every shell that
+  is not interactive.
+
+target:
+  package/contents/ui/CalibLogic.js
+
+find:
+      return " [ -n \"$XDG_RUNTIME_DIR\" ] && true > " + parkFile + " && pk=1;";
+
+replace:
+      return " [ -n \"$XDG_RUNTIME_DIR\" ] && : > " + parkFile + " && pk=1;";
+
+expect:
+  Killed by tests/test_calibrate_cancel.py::test_a_runtime_folder_that_is_not_there_costs_the_park_file_and_not_the_levels.
+  Line-neutral.

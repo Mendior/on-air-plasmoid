@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station is listened to while the question what its stream is still
+  stands.
+
+history:
+  Both are connections to the station beside the player's own. Measured on
+  one that limits them: five inside a second were answered 429 and the
+  station stayed silent.
+
+target:
+  package/contents/ui/Loudness.qml
+
+find:
+          if (kind && kind.busy) { settle.restart(); return; }
+
+replace:
+          if (kind && kind.busy) { settle.restart(); }
+
+expect:
+  Killed by tests/qml/tst_loudness.qml::test_the_question_what_the_stream_is_goes_first.
+  Line-neutral.

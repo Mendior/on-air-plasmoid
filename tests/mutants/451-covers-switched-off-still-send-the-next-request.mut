@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A cover lookup that is in the air when the online covers are switched
+  off goes on to its next request, and paints what it finds.
+
+history:
+  lookupAlbumArt asks the switch once, at its door. The chain behind it
+  asked only whether the track was still the same, so a request that was
+  out when the listener switched the covers off came home empty and sent
+  the next one: two requests where one was due, measured with the real
+  engine and answers held back by hand. A cover that came home that way
+  was painted as well. The answer is now dropped at the callback, before
+  it is looked at. This mutant lets it through again.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+                  if (!cfg.albumArtEnabled) return;
+                  kind = url ? SearchLogic.artKind(kind) : "";
+
+replace:
+                  if (false) return;
+                  kind = url ? SearchLogic.artKind(kind) : "";
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_covers_switched_off_end_a_chain_that_is_in_the_air.
+  Line-neutral.

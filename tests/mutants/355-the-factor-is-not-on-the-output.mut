@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The output plays the listener's level alone.
+
+history:
+  The option would be ticked, every station read, and nothing would be heard
+  of it.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          audioOutput: AudioOutput { id: playMusicSink; volume: playMusicOutput.volume * loudness.gain }
+
+replace:
+          audioOutput: AudioOutput { id: playMusicSink; volume: playMusicOutput.volume }
+
+expect:
+  Killed by tests/test_invariants.py::test_the_stations_factor_sits_in_one_place_and_in_no_number_a_listener_sees.
+  Line-neutral.

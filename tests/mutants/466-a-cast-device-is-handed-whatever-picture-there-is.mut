@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The picture sent to a cast device is the one on the Playing page, not
+  the song's own cover.
+
+history:
+  A television keeps the picture it was sent beside the title for as long
+  as the song plays, and has no line to say it is another record's sleeve.
+  _castArt hands CastLogic.picture the song's own cover or nothing, which
+  leaves the station's logo. This mutant hands it whatever picture there is.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          return CastLogic.picture(isPod ? _podPlayingArt : "", trackArtUrl, currentStationFavicon);
+
+replace:
+          return CastLogic.picture(isPod ? _podPlayingArt : "", albumArtUrl, currentStationFavicon);
+
+expect:
+  Killed by tests/test_invariants.py::test_the_picture_a_device_is_sent_is_chosen_in_one_place.
+  Line-neutral.

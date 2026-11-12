@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The engine no longer takes the listener off a list that has stopped growing.
+
+history:
+  A list stops growing when its writer has ended or the station is gone.
+  Left on it, the player reaches the end of what the list names and then no
+  stop() returns to the widget: measured, the event loop stood until the list
+  grew, which it never does. The engine leaves seven seconds before the end.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (SlideLogic.mustLeave((listLast + 1) * SlideLogic.SEG_MS, placeMs)) {
+
+replace:
+          if (false && SlideLogic.mustLeave((listLast + 1) * SlideLogic.SEG_MS, placeMs)) {
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_list_that_stops_growing_is_left_before_it_runs_out.

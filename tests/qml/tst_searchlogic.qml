@@ -2038,4 +2038,216 @@ TestCase {
         // A page size no directory serves is still only a size.
         compare(SL.pageAfter("/json/stations/search?name=x&limit=99999999999999999999999", 0, 50, 50).more, false)
     }
+
+    // ── A directory answer that is no list ────────────────────────────────
+
+    function test_a_directory_answer_is_its_rows() {
+        compare(SL.directoryRows(200, "[]").length, 0)
+        var rows = SL.directoryRows(200, '[{"name":"A","url":"http://a.example/s"},{"name":"B"}]')
+        compare(rows.length, 2)
+        compare(rows[0].name, "A")
+        var many = []
+        for (var i = 0; i < 2000; i++) many.push({ "name": "s" + i })
+        compare(SL.directoryRows(200, JSON.stringify(many)).length, 2000)
+    }
+
+    function test_json_that_is_no_list_is_no_answer() {
+        // The settings search parsed first and counted after: a body of
+        // "null" set its retry counter back to 0 and then threw on .length,
+        // so the page asked again without end, and an error object read as
+        // an empty result. Neither is a list.
+        compare(SL.directoryRows(200, "null"), null)
+        compare(SL.directoryRows(200, '{"error":"busy"}'), null)
+        compare(SL.directoryRows(200, '"[]"'), null)
+        compare(SL.directoryRows(200, "42"), null)
+        compare(SL.directoryRows(200, "true"), null)
+    }
+
+    function test_a_page_or_nothing_is_no_answer() {
+        compare(SL.directoryRows(200, "<html>Sign in to the hotel wifi</html>"), null)
+        compare(SL.directoryRows(200, ""), null)
+        compare(SL.directoryRows(200, undefined), null)
+        compare(SL.directoryRows(200, null), null)
+    }
+
+    function test_any_other_status_is_no_answer_whatever_the_body() {
+        compare(SL.directoryRows(503, "[]"), null)
+        compare(SL.directoryRows(0, "[]"), null)
+        compare(SL.directoryRows(204, "[]"), null)
+        compare(SL.directoryRows("200", "[]"), null)
+        compare(SL.directoryRows(undefined, "[]"), null)
+    }
+
+    // ── tagListPaged: the name list or the tag list ──────────────────────
+    function test_a_genre_page_of_nothing_but_saved_stations_is_the_list_that_is_paged() {
+        // "jazz": no station of that name, and the fifty tagged ones all saved.
+        // Nothing went onto the web list; the page was full, so it may go on.
+        verify(SL.tagListPaged(true, false, 50, true))
+        // The same with a name list that goes on behind its leads.
+        verify(SL.tagListPaged(true, true, 50, true))
+        // The two answers as pageAfter reads them, every row of each walked.
+        var names = SL.pageAfter(_qs50, 0, 0, 0), tags = SL.pageAfter(_qs50, 0, 50, 50)
+        verify(SL.tagListPaged(true, names.more, 50, tags.more))
+    }
+
+    function test_a_genre_list_that_has_run_out_leaves_the_paging_to_the_names() {
+        // Three tagged stations, a short page walked to its end, names that go on.
+        verify(!SL.tagListPaged(true, true, 3, false))
+        verify(!SL.tagListPaged(true, true, 1, false))
+        verify(!SL.tagListPaged(true, true, 49, false))
+        // A full page may have another behind it; so has a short one the cap cut.
+        verify(SL.tagListPaged(true, true, 50, true))
+        verify(SL.tagListPaged(true, true, 40, true))
+        // With the names run out too it stays the genre's list. Neither goes on.
+        verify(SL.tagListPaged(true, false, 3, false))
+    }
+
+    function test_a_plain_words_names_are_paged_while_they_go_on() {
+        // "nova": half of its first fifty names saved, and a tag list of any size.
+        verify(!SL.tagListPaged(false, true, 50, true))
+        verify(!SL.tagListPaged(false, true, 2, false))
+        // The names have run out: the tag list follows, whatever went on screen.
+        verify(SL.tagListPaged(false, false, 50, true))
+        verify(SL.tagListPaged(false, false, 2, false))
+    }
+
+    function test_a_tag_answer_of_no_rows_is_never_the_list_that_is_paged() {
+        verify(!SL.tagListPaged(true, false, 0, false))
+        verify(!SL.tagListPaged(true, true, 0, false))
+        verify(!SL.tagListPaged(false, false, 0, false))
+        // No rows and a claim of more: still no list to page.
+        verify(!SL.tagListPaged(true, false, 0, true))
+        // One row is an answer.
+        verify(SL.tagListPaged(true, false, 1, false))
+        verify(SL.tagListPaged(false, false, 1, false))
+        // Nothing said at all.
+        verify(!SL.tagListPaged())
+        verify(!SL.tagListPaged(null, null, null, null))
+        verify(!SL.tagListPaged(true, false))
+        verify(!SL.tagListPaged(true, false, undefined, true))
+    }
+
+    function test_the_two_lists_are_told_apart_by_true_alone() {
+        // A genre flag that is no true is a plain word: the names come first.
+        var flags = ["true", 1, {}, [], "jazz", null, undefined]
+        for (var i = 0; i < flags.length; i++) {
+            verify(!SL.tagListPaged(flags[i], true, 50, true))
+            verify(SL.tagListPaged(flags[i], false, 50, true))
+        }
+        // Names that are not known to go on have run out, and so has a tag list.
+        var more = ["true", 1, {}, null, undefined, 0, ""]
+        for (var k = 0; k < more.length; k++) {
+            verify(SL.tagListPaged(false, more[k], 2, false))
+            verify(!SL.tagListPaged(true, true, 50, more[k]))
+        }
+        // Counts that are no counts are no rows; text that is a number is one.
+        var none = [NaN, -3, {}, [], "x", null]
+        for (var j = 0; j < none.length; j++)
+            verify(!SL.tagListPaged(true, false, none[j], true))
+        verify(SL.tagListPaged(true, true, "50", true))
+    }
+
+    function test_a_tag_answer_past_any_honest_length_is_read_the_same() {
+        verify(SL.tagListPaged(true, true, 100000, true))
+        verify(!SL.tagListPaged(false, true, 100000, true))
+        verify(SL.tagListPaged(false, false, 100000, true))
+        verify(!SL.tagListPaged(true, true, 100000, false))
+    }
+
+    // ── pageOpen: the ceiling on the rows shown ──────────────────────────
+    function test_the_ceiling_is_held_against_the_rows_on_screen() {
+        var more = SL.pageAfter(_qs50, 270, 50, 50)
+        // 270 rows up, a page of 49 duplicates and one new station: 271.
+        verify(SL.pageOpen(more, 271, 300))
+        verify(SL.pageOpen(more, 285, 300))
+        // One row under the ceiling there is room for one more.
+        verify(SL.pageOpen(more, 299, 300))
+        // At the ceiling, and past it, the list has stopped.
+        verify(!SL.pageOpen(more, 300, 300))
+        verify(!SL.pageOpen(more, 301, 300))
+        // An ordinary page far from it, and a first page of nothing but saved stations.
+        verify(SL.pageOpen(more, 30, 300))
+        verify(SL.pageOpen(more, 0, 300))
+        // The ceiling is the caller's number.
+        verify(SL.pageOpen(more, 4, 5))
+        verify(!SL.pageOpen(more, 5, 5))
+    }
+
+    function test_a_list_that_has_ended_is_closed_however_few_rows_show() {
+        var ended = SL.pageAfter(_qs50, 50, 7, 7)
+        verify(!SL.pageOpen(ended, 0, 300))
+        verify(!SL.pageOpen(ended, 57, 300))
+        verify(!SL.pageOpen(ended, 299, 300))
+        // No answer yet.
+        verify(!SL.pageOpen(SL.pageAfter(), 0, 300))
+    }
+
+    function test_a_page_or_a_count_that_is_none_is_closed() {
+        var pages = [undefined, null, "", "more", 7, true, [], {}, { more: "true" }, { more: 1 }, { at: 50 }]
+        for (var i = 0; i < pages.length; i++)
+            verify(!SL.pageOpen(pages[i], 0, 300))
+        verify(!SL.pageOpen())
+        var more = { at: 50, more: true }
+        var none = [undefined, null, NaN, "12", "", {}, []]
+        for (var k = 0; k < none.length; k++) {
+            verify(!SL.pageOpen(more, none[k], 300))
+            verify(!SL.pageOpen(more, 12, none[k]))
+        }
+        // No ceiling to speak of leaves no room.
+        verify(!SL.pageOpen(more, 0, 0))
+        verify(!SL.pageOpen(more, 0, -300))
+    }
+
+    function test_counts_past_any_honest_length_are_only_numbers() {
+        var more = { at: 1000000000, more: true }
+        verify(!SL.pageOpen(more, 1000000000, 300))
+        verify(SL.pageOpen(more, 5, 1000000000))
+        verify(SL.pageOpen(more, 999999999, 1000000000))
+        verify(!SL.pageOpen(more, Infinity, 300))
+    }
+
+    // ── emptyNext: the listener's own stations are an answer ─────────────
+    function test_saved_stations_an_answer_named_are_no_empty_answer() {
+        // Fifty saved jazz stations and no web row: nothing is asked again.
+        compare(_empty({ own: 50 }), "done")
+        compare(_empty({ own: 1 }), "done")
+        compare(_empty({ own: 50, inheritedScope: true }), "done")
+        compare(_empty({ own: 50, bareScope: true }), "done")
+        compare(_empty({ own: 50, mode: "genre", inheritedScope: true }), "done")
+        // Without them the answer is as empty as it was.
+        compare(_empty({ own: 0 }), "stems")
+        compare(_empty({ own: 0, inheritedScope: true }), "unscope")
+        compare(_empty({ own: 0, bareScope: true }), "astyped")
+        compare(_empty({}), "stems")
+    }
+
+    function test_a_thin_answer_counts_the_listeners_own_stations_too() {
+        // A name with its country still asks inside the country under three rows.
+        compare(_empty({ count: 1, own: 1, inCountry: true }), "incountry")
+        compare(_empty({ count: 0, own: 2, inCountry: true }), "incountry")
+        compare(_empty({ count: 0, own: 0, inCountry: true }), "incountry")
+        // Three found, web rows or the listener's own, is an answer.
+        compare(_empty({ count: 1, own: 2, inCountry: true }), "done")
+        compare(_empty({ count: 0, own: 3, inCountry: true }), "done")
+        compare(_empty({ count: 2, own: 1, inCountry: true }), "done")
+    }
+
+    function test_an_own_that_is_no_count_names_no_station() {
+        var none = [undefined, null, NaN, -5, "", "x", {}, []]
+        for (var i = 0; i < none.length; i++) {
+            compare(_empty({ own: none[i] }), "stems")
+            compare(_empty({ own: none[i], inheritedScope: true }), "unscope")
+            compare(_empty({ count: 3, own: none[i] }), "done")
+        }
+        compare(_empty({ own: "4" }), "done")
+        compare(_empty({ own: 2.9 }), "done")
+        compare(_empty({ own: 1000000 }), "done")
+        // No answer from the network stays no answer, whatever was named before it.
+        compare(_empty({ own: 50, gotAnswer: false }), "done")
+        // A web count that is no count is none, and the two are added, not joined.
+        compare(_empty({ count: undefined, own: 50 }), "done")
+        compare(_empty({ count: NaN, own: 0 }), "stems")
+        compare(_empty({ count: "1", own: "1", inCountry: true }), "incountry")
+        compare(_empty({ count: "1", own: "2", inCountry: true }), "done")
+    }
 }

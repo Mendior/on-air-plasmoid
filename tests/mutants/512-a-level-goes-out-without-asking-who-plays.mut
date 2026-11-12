@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The one function that sends a device its level sends it without asking
+  the record whether the device plays the stream.
+
+history:
+  The slider, the wheel, the mute, the room's mute, the alarm and a
+  device's own balance row all end in one function, and that is where the
+  question belongs: asked on each road, the next road added forgets it.
+  A ticked Ruark that had refused the stream was turned down from 10 to 6
+  this way while a television beside it played (2026-11-12).
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (!CastLogic.plays(_castSession, dev.uuid)) return;
+
+replace:
+          if (false) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_a_level_is_sent_only_to_a_device_that_plays.
+  Line-neutral.

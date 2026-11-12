@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The devices the widget says it casts to are counted from the ticks, so
+  one that refused the stream is among them.
+
+history:
+  A device that refuses stays ticked, which is as decided: the next station
+  is offered to it again. With a television playing and a Ruark that had
+  refused beside it, the footer, the button's hint and the panel's hint
+  all read "Casting to 2 devices" (2026-11-12). The name is made from the
+  record of who plays or is still being asked.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+      readonly property string _castName: { var on = CastLogic.carriers(_castSession, _castTargets);
+
+replace:
+      readonly property string _castName: { var on = _castTargets;
+
+expect:
+  Killed by tests/test_invariants.py::test_a_failed_cast_says_which_kind_it_was_and_names_only_who_carries_the_stream.
+  Line-neutral.

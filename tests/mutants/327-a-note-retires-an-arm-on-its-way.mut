@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A start of the station the engine already holds retires an arm whose address write has not answered.
+
+history:
+  Measured on the bench with a segment writer killed under a listener 30 s
+  behind: the buffer was heard out, the broadcast came back, and it played on
+  with no buffer and a stray address file. The engine had armed the single
+  file a moment before the widget's own start of the station asked it to note
+  the live playback, and the note took an arm without a writer for a dead one.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          if (windowFull || (!writerUp && _pendingRun === "")) active = false;
+
+replace:
+          if (windowFull || !writerUp) active = false;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_the_broadcast_after_a_frozen_buffer_has_a_buffer_behind_it
+  and by tests/qml/tst_timeshiftengine.qml::test_a_second_start_before_the_address_is_down_keeps_the_arm.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A step back on the broadcast is taken also where no buffer can be parked in.
+
+history:
+  From the broadcast a step is a pause and a play. Where the pause
+  would be a stop (a buffer too young, a cast, a silent player) the press
+  would end the station, and the listener asked to hear more of it.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (live && (ms > 0 || !tsPauseAvailable || !isPlaying())) return;
+
+replace:
+          if (live && ms > 0) return;
+
+expect:
+  Killed by tests/test_invariants.py::test_a_step_is_a_pause_and_a_play_through_the_one_door.
+  Line-neutral.

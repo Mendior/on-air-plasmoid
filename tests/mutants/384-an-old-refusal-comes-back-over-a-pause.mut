@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A device's refusal is shown again over a pause that has nothing to do with it.
+
+history:
+  The Ruark refused a station, and the footer said so. Then a file from
+  My Music was played here and paused: the footer read "Could not cast to
+  Ruark R5se" where it should read "Paused", because the name stayed until
+  the next cast and the footer asks for it before it asks about a pause
+  (2026-11-11). The player starting on this computer takes the name down.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+              root._castFailedName = "";   // and it is kept only over silence here: the player starting ends it
+
+replace:
+              // and it is kept only over silence here: the player starting ends it
+
+expect:
+  Killed by tests/test_invariants.py::test_a_device_that_refused_the_stream_is_not_cast_to.
+  Line-neutral.

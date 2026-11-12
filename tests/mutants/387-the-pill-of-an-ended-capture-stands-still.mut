@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  After the writer has ended the pill no longer counts the broadcast going on.
+
+history:
+  The pill read the distance to the end of what was kept: under a parked
+  listener it stood still, and inside the kept buffer it ran down to 0:00
+  while the listener was as far behind the broadcast as ever. A capture that
+  ended is now how every long pause ends, so the pill counts on by the same
+  beats.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+          else if (slideFrozen) goneMs += ran;
+
+replace:
+          else if (false) goneMs += ran;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_the_pill_of_a_capture_that_ended_reads_the_distance_to_live.

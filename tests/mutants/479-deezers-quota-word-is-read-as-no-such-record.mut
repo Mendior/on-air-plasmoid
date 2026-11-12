@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A Deezer answer that carries an error is read as "nothing found".
+
+history:
+  Deezer reports a quota or rate problem as 200 with {"error"}. Read as
+  an answer, it files the song as one nobody has for half an hour, and with
+  the stand-ins it also lets a picture of the artist be filed as final
+  although the song search never answered. This mutant reads the error as
+  an empty answer.
+
+target:
+  package/contents/ui/ArtworkEngine.qml
+
+find:
+              return data.error ? undefined : SearchLogic.artFromDeezerSongs(data, want);
+
+replace:
+              return SearchLogic.artFromDeezerSongs(data, want);
+
+expect:
+  Killed by tests/qml/tst_artworkengine.qml::test_one_service_not_answering_leaves_the_question_open.
+  Line-neutral.

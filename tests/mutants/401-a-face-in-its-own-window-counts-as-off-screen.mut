@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A player standing in its own window with the popup shut is treated as hidden.
+
+history:
+  On screen is the open popup or the window that is up. Read as the popup
+  alone, the window's titles, its clock and the volume it shows stop the
+  moment the popup closes, which it does by itself when the window takes
+  the keyboard.
+
+target:
+  package/contents/ui/WindowLogic.js
+
+find:
+      return popupOpen === true || windowUp === true;
+
+replace:
+      return popupOpen === true;
+
+expect:
+  Killed by tests/qml/tst_windowlogic.qml::test_the_face_is_on_screen_while_either_seat_is.

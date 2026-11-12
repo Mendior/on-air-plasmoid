@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The cleanup a panel runs when it starts takes no address file an earlier
+  session left behind.
+
+history:
+  With a file for each recording, a panel that dies between a write and its
+  capture leaves a file holding a station's address, and nothing of the next
+  session would ever name it again. The first cleanup takes every file whose
+  name carries a start time before this session began.
+
+target:
+  package/contents/ui/RecordingEngine.qml
+
+find:
+              + RecLogic.olderFilesLine(PodcastLogic.shQuote(_recUrlBase + "-"), _recBornMs)
+
+replace:
+              + RecLogic.olderFilesLine(PodcastLogic.shQuote(_recUrlBase + "-"), 0)
+
+expect:
+  Killed by tests/qml/tst_recordingengine.qml::test_the_start_of_the_panel_takes_what_older_sessions_left
+  and tests/test_recording_stop_race.py::test_the_start_of_the_panel_takes_what_older_sessions_left.
+  Line-neutral.

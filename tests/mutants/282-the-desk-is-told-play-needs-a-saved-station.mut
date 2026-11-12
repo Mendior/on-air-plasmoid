@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  With nothing on, the desk is told Play can do something only when the list
+  has a row.
+
+history:
+  Up to 2026.43 the desk's CanPlay was "the list has a row", written apart
+  from what Play does. With no station saved, a search result that was
+  playing was announced as unplayable, and after its stop the desk's Play
+  stayed dark while the widget's own button brought it back. Measured
+  2026-11-11 on main.qml's state writer: status Playing, canPlay false.
+  2026.44 asks bareplay, the rule a Play that names nothing obeys, so a
+  stopped search result and a paused episode count too.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      return bareplay(hasAudition, lastPlay, count, pausedFile).what !== "nothing";
+
+replace:
+      return (count | 0) > 0;
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_a_playing_audition_can_be_played_with_no_station_saved
+  and tests/qml/tst_transportroads.qml::test_with_no_station_saved_a_search_result_can_be_played.
+  Line-neutral.

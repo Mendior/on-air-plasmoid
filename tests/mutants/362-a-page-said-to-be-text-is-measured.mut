@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  An answer that says it is text is fed to ffmpeg all the same.
+
+history:
+  A sign-in page of a hotel's network and an error page sent with 200 are
+  not what a station is, whatever their bytes decode to.
+
+target:
+  package/contents/ui/loudness.py
+
+find:
+          if streamkind.says_text(resp):
+              return ""
+          proc = subprocess.Popen(
+
+replace:
+          if streamkind.says_text(resp) and not resp:
+              return ""
+          proc = subprocess.Popen(
+
+expect:
+  Killed by tests/test_loudness.py::test_a_page_or_an_error_is_no_reading.
+  Line-neutral.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The stop no longer removes the play lists before it signals the writer.
+
+history:
+  A player whose reader waits on a list is let go when the list goes:
+  measured, four seconds after the list was removed, and never while it stood.
+  The stop gives the writer a second to close, and a list removed only after
+  that second holds the player a second longer.
+
+target:
+  package/contents/ui/SlideLogic.js
+
+find:
+      return ": TS_STOP; rm -f " + q(a.slidePath) + "/play-*.m3u8 2>/dev/null; rm -f " + q(a.cfgPath) + "; "
+
+replace:
+      return ": TS_STOP; rm -f " + q(a.cfgPath) + "; "
+
+expect:
+  Killed by tests/qml/tst_slidelogic.qml::test_the_stop_frees_the_player_first_and_takes_only_its_own_folder.

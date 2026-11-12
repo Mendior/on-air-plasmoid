@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The members' levels are asked for after the recorder has been started
+  instead of before it.
+
+history:
+  It looks like free time: the recorder needs its warm-up anyway. But the
+  slots are cut out of the capture by the schedule, counted from where
+  the capture begins, and the clock the players are held to starts after
+  the queries. Everything the queries take sits in the capture ahead of
+  the first slot, so every member lands that much late in its own window.
+  A few milliseconds are the same for all and cancel. One query that runs
+  into its three-second timeout pushes every member out of its slot and
+  into the next one's.
+
+target:
+  package/contents/ui/calibrate.py
+
+find:
+      volumes = [str(int(_ultra_volume_for(sink, trim))) for sink, _lag in members]
+      rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+      try:
+          rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+
+replace:
+      rec = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+      try:
+          rp = subprocess.Popen(recorder_args(mic, rec), stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+          volumes = [str(int(_ultra_volume_for(sink, trim))) for sink, _lag in members]
+
+expect:
+  Killed by tests/test_calibrate.py::test_every_level_is_asked_for_before_the_capture_begins.
+  Line-neutral.

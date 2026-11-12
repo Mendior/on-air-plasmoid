@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The tone's check after a fall takes a full buffer, or anything past five seconds, for the station being back.
+
+history:
+  A connection that answers the knock with a burst fills the buffer at
+  once and may hold its peace from there. The stand watch only watches a
+  position it has seen three seconds past where it began, so a connection
+  let through at 2.4 s that then stands is seen by nobody, and the alarm
+  ends in silence with the tone already stood down.
+
+target:
+  package/contents/ui/AlarmLogic.js
+
+find:
+      if (fell === true) return _finite(posMs) && posMs >= WAKE_BACK_MS;
+
+replace:
+      if (fell === null) return _finite(posMs) && posMs >= WAKE_BACK_MS;
+
+expect:
+  Killed by tst_alarmengine::test_a_new_connection_that_has_hardly_played_is_not_the_station_back
+  (and tst_alarmlogic::test_after_a_fall_it_is_the_new_connection_that_has_to_sound).
+  Line-neutral.

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Every line for the park file is appended whether or not the file could
+  be started.
+
+history:
+  That is how it was, and with a runtime folder it made no difference.
+  Without one the opening line was skipped and the appends were not: their
+  path then begins at the root, /onair_park_7.sh. An ordinary user's shell
+  fails there once per speaker and goes on. A shell with the right to
+  write there leaves the room's levels in a file nothing will ever read
+  back. The appends wait for the flag the opening line sets.
+
+target:
+  package/contents/ui/CalibLogic.js
+
+find:
+      return " [ -n \"$pk\" ] && printf " + printfArgs + " >> " + parkFile + ";";
+
+replace:
+      return " printf " + printfArgs + " >> " + parkFile + ";";
+
+expect:
+  Killed by tests/test_calibrate_cancel.py::test_a_runtime_folder_that_is_not_there_costs_the_park_file_and_not_the_levels.
+  Line-neutral.

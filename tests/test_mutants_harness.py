@@ -113,6 +113,25 @@ def test_apply_refuses_a_missing_or_ambiguous_anchor(tmp_path):
     assert err and "not unique" in err
 
 
+def test_gate_output_that_is_not_utf8_still_gets_a_verdict(tmp_path):
+    """qmltestrunner prints a failed compare of two strings in Latin-1. A
+    title with an Estonian letter in it ("Päiksepoolsel tänaval") then
+    arrives as a byte no UTF-8 reader accepts, and the run ended in a
+    UnicodeDecodeError where its verdict should have stood. Met on
+    2026-11-12 with mutant 461, whose kill prints such a title.
+    """
+    mod = _harness()
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    gate = scripts / "dev.sh"
+    gate.write_bytes(b"#!/bin/sh\nprintf 'Actual   (): P\\344iksepoolsel\\n'\n"
+                     b"printf 'lint FAILED: qml tests\\n'\nexit 1\n")
+    gate.chmod(0o755)
+    green, note = mod.run_gate(tmp_path, quick=True)
+    assert green is False
+    assert "lint FAILED: qml tests" in note
+
+
 def test_every_named_expectation_exists():
     """An expect field may describe a wish, but a PATH it names must be real.
 

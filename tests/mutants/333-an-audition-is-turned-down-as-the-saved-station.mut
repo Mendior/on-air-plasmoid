@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A search result that is being tried out takes the factor of the saved row
+  named last.
+
+history:
+  An audition is nobody's saved station, and the row the player was on
+  before it is stale by then.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      if (!f || f.preview !== "" || f.episode !== false || typeof f.source !== "string") return "";
+
+replace:
+      if (!f || f.episode !== false || typeof f.source !== "string") return "";
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_an_audition_an_episode_and_a_file_are_nobodys_subject.
+  Line-neutral.

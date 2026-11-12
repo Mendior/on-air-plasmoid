@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The watch's timer runs whether or not a live stream plays.
+
+history:
+  A panel widget sits idle for most of its life. The timer is bound to a
+  live stream playing, so an idle, parked or stopped widget wakes for
+  nothing.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+          running: watch.watching
+
+replace:
+          running: true
+
+expect:
+  Killed by test_invariants::test_a_stream_that_stands_is_handed_to_the_road_every_other_death_takes,
+  which the gate runs first, and by tst_standwatch::test_nothing_ticks_until_a_live_stream_plays.
+  Line-neutral.

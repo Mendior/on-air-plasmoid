@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A station is asked about although its standing order was taken down.
+
+history:
+  Stop takes the order down at once and the player plays on for the length
+  of the fade. A count that runs out inside those 400 ms started a helper
+  after the one moment that would have ended it, and the station was held
+  for twenty seconds after Stop.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      if (!f || f.on !== true || f.playing !== true || f.wanted !== true) return false;
+
+replace:
+      if (!f || f.on !== true || f.playing !== true) return false;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_nobody_is_listened_to_with_the_option_off_or_nothing_playing
+  and tests/qml/tst_loudness.qml::test_no_reading_starts_inside_a_stops_fade.
+  Line-neutral.

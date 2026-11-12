@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The length a buffer's header was written with is taken for the place the reader stood at.
+
+history:
+  Measured 2026-11-12: a station at an address with no ending, Ogg Vorbis and
+  plain FLAC alike, is kept in a Matroska file whose header names the whole
+  window as its length. Fourteen seconds of play, a pause of four, Play: 3.6 s
+  later the reader met the file's unfinished end, the player gave its position
+  as 300000 ms against 22 s captured, and the station went back to the
+  broadcast with the pause lost.
+
+target:
+  package/contents/ui/TimeshiftLogic.js
+
+find:
+      if (typeof posMs === "number" && typeof capturedMs === "number" && posMs >= 0 && posMs <= capturedMs) return posMs;
+
+replace:
+      if (typeof posMs === "number" && typeof capturedMs === "number" && posMs >= 0) return posMs;
+
+expect:
+  Killed by tst_timeshiftlogic::test_the_end_of_a_single_file_is_where_the_reader_stood.
+  Line-neutral.

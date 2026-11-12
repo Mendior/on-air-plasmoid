@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Where a device plays alone, a notch of the wheel counts from the level
+  the output here stands at.
+
+history:
+  Nothing that starts on a device alone touches the output here. After
+  the wake-up alarm told a device 40 %, it still stood at last night's
+  80 %, and one notch down sent the device from 0.200 to 0.375.
+
+target:
+  package/contents/ui/TransportLogic.js
+
+find:
+      if (away === true && Number.isFinite(own)) base = own;
+
+replace:
+      if (away === true && Number.isFinite(own)) base = base;
+
+expect:
+  Killed by tests/qml/tst_transportlogic.qml::test_where_a_device_plays_alone_a_notch_counts_from_the_listeners_level
+  and tests/qml/tst_volumeroad.qml::test_after_an_alarm_on_a_device_that_plays_alone_a_notch_counts_from_the_alarms_level.
+  Line-neutral.

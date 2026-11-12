@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The box a drawing is rendered into is square whatever its shape.
+
+history:
+  Cropped to a square box, a drawing of 200 by 80 is rendered 1500 by
+  600: its shape is kept, and the source size is not. A drawing of 109 to
+  1 is then read at 65400 by 600, 157 MB, just under the side Qt refuses
+  (measured in Qt 6.12). The box has the drawing's own shape, so cropping
+  to it cuts nothing and nothing is read larger than the source size. This
+  mutant makes the box square.
+
+target:
+  package/contents/ui/CoverLogic.js
+
+find:
+      return { "width": Math.round(w * k), "height": Math.round(h * k) };
+
+replace:
+      return { "width": Math.round(Math.max(w, h) * k), "height": Math.round(Math.max(w, h) * k) };
+
+expect:
+  Killed by tests/test_cover_larger_fetch.py::test_a_drawing_from_the_network_is_asked_for_its_shape_once,
+  which runs first, with a drawing from the network, and behind it by
+  tests/qml/tst_coverlogic.qml::test_a_drawing_gets_a_box_of_its_own_shape_inside_the_source_size,
+  which asks for the box itself.
+  Line-neutral.

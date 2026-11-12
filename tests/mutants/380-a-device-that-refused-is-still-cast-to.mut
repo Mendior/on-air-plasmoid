@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The last device refusing the stream leaves the widget saying it casts.
+
+history:
+  "Casting" was raised when the play command went out and never taken
+  down by an answer. A Ruark R5se refused two stations (UPnP 716,
+  2026-11-11): the footer read "Casting to Ruark R5se" over a silent room
+  for more than four minutes, the big button offered Stop, and the volume
+  went on being sent to a device that played nothing. When no device is
+  left playing or being asked, the cast is over, and the refusal's name
+  stands in the footer until the next try.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+          if (!castAns.carried) { root._castFailedName = root.isPlaying() ? "" : castWho; root._castFailedRefused = castNo; root._castEnd(); }
+
+replace:
+          if (!castAns.carried) { root._castFailedName = root.isPlaying() ? "" : castWho; root._castFailedRefused = castNo; }
+
+expect:
+  Killed by tests/test_invariants.py::test_a_device_that_refused_the_stream_is_not_cast_to.
+  Line-neutral.

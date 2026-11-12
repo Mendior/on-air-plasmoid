@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A standing position is handed over without asking whether the order lapsed.
+
+history:
+  A lid closed on a playing station and opened eight hours later: the
+  stream is dead and the position stands. Every automatic road back to
+  sound asks whether the order went unheard through the night first, and
+  this one is such a road.
+
+target:
+  package/contents/ui/StandWatch.qml
+
+find:
+          if (seen.stoodMs <= 0 || app._orderLapsed()) return false;
+
+replace:
+          if (seen.stoodMs <= 0) return false;
+
+expect:
+  Killed by test_invariants::test_a_stream_that_stands_is_handed_to_the_road_every_other_death_takes,
+  which the gate runs first, and by tst_standwatch::test_an_order_that_lapsed_is_asked_first_and_nothing_is_handed_over.
+  Line-neutral.

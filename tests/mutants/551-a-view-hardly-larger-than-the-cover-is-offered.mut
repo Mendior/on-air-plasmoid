@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any larger view that is larger at all is offered.
+
+history:
+  With the limit counted in the screen's pixels, a cover of 300 on a
+  cover frame of 310 may be shown 343 wide: a tenth larger, a click for a
+  picture that looks the same. A view is offered when it is a quarter
+  larger than the cover by its side. This mutant offers any that is larger.
+
+target:
+  package/contents/ui/CoverLogic.js
+
+find:
+  var GAIN = 1.25;
+
+replace:
+  var GAIN = 1;
+
+expect:
+  Killed by tests/qml/tst_coverlogic.qml::test_a_view_only_a_little_larger_is_not_offered.
+  Line-neutral.

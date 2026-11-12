@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Any file plays at the last station's factor while a pause buffer exists.
+
+history:
+  Only the buffer itself is the station. A My Music file started over a
+  parked station would otherwise be turned down by a radio station's number.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+          if (typeof f.buffer !== "string" || f.buffer === "" || f.source !== "file://" + f.buffer) return "";
+
+replace:
+          if (typeof f.buffer !== "string" || f.buffer === "") return "";
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_a_listener_inside_the_pause_buffer_is_still_on_the_station.
+  Line-neutral.

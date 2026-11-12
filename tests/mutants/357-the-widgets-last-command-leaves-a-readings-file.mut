@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  The widget goes without removing the file of a reading in flight.
+
+history:
+  The helper holds on to that file. Left in place, the helper listens on for
+  up to twenty seconds after the widget is gone.
+
+target:
+  package/contents/ui/main.qml
+
+find:
+                          + " " + PodcastLogic.shQuote(_icyUrlFile) + ".loud* '" + _podUrlFile.replace(/'/g, "'\\''")
+
+replace:
+                          + " '" + _podUrlFile.replace(/'/g, "'\\''")
+
+expect:
+  Killed by tests/test_invariants.py::test_the_loudness_engine_has_its_instance_its_answers_and_its_sweep.
+  Line-neutral.

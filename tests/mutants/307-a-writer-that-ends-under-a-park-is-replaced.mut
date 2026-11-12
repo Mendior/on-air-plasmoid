@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  A segment writer that ends while the listener is parked takes the segments with it.
+
+history:
+  A parked listener has asked to come back to a sentence. The writer's
+  end is no reason to throw away what was caught: the folder stays until the
+  listener has heard it out or pressed Stop.
+
+target:
+  package/contents/ui/TimeshiftEngine.qml
+
+find:
+                  if (shifted || shiftPosMs >= 0 || _stage !== "") {
+                      slideFrozen = true;
+
+replace:
+                  if (false) {
+                      slideFrozen = true;
+
+expect:
+  Killed by tests/qml/tst_slideengine.qml::test_a_cutting_writer_that_ends_under_a_park_keeps_what_it_caught.

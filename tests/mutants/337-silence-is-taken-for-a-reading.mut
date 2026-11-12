@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Egon Greenberg
+# SPDX-License-Identifier: LGPL-2.0-or-later
+
+summary:
+  Twenty seconds of dead air are written down as the station's loudness.
+
+history:
+  ffmpeg reads -70.0 for silence. Kept as a reading it would stand for
+  thirty days and leave a loud station at full level the whole time; as no
+  number it is asked for again tomorrow.
+
+target:
+  package/contents/ui/LoudLogic.js
+
+find:
+      return typeof lufs === "number" && lufs > SILENT_LUFS && lufs <= LOUDEST_LUFS;
+
+replace:
+      return typeof lufs === "number" && lufs > -100 && lufs <= LOUDEST_LUFS;
+
+expect:
+  Killed by tests/qml/tst_loudlogic.qml::test_silence_and_what_no_decoder_puts_out_are_no_answer.
+  Line-neutral.
