@@ -18,7 +18,6 @@ follows a script, with the real ffmpeg.
 """
 
 import importlib.util
-import os
 import shutil
 import signal
 import socket
@@ -322,11 +321,19 @@ def _wait_for(what: Callable[[], bool], limit: float = 5.0) -> bool:
 
 
 def _alive(pid: int) -> bool:
+    """Whether the process still runs.
+
+    One that has ended and waits to be collected does not: it holds no file and
+    makes no sound. A signal still reaches it, so asking with one said "alive"
+    for an ffmpeg orphaned by a killed helper wherever the first process of the
+    machine collects nobody's children, which is how a container job on GitHub
+    is started; there the row stays in the table for good.
+    """
     try:
-        os.kill(pid, 0)
+        stat = Path("/proc/%d/stat" % pid).read_text()
     except OSError:
         return False
-    return True
+    return stat.rsplit(")", 1)[-1].split()[0] != "Z"
 
 
 @needs_ffmpeg
